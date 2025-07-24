@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Redirecting...</title>
+    <script>
+        // Get the current path
+        var path = window.location.pathname;
+        
+        // Check if it's a lowercase version of your repo name
+        if (path.toLowerCase().includes('/pixelparties/')) {
+            // Redirect to the correct case
+            window.location.href = path.replace(/\/pixelparties\//i, '/PixelParties/');
+        } else {
+            // Show 404 message for actual missing pages
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('message').style.display = 'block';
+            });
+        }
+    </script>
+</head>
+<body>
+    <div id="message" style="display:none; text-align:center; margin-top:50px;">
+        <h1>404 - Page Not Found</h1>
+        <p><a href="/PixelParties/">Go to PixelParties</a></p>
+    </div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// battleScreen.js - Battle Screen Module with Hero Abilities Support
+// battleScreen.js - Battle Screen Module with Hero Abilities Support and Necromancy Integration
 
 import BattleManager from './battleManager.js';
 import { getCardInfo } from './cardDatabase.js';
@@ -22,9 +22,11 @@ export class BattleScreen {
 
     // Initialize battle screen with abilities
     init(isHost, playerFormation, opponentFormation, gameDataSender, roomManager, 
-     lifeManager, goldManager, turnTracker, roomManagerForPersistence = null,
-     playerAbilities = null, opponentAbilities = null,
-     playerSpellbooks = null, opponentSpellbooks = null) {
+        lifeManager, goldManager, turnTracker, roomManagerForPersistence = null,
+        playerAbilities = null, opponentAbilities = null,
+        playerSpellbooks = null, opponentSpellbooks = null,
+        actionManager = null,
+        playerCreatures = null, opponentCreatures = null) {
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -38,8 +40,10 @@ export class BattleScreen {
         this.opponentAbilities = opponentAbilities;
         this.playerSpellbooks = playerSpellbooks;
         this.opponentSpellbooks = opponentSpellbooks;
+        this.playerCreatures = playerCreatures;  
+        this.opponentCreatures = opponentCreatures;  
         
-        // Initialize battle manager with abilities
+        // Initialize battle manager with abilities and creatures
         this.battleManager.init(
             playerFormation,
             opponentFormation,
@@ -53,7 +57,9 @@ export class BattleScreen {
             playerAbilities,
             opponentAbilities,
             playerSpellbooks,
-            opponentSpellbooks
+            opponentSpellbooks,
+            playerCreatures, 
+            opponentCreatures  
         );
     }
 
@@ -98,8 +104,18 @@ export class BattleScreen {
         
         // Only the host should initiate the battle
         if (this.isHost) {
-            // Small delay to ensure both screens are ready
             setTimeout(() => {
+                // Re-render creatures after battle manager init
+                this.renderCreaturesAfterInit();
+                
+                // NECROMANCY FIX: Initialize necromancy stacks and displays
+                if (this.battleManager.necromancyManager) {
+                    // Initialize necromancy stacks for all heroes
+                    this.battleManager.necromancyManager.initializeNecromancyStacks();
+                    // Initialize visual displays
+                    this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
+                }
+                
                 // Start the synchronized battle
                 this.battleManager.startBattle();
                 
@@ -117,6 +133,11 @@ export class BattleScreen {
     // Receive battle start signal (for guest)
     receiveBattleStart(data) {
         if (!this.isHost && this.battleManager) {
+            // NECROMANCY FIX: Initialize necromancy displays for guest
+            if (this.battleManager.necromancyManager) {
+                this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
+            }
+            
             this.battleManager.startBattle();
         }
     }
@@ -164,25 +185,20 @@ export class BattleScreen {
     async showCardRewardsAndReturn(result) {
         console.log('🎁 Showing card rewards for battle result:', result);
         
-        // Get the hero selection instance to show rewards
         if (window.heroSelection && window.heroSelection.cardRewardManager) {
             try {
-                // Use the new unified reward system WITH battle result
+                // Pass the battle result to the reward manager
                 await window.heroSelection.cardRewardManager.showRewardsAfterBattle(
                     window.heroSelection.turnTracker,
                     window.heroSelection,
-                    result // Pass the battle result (victory/defeat/draw)
+                    result // Ensure battle result is passed
                 );
-                
-                // The reward manager will handle returning to formation screen
-                // after a selection is made
             } catch (error) {
                 console.error('Error showing card rewards:', error);
-                // Fallback to normal flow
                 this.returnToFormationScreen();
             }
         } else {
-            console.warn('Card reward manager not available, falling back to basic return');
+            console.warn('Card reward manager not available');
             this.returnToFormationScreen();
         }
     }
@@ -308,6 +324,13 @@ export class BattleScreen {
         
         // Display ability info for debugging (can be removed later)
         this.displayAbilityInfo();
+        
+        // NECROMANCY FIX: Inject necromancy CSS and initialize displays if battle manager exists
+        if (this.battleManager && this.battleManager.necromancyManager) {
+            this.battleManager.necromancyManager.injectNecromancyCSS();
+            // Initialize displays if heroes are already loaded
+            this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
+        }
     }
 
     // Generate battle screen HTML with new row layout
@@ -330,10 +353,6 @@ export class BattleScreen {
                     
                     <!-- Battle Center Area -->
                     <div class="battle-center">
-                        <div class="battle-effects-area">
-                            <!-- Visual effects and animations will go here -->
-                            <div class="battlefield-decoration">⚔️ BATTLEFIELD WITH ABILITIES ⚔️</div>
-                        </div>
                     </div>
                     
                     <!-- Player Heroes Row (Bottom) -->
@@ -451,13 +470,25 @@ export class BattleScreen {
             // Include hidden span for later updates
             bonusDisplay = `<span class="attack-bonus" style="display: none;"></span>`;
         }
+
+        // Get creatures for this hero from battle manager
+        let creaturesHTML = '';
+        if (this.battleManager) {
+            const heroInstance = side === 'player' 
+                ? this.battleManager.playerHeroes[position]
+                : this.battleManager.opponentHeroes[position];
+            
+            if (heroInstance && heroInstance.creatures && heroInstance.creatures.length > 0) {
+                creaturesHTML = this.createCreaturesHTML(heroInstance.creatures, side, position);
+            }
+        }
         
         // Enhanced hover handlers with abilities debug
         return `
-            <div class="battle-hero-slot ${side}-slot ${position}-slot" data-hero-id="${hero.id}">
-                <div class="battle-hero-card" 
-                    onmouseenter="window.showBattleCardPreview('${cardDataJson}'); window.showHeroInBattleTooltip('${side}', '${position}');"
-                    onmouseleave="window.hideBattleCardPreview(); window.hideHeroInBattleTooltip();">
+            <div class="battle-hero-slot ${side}-slot ${position}-slot" data-hero-id="${hero.id}"
+                onmouseenter="window.showBattleCardPreview('${cardDataJson}'); window.showHeroInBattleTooltip('${side}', '${position}');"
+                onmouseleave="window.hideBattleCardPreview(); window.hideHeroInBattleTooltip();">
+                <div class="battle-hero-card">
                     <div class="hero-image-container">
                         <img src="${hero.image}" 
                             alt="${hero.name}" 
@@ -479,10 +510,106 @@ export class BattleScreen {
                                 ${bonusDisplay}
                             </div>
                         </div>
+                        <div class="necromancy-stack-indicator" style="display: none;">
+                            <div class="necromancy-stack-circle">
+                                <span class="necromancy-stack-number">0</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                ${creaturesHTML}
             </div>
         `;
+    }
+
+    // Create creatures HTML for battle display (same as formation screen)
+    createCreaturesHTML(creatures, side, position) {
+        if (!creatures || creatures.length === 0) return '';
+        
+        return `
+            <div class="battle-hero-creatures" data-hero-position="${position}" data-side="${side}">
+                ${creatures.map((creature, index) => {
+                    const creatureSprite = `./Creatures/${creature.name}.png`;
+                    const cardData = {
+                        imagePath: creature.image,
+                        displayName: this.formatCardName(creature.name),
+                        cardType: 'creature'
+                    };
+                    const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
+                    
+                    // Vary animation speed for visual interest
+                    const speedClasses = ['speed-slow', 'speed-normal', 'speed-fast'];
+                    const speedClass = speedClasses[index % speedClasses.length];
+                    
+                    // Get creature's current stats
+                    const currentHp = creature.currentHp || creature.maxHp || 10;
+                    const maxHp = creature.maxHp || 10;
+                    const hpPercentage = (currentHp / maxHp) * 100;
+                    
+                    // Determine health bar color based on percentage
+                    let healthBarColor = 'linear-gradient(90deg, #4caf50 0%, #66bb6a 100%)'; // Green
+                    if (hpPercentage <= 30) {
+                        healthBarColor = 'linear-gradient(90deg, #f44336 0%, #ef5350 100%)'; // Red
+                    } else if (hpPercentage <= 60) {
+                        healthBarColor = 'linear-gradient(90deg, #ff9800 0%, #ffa726 100%)'; // Orange
+                    }
+                    
+                    return `
+                        <div class="creature-icon ${!creature.alive ? 'defeated' : ''}" 
+                            data-creature-index="${index}"
+                            onmouseenter="window.showBattleCardPreview('${cardDataJson}')"
+                            onmouseleave="window.hideBattleCardPreview()">
+                            <div class="creature-sprite-container">
+                                <img src="${creatureSprite}" 
+                                    alt="${creature.name}" 
+                                    class="creature-sprite ${speedClass}"
+                                    onerror="this.src='./Creatures/placeholder.png'"
+                                    style="${!creature.alive ? 'filter: grayscale(100%); opacity: 0.5;' : ''}">
+                            </div>
+                            ${creature.alive ? `
+                                <div class="creature-health-bar">
+                                    <div class="creature-health-fill" style="width: ${hpPercentage}%; background: ${healthBarColor};"></div>
+                                </div>
+                                <div class="creature-hp-text">${currentHp}/${maxHp}</div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    // NECROMANCY INTEGRATION: Enhanced renderCreaturesAfterInit with necromancy display updates
+    renderCreaturesAfterInit() {
+        ['left', 'center', 'right'].forEach(position => {
+            ['player', 'opponent'].forEach(side => {
+                const heroInstance = side === 'player' 
+                    ? this.battleManager.playerHeroes[position]
+                    : this.battleManager.opponentHeroes[position];
+                
+                if (heroInstance && heroInstance.creatures && heroInstance.creatures.length > 0) {
+                    const heroSlot = document.querySelector(`.${side}-slot.${position}-slot`);
+                    if (heroSlot) {
+                        // Remove existing creatures if any
+                        const existingCreatures = heroSlot.querySelector('.battle-hero-creatures');
+                        if (existingCreatures) {
+                            existingCreatures.remove();
+                        }
+                        
+                        // Add new creatures HTML
+                        const creaturesHTML = this.createCreaturesHTML(heroInstance.creatures, side, position);
+                        heroSlot.insertAdjacentHTML('beforeend', creaturesHTML);
+                        
+                        // NECROMANCY INTEGRATION: Update necromancy displays
+                        if (this.battleManager.necromancyManager) {
+                            this.battleManager.necromancyManager.updateNecromancyDisplayForHeroWithCreatures(
+                                side, position, heroInstance
+                            );
+                        }
+                    }
+                }
+            });
+        });
     }
 
     // Display ability info for debugging
@@ -606,6 +733,9 @@ export class BattleScreen {
             // Then sort by name within the same school
             return a.name.localeCompare(b.name);
         });
+
+        // Get creature count
+        const creatureCount = hero.creatures ? hero.creatures.length : 0;
         
         // Display the abilities debug info
         const debugOutput = ``;
@@ -733,7 +863,7 @@ export class BattleScreen {
         
         tooltip.innerHTML = `
             <div class="hero-tooltip-container">
-                <h4 class="hero-tooltip-title">${hero.name}</h4>
+                <h4 class="hero-tooltip-title">${hero.name}${creatureCount > 0 ? ` (${creatureCount} creatures)` : ''}</h4>
                 
                 <div class="abilities-section">
                     <h5 class="section-title">⚡ Abilities</h5>
@@ -1076,11 +1206,16 @@ export class BattleScreen {
     }
 }
 
-// Add styles for ability indicators and debug tooltip
-if (!document.getElementById('battleAbilityStyles')) {
+// Add consolidated styles for battle screen including all creature-related styles
+if (!document.getElementById('battleScreenStyles')) {
     const style = document.createElement('style');
-    style.id = 'battleAbilityStyles';
+    style.id = 'battleScreenStyles';
     style.textContent = `
+        /* ============================================
+        BATTLE SCREEN & CREATURE STYLES - UPDATED
+        ============================================ */
+
+        /* Ability indicators */
         .ability-indicator {
             position: absolute;
             top: 5px;
@@ -1094,28 +1229,525 @@ if (!document.getElementById('battleAbilityStyles')) {
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             z-index: 10;
         }
-        
+
         .ability-info-section {
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             margin-top: 10px;
             max-height: 150px;
             overflow-y: auto;
         }
-        
+
         .ability-info-area {
             padding: 10px;
             font-size: 0.85rem;
             color: rgba(255, 255, 255, 0.8);
         }
-        
+
+        /* ============================================
+        CREATURE DISPLAY STYLES - COMPLETELY TRANSPARENT CONTAINERS
+        ============================================ */
+
+        /* Hero creatures container - COMPLETELY TRANSPARENT */
+        .hero-creatures {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+            padding: 0; /* Remove padding to eliminate visual space */
+            min-height: 20px;
+            background: transparent; /* Explicitly transparent */
+            border: none;
+            justify-content: center;
+        }
+
+        .battle-hero-creatures {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 15;
+            /* Allow overflow for HP bars */
+            overflow: visible;
+            /* ENSURE NO BACKGROUND */
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        /* Player creatures ABOVE their heroes (just above the hero card) */
+        .player-slot .battle-hero-creatures {
+            top: -45px;
+            bottom: auto;
+        }
+
+        /* Opponent creatures BELOW their heroes (just below the hero card) */
+        .opponent-slot .battle-hero-creatures {
+            top: 100%;
+            bottom: auto;
+            margin-top: 5px;
+        }
+
+        .battle-hero-slot {
+            position: relative;
+            /* Allow overflow for creature HP bars */
+            overflow: visible !important;
+        }
+
+        /* Creature icon styling - COMPLETELY TRANSPARENT CONTAINER */
+        .creature-icon {
+            position: relative;
+            width: 30px;
+            height: 30px;
+            /* COMPLETELY TRANSPARENT - no visual container elements */
+            border: none;
+            border-radius: 50%;
+            background: transparent;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            /* Allow child elements to overflow for HP bars */
+            overflow: visible;
+            /* ENSURE NO SHADOWS OR OUTLINES */
+            box-shadow: none;
+            outline: none;
+        }
+
+        .creature-icon:hover {
+            transform: scale(1.15);
+            z-index: 25;
+            /* ENSURE NO BACKGROUND ON HOVER */
+            background: transparent;
+        }
+
+        .creature-sprite-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden; /* Keep this for the sprite animation */
+            border-radius: 50%;
+            /* COMPLETELY TRANSPARENT - no visual container elements */
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            outline: none;
+        }
+
+        /* Sprite animation container and styles */
+        .creature-sprite {
+            width: 300%; /* 3 frames side by side */
+            height: 100%;
+            image-rendering: pixelated; /* Crisp pixel art */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            position: absolute;
+            left: 0;
+            top: 0;
+            /* Animation: 2-1-2-3-2-1-2-3 pattern */
+            animation: creatureLoop 1.6s steps(1) infinite;
+        }
+
+        /* Different animation speeds for variety */
+        .creature-sprite.speed-slow {
+            animation-duration: 2.4s;
+        }
+
+        .creature-sprite.speed-normal {
+            animation-duration: 1.6s;
+        }
+
+        .creature-sprite.speed-fast {
+            animation-duration: 1.2s;
+        }
+
+        /* Pause animation on hover for better visibility */
+        .creature-icon:hover .creature-sprite {
+            animation-play-state: paused;
+        }
+
+        /* ============================================
+        CREATURE HEALTH BAR STYLES - ABOVE CREATURES
+        ============================================ */
+
+        .creature-health-bar {
+            position: absolute;
+            top: -12px; /* Position ABOVE the creature */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #000000; /* Black border instead of white */
+            border-radius: 3px;
+            overflow: hidden;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+        }
+
+        .creature-health-fill {
+            height: 100%;
+            transition: width 0.3s ease, background 0.3s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+
+        .creature-hp-text {
+            position: absolute;
+            top: -26px; /* Position ABOVE the health bar */
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 
+                1px 1px 2px rgba(0, 0, 0, 1),
+                0 0 4px rgba(0, 0, 0, 0.9);
+            white-space: nowrap;
+            z-index: 11;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 35px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Defeated creature styles */
+        .creature-icon.defeated {
+            opacity: 0.8;
+            background: transparent; /* Keep transparent even when defeated */
+        }
+
+        .creature-icon.defeated .creature-sprite-container {
+            background: transparent; /* No container styling even when defeated */
+        }
+
+        .creature-icon.defeated .creature-sprite {
+            filter: grayscale(100%);
+            opacity: 0.4;
+        }
+
+        /* Hover state enhancements */
+        .creature-icon:hover .creature-health-bar {
+            height: 7px;
+            top: -13px;
+            width: 45px;
+        }
+
+        .creature-icon:hover .creature-hp-text {
+            font-size: 11px;
+            top: -28px;
+        }
+
+        /* Add glow effect to sprite on hover instead of container */
+        .creature-icon:hover .creature-sprite {
+            filter: brightness(1.3) drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+        }
+
+        /* Critical health pulsing effect */
+        .creature-health-fill[style*="f44336"] {
+            animation: criticalPulse 1s ease-in-out infinite;
+        }
+
+        /* Additional fix for any other creature-related containers */
+        .creature-drop-zone,
+        .creature-placement-area,
+        .creatures-section {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        /* ============================================
+        CREATURE ANIMATIONS & EFFECTS
+        ============================================ */
+
+        /* Keyframes for the 2-1-2-3 loop pattern */
+        @keyframes creatureLoop {
+            0% {
+                /* Frame 2 (middle) */
+                transform: translateX(-33.333%);
+            }
+            12.5% {
+                /* Frame 1 (left) */
+                transform: translateX(0%);
+            }
+            25% {
+                /* Frame 2 (middle) */
+                transform: translateX(-33.333%);
+            }
+            37.5% {
+                /* Frame 3 (right) */
+                transform: translateX(-66.666%);
+            }
+            50% {
+                /* Frame 2 (middle) */
+                transform: translateX(-33.333%);
+            }
+            62.5% {
+                /* Frame 1 (left) */
+                transform: translateX(0%);
+            }
+            75% {
+                /* Frame 2 (middle) */
+                transform: translateX(-33.333%);
+            }
+            87.5% {
+                /* Frame 3 (right) */
+                transform: translateX(-66.666%);
+            }
+            100% {
+                /* Back to Frame 2 to loop smoothly */
+                transform: translateX(-33.333%);
+            }
+        }
+
+        /* Alternative smoother animation timing */
+        @keyframes creatureSmoothLoop {
+            0%, 100% { transform: translateX(-33.333%); } /* Frame 2 */
+            16.66% { transform: translateX(0%); } /* Frame 1 */
+            33.33% { transform: translateX(-33.333%); } /* Frame 2 */
+            50% { transform: translateX(-66.666%); } /* Frame 3 */
+            66.66% { transform: translateX(-33.333%); } /* Frame 2 */
+            83.33% { transform: translateX(0%); } /* Frame 1 */
+        }
+
+        /* Damage number animation for creatures */
+        .creature-icon .damage-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+            font-weight: bold;
+            color: #ff3333;
+            text-shadow: 
+                2px 2px 4px rgba(0, 0, 0, 0.9),
+                0 0 8px rgba(255, 0, 0, 0.5);
+            z-index: 200;
+            pointer-events: none;
+            animation: creatureDamageFloat 0.6s ease-out forwards;
+        }
+
+        @keyframes creatureDamageFloat {
+            0% {
+                transform: translate(-50%, -50%) scale(0.5);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(-50%, -80%) scale(1.2);
+            }
+            100% {
+                transform: translate(-50%, -100%) scale(1);
+                opacity: 0;
+            }
+        }
+
+        /* Shake animation enhancement for better visibility */
+        .creature-shaking {
+            animation: creatureShake 0.4s ease-in-out;
+            z-index: 100;
+        }
+
+        /* Add glow to sprite during shake instead of container */
+        .creature-shaking .creature-sprite {
+            filter: brightness(1.5) drop-shadow(0 0 10px rgba(255, 255, 100, 0.8));
+        }
+
+        @keyframes creatureShake {
+            0%, 100% { transform: translateX(0); }
+            10% { transform: translateX(-2px) rotate(-5deg); }
+            20% { transform: translateX(2px) rotate(5deg); }
+            30% { transform: translateX(-2px) rotate(-5deg); }
+            40% { transform: translateX(2px) rotate(5deg); }
+            50% { transform: translateX(-2px) rotate(-5deg); }
+            60% { transform: translateX(2px) rotate(5deg); }
+            70% { transform: translateX(-1px) rotate(-2deg); }
+            80% { transform: translateX(1px) rotate(2deg); }
+            90% { transform: translateX(-1px) rotate(-2deg); }
+        }
+
+        @keyframes criticalPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ============================================
+        BATTLE-SPECIFIC ANIMATIONS
+        ============================================ */
+
+        @keyframes collisionPulse {
+            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            100% { transform: scale(2) rotate(180deg); opacity: 0; }
+        }
+
+        @keyframes impactPulse {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        
+
         @keyframes fadeOut {
             from { opacity: 1; }
             to { opacity: 0; }
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -150%);
+                opacity: 0;
+            }
+        }
+
+        /* ============================================
+        BATTLE LAYOUT ADJUSTMENTS
+        ============================================ */
+
+        /* Adjust battle row spacing to accommodate creatures with HP bars */
+        .battle-row {
+            margin-bottom: 70px;
+        }
+
+        .opponent-row {
+            margin-bottom: 60px;
+        }
+
+        /* Ensure the entire battle field allows overflow */
+        .battle-field {
+            overflow: visible;
+            padding-top: 40px; /* Extra padding for opponent creature HP bars */
+            padding-bottom: 40px; /* Extra padding for player creature HP bars */
+        }
+
+        .battle-hero-card.attacking {
+            z-index: 50 !important;
+        }
+
+        .battle-hero-card.defeated {
+            animation: heroDefeat 0.5s ease-out forwards;
+        }
+
+        @keyframes heroDefeat {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.3; transform: scale(0.9); filter: grayscale(100%); }
+        }
+
+        .health-bar {
+            position: relative;
+        }
+
+        .battle-result-overlay .battle-result-message {
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            padding: 40px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        /* ============================================
+        VISUAL FEEDBACK FOR CREATURE INTERACTIONS
+        ============================================ */
+
+        /* Creature drop zones */
+        .team-slot.creature-drop-ready {
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+        }
+
+        .team-slot.creature-drop-invalid {
+            box-shadow: 0 0 20px rgba(244, 67, 54, 0.8);
+        }
+
+        /* Adjust character card layout to accommodate creatures */
+        .character-card.with-ability-zones {
+            padding-bottom: 10px;
+        }
+
+        /* Visual feedback when dragging creature spell */
+        .hand-card.spell-card[data-card-type="spell"] {
+            /* Style for creature spell cards in hand */
+        }
+        
+        /* ============================================
+        NECROMANCY STACK INDICATOR STYLES - NEXT TO ATTACK STAT
+        ============================================ */
+        
+        .necromancy-stack-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 4px;
+        }
+        
+        .necromancy-stack-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 2px 6px rgba(0, 0, 0, 0.5),
+                0 0 10px rgba(138, 43, 226, 0.4); /* Purple glow for necromancy */
+            transition: all 0.3s ease;
+        }
+        
+        .necromancy-stack-number {
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+            line-height: 1;
+        }
+        
+        .necromancy-stack-circle.stack-consumed {
+            animation: necromancyStackPulse 0.6s ease-out;
+        }
+        
+        @keyframes necromancyStackPulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 
+                    0 2px 6px rgba(0, 0, 0, 0.5),
+                    0 0 10px rgba(138, 43, 226, 0.4);
+            }
+            50% {
+                transform: scale(1.2);
+                box-shadow: 
+                    0 4px 12px rgba(0, 0, 0, 0.7),
+                    0 0 20px rgba(138, 43, 226, 0.8);
+                background: rgba(138, 43, 226, 0.9);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 
+                    0 2px 6px rgba(0, 0, 0, 0.5),
+                    0 0 10px rgba(138, 43, 226, 0.4);
+                background: rgba(0, 0, 0, 0.9);
+            }
+        }
+        
+        /* Hover effect for necromancy indicator */
+        .battle-hero-slot:hover .necromancy-stack-circle {
+            transform: scale(1.1);
+            box-shadow: 
+                0 3px 8px rgba(0, 0, 0, 0.6),
+                0 0 15px rgba(138, 43, 226, 0.6);
+        }
+        
+        /* Hide necromancy indicator when hero has no necromancy ability or no creatures */
+        .battle-hero-slot:not(.has-necromancy-stacks) .necromancy-stack-indicator {
+            display: none !important;
         }
     `;
     document.head.appendChild(style);

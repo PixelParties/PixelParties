@@ -1,4 +1,4 @@
-// hero.js - Centralized Hero Class for Battle System with Spellbook Support
+// hero.js - Enhanced Hero Class with Necromancy Stack Management
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -43,6 +43,13 @@ export class Hero {
         
         // Spellbook - array of spell cards
         this.spellbook = [];
+
+        // Creatures - array of creature cards summoned by this hero
+        this.creatures = [];
+        
+        // NEW: Necromancy stacks tracking
+        this.necromancyStacks = 0;
+        this.maxNecromancyStacks = 0; // Track initial stacks for display purposes
         
         // Extensible state for future features
         this.statusEffects = [];
@@ -84,6 +91,50 @@ export class Hero {
         }
         
         console.log(`${this.name} abilities set:`, this.abilities);
+    }
+    
+    // NEW: Initialize necromancy stacks based on ability level
+    initializeNecromancyStacks() {
+        if (this.hasAbility('Necromancy')) {
+            const necromancyLevel = this.getAbilityStackCount('Necromancy');
+            this.necromancyStacks = necromancyLevel;
+            this.maxNecromancyStacks = necromancyLevel;
+            console.log(`${this.name} initialized with ${this.necromancyStacks} Necromancy stacks`);
+        } else {
+            this.necromancyStacks = 0;
+            this.maxNecromancyStacks = 0;
+        }
+    }
+    
+    // NEW: Get current necromancy stacks
+    getNecromancyStacks() {
+        return this.necromancyStacks;
+    }
+    
+    // NEW: Get maximum necromancy stacks (for display)
+    getMaxNecromancyStacks() {
+        return this.maxNecromancyStacks;
+    }
+    
+    // NEW: Consume a necromancy stack
+    consumeNecromancyStack() {
+        if (this.necromancyStacks > 0) {
+            this.necromancyStacks--;
+            console.log(`${this.name} consumed necromancy stack, ${this.necromancyStacks} remaining`);
+            return true;
+        }
+        return false;
+    }
+    
+    // NEW: Check if hero has necromancy stacks available
+    hasNecromancyStacks() {
+        return this.necromancyStacks > 0;
+    }
+    
+    // NEW: Set necromancy stacks (for restoration)
+    setNecromancyStacks(stacks) {
+        this.necromancyStacks = Math.max(0, stacks);
+        console.log(`${this.name} necromancy stacks set to ${this.necromancyStacks}`);
     }
     
     // Set spellbook from HeroSpellbookManager data
@@ -146,6 +197,53 @@ export class Hero {
     // Get spell count for a specific spell
     getSpecificSpellCount(spellName) {
         return this.spellbook.filter(spell => spell.name === spellName).length;
+    }
+
+    // Set creatures from HeroCreatureManager data
+    setCreatures(creaturesData) {
+        if (!creaturesData || !Array.isArray(creaturesData)) return;
+        
+        // Clear existing creatures
+        this.creatures = [];
+        
+        // Copy creatures from manager data
+        this.creatures = creaturesData.map(creature => ({ ...creature }));
+        
+        console.log(`${this.name} creatures set with ${this.creatures.length} creatures`);
+    }
+
+    // Add a creature
+    addCreature(creatureCard) {
+        if (!creatureCard || creatureCard.subtype !== 'Creature') {
+            console.error('Invalid creature card provided');
+            return false;
+        }
+        
+        this.creatures.push({ ...creatureCard });
+        console.log(`Added creature ${creatureCard.name} to ${this.name}`);
+        return true;
+    }
+
+    // Remove a creature by index
+    removeCreature(index) {
+        if (index < 0 || index >= this.creatures.length) {
+            console.error(`Invalid creature index: ${index}`);
+            return null;
+        }
+        
+        const removedCreature = this.creatures.splice(index, 1)[0];
+        console.log(`Removed creature ${removedCreature.name} from ${this.name}`);
+        return removedCreature;
+    }
+
+    // Get all creatures
+    getAllCreatures() {
+        return [...this.creatures];
+    }
+
+    // Get creature count
+    getCreatureCount() {
+        return this.creatures.length;
     }
     
     // Get ability by name
@@ -314,6 +412,13 @@ export class Hero {
             
             // Spellbook
             spellbook: this.spellbook.map(spell => ({ ...spell })),
+
+            // Creatures
+            creatures: this.creatures.map(creature => ({ ...creature })),
+            
+            // NEW: Necromancy stacks
+            necromancyStacks: this.necromancyStacks,
+            maxNecromancyStacks: this.maxNecromancyStacks,
             
             // Battle state
             statusEffects: this.statusEffects,
@@ -353,6 +458,13 @@ export class Hero {
         
         // Restore spellbook
         hero.spellbook = savedState.spellbook || [];
+
+        // Restore creatures
+        hero.creatures = savedState.creatures || [];
+        
+        // NEW: Restore necromancy stacks
+        hero.necromancyStacks = savedState.necromancyStacks || 0;
+        hero.maxNecromancyStacks = savedState.maxNecromancyStacks || 0;
         
         // Restore battle state
         hero.statusEffects = savedState.statusEffects || [];

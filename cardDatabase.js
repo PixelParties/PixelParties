@@ -182,7 +182,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 100
     },
     'DestructionMagic': {
         name: 'DestructionMagic',
@@ -202,6 +203,7 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
+        hp: 120
     },
     'LootThePrincess': {
         name: 'LootThePrincess',
@@ -221,7 +223,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 10
     },
     'PhoenixBombardment': {
         name: 'PhoenixBombardment',
@@ -241,7 +244,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'SummoningMagic': {
         name: 'SummoningMagic',
@@ -411,7 +415,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 200
     },
     'Cold-HeartedYuki-Onna': {
         name: 'Cold-HeartedYuki-Onna',
@@ -421,7 +426,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 1
     },
     'FrostRune': {
         name: 'FrostRune',
@@ -490,17 +496,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
-    },
-    'ChaorcFriendlyFireballer': {
-        name: 'ChaorcFriendlyFireballer',
-        image: './Cards/All/ChaorcFriendlyFireballer.png',
-        cardType: 'Spell',
-        level: 1,
-        cost: 0,
-        action: true,
-        spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'Fireball': {
         name: 'Fireball',
@@ -527,6 +524,16 @@ const CARD_DATABASE = {
         image: './Cards/All/FlameAvalanche.png',
         cardType: 'Spell',
         level: 3,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
+        subtype: null
+    },
+    'MountainTearRiver': {
+        name: 'MountainTearRiver',
+        image: './Cards/All/MountainTearRiver.png',
+        cardType: 'Spell',
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -916,7 +923,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'Cavalry': {
         name: 'Cavalry',
@@ -926,7 +934,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 150
     },
     'Challenge': {
         name: 'Challenge',
@@ -955,7 +964,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'FuriousAnger': {
         name: 'FuriousAnger',
@@ -1091,7 +1101,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'SkeletonBard': {
         name: 'SkeletonBard',
@@ -1101,7 +1112,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'SkeletonDeathKnight': {
         name: 'SkeletonDeathKnight',
@@ -1111,7 +1123,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'SkeletonMage': {
         name: 'SkeletonMage',
@@ -1121,7 +1134,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'SkeletonNecromancer': {
         name: 'SkeletonNecromancer',
@@ -1131,7 +1145,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
     'SkeletonReaper': {
         name: 'SkeletonReaper',
@@ -1141,9 +1156,9 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
-        subtype: 'Creature'
+        subtype: 'Creature',
+        hp: 50
     },
-
 
 
     // NEUTRAL CARDS
@@ -1235,6 +1250,11 @@ export function getCardInfo(cardName) {
     // Only add level if it exists (for spell cards)
     if (cardInfo.level !== undefined) {
         baseInfo.level = cardInfo.level;
+    }
+    
+    // Only add level if it exists (for spell cards)
+    if (cardInfo.hp !== undefined) {
+        baseInfo.hp = cardInfo.hp;
     }
 
     // Add hero-specific properties if this is a hero card

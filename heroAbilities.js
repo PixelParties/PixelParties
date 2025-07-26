@@ -1,4 +1,4 @@
-// heroAbilities.js - Hero Ability Zones Management Module with Turn-Based Attachment Limits
+// heroAbilities.js - Hero Ability Zones Management Module with Turn-Based Attachment Limits and Leadership Tracking
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -31,8 +31,15 @@ export class HeroAbilitiesManager {
             right: new Set()
         };
         
-        // NEW: Track which heroes have received an ability this turn
+        // Track which heroes have received an ability this turn
         this.heroAbilityAttachedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+        
+        // NEW: Track Leadership usage per turn
+        this.heroLeadershipUsedThisTurn = {
             left: false,
             center: false,
             right: false
@@ -43,7 +50,7 @@ export class HeroAbilitiesManager {
         this.formationManager = null;
         this.onStateChange = null; // Callback for when state changes
         
-        console.log('HeroAbilitiesManager initialized with turn-based attachment limits');
+        console.log('HeroAbilitiesManager initialized with turn-based attachment limits and Leadership tracking');
     }
 
     // Initialize with references to other managers
@@ -66,7 +73,7 @@ export class HeroAbilitiesManager {
         return abilityName.replace(/([a-z])([A-Z])/g, '$1 $2');
     }
 
-    // === NEW TURN-BASED METHODS ===
+    // === TURN-BASED METHODS ===
 
     // Check if a hero can receive an ability this turn
     canHeroReceiveAbilityThisTurn(heroPosition) {
@@ -86,6 +93,27 @@ export class HeroAbilitiesManager {
         }
     }
 
+    // === NEW LEADERSHIP METHODS ===
+
+    // Check if a hero can use Leadership this turn
+    canUseLeadership(heroPosition) {
+        if (!this.heroLeadershipUsedThisTurn.hasOwnProperty(heroPosition)) {
+            console.error(`Invalid hero position: ${heroPosition}`);
+            return false;
+        }
+        return !this.heroLeadershipUsedThisTurn[heroPosition];
+    }
+
+    // Mark Leadership as used for this hero this turn
+    markLeadershipUsed(heroPosition) {
+        if (this.heroLeadershipUsedThisTurn.hasOwnProperty(heroPosition)) {
+            this.heroLeadershipUsedThisTurn[heroPosition] = true;
+            console.log(`${heroPosition} hero's Leadership marked as used this turn`);
+            return true;
+        }
+        return false;
+    }
+
     // Reset turn-based tracking (called after battle)
     resetTurnBasedTracking() {
         this.heroAbilityAttachedThisTurn = {
@@ -93,7 +121,15 @@ export class HeroAbilitiesManager {
             center: false,
             right: false
         };
-        console.log('Turn-based ability attachment tracking reset for new turn');
+        
+        // Reset Leadership usage
+        this.heroLeadershipUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+        
+        console.log('Turn-based ability attachment and Leadership tracking reset for new turn');
     }
 
     // Check if there's a hero at the given position
@@ -243,6 +279,11 @@ export class HeroAbilitiesManager {
         if (this.heroAbilityAttachedThisTurn[heroPosition] === undefined) {
             this.heroAbilityAttachedThisTurn[heroPosition] = false;
         }
+        
+        // Ensure Leadership tracking exists
+        if (this.heroLeadershipUsedThisTurn[heroPosition] === undefined) {
+            this.heroLeadershipUsedThisTurn[heroPosition] = false;
+        }
     }
 
     // Handle team slot drop (for ability cards)
@@ -266,7 +307,7 @@ export class HeroAbilitiesManager {
             return false;
         }
         
-        // NEW: Check if there's actually a hero in this slot
+        // Check if there's actually a hero in this slot
         if (!this.hasHeroAtPosition(heroPosition)) {
             console.log(`No hero in ${heroPosition} position, cannot attach ability`);
             this.handManager.handleInvalidDrop();
@@ -308,7 +349,7 @@ export class HeroAbilitiesManager {
         }
     }
 
-    // NEW: Show visual feedback when turn limit is reached
+    // Show visual feedback when turn limit is reached
     showTurnLimitFeedback(heroPosition) {
         const teamSlot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
         if (teamSlot) {
@@ -421,7 +462,7 @@ export class HeroAbilitiesManager {
         return null;
     }
 
-    // === EXISTING METHODS (unchanged) ===
+    // === EXISTING METHODS ===
 
     // Initialize hero with their starting abilities
     initializeHeroStartingAbilities(heroPosition, heroData) {
@@ -589,6 +630,11 @@ export class HeroAbilitiesManager {
         this.heroAbilityAttachedThisTurn[fromPosition] = this.heroAbilityAttachedThisTurn[toPosition];
         this.heroAbilityAttachedThisTurn[toPosition] = tempTurnTracking;
         
+        // Swap Leadership usage tracking
+        const tempLeadershipTracking = this.heroLeadershipUsedThisTurn[fromPosition];
+        this.heroLeadershipUsedThisTurn[fromPosition] = this.heroLeadershipUsedThisTurn[toPosition];
+        this.heroLeadershipUsedThisTurn[toPosition] = tempLeadershipTracking;
+        
         console.log(`Moved abilities from ${fromPosition} to ${toPosition}`);
         
         // Validate structures after swap
@@ -606,8 +652,11 @@ export class HeroAbilitiesManager {
         };
         this.heroAbilityRegistry[heroPosition] = new Set();
         
-        // NEW: Reset turn tracking for this position
+        // Reset turn tracking for this position
         this.heroAbilityAttachedThisTurn[heroPosition] = false;
+        
+        // Reset Leadership tracking for this position
+        this.heroLeadershipUsedThisTurn[heroPosition] = false;
         
         console.log(`Cleared abilities for ${heroPosition} hero`);
         
@@ -642,8 +691,9 @@ export class HeroAbilitiesManager {
         return {
             heroAbilityZones: JSON.parse(JSON.stringify(this.heroAbilityZones)),
             heroAbilityRegistry: registryExport,
-            // NEW: Include turn-based tracking in save state
-            heroAbilityAttachedThisTurn: JSON.parse(JSON.stringify(this.heroAbilityAttachedThisTurn))
+            heroAbilityAttachedThisTurn: JSON.parse(JSON.stringify(this.heroAbilityAttachedThisTurn)),
+            // Include Leadership usage in save state
+            heroLeadershipUsedThisTurn: JSON.parse(JSON.stringify(this.heroLeadershipUsedThisTurn))
         };
     }
     
@@ -667,7 +717,7 @@ export class HeroAbilitiesManager {
             }
         }
         
-        // NEW: Import turn-based tracking
+        // Import turn-based tracking
         if (state.heroAbilityAttachedThisTurn) {
             this.heroAbilityAttachedThisTurn = JSON.parse(JSON.stringify(state.heroAbilityAttachedThisTurn));
         } else {
@@ -679,7 +729,19 @@ export class HeroAbilitiesManager {
             };
         }
         
-        console.log('Imported hero abilities state with turn-based tracking and zone validation');
+        // Import Leadership usage tracking
+        if (state.heroLeadershipUsedThisTurn) {
+            this.heroLeadershipUsedThisTurn = JSON.parse(JSON.stringify(state.heroLeadershipUsedThisTurn));
+        } else {
+            // Default to false if not in save state (backward compatibility)
+            this.heroLeadershipUsedThisTurn = {
+                left: false,
+                center: false,
+                right: false
+            };
+        }
+        
+        console.log('Imported hero abilities state with Leadership tracking and zone validation');
         return true;
     }
     
@@ -697,8 +759,14 @@ export class HeroAbilitiesManager {
             right: new Set()
         };
         
-        // NEW: Reset turn-based tracking
         this.heroAbilityAttachedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+        
+        // Reset Leadership tracking
+        this.heroLeadershipUsedThisTurn = {
             left: false,
             center: false,
             right: false
@@ -708,7 +776,7 @@ export class HeroAbilitiesManager {
         this.formationManager = null;
         this.onStateChange = null;
         
-        console.log('HeroAbilitiesManager reset');
+        console.log('HeroAbilitiesManager reset with Leadership tracking');
     }
 }
 

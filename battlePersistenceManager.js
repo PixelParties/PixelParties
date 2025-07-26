@@ -1,4 +1,6 @@
-// battlePersistenceManager.js - Enhanced Battle State Persistence Manager with Connection State
+// battlePersistenceManager.js - Enhanced Battle State Persistence Manager with Necromancy Module Support
+
+import { NecromancyUtils } from './Abilities/necromancy.js'; // NEW IMPORT
 
 export class BattlePersistenceManager {
     constructor(roomManager, isHost) {
@@ -10,10 +12,10 @@ export class BattlePersistenceManager {
         this.saveThrottleDelay = 100; // Minimum time between saves (ms)
         this.lastSaveTime = 0;
         
-        // Battle state version for future expansion
-        this.BATTLE_STATE_VERSION = '1.0.1'; // Incremented for connection-aware features
+        // Battle state version for future expansion - UPDATED for necromancy support
+        this.BATTLE_STATE_VERSION = '1.1.0'; 
         
-        console.log('BattlePersistenceManager initialized for', isHost ? 'HOST' : 'GUEST', 'with connection-aware features');
+        console.log('BattlePersistenceManager initialized for', isHost ? 'HOST' : 'GUEST', 'with necromancy persistence support');
     }
 
     // Save complete battle state to Firebase (enhanced with connection state)
@@ -60,7 +62,7 @@ export class BattlePersistenceManager {
             this.lastSavedStateHash = stateHash;
             
             const pauseInfo = battleState.connectionState?.battlePaused ? ' (PAUSED)' : '';
-            console.log(`✅ Battle state saved by ${this.isHost ? 'HOST' : 'GUEST'} (Turn ${battleState.currentTurn})${pauseInfo}`);
+            console.log(`✅ Battle state with creatures saved by ${this.isHost ? 'HOST' : 'GUEST'} (Turn ${battleState.currentTurn})${pauseInfo}`);
             
             // Mark battle as active in gameState for reconnection detection
             await roomRef.child('gameState').update({
@@ -89,7 +91,7 @@ export class BattlePersistenceManager {
             currentTurn: battleManager.currentTurn,
             turnInProgress: battleManager.turnInProgress,
             
-            // Hero states with complete information
+            // Hero states with complete information INCLUDING CREATURES
             hostHeroes: this.exportHeroStates(battleManager, 'host'),
             guestHeroes: this.exportHeroStates(battleManager, 'guest'),
             
@@ -137,7 +139,7 @@ export class BattlePersistenceManager {
         return baseState;
     }
 
-    // Restore battle manager from saved state (enhanced)
+    // Restore battle manager from saved state (enhanced with creatures)
     async restoreBattleState(battleManager, savedState) {
         if (!savedState) {
             console.error('No saved state provided for restoration');
@@ -145,7 +147,7 @@ export class BattlePersistenceManager {
         }
 
         try {
-            console.log('🔄 Restoring battle state from Firebase...');
+            console.log('🔄 Restoring battle state with creatures from Firebase...');
 
             // Restore core battle parameters
             battleManager.battleActive = savedState.battleActive;
@@ -155,13 +157,13 @@ export class BattlePersistenceManager {
             // Restore battle log
             battleManager.battleLog = savedState.battleLog || [];
 
-            // Restore hero states
+            // Restore hero states INCLUDING CREATURES
             this.restoreHeroStates(battleManager, savedState);
 
             // Restore formations
             this.restoreFormations(battleManager, savedState);
 
-            // Update visual elements
+            // Update visual elements INCLUDING CREATURE VISUALS
             this.updateBattleVisuals(battleManager, savedState);
 
             // Restore extensible state (for future features)
@@ -172,7 +174,7 @@ export class BattlePersistenceManager {
                 this.restoreConnectionState(battleManager, savedState.connectionState);
             }
 
-            console.log('✅ Battle state restoration completed with connection awareness');
+            console.log('✅ Battle state restoration with creatures completed');
             return true;
 
         } catch (error) {
@@ -205,7 +207,7 @@ export class BattlePersistenceManager {
         }
     }
 
-    // Enhanced state hash generation to include connection state
+    // Enhanced state hash generation to include creatures and connection state
     generateStateHash(state) {
         const stateForHash = {
             turn: state.currentTurn,
@@ -213,7 +215,9 @@ export class BattlePersistenceManager {
             guestHeroes: state.guestHeroes,
             battleActive: state.battleActive,
             // Include pause state in hash so pauses trigger saves
-            battlePaused: state.connectionState?.battlePaused || false
+            battlePaused: state.connectionState?.battlePaused || false,
+            // NEW: Include necromancy stacks in hash using module utility
+            necromancyData: NecromancyUtils.extractNecromancyData(state)
         };
         
         const stateString = JSON.stringify(stateForHash);
@@ -228,7 +232,7 @@ export class BattlePersistenceManager {
         return hash.toString();
     }
 
-    // Enhanced validation to check connection state
+    // Enhanced validation to check creatures and connection state
     validateBattleState(savedState) {
         if (!savedState || typeof savedState !== 'object') return false;
         
@@ -266,7 +270,7 @@ export class BattlePersistenceManager {
                 })
             ]);
 
-            console.log('🧹 Battle state cleared from Firebase (including pause state)');
+            console.log('🧹 Battle state with creatures cleared from Firebase');
             return true;
 
         } catch (error) {
@@ -298,7 +302,7 @@ export class BattlePersistenceManager {
         await this.saveBattleState(battleManager);
     }
 
-    // Export hero states with absolute side perspective
+    // Export hero states with absolute side perspective INCLUDING CREATURES AND NECROMANCY
     exportHeroStates(battleManager, absoluteSide) {
         // Determine which heroes belong to which absolute side
         let heroes;
@@ -330,6 +334,12 @@ export class BattlePersistenceManager {
                     position: hero.position,
                     absoluteSide: absoluteSide,
                     
+                    // CREATURES STATE
+                    creatures: this.exportCreatureStates(hero.creatures),
+                    
+                    // NEW: Necromancy stacks persistence using module utility
+                    ...NecromancyUtils.extractNecromancyDataFromHero(hero),
+                    
                     // Extensible hero state
                     statusEffects: hero.statusEffects || [],
                     temporaryModifiers: hero.temporaryModifiers || {},
@@ -344,6 +354,48 @@ export class BattlePersistenceManager {
         });
 
         return heroStates;
+    }
+
+    // NEW: Export creature states with full combat information
+    exportCreatureStates(creatures) {
+        if (!creatures || !Array.isArray(creatures)) {
+            return [];
+        }
+
+        return creatures.map(creature => {
+            return {
+                // Basic creature identification
+                name: creature.name,
+                image: creature.image,
+                
+                // Combat stats - PERSISTENT
+                currentHp: creature.currentHp,
+                maxHp: creature.maxHp,
+                atk: creature.atk,
+                alive: creature.alive,
+                
+                // Additional creature data that might be needed
+                originalStats: {
+                    baseHp: creature.maxHp,
+                    baseAtk: creature.atk
+                },
+                
+                // Creature-specific status effects
+                statusEffects: creature.statusEffects || [],
+                temporaryModifiers: creature.temporaryModifiers || {},
+                
+                // Combat history for this creature
+                damageHistory: creature.damageHistory || [],
+                
+                // Future expansion for creature-specific features
+                creatureAbilities: creature.creatureAbilities || [],
+                equipment: creature.equipment || [],
+                
+                // Metadata
+                createdAt: creature.createdAt || Date.now(),
+                lastDamaged: creature.lastDamaged || null
+            };
+        });
     }
 
     // Export formation data with absolute sides
@@ -388,7 +440,7 @@ export class BattlePersistenceManager {
             }
 
             const pauseInfo = battleState.connectionState?.battlePaused ? ' (PAUSED)' : '';
-            console.log(`📥 Battle state loaded from Firebase (Turn ${battleState.currentTurn})${pauseInfo}`);
+            console.log(`📥 Battle state with creatures loaded from Firebase (Turn ${battleState.currentTurn})${pauseInfo}`);
             console.log(`Last updated by: ${battleState.lastUpdatedBy} at ${new Date(battleState.lastUpdatedAt)}`);
 
             return battleState;
@@ -399,7 +451,7 @@ export class BattlePersistenceManager {
         }
     }
 
-    // Restore hero states from saved data
+    // Restore hero states from saved data INCLUDING CREATURES AND NECROMANCY
     restoreHeroStates(battleManager, savedState) {
         const myAbsoluteSide = this.isHost ? 'host' : 'guest';
         const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
@@ -410,11 +462,17 @@ export class BattlePersistenceManager {
             const savedHero = myHeroStates[position];
             if (savedHero && battleManager.playerHeroes[position]) {
                 const hero = battleManager.playerHeroes[position];
+                
+                // Restore basic hero stats
                 hero.currentHp = savedHero.currentHp;
                 hero.maxHp = savedHero.maxHp;
                 hero.atk = savedHero.atk;
                 hero.alive = savedHero.alive;
                 hero.absoluteSide = savedHero.absoluteSide;
+                
+                // NEW: Restore necromancy stacks using the saved data
+                hero.necromancyStacks = savedHero.necromancyStacks || 0;
+                hero.maxNecromancyStacks = savedHero.maxNecromancyStacks || 0;
                 
                 // Restore extensible hero properties
                 hero.statusEffects = savedHero.statusEffects || [];
@@ -423,6 +481,13 @@ export class BattlePersistenceManager {
                 hero.customStats = savedHero.customStats || {};
                 hero.heroAbilities = savedHero.heroAbilities || [];
                 hero.equipmentEffects = savedHero.equipmentEffects || [];
+                
+                // RESTORE CREATURES
+                if (savedHero.creatures) {
+                    this.restoreCreatureStates(hero, savedHero.creatures);
+                }
+                
+                console.log(`Restored ${hero.name} with ${hero.necromancyStacks}/${hero.maxNecromancyStacks} necromancy stacks`);
             }
         });
 
@@ -432,11 +497,17 @@ export class BattlePersistenceManager {
             const savedHero = opponentHeroStates[position];
             if (savedHero && battleManager.opponentHeroes[position]) {
                 const hero = battleManager.opponentHeroes[position];
+                
+                // Restore basic hero stats
                 hero.currentHp = savedHero.currentHp;
                 hero.maxHp = savedHero.maxHp;
                 hero.atk = savedHero.atk;
                 hero.alive = savedHero.alive;
                 hero.absoluteSide = savedHero.absoluteSide;
+                
+                // NEW: Restore necromancy stacks using the saved data
+                hero.necromancyStacks = savedHero.necromancyStacks || 0;
+                hero.maxNecromancyStacks = savedHero.maxNecromancyStacks || 0;
                 
                 // Restore extensible hero properties
                 hero.statusEffects = savedHero.statusEffects || [];
@@ -445,10 +516,54 @@ export class BattlePersistenceManager {
                 hero.customStats = savedHero.customStats || {};
                 hero.heroAbilities = savedHero.heroAbilities || [];
                 hero.equipmentEffects = savedHero.equipmentEffects || [];
+                
+                // RESTORE CREATURES
+                if (savedHero.creatures) {
+                    this.restoreCreatureStates(hero, savedHero.creatures);
+                }
+                
+                console.log(`Restored opponent ${hero.name} with ${hero.necromancyStacks}/${hero.maxNecromancyStacks} necromancy stacks`);
             }
         });
 
-        console.log('🦸 Hero states restored from Firebase');
+        console.log('🦸 Hero states with creatures and necromancy stacks restored from Firebase');
+    }
+
+    // NEW: Restore creature states with full combat information
+    restoreCreatureStates(hero, savedCreatures) {
+        if (!savedCreatures || !Array.isArray(savedCreatures)) {
+            hero.creatures = [];
+            return;
+        }
+
+        hero.creatures = savedCreatures.map(savedCreature => {
+            return {
+                // Basic creature identification
+                name: savedCreature.name,
+                image: savedCreature.image,
+                
+                // Combat stats - RESTORED
+                currentHp: savedCreature.currentHp,
+                maxHp: savedCreature.maxHp,
+                atk: savedCreature.atk,
+                alive: savedCreature.alive,
+                
+                // Restore additional creature data
+                statusEffects: savedCreature.statusEffects || [],
+                temporaryModifiers: savedCreature.temporaryModifiers || {},
+                damageHistory: savedCreature.damageHistory || [],
+                
+                // Future expansion data
+                creatureAbilities: savedCreature.creatureAbilities || [],
+                equipment: savedCreature.equipment || [],
+                
+                // Metadata
+                createdAt: savedCreature.createdAt || Date.now(),
+                lastDamaged: savedCreature.lastDamaged || null
+            };
+        });
+
+        console.log(`🐾 Restored ${hero.creatures.length} creatures for ${hero.name}, alive: ${hero.creatures.filter(c => c.alive).length}`);
     }
 
     // Restore formation data
@@ -483,7 +598,7 @@ export class BattlePersistenceManager {
         console.log('🏺 Formations restored from Firebase');
     }
 
-    // Update battle visuals after restoration
+    // Update battle visuals after restoration INCLUDING NECROMANCY DISPLAYS
     updateBattleVisuals(battleManager, savedState) {
         // Update health bars and visual states
         ['left', 'center', 'right'].forEach(position => {
@@ -497,6 +612,14 @@ export class BattlePersistenceManager {
                 } else {
                     battleManager.resetHeroVisualState('player', position);
                 }
+                
+                // UPDATE CREATURE VISUALS
+                battleManager.updateCreatureVisuals('player', position, hero.creatures);
+                
+                // NEW: Update necromancy stack display using the battle manager's module
+                if (battleManager.necromancyManager) {
+                    battleManager.necromancyManager.updateNecromancyStackDisplay('player', position, hero.necromancyStacks);
+                }
             }
 
             // Update opponent heroes visuals
@@ -508,6 +631,14 @@ export class BattlePersistenceManager {
                     battleManager.handleHeroDeath(hero);
                 } else {
                     battleManager.resetHeroVisualState('opponent', position);
+                }
+                
+                // UPDATE CREATURE VISUALS
+                battleManager.updateCreatureVisuals('opponent', position, hero.creatures);
+                
+                // NEW: Update necromancy stack display using the battle manager's module
+                if (battleManager.necromancyManager) {
+                    battleManager.necromancyManager.updateNecromancyStackDisplay('opponent', position, hero.necromancyStacks);
                 }
             }
         });
@@ -521,7 +652,7 @@ export class BattlePersistenceManager {
             });
         }
 
-        console.log('🎨 Battle visuals updated after restoration');
+        console.log('🎨 Battle visuals with creature states and necromancy displays updated after restoration');
     }
 
     // Restore extensible state for future features

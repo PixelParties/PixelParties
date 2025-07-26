@@ -1,4 +1,4 @@
-// goldManager.js - Gold Management Module
+// goldManager.js - Gold Management Module with Enhanced Tracking
 
 export class GoldManager {
     constructor() {
@@ -8,7 +8,12 @@ export class GoldManager {
         this.animationQueue = [];
         this.isAnimating = false;
         
-        console.log('GoldManager initialized');
+        // Enhanced tracking for reward system integration
+        this.lastGoldChange = 0;
+        this.goldHistory = [];
+        this.maxHistoryLength = 10;
+        
+        console.log('GoldManager initialized with enhanced tracking');
     }
 
     // Initialize with callback for gold changes
@@ -27,12 +32,34 @@ export class GoldManager {
         return this.opponentGold;
     }
 
-    // Add gold to player
-    addPlayerGold(amount) {
+    // Record gold change in history
+    recordGoldChange(amount, reason = 'unknown') {
+        const change = {
+            amount: amount,
+            timestamp: Date.now(),
+            reason: reason,
+            newTotal: this.playerGold
+        };
+        
+        this.goldHistory.unshift(change);
+        
+        // Keep history limited
+        if (this.goldHistory.length > this.maxHistoryLength) {
+            this.goldHistory.pop();
+        }
+        
+        this.lastGoldChange = amount;
+    }
+
+    // Add gold to player with enhanced tracking
+    addPlayerGold(amount, reason = 'manual') {
         const oldGold = this.playerGold;
         this.playerGold += amount;
         
-        console.log(`Player gold: ${oldGold} -> ${this.playerGold} (+${amount})`);
+        // Record the change
+        this.recordGoldChange(amount, reason);
+        
+        console.log(`Player gold: ${oldGold} -> ${this.playerGold} (+${amount}) [${reason}]`);
         
         // Trigger callback if set
         if (this.goldChangeCallback) {
@@ -40,7 +67,8 @@ export class GoldManager {
                 type: 'player_gold_change',
                 oldValue: oldGold,
                 newValue: this.playerGold,
-                change: amount
+                change: amount,
+                reason: reason
             });
         }
         
@@ -51,11 +79,11 @@ export class GoldManager {
     }
 
     // Add gold to opponent
-    addOpponentGold(amount) {
+    addOpponentGold(amount, reason = 'manual') {
         const oldGold = this.opponentGold;
         this.opponentGold += amount;
         
-        console.log(`Opponent gold: ${oldGold} -> ${this.opponentGold} (+${amount})`);
+        console.log(`Opponent gold: ${oldGold} -> ${this.opponentGold} (+${amount}) [${reason}]`);
         
         // Trigger callback if set
         if (this.goldChangeCallback) {
@@ -63,7 +91,8 @@ export class GoldManager {
                 type: 'opponent_gold_change',
                 oldValue: oldGold,
                 newValue: this.opponentGold,
-                change: amount
+                change: amount,
+                reason: reason
             });
         }
         
@@ -73,12 +102,18 @@ export class GoldManager {
         return this.opponentGold;
     }
 
-    // Set player's gold (for syncing)
-    setPlayerGold(amount) {
+    // Set player's gold (for syncing) with enhanced tracking
+    setPlayerGold(amount, reason = 'sync') {
         const oldGold = this.playerGold;
         this.playerGold = Math.max(0, amount);
+        const change = this.playerGold - oldGold;
         
-        console.log(`Player gold set to: ${this.playerGold}`);
+        // Record the change if significant
+        if (Math.abs(change) > 0) {
+            this.recordGoldChange(change, reason);
+        }
+        
+        console.log(`Player gold set to: ${this.playerGold} [${reason}]`);
         
         // Trigger callback if set
         if (this.goldChangeCallback) {
@@ -86,17 +121,18 @@ export class GoldManager {
                 type: 'player_gold_set',
                 oldValue: oldGold,
                 newValue: this.playerGold,
-                change: this.playerGold - oldGold
+                change: change,
+                reason: reason
             });
         }
     }
 
     // Set opponent's gold (for syncing)
-    setOpponentGold(amount) {
+    setOpponentGold(amount, reason = 'sync') {
         const oldGold = this.opponentGold;
         this.opponentGold = Math.max(0, amount);
         
-        console.log(`Opponent gold set to: ${this.opponentGold}`);
+        console.log(`Opponent gold set to: ${this.opponentGold} [${reason}]`);
         
         // Trigger callback if set
         if (this.goldChangeCallback) {
@@ -104,9 +140,55 @@ export class GoldManager {
                 type: 'opponent_gold_set',
                 oldValue: oldGold,
                 newValue: this.opponentGold,
-                change: this.opponentGold - oldGold
+                change: this.opponentGold - oldGold,
+                reason: reason
             });
         }
+    }
+
+    // Award gold directly with reason tracking
+    awardGold(amount, isOpponent = false, reason = 'battle_reward') {
+        if (amount <= 0) return 0;
+        
+        if (isOpponent) {
+            this.addOpponentGold(amount, reason);
+            console.log(`Opponent awarded ${amount} gold from ${reason}`);
+        } else {
+            this.addPlayerGold(amount, reason);
+            console.log(`Player awarded ${amount} gold from ${reason}`);
+        }
+        
+        return amount;
+    }
+
+    // DEPRECATED: Award gold based on battle result
+    // Kept for backwards compatibility but now returns 0 to prevent double-awarding
+    awardBattleGold(result) {
+        console.warn('awardBattleGold is deprecated - gold should be awarded through reward screen');
+        return 0; // Return 0 to prevent double-awarding
+    }
+
+    // DEPRECATED: Award gold to opponent
+    // Kept for backwards compatibility but now returns 0 to prevent double-awarding
+    awardOpponentBattleGold(result) {
+        console.warn('awardOpponentBattleGold is deprecated - gold should be awarded through reward screen');
+        return 0; // Return 0 to prevent double-awarding
+    }
+
+    // Get last gold change amount
+    getLastGoldChange() {
+        return this.lastGoldChange;
+    }
+
+    // Get recent gold changes
+    getGoldHistory(count = 5) {
+        return this.goldHistory.slice(0, count);
+    }
+
+    // Clear gold history
+    clearGoldHistory() {
+        this.goldHistory = [];
+        this.lastGoldChange = 0;
     }
 
     // Queue gold animation
@@ -147,13 +229,13 @@ export class GoldManager {
         // Create animation element
         const animationElement = document.createElement('div');
         animationElement.className = 'gold-gain-animation';
-        animationElement.textContent = `+${amount}`;
+        animationElement.textContent = `${amount > 0 ? '+' : ''}${amount}`;
         animationElement.style.cssText = `
             position: absolute;
             top: 50%;
             left: 100%;
             transform: translateY(-50%);
-            color: #28a745;
+            color: ${amount > 0 ? '#28a745' : '#dc3545'};
             font-size: 16px;
             font-weight: bold;
             z-index: 100;
@@ -176,7 +258,7 @@ export class GoldManager {
         }, 1500);
     }
 
-    // Animate gold counter ticking up
+    // Animate gold counter ticking up/down
     animateGoldCounter(target, amount) {
         const goldNumberElement = document.querySelector(`.${target}-gold-number`);
         if (!goldNumberElement) return;
@@ -196,12 +278,17 @@ export class GoldManager {
             
             goldNumberElement.textContent = currentValue;
             
-            // Add pulse effect during animation
+            // Add pulse effect during animation with color for negative amounts
             if (progress < 1) {
-                goldNumberElement.style.transform = `scale(${1 + (Math.sin(progress * Math.PI * 6) * 0.1)})`;
+                const scale = 1 + (Math.sin(progress * Math.PI * 6) * 0.1);
+                goldNumberElement.style.transform = `scale(${scale})`;
+                if (amount < 0) {
+                    goldNumberElement.style.color = '#dc3545';
+                }
                 requestAnimationFrame(animate);
             } else {
                 goldNumberElement.style.transform = 'scale(1)';
+                goldNumberElement.style.color = '';
                 goldNumberElement.textContent = endValue;
             }
         };
@@ -235,68 +322,18 @@ export class GoldManager {
         }
     }
 
-    // Award gold based on battle result
-    awardBattleGold(result) {
-        let playerGoldGain = 0;
-        
-        switch (result) {
-            case 'victory':
-                playerGoldGain = 4; // Winner gets 4 gold
-                console.log('Player won battle - awarding 4 gold');
-                break;
-            case 'defeat':
-                playerGoldGain = 5; // Loser gets 5 gold (4 + 1 bonus)
-                console.log('Player lost battle - awarding 5 gold (including loser bonus)');
-                break;
-            case 'draw':
-                playerGoldGain = 4; // Draw gives base amount
-                console.log('Battle was a draw - awarding 4 gold');
-                break;
-        }
-        
-        if (playerGoldGain > 0) {
-            this.addPlayerGold(playerGoldGain);
-        }
-        
-        return playerGoldGain;
-    }
-
-    // Award gold to opponent (called when we receive their battle result)
-    awardOpponentBattleGold(result) {
-        let opponentGoldGain = 0;
-        
-        switch (result) {
-            case 'victory':
-                opponentGoldGain = 4; // Winner gets 4 gold
-                console.log('Opponent won battle - they get 4 gold');
-                break;
-            case 'defeat':
-                opponentGoldGain = 5; // Loser gets 5 gold (4 + 1 bonus)
-                console.log('Opponent lost battle - they get 5 gold (including loser bonus)');
-                break;
-            case 'draw':
-                opponentGoldGain = 4; // Draw gives base amount
-                console.log('Battle was a draw - opponent gets 4 gold');
-                break;
-        }
-        
-        if (opponentGoldGain > 0) {
-            this.addOpponentGold(opponentGoldGain);
-        }
-        
-        return opponentGoldGain;
-    }
-
-    // Export gold data (for saving/syncing)
+    // Export gold data (for saving/syncing) with enhanced data
     exportGoldData() {
         return {
             playerGold: this.playerGold,
             opponentGold: this.opponentGold,
+            lastGoldChange: this.lastGoldChange,
+            goldHistory: this.goldHistory,
             timestamp: Date.now()
         };
     }
 
-    // Import gold data (for loading/syncing)
+    // Import gold data (for loading/syncing) with enhanced data
     importGoldData(goldData) {
         if (!goldData || typeof goldData !== 'object') {
             console.error('Invalid gold data provided');
@@ -311,7 +348,16 @@ export class GoldManager {
             this.opponentGold = Math.max(0, goldData.opponentGold);
         }
         
-        console.log(`Imported gold data - Player: ${this.playerGold}, Opponent: ${this.opponentGold}`);
+        // Import enhanced tracking data if available
+        if (typeof goldData.lastGoldChange === 'number') {
+            this.lastGoldChange = goldData.lastGoldChange;
+        }
+        
+        if (Array.isArray(goldData.goldHistory)) {
+            this.goldHistory = goldData.goldHistory.slice(0, this.maxHistoryLength);
+        }
+        
+        console.log(`Imported gold data - Player: ${this.playerGold}, Opponent: ${this.opponentGold}, Last Change: ${this.lastGoldChange}`);
         return true;
     }
 
@@ -321,25 +367,31 @@ export class GoldManager {
         this.opponentGold = 0;
         this.animationQueue = [];
         this.isAnimating = false;
+        this.lastGoldChange = 0;
+        this.goldHistory = [];
         
         console.log('GoldManager reset');
     }
 
-    // Get gold statistics
+    // Get gold statistics with enhanced data
     getGoldStats() {
         return {
             playerGold: this.playerGold,
             opponentGold: this.opponentGold,
-            totalGold: this.playerGold + this.opponentGold
+            totalGold: this.playerGold + this.opponentGold,
+            lastGoldChange: this.lastGoldChange,
+            recentChanges: this.getGoldHistory(3)
         };
     }
 
-    // Log current gold state (for debugging)
+    // Log current gold state (for debugging) with enhanced data
     logGoldState() {
-        console.log('=== GOLD STATE ===');
+        console.log('=== ENHANCED GOLD STATE ===');
         console.log('Player Gold:', this.playerGold);
         console.log('Opponent Gold:', this.opponentGold);
         console.log('Total Gold:', this.playerGold + this.opponentGold);
-        console.log('==================');
+        console.log('Last Gold Change:', this.lastGoldChange);
+        console.log('Recent History:', this.getGoldHistory(3));
+        console.log('===========================');
     }
 }

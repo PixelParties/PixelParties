@@ -1,4 +1,4 @@
-// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management
+// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management and Creature Drag & Drop
 
 export class HeroSelectionUI {
     constructor() {
@@ -11,6 +11,163 @@ export class HeroSelectionUI {
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, str => str.toUpperCase())
             .trim();
+    }
+
+    // Show spellbook tooltip for a hero in formation screen
+    showHeroSpellbookTooltip(position, heroElement) {
+        // Get hero data
+        const hero = window.heroSelection?.formationManager?.getBattleFormation()?.[position];
+        if (!hero) return;
+        
+        // Get spellbook data
+        const spellbook = window.heroSelection?.heroSpellbookManager?.getHeroSpellbook(position);
+        if (!spellbook || spellbook.length === 0) return;
+        
+        // Remove any existing spellbook tooltip
+        this.hideHeroSpellbookTooltip();
+        
+        // Create spellbook tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'formation-spellbook-tooltip';
+        tooltip.id = 'formationSpellbookTooltip';
+        
+        // Sort spells by school first, then by name
+        const sortedSpells = [...spellbook].sort((a, b) => {
+            const schoolCompare = (a.spellSchool || 'Unknown').localeCompare(b.spellSchool || 'Unknown');
+            if (schoolCompare !== 0) return schoolCompare;
+            return a.name.localeCompare(b.name);
+        });
+        
+        // Build spellbook HTML
+        let spellbookHTML = `
+            <div class="spellbook-tooltip-container">
+                <h4 class="spellbook-tooltip-title">📜 ${hero.name}'s Spellbook</h4>
+                <div class="spellbook-list">
+        `;
+        
+        let currentSchool = null;
+        sortedSpells.forEach(spell => {
+            const spellSchool = spell.spellSchool || 'Unknown';
+            
+            // Add school header if new school
+            if (spellSchool !== currentSchool) {
+                if (currentSchool !== null) {
+                    spellbookHTML += '</div>'; // Close previous school section
+                }
+                currentSchool = spellSchool;
+                
+                // School styling
+                const schoolColors = {
+                    'DestructionMagic': '#ff6b6b',
+                    'SupportMagic': '#ffd43b',
+                    'DecayMagic': '#845ef7',
+                    'MagicArts': '#4dabf7',
+                    'SummoningMagic': '#51cf66',
+                    'Fighting': '#ff8c42',
+                    'Unknown': '#868e96'
+                };
+                const schoolColor = schoolColors[spellSchool] || '#868e96';
+                
+                const schoolIcons = {
+                    'DestructionMagic': '🔥',
+                    'SupportMagic': '✨',
+                    'DecayMagic': '💀',
+                    'MagicArts': '🔮',
+                    'SummoningMagic': '🌿',
+                    'Fighting': '⚔️',
+                    'Unknown': '❓'
+                };
+                const schoolIcon = schoolIcons[spellSchool] || '❓';
+                
+                const displaySchoolName = this.formatCardName(spellSchool);
+                
+                spellbookHTML += `
+                    <div class="spell-school-header" style="color: ${schoolColor};">
+                        <span class="school-icon">${schoolIcon}</span> ${displaySchoolName}
+                    </div>
+                    <div class="spell-school-section">
+                `;
+            }
+            
+            const spellLevel = spell.level !== undefined ? spell.level : 0;
+            const spellName = this.formatCardName(spell.name);
+            
+            spellbookHTML += `
+                <div class="spell-entry">
+                    <span class="spell-name">${spellName}</span>
+                    <span class="spell-level">Lv${spellLevel}</span>
+                </div>
+            `;
+        });
+        
+        if (currentSchool !== null) {
+            spellbookHTML += '</div>'; // Close last school section
+        }
+        
+        spellbookHTML += `
+                </div>
+                <div class="spell-count">Total Spells: ${sortedSpells.length}</div>
+            </div>
+        `;
+        
+        tooltip.innerHTML = spellbookHTML;
+        document.body.appendChild(tooltip);
+        
+        // Position tooltip to the left of the hero card
+        this.positionSpellbookTooltip(tooltip, heroElement);
+    }
+
+    // Hide spellbook tooltip
+    hideHeroSpellbookTooltip() {
+        const tooltip = document.getElementById('formationSpellbookTooltip');
+        if (tooltip) {
+            tooltip.remove();
+        }
+    }
+
+    // Position spellbook tooltip
+    positionSpellbookTooltip(tooltip, heroElement) {
+        if (!heroElement) return;
+        
+        const heroRect = heroElement.getBoundingClientRect();
+        
+        // Calculate position (to the left of the hero)
+        const tooltipWidth = 320; // Approximate width
+        let leftPos = heroRect.left - tooltipWidth - 20; // 20px gap
+        let topPos = heroRect.top;
+        
+        // Check if it would go off screen on the left
+        if (leftPos < 10) {
+            // Position to the right instead
+            leftPos = heroRect.right + 20;
+        }
+        
+        // Ensure it doesn't go off screen on top
+        if (topPos < 10) {
+            topPos = 10;
+        }
+        
+        tooltip.style.left = `${leftPos}px`;
+        tooltip.style.top = `${topPos}px`;
+        
+        // Check if card tooltip is visible and adjust position
+        const cardTooltip = document.querySelector('.large-card-tooltip:not(.formation-spellbook-tooltip)');
+        if (cardTooltip) {
+            const cardRect = cardTooltip.getBoundingClientRect();
+            
+            // If overlapping with card tooltip, reposition
+            if (leftPos + tooltipWidth > cardRect.left && leftPos < cardRect.right) {
+                // Try to position further left
+                leftPos = cardRect.left - tooltipWidth - 20;
+                if (leftPos < 10) {
+                    // If still no room, stack vertically
+                    topPos = cardRect.bottom + 20;
+                    leftPos = heroRect.left;
+                }
+                tooltip.style.left = `${leftPos}px`;
+                tooltip.style.top = `${topPos}px`;
+            }
+        }
     }
 
     // Create character card HTML
@@ -76,6 +233,10 @@ export class HeroSelectionUI {
     createAbilityZonesHTML(position, heroAbilitiesManager) {
         const abilities = heroAbilitiesManager ? heroAbilitiesManager.getHeroAbilities(position) : null;
         
+        // Get creatures if available
+        const creatures = window.heroSelection?.heroCreatureManager ? 
+            window.heroSelection.heroCreatureManager.getHeroCreatures(position) : [];
+        
         const createZoneHTML = (zoneNumber) => {
             const zoneAbilities = abilities ? abilities[`zone${zoneNumber}`] : [];
             const hasAbilities = zoneAbilities && zoneAbilities.length > 0;
@@ -94,27 +255,79 @@ export class HeroSelectionUI {
                 
                 return `
                     <div class="ability-zone filled" 
-                         data-position="${position}" 
-                         data-zone="${zoneNumber}">
+                        data-position="${position}" 
+                        data-zone="${zoneNumber}">
                         <img src="${ability.image}" 
-                             alt="${ability.name}" 
-                             class="ability-card-image"
-                             onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
-                             onmouseleave="window.hideCardTooltip()"
-                             onerror="this.src='./Cards/placeholder.png'">
+                            alt="${ability.name}" 
+                            class="ability-card-image clickable-ability"
+                            onclick="window.onAbilityClick('${position}', ${zoneNumber}, '${ability.name}', ${stackCount})"
+                            onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
+                            onmouseleave="window.hideCardTooltip()"
+                            onerror="this.src='./Cards/placeholder.png'">
                         <div class="ability-stack-count">${stackCount}</div>
                     </div>
                 `;
             } else {
                 return `
                     <div class="ability-zone" 
-                         data-position="${position}" 
-                         data-zone="${zoneNumber}">
+                        data-position="${position}" 
+                        data-zone="${zoneNumber}">
                         <div class="zone-placeholder">Z${zoneNumber}</div>
                     </div>
                 `;
             }
         };
+        
+        // Create animated creatures HTML with drag and drop functionality
+        let creaturesHTML = '';
+        if (creatures && creatures.length > 0) {
+            creaturesHTML = `
+                <div class="hero-creatures" 
+                    data-hero-position="${position}"
+                    ondragover="window.onCreatureContainerDragOver(event, '${position}')"
+                    ondrop="window.onCreatureContainerDrop(event, '${position}')"
+                    ondragleave="window.onCreatureContainerDragLeave(event)">
+                    ${creatures.map((creature, index) => {
+                        const creatureSprite = `./Creatures/${creature.name}.png`;
+                        const cardData = {
+                            imagePath: creature.image,
+                            displayName: this.formatCardName(creature.name),
+                            cardType: 'creature'
+                        };
+                        const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
+                        
+                        // Prepare creature data for drag operations
+                        const creatureDataJson = JSON.stringify({
+                            name: creature.name,
+                            heroPosition: position,
+                            index: index
+                        }).replace(/"/g, '&quot;');
+                        
+                        // Vary animation speed for visual interest
+                        const speedClasses = ['speed-slow', 'speed-normal', 'speed-fast'];
+                        const speedClass = speedClasses[index % speedClasses.length];
+                        
+                        return `
+                            <div class="creature-icon" 
+                                data-creature-index="${index}"
+                                data-hero-position="${position}"
+                                draggable="true"
+                                ondragstart="window.onCreatureDragStart(event, '${creatureDataJson}')"
+                                ondragend="window.onCreatureDragEnd(event)"
+                                onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
+                                onmouseleave="window.hideCardTooltip()">
+                                <div class="creature-sprite-container">
+                                    <img src="${creatureSprite}" 
+                                        alt="${creature.name}" 
+                                        class="creature-sprite ${speedClass}"
+                                        onerror="this.src='./Creatures/placeholder.png'">
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
         
         return `
             <div class="hero-ability-zones" data-hero-position="${position}">
@@ -122,29 +335,34 @@ export class HeroSelectionUI {
                 ${createZoneHTML(2)}
                 ${createZoneHTML(3)}
             </div>
+            ${creaturesHTML}
         `;
     }
 
     // Create team building slot HTML
     createTeamSlotHTML(position, character = null, createCharacterCardFn, heroAbilitiesManager = null) {
-        const mouseEvents = character ? `
-            onmouseenter="window.showHeroSpellbookTooltip('${position}')"
-            onmouseleave="window.hideHeroSpellbookTooltip()"
-        ` : '';
-
         const slotClass = character ? 'team-slot filled' : 'team-slot empty';
+        
+        // Create character HTML WITHOUT tooltip events (we'll handle them at the slot level)
         const characterHTML = character ? 
-            this.createCharacterCardHTML(character, false, false, true, true, position, true, heroAbilitiesManager) : 
+            this.createCharacterCardHTML(character, false, false, false, true, position, true, heroAbilitiesManager) : 
             '<div class="slot-placeholder">Empty Slot</div>';
+        
+        // Add mouse events at the slot level
+        const mouseEvents = character ? `
+            onmouseenter="window.handleHeroHoverEnter('${position}', this)"
+            onmouseleave="window.handleHeroHoverLeave()"
+        ` : '';
         
         // Add drag handlers for both hero swapping AND ability attachment
         return `
             <div class="${slotClass}" 
-                 data-position="${position}"
-                 ondragover="window.onTeamSlotDragOver(event, '${position}')"
-                 ondrop="window.onTeamSlotDrop(event, '${position}')"
-                 ondragleave="window.onTeamSlotDragLeave(event)"
-                 ondragenter="window.onTeamSlotDragEnter(event)">
+                data-position="${position}"
+                ${mouseEvents}
+                ondragover="window.onTeamSlotDragOver(event, '${position}')"
+                ondrop="window.onTeamSlotDrop(event, '${position}')"
+                ondragleave="window.onTeamSlotDragLeave(event)"
+                ondragenter="window.onTeamSlotDragEnter(event)">
                 ${characterHTML}
             </div>
         `;
@@ -231,6 +449,8 @@ export class HeroSelectionUI {
                         <h2>🛡️ Your Battle Formation</h2>
                         <p class="drag-hint">💡 Drag and drop heroes to rearrange your formation!</p>
                         <p class="drag-hint">🎯 Drag ability cards to any hero slot to attach them!</p>
+                        <p class="drag-hint">📜 Drag spell cards to heroes to add them to their spellbook!</p>
+                        <p class="drag-hint">🐾 Drag creatures to reorder them within the same hero!</p>
                     </div>
                     
                     <div class="team-slots-container">
@@ -390,7 +610,10 @@ function onTeamSlotDragOver(event, position) {
             // Clean up tooltip from other slots if we're over a different slot
             if (currentTooltipSlot && currentTooltipSlot !== slot) {
                 cleanupAllAbilityTooltips();
-                currentTooltipSlot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
+                // Add null check before accessing classList
+                if (currentTooltipSlot && currentTooltipSlot.classList) {
+                    currentTooltipSlot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
+                }
             }
             
             // Check if tooltip already exists for this slot
@@ -622,6 +845,208 @@ if (typeof document !== 'undefined') {
     });
 }
 
+// ===== NEW: CREATURE DRAG AND DROP HANDLERS =====
+
+// Global creature drag state tracking
+let creatureDragState = {
+    isDragging: false,
+    draggedCreature: null,
+    draggedFromHero: null,
+    draggedFromIndex: null
+};
+
+// Creature drag start handler
+function onCreatureDragStart(event, creatureDataJson) {
+    try {
+        const creatureData = JSON.parse(creatureDataJson.replace(/&quot;/g, '"'));
+        
+        // Create a custom drag image showing only the middle frame
+        const originalImg = event.target.closest('.creature-icon').querySelector('.creature-sprite');
+        if (originalImg && originalImg.complete && originalImg.naturalWidth > 0) {
+            // Create a canvas to extract just the middle frame
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to match the sprite container
+            canvas.width = 32;
+            canvas.height = 32;
+            
+            // Calculate frame width (each frame is 1/3 of total width)
+            const frameWidth = originalImg.naturalWidth / 3;
+            const frameHeight = originalImg.naturalHeight;
+            
+            // Draw only the middle frame (frame index 1, which is the second frame)
+            ctx.drawImage(
+                originalImg,
+                frameWidth, 0, frameWidth, frameHeight, // Source: middle frame
+                0, 0, canvas.width, canvas.height       // Destination: full canvas
+            );
+            
+            // Set the custom drag image
+            event.dataTransfer.setDragImage(canvas, 16, 16); // Center the drag image
+        }
+        
+        // Set up drag data
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('application/x-creature-drag', creatureDataJson);
+        event.dataTransfer.setData('text/plain', creatureData.name);
+        
+        // Update creature manager drag state
+        if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+            const success = window.heroSelection.heroCreatureManager.startCreatureDrag(
+                creatureData.heroPosition,
+                creatureData.index,
+                event.target.closest('.creature-icon')
+            );
+            
+            if (!success) {
+                event.preventDefault();
+                return false;
+            }
+        }
+        
+        // Update global drag state
+        creatureDragState = {
+            isDragging: true,
+            draggedCreature: creatureData,
+            draggedFromHero: creatureData.heroPosition,
+            draggedFromIndex: creatureData.index
+        };
+        
+        // Add visual feedback
+        event.target.closest('.creature-icon').classList.add('creature-dragging');
+        
+        console.log(`Started dragging creature ${creatureData.name} from ${creatureData.heroPosition}[${creatureData.index}]`);
+        
+    } catch (error) {
+        console.error('Error starting creature drag:', error);
+        event.preventDefault();
+        return false;
+    }
+}
+
+// Creature drag end handler
+function onCreatureDragEnd(event) {
+    // Clean up drag state
+    if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+        window.heroSelection.heroCreatureManager.endCreatureDrag();
+    }
+    
+    creatureDragState = {
+        isDragging: false,
+        draggedCreature: null,
+        draggedFromHero: null,
+        draggedFromIndex: null
+    };
+    
+    // Clean up visual feedback
+    const draggingElements = document.querySelectorAll('.creature-dragging');
+    draggingElements.forEach(el => el.classList.remove('creature-dragging'));
+    
+    // Clean up drop zone visual feedback
+    const creatureContainers = document.querySelectorAll('.hero-creatures');
+    creatureContainers.forEach(container => {
+        container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
+    });
+    
+    console.log('Creature drag ended');
+}
+
+// Creature container drag over handler
+function onCreatureContainerDragOver(event, heroPosition) {
+    // Only handle creature drags
+    if (!creatureDragState.isDragging) {
+        return;
+    }
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const container = event.currentTarget;
+    
+    // Check if this is the same hero as the dragged creature
+    if (heroPosition === creatureDragState.draggedFromHero) {
+        // Valid drop zone - same hero
+        container.classList.add('creature-drop-ready');
+        container.classList.remove('creature-drop-invalid');
+        event.dataTransfer.dropEffect = 'move';
+    } else {
+        // Invalid drop zone - different hero
+        container.classList.add('creature-drop-invalid');
+        container.classList.remove('creature-drop-ready');
+        event.dataTransfer.dropEffect = 'none';
+    }
+}
+
+// Creature container drag leave handler
+function onCreatureContainerDragLeave(event) {
+    const container = event.currentTarget;
+    const rect = container.getBoundingClientRect();
+    
+    const x = event.clientX;
+    const y = event.clientY;
+    const margin = 5; // Small margin for better UX
+    
+    // Only remove classes if we're actually leaving the container
+    if (x < rect.left - margin || x > rect.right + margin || 
+        y < rect.top - margin || y > rect.bottom + margin) {
+        
+        container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
+    }
+}
+
+// Creature container drop handler
+async function onCreatureContainerDrop(event, heroPosition) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const container = event.currentTarget;
+    
+    // Clean up visual feedback
+    container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
+    
+    // Only handle creature drags
+    if (!creatureDragState.isDragging) {
+        return false;
+    }
+    
+    // Only allow drops within the same hero
+    if (heroPosition !== creatureDragState.draggedFromHero) {
+        console.log('Cannot move creature to different hero - ignoring drop');
+        return false;
+    }
+    
+    // Handle the reorder using the creature manager
+    if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+        const success = window.heroSelection.heroCreatureManager.handleCreatureDrop(
+            heroPosition,
+            event.clientX,
+            container
+        );
+        
+        if (success) {
+            // Update the UI
+            if (window.heroSelection.updateBattleFormationUI) {
+                window.heroSelection.updateBattleFormationUI();
+            }
+            
+            // Save game state
+            if (window.heroSelection.saveGameState) {
+                await window.heroSelection.saveGameState();
+            }
+            
+            // Send formation update to opponent
+            if (window.heroSelection.sendFormationUpdate) {
+                await window.heroSelection.sendFormationUpdate();
+            }
+        }
+        
+        return success;
+    }
+    
+    return false;
+}
+
 // Add tooltip functions
 window.showHeroSpellbookTooltip = function(position) {
     const spellbook = window.heroSelection.heroSpellbookManager.getHeroSpellbook(position);
@@ -644,6 +1069,94 @@ window.showHeroSpellbookTooltip = function(position) {
     slot.appendChild(tooltip);
 };
 
+// Enhanced hover handlers for hero slots
+window.handleHeroHoverEnter = function(position, element) {
+    if (!window.heroSelection) return;
+    
+    // Show card tooltip
+    const hero = window.heroSelection.formationManager.getBattleFormation()[position];
+    if (hero) {
+        const cardData = {
+            imagePath: hero.image,
+            displayName: hero.name,
+            cardType: 'character'
+        };
+        window.showCardTooltip(JSON.stringify(cardData), element);
+    }
+    
+    // Show spellbook tooltip if hero has spells
+    if (window.heroSelection.heroSelectionUI) {
+        window.heroSelection.heroSelectionUI.showHeroSpellbookTooltip(position, element);
+    }
+};
+
+window.handleHeroHoverLeave = function() {
+    // Hide card tooltip
+    window.hideCardTooltip();
+    
+    // Hide spellbook tooltip
+    if (window.heroSelection?.heroSelectionUI) {
+        window.heroSelection.heroSelectionUI.hideHeroSpellbookTooltip();
+    }
+};
+
+// Global ability click handler
+async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount) {
+    console.log(`Ability clicked: ${abilityName} at ${heroPosition} zone ${zoneNumber}, stack count: ${stackCount}`);
+    
+    // Handle specific abilities
+    switch(abilityName) {
+        case 'Leadership':
+            // Handle Leadership ability
+            try {
+                // Ensure the Leadership ability module is available
+                if (window.leadershipAbility) {
+                    await window.leadershipAbility.handleClick(heroPosition, stackCount);
+                } else {
+                    // Dynamically import if not available
+                    const { leadershipAbility } = await import('./leadership.js');
+                    await leadershipAbility.handleClick(heroPosition, stackCount);
+                }
+            } catch (error) {
+                console.error('Failed to handle Leadership ability:', error);
+                
+                // Show error feedback to user
+                const abilityZone = document.querySelector(`.ability-zone[data-position="${heroPosition}"][data-zone="${zoneNumber}"]`);
+                if (abilityZone) {
+                    abilityZone.classList.add('ability-error');
+                    setTimeout(() => {
+                        abilityZone.classList.remove('ability-error');
+                    }, 1000);
+                }
+            }
+            break;
+            
+        case 'Adventurousness':
+            // Dynamically import the Adventurousness module
+            try {
+                const { adventurousnessAbility } = await import('./Abilities/adventurousness.js');
+                adventurousnessAbility.handleClick(heroPosition, stackCount);
+            } catch (error) {
+                console.error('Failed to load Adventurousness ability handler:', error);
+            }
+            break;
+            
+        default:
+            // For other abilities, just log for now
+            console.log(`No specific handler for ${abilityName} yet`);
+            
+            // Visual feedback for click
+            const abilityZone = document.querySelector(`.ability-zone[data-position="${heroPosition}"][data-zone="${zoneNumber}"]`);
+            if (abilityZone) {
+                abilityZone.classList.add('ability-clicked');
+                setTimeout(() => {
+                    abilityZone.classList.remove('ability-clicked');
+                }, 300);
+            }
+            break;
+    }
+}
+
 // Attach to window
 if (typeof window !== 'undefined') {
     window.onTeamSlotDragOver = onTeamSlotDragOver;
@@ -651,4 +1164,112 @@ if (typeof window !== 'undefined') {
     window.onTeamSlotDragLeave = onTeamSlotDragLeave;
     window.onTeamSlotDrop = onTeamSlotDrop;
     window.cleanupAllAbilityTooltips = cleanupAllAbilityTooltips;
+    window.onAbilityClick = onAbilityClick;
+    
+    // NEW: Creature drag and drop functions
+    window.onCreatureDragStart = onCreatureDragStart;
+    window.onCreatureDragEnd = onCreatureDragEnd;
+    window.onCreatureContainerDragOver = onCreatureContainerDragOver;
+    window.onCreatureContainerDragLeave = onCreatureContainerDragLeave;
+    window.onCreatureContainerDrop = onCreatureContainerDrop;
+}
+
+// Add clickable ability and creature drag styles
+if (typeof document !== 'undefined' && !document.getElementById('clickableAbilityStyles')) {
+    const style = document.createElement('style');
+    style.id = 'clickableAbilityStyles';
+    style.textContent = `
+        /* Clickable Ability Styles */
+        .ability-card-image.clickable-ability {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        }
+
+        .ability-card-image.clickable-ability:hover {
+            transform: scale(1.1);
+            filter: brightness(1.2);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        .ability-card-image.clickable-ability:active {
+            transform: scale(0.95);
+        }
+
+        .ability-zone.ability-clicked {
+            animation: abilityClickPulse 0.3s ease-out;
+        }
+
+        @keyframes abilityClickPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        /* Make sure ability zones have proper z-index for clicks */
+        .ability-zone.filled {
+            position: relative;
+            z-index: 10;
+        }
+
+        .ability-zone.filled .ability-card-image {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Creature Drag and Drop Styles */
+        .creature-icon {
+            cursor: grab;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            position: relative;
+        }
+
+        .creature-icon:hover {
+            transform: scale(1.05);
+        }
+
+        .creature-icon.creature-dragging {
+            opacity: 0.5;
+            transform: scale(0.9);
+            cursor: grabbing;
+        }
+
+        .hero-creatures {
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 4px;
+            min-height: 40px;
+            position: relative;
+        }
+
+        .hero-creatures.creature-drop-ready {
+            background-color: rgba(76, 175, 80, 0.1);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .hero-creatures.creature-drop-invalid {
+            background-color: rgba(244, 67, 54, 0.1);
+            border-color: rgba(244, 67, 54, 0.5);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Add CSS for ability error state
+if (typeof document !== 'undefined' && !document.getElementById('abilityErrorStyles')) {
+    const style = document.createElement('style');
+    style.id = 'abilityErrorStyles';
+    style.textContent = `
+        .ability-zone.ability-error {
+            animation: abilityErrorShake 0.5s ease-out;
+        }
+        
+        @keyframes abilityErrorShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    `;
+    document.head.appendChild(style);
 }

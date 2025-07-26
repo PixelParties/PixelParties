@@ -333,6 +333,7 @@ body::before {
     z-index: -1;
 }
 
+/* Body states for drag and drop */
 body.dragging-ability .ability-zone:not(.filled) {
     background: rgba(102, 126, 234, 0.15);
     border-style: solid;
@@ -366,7 +367,13 @@ body.dragging-spell .team-slot.filled {
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
 }
 
-/* Headings */
+body.reward-overlay-active {
+    overflow: hidden !important;
+    position: fixed;
+    width: 100%;
+}
+
+/* Typography */
 h1 {
     color: #333;
     margin-bottom: 30px;
@@ -438,10 +445,6 @@ h1::after {
     pointer-events: none;
 }
 
-.container.hidden {
-    display: none !important;
-}
-
 .game-screen {
     width: 100vw;
     height: 100vh;
@@ -459,18 +462,6 @@ h1::after {
     overflow: hidden;
 }
 
-.game-screen.hidden {
-    display: none !important;
-}
-
-.game-subtitle {
-    color: #666;
-    font-size: 1rem;
-    margin-bottom: 30px;
-    font-weight: 500;
-    opacity: 0.8;
-}
-
 .game-title {
     font-size: 3rem;
     font-weight: 900;
@@ -483,6 +474,14 @@ h1::after {
     text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
     text-align: center;
     display: none;
+}
+
+.game-subtitle {
+    color: #666;
+    font-size: 1rem;
+    margin-bottom: 30px;
+    font-weight: 500;
+    opacity: 0.8;
 }
 
 .game-screen .game-subtitle {
@@ -548,10 +547,6 @@ h1::after {
     margin-bottom: 15px;
 }
 
-.password-section.hidden {
-    display: none;
-}
-
 .password-hint {
     font-size: 0.85rem;
     color: #666;
@@ -560,7 +555,7 @@ h1::after {
 }
 
 /* ============================================
-   7. BUTTONS - Consolidated and organized
+   7. BUTTONS - All button variants
    ============================================ */
 .btn {
     padding: 16px 32px;
@@ -761,18 +756,13 @@ h1::after {
     box-shadow: 0 2px 10px rgba(196, 69, 105, 0.3);
 }
 
-.to-battle-button:disabled {
+.to-battle-button:disabled,
+.to-battle-button:disabled:hover {
     background: linear-gradient(135deg, #999 0%, #777 100%);
     cursor: not-allowed;
     opacity: 0.7;
     box-shadow: none;
     transform: none;
-}
-
-.to-battle-button:disabled:hover {
-    transform: none;
-    box-shadow: none;
-    background: linear-gradient(135deg, #999 0%, #777 100%);
 }
 
 /* Modal buttons */
@@ -1013,12 +1003,19 @@ h1::after {
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.loading-rooms {
+.loading-rooms,
+.no-rooms {
     text-align: center;
     padding: 40px 20px;
     color: #666;
     font-size: 1.1rem;
     font-weight: 600;
+}
+
+.no-rooms-icon {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    opacity: 0.5;
 }
 
 .room-item {
@@ -1143,19 +1140,6 @@ h1::after {
     gap: 10px;
 }
 
-.no-rooms {
-    text-align: center;
-    padding: 40px 20px;
-    color: #666;
-    font-size: 1.1rem;
-}
-
-.no-rooms-icon {
-    font-size: 3rem;
-    margin-bottom: 15px;
-    opacity: 0.5;
-}
-
 /* ============================================
    11. MODALS & OVERLAYS
    ============================================ */
@@ -1171,10 +1155,6 @@ h1::after {
     justify-content: center;
     align-items: center;
     z-index: var(--z-modal);
-}
-
-.modal-overlay.hidden {
-    display: none;
 }
 
 .password-modal,
@@ -1228,10 +1208,6 @@ h1::after {
     font-size: 0.9rem;
     border: 1px solid rgba(253, 121, 168, 0.3);
     animation: shake 0.5s ease-in-out;
-}
-
-.password-error.hidden {
-    display: none;
 }
 
 .modal-buttons,
@@ -1342,7 +1318,7 @@ h1::after {
 }
 
 /* ============================================
-   12. TOOLTIPS - Consolidated
+   12. TOOLTIPS - All tooltip types
    ============================================ */
 .card-tooltip-container {
     position: fixed;
@@ -1356,7 +1332,9 @@ h1::after {
     overflow: visible;
 }
 
-.large-card-tooltip {
+.large-card-tooltip,
+.battle-card-tooltip,
+.preview-card-display {
     position: absolute;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 249, 250, 0.98));
     backdrop-filter: blur(20px);
@@ -1378,9 +1356,6 @@ h1::after {
 .battle-card-tooltip,
 .preview-card-display {
     animation: tooltipFadeInSmooth 0.1s ease-out;
-    box-sizing: border-box;
-    transform: none !important;
-    transition: opacity 0.1s ease-out;
 }
 
 .large-card-image {
@@ -1452,9 +1427,6 @@ h1::after {
     text-overflow: ellipsis;
     pointer-events: none !important;
     user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
     opacity: 0;
     animation: tooltipSlideIn 0.25s ease-out forwards;
     box-sizing: border-box;
@@ -1800,11 +1772,19 @@ h1::after {
     align-items: center;
     flex: 1;
     min-width: 0;
+    position: relative !important;
+    min-width: 300px;
+    min-height: 400px;
 }
 
 .team-building-right {
     justify-content: flex-start;
     padding-top: 100px;
+}
+
+/* Force layout recalculation after battle */
+.hero-selection-screen[data-post-battle="true"] .team-building-right {
+    transform: translateZ(0); /* Force GPU acceleration and layout recalc */
 }
 
 .selection-header,
@@ -1993,7 +1973,6 @@ h1::after {
     overflow: hidden;
     flex: 1;
     max-width: 60px;
-    pointer-events: none;
 }
 
 .character-card .ability-zone:hover {
@@ -2322,7 +2301,7 @@ h1::after {
 }
 
 /* ============================================
-   15. CARD SYSTEMS - All card-related styles consolidated
+   15. CARD SYSTEMS - All card-related styles
    ============================================ */
 .card-preview-content {
     width: 100%;
@@ -2421,17 +2400,14 @@ h1::after {
     min-height: 120px;
 }
 
-.card-slot:hover {
+.card-slot:hover,
+.card-grid-4x3 .card-slot:hover,
+.card-grid-4x4 .card-slot:hover,
+.card-grid-5x4 .card-slot:hover {
     transform: scale(1.05);
     border-color: rgba(102, 126, 234, 0.5);
     box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
     z-index: 10;
-}
-
-.card-grid-4x4 .card-slot,
-.card-grid-5x4 .card-slot {
-    min-height: 100px;
-    padding: 6px;
 }
 
 .card-grid-4x3 .card-slot:hover,
@@ -2439,6 +2415,12 @@ h1::after {
 .card-grid-5x4 .card-slot:hover {
     transform: scale(1.1);
     z-index: 15;
+}
+
+.card-grid-4x4 .card-slot,
+.card-grid-5x4 .card-slot {
+    min-height: 100px;
+    padding: 6px;
 }
 
 .character-card-slot {
@@ -2640,7 +2622,7 @@ h1::after {
     backdrop-filter: blur(8px);
     border: 2px solid rgba(255,255,255,0.1);
     border-radius: var(--radius-medium);
-    padding: 20px;
+    padding: 12px;
     width: 100%;
     box-shadow: var(--shadow-medium);
 }
@@ -2702,11 +2684,11 @@ h1::after {
     align-items: flex-end;
     flex-wrap: nowrap;
     max-width: 100%;
-    padding: 10px 0;
+    padding: 5px 0;
     position: relative;
     overflow: visible;
     transition: var(--transition-medium);
-    min-height: 240px;
+    min-height: 220px;
 }
 
 .hand-cards.preview-reordering {
@@ -2789,8 +2771,6 @@ h1::after {
     flex-shrink: 0;
     margin-right: 0;
     user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
     opacity: 1;
     transform: none;
 }
@@ -2844,11 +2824,7 @@ h1::after {
     object-fit: cover;
     background: linear-gradient(135deg, #3a3a3a, #2a2a2a);
     pointer-events: none;
-    -webkit-user-drag: none;
-    -moz-user-drag: none;
-    user-drag: none;
     user-select: none;
-    -webkit-user-select: none;
 }
 
 .hand-display-area-inline .hand-card-image:hover,
@@ -2882,8 +2858,6 @@ h1::after {
     z-index: 15;
     pointer-events: none;
     user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
 }
 
 .hand-display-area-inline .hand-card:hover .hand-card-name {
@@ -3720,6 +3694,8 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     animation: modalSlideIn 0.5s ease-out;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .card-reward-container::before {
@@ -3745,7 +3721,7 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
 
 .card-reward-header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 20px !important;
     position: relative;
     z-index: 2;
 }
@@ -4044,6 +4020,59 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     color: #ffc107;
 }
 
+/* Reward container styles */
+.reward-container.enhanced-with-gold-and-preview {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.reward-content-wrapper {
+    display: flex;
+    gap: 25px;
+    height: 100%;
+    width: 100%;
+}
+
+.reward-left-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.reward-right-section {
+    flex: 0 0 380px;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 0;
+}
+
+.reward-main-content {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+    margin-bottom: 30px;
+    justify-content: flex-start;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.reward-card-preview-section {
+    flex: 1;
+    max-height: calc(100% - 40px);
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.05) 0%, 
+        rgba(102, 126, 234, 0.1) 100%);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 15px;
+    padding: 8px;
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+}
+
 /* ============================================
    20. ACTION DISPLAY SYSTEM
    ============================================ */
@@ -4160,76 +4189,99 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
 
 /* Resource display container for Gold and Actions */
 .resource-display-container {
-    position: fixed;
-    bottom: 120px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: absolute;
+    bottom: 20px;          
+    right: 22%;
     z-index: 100;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
+    width: auto;
+    max-width: 1000px;
+    pointer-events: none;
 }
 
-/* Compact action display */
-.action-display-container.compact {
+/* Make child elements interactive while keeping container non-interactive */
+.resource-display-container > * {
+    pointer-events: auto;
+}
+
+/* Ensure gold and action displays have constrained widths and are left-aligned */
+.resource-display-container .gold-display-enhanced,
+.resource-display-container .action-display-container {
+    width: auto;
+    max-width: 280px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+/* Target action displays within the resource container to be compact */
+.resource-display-container .action-display-container {
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(16, 16, 32, 0.95));
     border: 2px solid #ffd700;
     border-radius: 12px;
     padding: 8px 16px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(10px);
+    min-width: 160px;
 }
 
-.action-display-container.compact .action-display {
+.resource-display-container .action-display {
     display: flex;
     align-items: center;
     gap: 12px;
+    justify-content: space-between;
 }
 
-.action-display-container.compact .action-header {
+.resource-display-container .action-header {
     display: flex;
     align-items: center;
     gap: 6px;
     margin: 0;
+    flex-shrink: 0;
 }
 
-.action-display-container.compact .action-icon {
+.resource-display-container .action-icon {
     font-size: 18px;
 }
 
-.action-display-container.compact .action-label {
+.resource-display-container .action-label {
     font-size: 14px;
     font-weight: bold;
     color: #ffd700;
+    white-space: nowrap;
 }
 
-.action-display-container.compact .action-counter {
+.resource-display-container .action-counter {
     font-size: 16px;
     font-weight: bold;
     color: white;
     display: flex;
     align-items: center;
     gap: 4px;
+    flex-shrink: 0;
 }
 
-.action-display-container.compact .current-actions {
+.resource-display-container .current-actions {
     color: #ffd700;
     font-size: 20px;
 }
 
-.action-display-container.compact .max-actions {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 14px;
+/* Hide the max actions display in resource container */
+.resource-display-container .max-actions {
+    display: none;
 }
 
-.action-display-container.compact .action-orbs {
+.resource-display-container .action-orbs {
     display: flex;
     gap: 4px;
     align-items: center;
+    flex-shrink: 0;
 }
 
-.action-display-container.compact .action-orb {
+.resource-display-container .action-orb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
@@ -4237,12 +4289,12 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     transition: all 0.3s ease;
 }
 
-.action-display-container.compact .action-orb.filled {
+.resource-display-container .action-orb.filled {
     background: radial-gradient(circle at 30% 30%, #ffed4e, #ffd700);
     box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
 }
 
-.action-display-container.compact .action-orb.empty {
+.resource-display-container .action-orb.empty {
     background: rgba(0, 0, 0, 0.5);
     border-color: rgba(255, 215, 0, 0.3);
 }
@@ -4251,15 +4303,264 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     animation: actionPulse 0.5s ease-out;
 }
 
-/* Adjust gold display to work with resource container */
-.gold-display-enhanced {
+/* Ensure gold display has proper constraints and left-alignment */
+.resource-display-container .gold-display-enhanced {
     position: static !important;
     transform: none !important;
     margin: 0;
+    width: auto;
+    max-width: 200px;
+    align-self: flex-start;
+}
+
+.resource-display-container .gold-amount-large {
+    padding: 0.5rem 1rem;
+    gap: 8px;
+    width: auto;
+    max-width: 180px;
+    box-sizing: border-box;
+    justify-content: flex-start;
 }
 
 /* ============================================
-   21. SCROLLBARS
+   21. DECK TOOLTIP POSITIONING SYSTEM
+   ============================================ */
+.deck-tooltip-anchor {
+    position: fixed !important;
+    top: 100px !important; 
+    right: 50px !important;
+    left: auto !important;
+    transform: none !important;
+    width: 450px;
+    height: 600px;
+    pointer-events: none;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.deck-tooltip-content {
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    position: relative;
+    display: none;
+    padding: 0;
+}
+
+.deck-tooltip-content .large-card-tooltip {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    width: 100%;
+    height: 100%;
+    max-width: none !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    box-sizing: border-box; 
+}
+
+.deck-tooltip-content .large-card-image {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: calc(100% - 40px) !important;
+    object-fit: contain !important;
+    flex: 1 1 auto;
+    margin-bottom: 1px;
+}
+
+.deck-tooltip-content .card-tooltip-name {
+    flex: 0 0 auto;
+    width: 100%;
+    text-align: center;
+    padding: 10px;
+    font-size: 1.2rem !important;
+}
+
+/* ============================================
+   22. FORMATION SPELLBOOK TOOLTIP
+   ============================================ */
+.formation-spellbook-tooltip {
+    position: fixed;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.98), rgba(16, 16, 32, 0.98));
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid #667eea;
+    min-width: 300px;
+    max-width: 350px;
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.8),
+        0 0 40px rgba(102, 126, 234, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    z-index: 2999; /* Just below card tooltip */
+    pointer-events: none;
+    animation: tooltipFadeIn 0.2s ease-out;
+}
+
+.spellbook-tooltip-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.spellbook-tooltip-title {
+    margin: 0 0 15px 0;
+    color: #fff;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.formation-spellbook-tooltip .spellbook-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.formation-spellbook-tooltip .spellbook-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.formation-spellbook-tooltip .spellbook-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.formation-spellbook-tooltip .spellbook-list::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.5);
+    border-radius: 3px;
+}
+
+.formation-spellbook-tooltip .spell-school-header {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 12px 0 8px 0;
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.9;
+}
+
+.formation-spellbook-tooltip .spell-school-header:first-child {
+    margin-top: 0;
+}
+
+.formation-spellbook-tooltip .school-icon {
+    font-size: 16px;
+}
+
+.formation-spellbook-tooltip .spell-school-section {
+    margin-left: 10px;
+    margin-bottom: 8px;
+}
+
+.formation-spellbook-tooltip .spell-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.formation-spellbook-tooltip .spell-entry:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateX(2px);
+}
+
+.formation-spellbook-tooltip .spell-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.formation-spellbook-tooltip .spell-level {
+    font-size: 12px;
+    padding: 2px 8px;
+    background: rgba(102, 126, 234, 0.3);
+    border-radius: 12px;
+    color: #c3ceff;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.formation-spellbook-tooltip .spell-count {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(102, 126, 234, 0.3);
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+}
+
+/* Empty spellbook state */
+.formation-spellbook-tooltip .empty-spellbook {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+}
+
+/* ============================================
+   23. CLICKABLE ABILITY STYLES
+   ============================================ */
+.ability-card-image.clickable-ability {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.ability-card-image.clickable-ability:hover {
+    transform: scale(1.1);
+    filter: brightness(1.2);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+}
+
+.ability-card-image.clickable-ability:active {
+    transform: scale(0.95);
+}
+
+.ability-zone.ability-clicked {
+    animation: abilityClickPulse 0.3s ease-out;
+}
+
+@keyframes abilityClickPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+
+/* Make sure ability zones have proper z-index for clicks */
+.ability-zone.filled {
+    position: relative;
+    z-index: 10;
+}
+
+.ability-zone.filled .ability-card-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ============================================
+   24. SCROLLBARS
    ============================================ */
 .rooms-list::-webkit-scrollbar,
 .combat-log-area::-webkit-scrollbar,
@@ -4303,8 +4604,24 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
 }
 
 /* ============================================
-   22. RESPONSIVE DESIGN - Consolidated breakpoints
+   25. RESPONSIVE DESIGN - Consolidated breakpoints
    ============================================ */
+@media (max-width: 1400px) {
+    .reward-container.enhanced-with-gold-and-preview {
+        padding: 30px !important;
+        max-height: 96vh !important;
+    }
+    
+    #cardRewardOverlay .reward-hand-content-normal .hand-cards {
+        min-height: 180px !important;
+    }
+    
+    .formation-spellbook-tooltip {
+        min-width: 280px;
+        max-width: 320px;
+    }
+}
+
 @media (max-width: 1200px) {
     .card-preview-column,
     .team-building-right {
@@ -4410,6 +4727,48 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     .action-orb {
         width: 20px;
         height: 20px;
+    }
+    
+    .resource-display-container {
+        right: 20px;
+        max-width: 250px;
+    }
+    
+    .deck-tooltip-anchor {
+        top: -380px;
+        width: 300px;
+        height: 380px;
+    }
+    
+    .deck-tooltip-content .large-card-image {
+        max-width: 240px;
+        max-height: 300px;
+    }
+    
+    .reward-content-wrapper {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .reward-right-section {
+        flex: none;
+        width: 100%;
+        max-height: 400px;
+        order: -1;
+    }
+    
+    .reward-card-preview-section {
+        max-height: 100%;
+    }
+    
+    .formation-spellbook-tooltip {
+        min-width: 260px;
+        max-width: 300px;
+        padding: 16px;
+    }
+    
+    .formation-spellbook-tooltip .spell-entry {
+        padding: 6px 10px;
     }
 }
 
@@ -4542,12 +4901,12 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     
     .hand-display-area-inline .hand-cards {
         gap: 10px;
-        min-height: 200px;
+        min-height: 180px;
     }
     
     .hand-display-area-inline {
         margin-top: 20px;
-        padding: 15px;
+        padding: 10px;
     }
     
     .hand-zone-drag-over::before {
@@ -4746,6 +5105,44 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     .action-display {
         min-width: 200px;
     }
+    
+    .resource-display-container {
+        bottom: 15px;
+        right: 15px;
+        max-width: 200px;
+    }
+    
+    .resource-display-container .gold-amount-large {
+        max-width: 150px;
+    }
+    
+    .resource-display-container .action-display-container {
+        min-width: 140px;
+    }
+    
+    .deck-tooltip-anchor {
+        top: -320px;
+        width: 250px;
+        height: 320px;
+    }
+    
+    .deck-tooltip-content .large-card-image {
+        max-width: 200px;
+        max-height: 250px;
+    }
+    
+    .reward-container.enhanced-with-gold-and-preview {
+        padding: 20px 15px !important;
+        max-height: 98vh !important;
+    }
+    
+    .reward-header {
+        margin-bottom: 15px !important;
+    }
+    
+    #cardRewardOverlay .reward-hand-content-normal .hand-cards {
+        min-height: 160px !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -4870,10 +5267,22 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     .hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card {
         margin-right: -40px;
     }
+    
+    .resource-display-container {
+        max-width: 180px;
+    }
+    
+    .resource-display-container .gold-amount-large {
+        max-width: 130px;
+    }
+    
+    .resource-display-container .action-display-container {
+        min-width: 120px;
+    }
 }
 
 /* ============================================
-   23. ACCESSIBILITY & HIGH CONTRAST
+   26. ACCESSIBILITY & HIGH CONTRAST
    ============================================ */
 @media (prefers-contrast: high) {
     .hand-card-dragging {
@@ -4927,7 +5336,7 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
 }
 
 /* ============================================
-   24. REDUCED MOTION SUPPORT
+   27. REDUCED MOTION SUPPORT
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
     *,
@@ -4997,392 +5406,369 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     }
 }
 
-/* Resource display container for Gold and Actions - Fixed positioning and width constraints */
-.resource-display-container {
-    position: fixed;
-    bottom: 20px;          /* Moved down slightly more from 30px to 20px */
-    right: 1800px;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start; /* Changed from flex-end to flex-start for left-alignment */
-    gap: 10px;
-    width: auto;
-    max-width: 1000px;
-    pointer-events: none;
-}
-
-/* Make child elements interactive while keeping container non-interactive */
-.resource-display-container > * {
-    pointer-events: auto;
-}
-
-/* Ensure gold and action displays have constrained widths and are left-aligned */
-.resource-display-container .gold-display-enhanced,
-.resource-display-container .action-display-container {
-    width: auto;
-    max-width: 280px;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    align-self: flex-start; /* Ensure both displays align to the left */
-}
-
-/* Target action displays within the resource container to be compact */
-.resource-display-container .action-display-container {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(16, 16, 32, 0.95));
-    border: 2px solid #ffd700;
-    border-radius: 12px;
-    padding: 8px 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(10px);
-    min-width: 160px;
-}
-
-.resource-display-container .action-display {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: space-between;
-}
-
-.resource-display-container .action-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    flex-shrink: 0;
-}
-
-.resource-display-container .action-icon {
-    font-size: 18px;
-}
-
-.resource-display-container .action-label {
-    font-size: 14px;
-    font-weight: bold;
-    color: #ffd700;
-    white-space: nowrap;
-}
-
-.resource-display-container .action-counter {
-    font-size: 16px;
-    font-weight: bold;
-    color: white;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-}
-
-.resource-display-container .current-actions {
-    color: #ffd700;
-    font-size: 20px;
-}
-
-/* Hide the max actions display in resource container */
-.resource-display-container .max-actions {
-    display: none;
-}
-
-.resource-display-container .action-orbs {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.resource-display-container .action-orb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid #ffd700;
-    transition: all 0.3s ease;
-}
-
-.resource-display-container .action-orb.filled {
-    background: radial-gradient(circle at 30% 30%, #ffed4e, #ffd700);
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
-}
-
-.resource-display-container .action-orb.empty {
-    background: rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 215, 0, 0.3);
-}
-
-/* Ensure gold display has proper constraints and left-alignment */
-.resource-display-container .gold-display-enhanced {
-    position: static !important;
-    transform: none !important;
-    margin: 0;
-    width: auto;
-    max-width: 200px;
-    align-self: flex-start; /* Explicitly left-align the gold display */
-}
-
-.resource-display-container .gold-amount-large {
-    padding: 0.5rem 1rem;
-    gap: 8px;
-    width: auto;
-    max-width: 180px;
-    box-sizing: border-box;
-    justify-content: flex-start; /* Changed from center to flex-start for left-alignment */
-}
-
-/* Debug styles - remove these after confirming fix works */
-.resource-display-container {
-    /* Uncomment the line below temporarily to see the container bounds */
-    /* border: 2px solid red; */
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 1200px) {
-    .resource-display-container {
-        right: 20px;
-        max-width: 250px;
-    }
-}
-
-@media (max-width: 768px) {
-    .resource-display-container {
-        bottom: 15px;
-        right: 15px;
-        max-width: 200px;
-    }
-    
-    .resource-display-container .gold-amount-large {
-        max-width: 150px;
-    }
-    
-    .resource-display-container .action-display-container {
-        min-width: 140px;
-    }
-}
-
-@media (max-width: 480px) {
-    .resource-display-container {
-        bottom: 15px;
-        right: 15px;
-        max-width: 180px;
-    }
-    
-    .resource-display-container .gold-amount-large {
-        max-width: 130px;
-    }
-    
-    .resource-display-container .action-display-container {
-        min-width: 120px;
-    }
-}
-
-
-/* Main hand container - reduce padding from 20px to 12px */
-.hand-display-area-inline {
-    position: relative;
-    margin-top: 30px;
-    background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.7) 100%);
-    backdrop-filter: blur(8px);
-    border: 2px solid rgba(255,255,255,0.1);
-    border-radius: var(--radius-medium);
-    padding: 12px; /* Reduced from 20px */
-    width: 100%;
-    box-shadow: var(--shadow-medium);
-}
-
-/* Hand cards container - reduce top/bottom padding and min-height */
-.hand-display-area-inline .hand-cards {
-    display: flex;
-    gap: 0px;
-    justify-content: center;
-    align-items: flex-end;
-    flex-wrap: nowrap;
-    max-width: 100%;
-    padding: 5px 0; /* Reduced from 10px 0 */
-    position: relative;
-    overflow: visible;
-    transition: var(--transition-medium);
-    min-height: 220px; /* Reduced from 240px */
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 768px) {
-    .hand-display-area-inline {
-        margin-top: 20px;
-        padding: 10px; /* Reduced from 15px */
-    }
-    
-    .hand-display-area-inline .hand-cards {
-        gap: 10px;
-        min-height: 180px; /* Reduced from 200px */
-        padding: 3px 0; /* Reduced spacing */
-    }
-}
-
-@media (max-width: 480px) {
-    .hand-display-area-inline {
-        padding: 8px; /* Further reduced for mobile */
-    }
-    
-    .hand-display-area-inline .hand-cards {
-        padding: 2px 0; /* Minimal padding for mobile */
-        min-height: 160px; /* Further reduced for mobile */
-    }
-}
-
-/* ============================================
-   CHANGES TO APPLY TO styles.css
-   ============================================ */
-
-/* 1. FIND THIS RULE (around line 4935) AND REPLACE IT: */
-/* OLD: */
-.reward-container.enhanced-with-gold-and-preview {
-    /* ... other properties ... */
-    overflow-y: auto;  /* <- CHANGE THIS LINE */
-}
-
-/* NEW: */
-.reward-container.enhanced-with-gold-and-preview {
-    /* ... other properties ... */
-    overflow: hidden;  /* Changed from overflow-y: auto */
-    display: flex;
-    flex-direction: column;
-}
-
-/* 2. ADD THIS NEW RULE (can be added after the .reward-container rule): */
-/* Prevent body scrolling when reward overlay is active */
-body.reward-overlay-active {
-    overflow: hidden !important;
-    position: fixed;
-    width: 100%;
-}
-
-/* 3. OPTIONAL: Additional adjustments to ensure content fits without scrolling */
-/* These can be added to the reward styles section */
-
-/* Make the main content section flexible */
-.reward-main-content {
-    display: flex;
-    gap: 25px;
-    align-items: flex-start;
-    margin-bottom: 30px;
-    justify-content: space-between;
-    flex: 1;
-    min-height: 0; /* Allow flexbox to shrink */
-    overflow: hidden;
-}
-
-/* Compact the header spacing */
-.reward-header {
-    text-align: center;
-    margin-bottom: 20px !important; /* Reduced from 30px */
-    position: relative;
-}
-
-/* Reduce hand display margins in reward screen */
+/* Hand display enhanced specifics for reward overlay */
 #cardRewardOverlay .reward-hand-display-section-normal {
-    margin: 15px 0 10px 0 !important; /* Reduced margins */
-    padding: 12px 16px !important; /* Reduced padding */
+    margin: 15px 0 10px 0 !important;
+    padding: 12px 16px !important;
 }
 
 #cardRewardOverlay .reward-hand-content-normal .hand-container {
-    padding: 10px !important; /* Reduced padding */
+    padding: 10px !important;
 }
 
 #cardRewardOverlay .reward-hand-content-normal .hand-cards {
-    min-height: 200px !important; /* Reduced from default */
-    padding: 5px 0 !important; /* Reduced padding */
+    min-height: 200px !important;
+    padding: 5px 0 !important;
 }
 
-/* Responsive adjustments for smaller screens */
-@media (max-width: 1400px) {
-    .reward-container.enhanced-with-gold-and-preview {
-        padding: 30px !important; /* Reduced padding on smaller screens */
-        max-height: 96vh !important; /* Use more viewport on smaller screens */
-    }
+/* ============================================
+   COMPLETE CREATURE CONTAINER TRANSPARENCY FIX
+   ============================================ */
+
+/* Force complete transparency on ALL creature containers */
+.hero-creatures,
+.battle-hero-creatures,
+.creature-icon,
+.creature-sprite-container,
+.creature-drop-zone,
+.creature-placement-area,
+.creatures-section {
+    /* Remove ALL visual elements */
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    backdrop-filter: none !important;
     
-    #cardRewardOverlay .reward-hand-content-normal .hand-cards {
-        min-height: 180px !important;
-    }
+    /* Remove any padding/margin that could create visual space */
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
-@media (max-width: 768px) {
-    .reward-container.enhanced-with-gold-and-preview {
-        padding: 20px 15px !important;
-        max-height: 98vh !important; /* Use more viewport on mobile */
-    }
-    
-    .reward-header {
-        margin-bottom: 15px !important;
-    }
-    
-    #cardRewardOverlay .reward-hand-content-normal .hand-cards {
-        min-height: 160px !important;
-    }
+/* Specifically target the main creature containers */
+.battle-hero-creatures {
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
 }
 
-/* Add these new styles */
-.reward-content-wrapper {
+/* Individual creature icon containers */
+.creature-icon {
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+}
+
+/* Sprite containers */
+.creature-sprite-container {
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Remove transparency from hover states too */
+.creature-icon:hover {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Ensure defeated creatures also have no container styling */
+.creature-icon.defeated {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.creature-icon.defeated .creature-sprite-container {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Override any inherited styles from parent elements */
+.battle-hero-slot .battle-hero-creatures,
+.team-slot .hero-creatures,
+.character-card .hero-creatures {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Additional fallback rules to catch any missed elements */
+[class*="creature"] {
+    background-color: transparent !important;
+    border-color: transparent !important;
+}
+
+/* Ensure only the sprite image and health bars are visible */
+.creature-sprite,
+.creature-health-bar,
+.creature-hp-text {
+    /* These should remain visible */
+    background: initial;
+    border: initial;
+    box-shadow: initial;
+}
+
+/* ===== CREATURE DRAG AND DROP STYLES ===== */
+
+/* Base creature container styles */
+.hero-creatures {
     display: flex;
-    gap: 25px;
-    height: 100%;
-    width: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    min-height: 44px;
+    transition: all 0.2s ease;
+    position: relative;
+    background: rgba(0, 0, 0, 0.1);
 }
 
-.reward-left-section {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.reward-right-section {
-    flex: 0 0 380px; /* Same width as before */
-    display: flex;
-    align-items: flex-start; /* Top align */
-    padding-top: 0; /* Start from the top */
-}
-
-/* Update reward-main-content to remove preview section */
-.reward-main-content {
-    display: flex;
-    gap: 25px;
-    align-items: flex-start;
-    margin-bottom: 30px;
-    justify-content: flex-start; /* Changed from space-between */
-    flex: 1;
-    min-height: 0;
+/* Individual creature icon styles */
+.creature-icon {
+    cursor: grab;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 5;
+    border-radius: 4px;
     overflow: hidden;
 }
 
-/* Update the preview section to have full height */
-.reward-card-preview-section {
-    flex: 1; /* Take full height */
-    max-height: calc(100% - 40px); /* Account for container padding */
-    background: linear-gradient(135deg, 
-        rgba(255, 255, 255, 0.05) 0%, 
-        rgba(102, 126, 234, 0.1) 100%);
-    border: 2px solid rgba(102, 126, 234, 0.3);
-    border-radius: 15px;
-    padding: 8px;
-    backdrop-filter: blur(10px);
-    display: flex;
-    flex-direction: column;
+.creature-icon:hover {
+    transform: scale(1.05);
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Responsive updates */
-@media (max-width: 1200px) {
-    .reward-content-wrapper {
-        flex-direction: column;
-        gap: 20px;
+.creature-icon:active {
+    cursor: grabbing;
+}
+
+/* Creature being dragged */
+.creature-icon.creature-dragging {
+    opacity: 0.5;
+    transform: scale(0.9) rotate(5deg);
+    cursor: grabbing;
+    z-index: 1000;
+    filter: brightness(0.8);
+}
+
+/* Creature sprite container */
+.creature-sprite-container {
+    position: relative;
+    width: 32px;
+    height: 32px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.creature-sprite {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: filter 0.2s ease;
+}
+
+/* Drop zone states */
+.hero-creatures.creature-drop-ready {
+    background: rgba(76, 175, 80, 0.15);
+    border-color: rgba(76, 175, 80, 0.6);
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.3);
+}
+
+.hero-creatures.creature-drop-invalid {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.6);
+    box-shadow: 0 0 12px rgba(244, 67, 54, 0.3);
+}
+
+/* Drop zone feedback messages */
+.hero-creatures.creature-drop-ready::before {
+    content: "↻ Reorder creatures within this hero";
+    position: absolute;
+    top: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.95), rgba(56, 142, 60, 0.95));
+    color: white;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    animation: slideInFromTop 0.2s ease-out;
+}
+
+.hero-creatures.creature-drop-invalid::before {
+    content: "✕ Cannot move creatures to different heroes";
+    position: absolute;
+    top: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.95), rgba(211, 47, 47, 0.95));
+    color: white;
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    animation: slideInFromTop 0.2s ease-out;
+}
+
+/* Animation for feedback messages */
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* Creature animation speed classes */
+.creature-sprite.speed-slow {
+    animation: creatureBob 3s ease-in-out infinite;
+}
+
+.creature-sprite.speed-normal {
+    animation: creatureBob 2s ease-in-out infinite;
+}
+
+.creature-sprite.speed-fast {
+    animation: creatureBob 1.5s ease-in-out infinite;
+}
+
+/* Gentle bobbing animation for creatures */
+@keyframes creatureBob {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+/* Pause animations while dragging to reduce visual noise */
+.creature-icon.creature-dragging .creature-sprite {
+    animation-play-state: paused;
+}
+
+/* Enhanced creature container for heroes with many creatures */
+.hero-creatures:has(.creature-icon:nth-child(4)) {
+    max-width: 140px; /* Limit width when there are many creatures */
+}
+
+/* Responsive creature sizing for different screen sizes */
+@media (max-width: 768px) {
+    .creature-sprite-container {
+        width: 28px;
+        height: 28px;
     }
     
-    .reward-right-section {
-        flex: none;
-        width: 100%;
-        max-height: 400px;
-        order: -1; /* Move preview to top on mobile */
+    .hero-creatures {
+        gap: 3px;
+        padding: 4px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .hero-creatures.creature-drop-ready {
+        border-color: #4CAF50;
+        background: rgba(76, 175, 80, 0.3);
     }
     
-    .reward-card-preview-section {
-        max-height: 100%;
+    .hero-creatures.creature-drop-invalid {
+        border-color: #F44336;
+        background: rgba(244, 67, 54, 0.3);
     }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .creature-icon,
+    .hero-creatures,
+    .creature-sprite {
+        transition: none;
+        animation: none;
+    }
+    
+    .creature-icon:hover {
+        transform: none;
+    }
+    
+    .creature-icon.creature-dragging {
+        transform: none;
+    }
+}
+
+/* Focus styles for keyboard navigation */
+.creature-icon:focus {
+    outline: 2px solid #4CAF50;
+    outline-offset: 2px;
+}
+
+/* Clean creature styling without position indicators */
+.hero-creatures .creature-icon {
+    position: relative;
+}
+
+/* Special styling for empty creature containers */
+.hero-creatures:empty::before {
+    content: "No creatures";
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+}
+
+/* Smooth transitions for creature reordering */
+.creature-icon {
+    transition: 
+        transform 0.2s ease,
+        opacity 0.2s ease,
+        box-shadow 0.2s ease,
+        filter 0.2s ease;
+}
+
+/* Enhance visual feedback during successful reorder */
+@keyframes creatureReorderSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.creature-icon.just-reordered {
+    animation: creatureReorderSuccess 0.4s ease-out;
+}
+
+/* Pause animations while dragging and show only middle frame of spritesheet */
+.creature-icon.creature-dragging .creature-sprite-container .creature-sprite {
+    animation-play-state: paused !important;
+    /* For spritesheets with 3 frames: show only the middle frame */
+    width: 300% !important; /* 3 times container width for 3-frame spritesheet */
+    height: 100% !important;
+    object-fit: none !important; /* Don't scale/crop the image */
+    transform: translateX(-33.33%) !important; /* Shift left to show middle frame */
+    position: relative !important;
 }

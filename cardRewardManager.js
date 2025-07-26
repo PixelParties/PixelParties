@@ -1,4 +1,4 @@
-// cardRewardManager.js - Enhanced with Compact Hand Display in Rewards Screen (No Scroll Fix)
+// cardRewardManager.js - Enhanced with Improved Redraw Button and Gold Display System
 
 import { CardPreviewManager } from './cardPreviewManager.js';
 import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js';
@@ -38,7 +38,7 @@ export class CardRewardManager {
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'TreasureChest', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'Clone', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
-            'Ida': ['BottledFlame', 'BurningSkeleton', 'ChaorcFriendlyFireballer', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
+            'Ida': ['BottledFlame', 'BurningSkeleton', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'PressedSkill'],
@@ -48,8 +48,15 @@ export class CardRewardManager {
             'Toras': ['HeavyHit', 'LegendarySwordOfABarbarianKing', 'Overheat', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic']
         };
-        
-        console.log('CardRewardManager initialized with Hero rewards and Gold display');
+
+        // Redraw system
+        this.redrawCost = 1; // Starting cost
+        this.totalRedraws = 0; // Track total redraws this session
+        this.currentRewardCards = []; // Store current rewards for redraw
+        this.currentRewardType = null; // 'cards' or 'heroes'
+        this.isRedrawing = false; // Prevent multiple redraws at once
+    
+        console.log('CardRewardManager initialized with enhanced redraw and gold display');
     }
 
     // Calculate and store gold breakdown for current battle result
@@ -68,6 +75,7 @@ export class CardRewardManager {
             battleBonus: 0,
             wealthBonus: 0,
             wealthDetails: [],
+            semiBonus: 0, 
             total: 0
         };
 
@@ -129,8 +137,25 @@ export class CardRewardManager {
             console.warn('⚠️ Hero selection or abilities manager not available for wealth calculation');
         }
 
-        // Calculate total
-        breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus;
+        // Check for Semi hero bonus
+        if (this.heroSelection && this.heroSelection.formationManager) {
+            const formation = this.heroSelection.formationManager.getBattleFormation();
+            console.log('🎯 Checking formation for Semi hero:', formation);
+            
+            // Check if any hero in the formation is Semi
+            const hasSemi = ['left', 'center', 'right'].some(position => {
+                const hero = formation[position];
+                return hero && hero.name === 'Semi';
+            });
+            
+            if (hasSemi) {
+                breakdown.semiBonus = 6;
+                console.log('🌟 Semi hero found in formation! Adding +6 gold bonus');
+            }
+        }
+
+        // Calculate total - INCLUDING the new Semi bonus
+        breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + breakdown.semiBonus;
         
         console.log('📊 Final gold breakdown:', breakdown);
         return breakdown;
@@ -138,6 +163,9 @@ export class CardRewardManager {
 
     // Enhanced show rewards method with gold breakdown
     async showRewardsAfterBattle(turnTracker, heroSelection, battleResult = 'victory') {
+        // Reset redraw cost for new reward session
+        this.redrawCost = 1;
+
         this.heroSelection = heroSelection;
         const currentTurn = turnTracker.getCurrentTurn();
         
@@ -175,7 +203,7 @@ export class CardRewardManager {
         return true;
     }
 
-    // Create gold breakdown display HTML
+    // Create gold breakdown display HTML with total gold display - FIXED with debug logging
     createGoldBreakdownHTML() {
         console.log('🎨 Creating gold breakdown HTML. Current breakdown:', this.lastGoldBreakdown);
         
@@ -201,17 +229,29 @@ export class CardRewardManager {
         const breakdown = this.lastGoldBreakdown;
         console.log('🎨 Rendering breakdown with data:', breakdown);
         
+        // Calculate current total gold (current + pending - redraws)
+        const currentGold = this.goldManager.getPlayerGold();
+        const pendingGold = breakdown.total - (breakdown.redrawDeduction || 0);
+        const totalGold = currentGold + pendingGold;
+        
+        console.log('💰 Gold calculation:', {
+            currentGold,
+            pendingGold,
+            totalGold,
+            redrawDeduction: breakdown.redrawDeduction || 0
+        });
+        
         return `
             <div class="gold-breakdown-container">
                 <div class="gold-breakdown-header">
                     <div class="gold-icon">💰</div>  
-                    <h3>Gold Earned</h3>
+                    <h3>Battle Rewards</h3>
                 </div>
                 
                 <div class="gold-breakdown-content">
                     <!-- Base Gold -->
                     <div class="gold-line-item">
-                        <span class="gold-source">Base</span>
+                        <span class="gold-source">Base Reward</span>
                         <span class="gold-arrow">→</span>
                         <span class="gold-amount">${breakdown.baseGold}</span>
                     </div>
@@ -222,6 +262,15 @@ export class CardRewardManager {
                         <span class="gold-arrow">→</span>
                         <span class="gold-amount">${breakdown.battleBonus}</span>
                     </div>
+                    
+                    <!-- Semi Hero Bonus -->
+                    ${breakdown.semiBonus > 0 ? `
+                        <div class="gold-line-item semi-bonus">
+                            <span class="gold-source">Semi Effect</span>
+                            <span class="gold-arrow">→</span>
+                            <span class="gold-amount">${breakdown.semiBonus}</span>
+                        </div>
+                    ` : ''}
                     
                     <!-- Wealth Bonus Section -->
                     ${breakdown.wealthBonus > 0 ? `
@@ -243,11 +292,34 @@ export class CardRewardManager {
                         </div>
                     ` : ''}
                     
-                    <!-- Total Line -->
+                    <!-- Redraw Deduction (if any) -->
+                    ${breakdown.redrawDeduction > 0 ? `
+                        <div class="gold-line-item redraw-deduction">
+                            <span class="gold-source">Redraws Used</span>
+                            <span class="gold-arrow">→</span>
+                            <span class="gold-amount">-${breakdown.redrawDeduction}</span>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Battle Rewards Total -->
                     <div class="gold-total-line">
-                        <span class="gold-total-label">Total</span>
+                        <span class="gold-total-label">Battle Total</span>
                         <span class="gold-arrow total-arrow">→</span>
-                        <span class="gold-total-amount">${breakdown.total} Gold</span>
+                        <span class="gold-total-amount">${pendingGold} Gold</span>
+                    </div>
+                </div>
+                
+                <!-- Your Total Gold Display -->
+                <div class="total-gold-display">
+                    <div class="total-gold-header">
+                        <span class="total-gold-icon">🏆</span>
+                        <span class="total-gold-label">Your Total Gold</span>
+                    </div>
+                    <div class="total-gold-amount" id="totalGoldAmount">${totalGold}</div>
+                    <div class="total-gold-breakdown">
+                        <span class="current-gold">Current: ${currentGold}</span>
+                        <span class="plus-sign">+</span>
+                        <span class="pending-gold">Battle: ${pendingGold}</span>
                     </div>
                 </div>
             </div>
@@ -264,7 +336,51 @@ export class CardRewardManager {
         return 'Battle';
     }
 
-    // Create dedicated card preview section - UPDATED: Removed labels, made larger
+    // Enhanced redraw button HTML - FIXED affordability calculation
+    createRedrawButtonHTML() {
+        const currentGold = this.goldManager.getPlayerGold();
+        const pendingGold = this.lastGoldBreakdown ? (this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0)) : 0;
+        const totalAvailableGold = currentGold + pendingGold;
+        const canAfford = totalAvailableGold >= this.redrawCost;
+        
+        return `
+            <div class="enhanced-redraw-container">
+                <button class="enhanced-redraw-button ${!canAfford ? 'disabled' : ''}" 
+                        onclick="window.handleRewardRedraw()"
+                        ${!canAfford ? 'disabled' : ''}>
+                    <div class="redraw-button-inner">
+                        <div class="redraw-icon-container">
+                            <span class="redraw-icon">🔄</span>
+                        </div>
+                        <div class="redraw-content">
+                            <div class="redraw-title">Redraw Options</div>
+                            <div class="redraw-subtitle">Get new ${this.currentRewardType === 'heroes' ? 'heroes' : 'cards'}</div>
+                        </div>
+                        <div class="redraw-cost-container">
+                            <div class="cost-label">Cost</div>
+                            <div class="cost-amount">
+                                <span class="gold-icon">💰</span>
+                                <span class="cost-number">${this.redrawCost}</span>
+                            </div>
+                        </div>
+                    </div>
+                </button>
+                ${!canAfford ? `
+                    <div class="redraw-insufficient-funds">
+                        <span class="warning-icon">⚠️</span>
+                        Need ${this.redrawCost - totalAvailableGold} more gold
+                    </div>
+                ` : `
+                    <div class="redraw-hint-success">
+                        <span class="hint-icon">💡</span>
+                        Click to refresh your options
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    // Create dedicated card preview section
     createCardPreviewSection() {
         return `
             <div class="reward-card-preview-section">
@@ -278,7 +394,7 @@ export class CardRewardManager {
         `;
     }
 
-    // UPDATED: Create normal-sized hand display section - moved below, normal card sizes
+    // Create normal-sized hand display section
     createHandDisplaySection() {
         if (!this.handManager) {
             return '<div class="reward-hand-placeholder">Hand not available</div>';
@@ -301,8 +417,153 @@ export class CardRewardManager {
         `;
     }
 
-    // Enhanced display reward UI with dedicated tooltip area and compact hand display moved up
+    // Updated handleRedraw method to work with total gold - FIXED double deduction and timing
+    async handleRedraw() {
+        if (this.isRedrawing || this.selectionMade) {
+            return;
+        }
+        
+        // Calculate total available gold
+        const currentGold = this.goldManager.getPlayerGold();
+        const pendingGold = this.lastGoldBreakdown ? (this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0)) : 0;
+        const totalAvailableGold = currentGold + pendingGold;
+        
+        if (totalAvailableGold < this.redrawCost) {
+            this.showRedrawError(`Not enough gold! Need ${this.redrawCost} gold.`);
+            return;
+        }
+        
+        this.isRedrawing = true;
+        
+        // Show total gold change animation BEFORE making changes
+        this.showTotalGoldChange(-this.redrawCost);
+        
+        // Deduct from current gold first, then from pending
+        let goldToDeductFromCurrent = Math.min(currentGold, this.redrawCost);
+        let goldToDeductFromPending = this.redrawCost - goldToDeductFromCurrent;
+        
+        // Update current gold if needed
+        if (goldToDeductFromCurrent > 0) {
+            const newGoldAmount = currentGold - goldToDeductFromCurrent;
+            this.goldManager.setPlayerGold(newGoldAmount, 'redraw');
+        }
+        
+        // Update pending gold ONLY if we needed to use pending gold
+        if (goldToDeductFromPending > 0 && this.lastGoldBreakdown) {
+            // Only track redraw deduction for the amount taken from pending gold
+            this.lastGoldBreakdown.redrawDeduction = (this.lastGoldBreakdown.redrawDeduction || 0) + goldToDeductFromPending;
+        }
+        
+        // Generate new rewards
+        let newRewards;
+        if (this.currentRewardType === 'heroes') {
+            newRewards = this.generateHeroRewards(3);
+        } else {
+            newRewards = this.generateRewardCards(3);
+        }
+        
+        // Update current rewards
+        this.currentRewardCards = newRewards;
+        
+        // Animate the redraw
+        await this.animateRedraw();
+        
+        // Update the display
+        if (this.currentRewardType === 'heroes') {
+            this.updateHeroRewardDisplay(newRewards);
+        } else {
+            this.updateCardRewardDisplay(newRewards);
+        }
+        
+        // Increment redraw cost
+        this.redrawCost++;
+        this.totalRedraws++;
+        
+        // Update both gold breakdown and redraw button
+        this.updateGoldBreakdownAfterRedraw();
+        this.updateRedrawButton();
+        
+        // Save the pending rewards with the new cards
+        await this.savePendingRewards(newRewards, this.currentRewardType === 'heroes');
+        
+        this.isRedrawing = false;
+    }
+
+    // New method to show total gold change animation - FIXED calculation
+    showTotalGoldChange(amount) {
+        const totalGoldElement = document.getElementById('totalGoldAmount');
+        if (!totalGoldElement) return;
+        
+        // Get the current total that's displayed
+        const currentDisplayedTotal = parseInt(totalGoldElement.textContent) || 0;
+        const newTotal = currentDisplayedTotal + amount;
+        
+        // Create change indicator
+        const changeIndicator = document.createElement('div');
+        changeIndicator.className = 'total-gold-change-indicator';
+        changeIndicator.textContent = `${amount}`;
+        changeIndicator.style.cssText = `
+            position: absolute;
+            top: 50%;
+            right: -80px;
+            transform: translateY(-50%);
+            color: ${amount < 0 ? '#ff6b6b' : '#4caf50'};
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            animation: totalGoldChangeSlide 2s ease-out forwards;
+            z-index: 101;
+        `;
+        
+        totalGoldElement.style.position = 'relative';
+        totalGoldElement.appendChild(changeIndicator);
+        
+        // Flash the total gold number
+        totalGoldElement.style.animation = 'totalGoldFlash 0.6s ease-out';
+        setTimeout(() => {
+            totalGoldElement.style.animation = '';
+        }, 600);
+        
+        // Animate the number change to the new total
+        this.animateTotalGoldCounter(totalGoldElement, newTotal);
+        
+        setTimeout(() => {
+            changeIndicator.remove();
+        }, 2000);
+    }
+
+    // Animate total gold counter
+    animateTotalGoldCounter(element, targetValue) {
+        const startValue = parseInt(element.textContent) || 0;
+        const difference = targetValue - startValue;
+        const duration = 800;
+        const startTime = Date.now();
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            const easeOut = 1 - Math.pow(1 - progress, 3);
+            const currentValue = Math.round(startValue + (difference * easeOut));
+            
+            element.textContent = currentValue;
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                element.textContent = targetValue;
+            }
+        };
+        
+        animate();
+    }
+
+    // Enhanced display reward UI with enhanced redraw button integration
     displayRewardUI(rewardCards, currentTurn) {
+        // Store current rewards and type
+        this.currentRewardCards = rewardCards;
+        this.currentRewardType = 'cards';
+        
         // Remove any existing reward overlay
         this.clearAnyActiveCardRewards();
         
@@ -320,11 +581,14 @@ export class CardRewardManager {
                         </div>
                         
                         <div class="reward-main-content">
-                            <!-- Gold Breakdown (Left) -->
-                            ${this.createGoldBreakdownHTML()}
+                            <!-- Gold Breakdown with integrated redraw button -->
+                            <div class="gold-and-redraw-section">
+                                ${this.createGoldBreakdownHTML()}
+                                ${this.createRedrawButtonHTML()}
+                            </div>
                             
                             <!-- Reward Cards (Center) -->
-                            <div class="reward-cards enhanced-cards">
+                            <div class="reward-cards enhanced-cards" id="rewardCardsContainer">
                                 ${rewardCards.map((card, index) => this.createRewardCardHTML(card, index)).join('')}
                             </div>
                         </div>
@@ -333,7 +597,7 @@ export class CardRewardManager {
                         ${this.createHandDisplaySection()}
                     </div>
                     
-                    <!-- Card Preview (Right) - NOW OUTSIDE AND TOP-ALIGNED -->
+                    <!-- Card Preview (Right) -->
                     <div class="reward-right-section">
                         ${this.createCardPreviewSection()}
                     </div>
@@ -382,8 +646,12 @@ export class CardRewardManager {
         overlay.style.animation = 'fadeIn 0.3s ease-out';
     }
 
-    // Enhanced display Hero reward UI with dedicated tooltip area and compact hand display moved up
+    // Enhanced display Hero reward UI with enhanced redraw button integration
     displayHeroRewardUI(rewardHeroes, currentTurn) {
+        // Store current rewards and type
+        this.currentRewardCards = rewardHeroes;
+        this.currentRewardType = 'heroes';
+        
         // Remove any existing reward overlay
         this.clearAnyActiveCardRewards();
         
@@ -398,13 +666,16 @@ export class CardRewardManager {
                         <div class="reward-header">
                             <h2>🦸 Epic Hero Rewards!</h2>
                             <p>Choose one Hero to join your roster (Turn ${currentTurn})</p>
-                            ${currentTurn === 2 ? '<div class="special-reward-indicator turn-2">⚔️ Turn 2 Special Reward</div>' : ''}
-                            ${currentTurn === 4 ? '<div class="special-reward-indicator turn-4">🏆 Turn 4 Epic Reward</div>' : ''}
+                            ${currentTurn === 3 ? '<div class="special-reward-indicator turn-3">⚔️ Turn 3 Special Reward</div>' : ''}
+                            ${currentTurn === 5 ? '<div class="special-reward-indicator turn-5">🏆 Turn 5 Epic Reward</div>' : ''}
                         </div>
                         
                         <div class="reward-main-content">
-                            <!-- Gold Breakdown (Left) -->
-                            ${this.createGoldBreakdownHTML()}
+                            <!-- Gold Breakdown with integrated redraw button -->
+                            <div class="gold-and-redraw-section">
+                                ${this.createGoldBreakdownHTML()}
+                                ${this.createRedrawButtonHTML()}
+                            </div>
                             
                             <!-- Hero Rewards (Center) -->
                             <div class="hero-reward-selection enhanced-hero-selection">
@@ -412,11 +683,11 @@ export class CardRewardManager {
                             </div>
                         </div>
                         
-                        <!-- MOVED DOWN: Hand Display Section -->
+                        <!-- Hand Display Section -->
                         ${this.createHandDisplaySection()}
                     </div>
                     
-                    <!-- Card Preview (Right) - NOW OUTSIDE AND TOP-ALIGNED -->
+                    <!-- Card Preview (Right) -->
                     <div class="reward-right-section">
                         ${this.createCardPreviewSection()}
                     </div>
@@ -465,7 +736,7 @@ export class CardRewardManager {
         overlay.style.animation = 'fadeIn 0.3s ease-out';
     }
 
-    // Enhanced reward styles with UPDATED preview section and COMPACT hand display
+    // Enhanced reward styles with updated redraw button and total gold display
     ensureRewardStyles() {
         if (document.getElementById('cardRewardStyles')) return;
         
@@ -514,6 +785,18 @@ export class CardRewardManager {
                 max-width: 1800px; /* EXTRA WIDTH for hero rewards with preview */
             }
             
+            .reward-content-wrapper {
+                display: flex;
+                gap: 25px;
+                height: 100%;
+            }
+            
+            .reward-left-section {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+            
             .reward-main-content {
                 display: flex;
                 gap: 25px; /* Reduced gap to fit 3 sections */
@@ -525,9 +808,16 @@ export class CardRewardManager {
                 overflow: hidden;
             }
             
-            /* Gold Breakdown Styles - MADE NARROWER */
+            /* Gold and Redraw Section Layout */
+            .gold-and-redraw-section {
+                flex: 0 0 320px; /* Increased width to accommodate larger redraw button */
+                display: flex;
+                flex-direction: column;
+                gap: 0; /* Remove gap since redraw button is now inside gold container */
+            }
+            
+            /* Gold Breakdown Styles */
             .gold-breakdown-container {
-                flex: 0 0 240px; /* Fixed width for gold breakdown */
                 background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.1));
                 border: 2px solid rgba(255, 193, 7, 0.4);
                 border-radius: 15px;
@@ -594,6 +884,20 @@ export class CardRewardManager {
             .gold-line-item.wealth-bonus {
                 background: rgba(156, 39, 176, 0.1);
                 border-color: rgba(156, 39, 176, 0.4);
+            }
+
+            .gold-line-item.semi-bonus {
+                background: rgba(64, 224, 208, 0.1);  /* Turquoise background for Semi */
+                border-color: rgba(64, 224, 208, 0.4);
+            }
+            
+            .gold-line-item.redraw-deduction {
+                background: rgba(255, 107, 107, 0.1);
+                border-color: rgba(255, 107, 107, 0.4);
+            }
+            
+            .gold-line-item.redraw-deduction .gold-amount {
+                color: #ff6b6b;
             }
             
             .gold-source {
@@ -684,6 +988,250 @@ export class CardRewardManager {
                 text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
             }
             
+            /* Total Gold Display Styles */
+            .total-gold-display {
+                margin-top: 20px;
+                padding: 15px;
+                background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 193, 7, 0.15));
+                border: 2px solid rgba(255, 215, 0, 0.6);
+                border-radius: 12px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 6px 20px rgba(255, 215, 0, 0.25);
+            }
+            
+            .total-gold-header {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                margin-bottom: 8px;
+            }
+            
+            .total-gold-icon {
+                font-size: 20px;
+                animation: goldIconFloat 3s ease-in-out infinite;
+            }
+            
+            .total-gold-label {
+                font-size: 14px;
+                font-weight: bold;
+                color: #fff;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            
+            .total-gold-amount {
+                font-size: 32px;
+                font-weight: 900;
+                color: #ffd700;
+                text-align: center;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+                position: relative;
+                margin-bottom: 8px;
+            }
+            
+            .total-gold-breakdown {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 8px;
+                font-size: 12px;
+                color: rgba(255, 255, 255, 0.8);
+            }
+            
+            .current-gold,
+            .pending-gold {
+                padding: 2px 6px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 4px;
+            }
+            
+            .plus-sign {
+                color: #4caf50;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            
+            /* Enhanced Redraw Button Styles */
+            .enhanced-redraw-container {
+                margin-top: 15px;
+                width: 100%;
+            }
+            
+            .enhanced-redraw-button {
+                width: 100%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 0;
+                border-radius: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+                position: relative;
+                overflow: hidden;
+                min-height: 80px;
+            }
+            
+            .enhanced-redraw-button::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+                transition: left 0.6s ease;
+            }
+            
+            .enhanced-redraw-button:hover:not(.disabled)::before {
+                left: 100%;
+            }
+            
+            .enhanced-redraw-button:hover:not(.disabled) {
+                transform: translateY(-2px);
+                box-shadow: 0 12px 35px rgba(102, 126, 234, 0.5);
+                background: linear-gradient(135deg, #7c8cff 0%, #8b5fbf 100%);
+            }
+            
+            .enhanced-redraw-button:active:not(.disabled) {
+                transform: translateY(0);
+            }
+            
+            .enhanced-redraw-button.disabled {
+                background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);
+                cursor: not-allowed;
+                opacity: 0.7;
+                box-shadow: 0 4px 15px rgba(99, 110, 114, 0.3);
+            }
+            
+            .redraw-button-inner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 16px 20px;
+                position: relative;
+                z-index: 1;
+            }
+            
+            .redraw-icon-container {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 48px;
+                height: 48px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 50%;
+                backdrop-filter: blur(10px);
+            }
+            
+            .redraw-icon {
+                font-size: 24px;
+                animation: none;
+                transition: transform 0.3s ease;
+            }
+            
+            .enhanced-redraw-button:hover:not(.disabled) .redraw-icon {
+                animation: spin 1s ease-in-out;
+                transform: scale(1.1);
+            }
+            
+            .redraw-content {
+                flex: 1;
+                text-align: center;
+                margin: 0 16px;
+            }
+            
+            .redraw-title {
+                font-size: 18px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 1.5px;
+                margin-bottom: 4px;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            }
+            
+            .redraw-subtitle {
+                font-size: 12px;
+                opacity: 0.9;
+                font-weight: normal;
+                text-transform: none;
+                letter-spacing: 0.5px;
+            }
+            
+            .redraw-cost-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+            }
+            
+            .cost-label {
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                opacity: 0.8;
+                font-weight: 600;
+            }
+            
+            .cost-amount {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(0, 0, 0, 0.3);
+                padding: 8px 12px;
+                border-radius: 20px;
+                font-size: 16px;
+                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+            }
+            
+            .cost-amount .gold-icon {
+                font-size: 18px;
+                filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+            }
+            
+            .cost-number {
+                font-weight: 900;
+                font-size: 18px;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            }
+            
+            .redraw-insufficient-funds {
+                margin-top: 12px;
+                padding: 8px 12px;
+                background: rgba(244, 67, 54, 0.15);
+                border: 1px solid rgba(244, 67, 54, 0.4);
+                border-radius: 8px;
+                color: #ff6b6b;
+                font-size: 14px;
+                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            
+            .redraw-hint-success {
+                margin-top: 12px;
+                padding: 8px 12px;
+                background: rgba(76, 175, 80, 0.15);
+                border: 1px solid rgba(76, 175, 80, 0.4);
+                border-radius: 8px;
+                color: #4caf50;
+                font-size: 14px;
+                text-align: center;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            
+            .warning-icon,
+            .hint-icon {
+                font-size: 16px;
+            }
+            
             /* Enhanced Card Layout - CENTER SECTION */
             .reward-cards.enhanced-cards {
                 flex: 1; /* Take available space between gold and preview */
@@ -706,7 +1254,7 @@ export class CardRewardManager {
                 max-width: none;
             }
             
-            /* UPDATED: Card Preview Section (RIGHT) - No labels, larger display */
+            /* Card Preview Section (RIGHT) */
             .reward-card-preview-section {
                 flex: 0 0 380px; /* INCREASED width from 280px to 380px */
                 background: linear-gradient(135deg, 
@@ -778,7 +1326,7 @@ export class CardRewardManager {
                 transform: scale(1.02);
             }
             
-            /* NEW: NORMAL Hand Display Section Styles - MOVED DOWN AND NORMAL SIZE */
+            /* NORMAL Hand Display Section Styles */
             .reward-hand-display-section-normal {
                 margin: 20px 0 15px 0; /* Position after main content */
                 padding: 15px 20px; /* Normal padding */
@@ -796,7 +1344,7 @@ export class CardRewardManager {
                 align-items: center;
             }
             
-            /* NORMAL hand display overrides - SAME SIZE AS HERO SELECTION SCREEN */
+            /* NORMAL hand display overrides */
             .reward-hand-display-section-normal .hand-display-container {
                 width: 100%;
                 max-width: none;
@@ -820,9 +1368,9 @@ export class CardRewardManager {
                 flex-wrap: wrap !important; /* Allow wrapping if needed */
             }
             
-            /* NORMAL SIZE hand cards for reward screen - DIRECT SIZING INSTEAD OF SCALING */
+            /* NORMAL SIZE hand cards for reward screen */
             .reward-hand-display-section-normal .hand-card {
-                width: 120px !important; /* Direct width control - adjust this value */
+                width: 120px !important; /* Direct width control */
                 height: auto !important;
                 min-width: 120px !important;
                 max-width: 120px !important;
@@ -842,13 +1390,13 @@ export class CardRewardManager {
             
             .reward-hand-display-section-normal .hand-card-image {
                 width: 100% !important;
-                height: 168px !important; /* Direct height control - adjust this value */
+                height: 168px !important; /* Direct height control */
                 object-fit: cover !important;
                 border-radius: 8px !important;
             }
             
             .reward-hand-display-section-normal .hand-card-name {
-                font-size: 12px !important; /* Direct font size control - adjust this value */
+                font-size: 12px !important; /* Direct font size control */
                 padding: 4px !important;
                 line-height: 1.2 !important;
                 text-align: center;
@@ -858,12 +1406,7 @@ export class CardRewardManager {
                 max-width: 100%;
             }
             
-            /* Keep action indicators visible in normal mode */
-            .reward-hand-display-section-normal .action-indicator {
-                /* Use default action indicator styles */
-            }
-            
-            /* Existing reward card styles remain the same */
+            /* Existing reward card styles */
             .reward-card {
                 background: rgba(255, 255, 255, 0.05);
                 border: 2px solid rgba(102, 126, 234, 0.3);
@@ -1000,7 +1543,7 @@ export class CardRewardManager {
             
             .reward-header {
                 text-align: center;
-                margin-bottom: 15px; /* Reduced margin since hand is now above */
+                margin-bottom: 15px;
                 position: relative;
             }
             
@@ -1043,6 +1586,32 @@ export class CardRewardManager {
                 z-index: 10;
             }
             
+            /* Total Gold Change Animation */
+            @keyframes totalGoldChangeSlide {
+                0% { 
+                    opacity: 0; 
+                    transform: translateY(-50%) translateX(-20px) scale(0.8); 
+                }
+                25% { 
+                    opacity: 1; 
+                    transform: translateY(-50%) translateX(0px) scale(1.2); 
+                }
+                75% { 
+                    opacity: 1; 
+                    transform: translateY(-50%) translateX(0px) scale(1); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translateY(-50%) translateX(20px) scale(0.9); 
+                }
+            }
+            
+            @keyframes totalGoldFlash {
+                0% { transform: scale(1); color: #ffd700; }
+                50% { transform: scale(1.1); color: #ff6b6b; }
+                100% { transform: scale(1); color: #ffd700; }
+            }
+            
             /* Animations */
             @keyframes goldIconFloat {
                 0%, 100% { transform: translateY(0px) rotate(0deg); }
@@ -1076,6 +1645,11 @@ export class CardRewardManager {
                 50% { opacity: 0.5; }
             }
             
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
             .reward-footer {
                 text-align: center;
             }
@@ -1085,7 +1659,12 @@ export class CardRewardManager {
                 font-style: italic;
             }
             
-            /* Responsive Design - UPDATED with compact hand display */
+            /* Remove the old separate redraw button positioning */
+            .reward-main-content + .redraw-button-container {
+                display: none;
+            }
+            
+            /* Responsive Design */
             @media (max-width: 1600px) {
                 .reward-container.enhanced-with-gold-and-preview {
                     max-width: 95%;
@@ -1093,18 +1672,27 @@ export class CardRewardManager {
                 }
                 
                 .reward-card-preview-section {
-                    flex: 0 0 320px; /* Reduced but still larger than before */
+                    flex: 0 0 320px;
                 }
                 
                 .reward-card-preview-area .preview-card-image {
-                    max-width: 280px; /* Reduced but still larger */
+                    max-width: 280px;
                 }
                 
-                /* Normal hand cards maintain their size on smaller screens */
-                .reward-hand-display-section-normal .hand-cards {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    flex-wrap: wrap !important;
+                .gold-and-redraw-section {
+                    flex: 0 0 300px;
+                }
+                
+                .enhanced-redraw-button {
+                    min-height: 70px;
+                }
+                
+                .redraw-title {
+                    font-size: 16px;
+                }
+                
+                .total-gold-amount {
+                    font-size: 28px;
                 }
             }
             
@@ -1122,11 +1710,20 @@ export class CardRewardManager {
                     height: 196px;
                 }
                 
-                /* Hand cards maintain normal size on medium screens */
-                .reward-hand-display-section-normal .hand-cards {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    flex-wrap: wrap !important;
+                .gold-and-redraw-section {
+                    flex: 0 0 280px;
+                }
+                
+                .enhanced-redraw-button {
+                    min-height: 65px;
+                }
+                
+                .redraw-title {
+                    font-size: 15px;
+                }
+                
+                .total-gold-amount {
+                    font-size: 26px;
                 }
             }
             
@@ -1137,14 +1734,15 @@ export class CardRewardManager {
                 }
                 
                 .gold-breakdown-container,
-                .reward-card-preview-section {
+                .reward-card-preview-section,
+                .gold-and-redraw-section {
                     flex: none;
                     align-self: center;
-                    max-width: 500px; /* Larger on mobile layout */
+                    max-width: 500px;
                 }
                 
                 .reward-card-preview-area {
-                    min-height: 400px; /* Maintain good size on mobile */
+                    min-height: 400px;
                 }
                 
                 .hero-reward-selection.enhanced-hero-selection,
@@ -1152,19 +1750,19 @@ export class CardRewardManager {
                     justify-content: center;
                     flex-wrap: wrap;
                     gap: 20px;
+                    margin-left: 0;
                 }
                 
-                /* Hand display responsive adjustments - MAINTAIN HORIZONTAL LAYOUT */
-                .reward-hand-display-section-normal {
-                    margin: 15px 0 10px 0;
-                    padding: 12px 15px;
+                .enhanced-redraw-button {
+                    min-height: 75px;
                 }
                 
-                .reward-hand-display-section-normal .hand-cards {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    flex-wrap: wrap !important;
-                    justify-content: center !important;
+                .redraw-title {
+                    font-size: 16px;
+                }
+                
+                .total-gold-amount {
+                    font-size: 30px;
                 }
             }
             
@@ -1183,24 +1781,31 @@ export class CardRewardManager {
                 }
                 
                 .reward-card-preview-area .preview-card-image {
-                    max-width: 280px; /* Still reasonably large on mobile */
+                    max-width: 280px;
                 }
                 
-                .reward-hand-display-section-normal {
-                    margin: 10px 0 8px 0;
-                    padding: 10px 12px;
+                .enhanced-redraw-button {
+                    min-height: 80px;
                 }
                 
-                .reward-hand-display-section-normal .hand-cards {
-                    display: flex !important;
-                    flex-direction: row !important;
-                    flex-wrap: wrap !important;
-                    justify-content: center !important;
-                    gap: 6px !important; /* Slightly smaller gap on mobile */
+                .redraw-button-inner {
+                    padding: 12px 16px;
                 }
                 
-                .reward-header h3 {
-                    font-size: 1.2rem;
+                .redraw-title {
+                    font-size: 15px;
+                }
+                
+                .redraw-subtitle {
+                    font-size: 11px;
+                }
+                
+                .total-gold-amount {
+                    font-size: 28px;
+                }
+                
+                .total-gold-breakdown {
+                    font-size: 11px;
                 }
             }
         `;
@@ -1208,8 +1813,156 @@ export class CardRewardManager {
         document.head.appendChild(style);
     }
 
-    // Rest of the methods remain unchanged from the original implementation...
-    // [All other methods continue here - generateHeroRewards, generateRewardCards, etc.]
+    // Add animation method
+    async animateRedraw() {
+        const cards = document.querySelectorAll('.reward-card');
+        cards.forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.add('redrawing');
+            }, index * 10);
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 20));
+        
+        cards.forEach(card => {
+            card.classList.remove('redrawing');
+        });
+    }
+
+    updateCardRewardDisplay(newCards) {
+        const container = document.getElementById('rewardCardsContainer');
+        if (container) {
+            container.innerHTML = newCards.map((card, index) => 
+                this.createRewardCardHTML(card, index)
+            ).join('');
+            
+            // Re-attach event listeners
+            this.attachRewardCardListeners(newCards);
+        }
+    }
+
+    attachRewardCardListeners(rewardCards) {
+        rewardCards.forEach((card, index) => {
+            const cardElement = document.querySelector(`[data-reward-index="${index}"]`);
+            if (cardElement) {
+                // Click handler for selection
+                cardElement.addEventListener('click', () => this.handleCardSelection(card.name));
+                
+                // Enhanced tooltip handlers for dedicated preview area
+                const cardImage = cardElement.querySelector('.reward-card-image');
+                if (cardImage) {
+                    // Prepare card data for tooltip
+                    const cardData = {
+                        imagePath: card.image,
+                        displayName: this.formatCardName(card.name),
+                        cardType: card.cardType
+                    };
+                    
+                    cardImage.addEventListener('mouseenter', () => {
+                        this.cardPreviewManager.showCardTooltip(cardData, cardImage);
+                    });
+                    
+                    cardImage.addEventListener('mouseleave', () => {
+                        this.cardPreviewManager.hideCardTooltip();
+                    });
+                }
+            }
+        });
+    }
+
+    attachHeroRewardListeners(rewardHeroes) {
+        rewardHeroes.forEach((hero, index) => {
+            const heroElement = document.querySelector(`[data-reward-index="${index}"]`);
+            if (heroElement) {
+                // Click handler for selection
+                heroElement.addEventListener('click', () => this.handleHeroSelection(hero.name));
+                
+                // Enhanced tooltip handlers for dedicated preview area
+                const heroImage = heroElement.querySelector('.hero-card-image');
+                if (heroImage) {
+                    // Prepare hero data for tooltip
+                    const heroData = {
+                        imagePath: hero.image,
+                        displayName: hero.name,
+                        cardType: 'character'
+                    };
+                    
+                    heroImage.addEventListener('mouseenter', () => {
+                        this.cardPreviewManager.showCardTooltip(heroData, heroImage);
+                    });
+                    
+                    heroImage.addEventListener('mouseleave', () => {
+                        this.cardPreviewManager.hideCardTooltip();
+                    });
+                }
+            }
+        });
+    }
+
+    updateHeroRewardDisplay(newHeroes) {
+        const container = document.querySelector('.hero-reward-selection');
+        if (container) {
+            container.innerHTML = newHeroes.map((hero, index) => 
+                this.createHeroRewardHTML(hero, index)
+            ).join('');
+            
+            // Re-attach event listeners
+            this.attachHeroRewardListeners(newHeroes);
+        }
+    }
+
+    // Show redraw error
+    showRedrawError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'redraw-error-message';
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(244, 67, 54, 0.95);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            z-index: 10001;
+            animation: shake 0.5s ease-in-out;
+        `;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 2000);
+    }
+
+    // Update gold breakdown and total gold display after redraw
+    updateGoldBreakdownAfterRedraw() {
+        const goldBreakdownContainer = document.querySelector('.gold-breakdown-container');
+        if (goldBreakdownContainer) {
+            // Replace the entire gold breakdown with updated values
+            goldBreakdownContainer.outerHTML = this.createGoldBreakdownHTML();
+        }
+        
+        // Also update the main gold display if it exists
+        const goldNumberElement = document.querySelector('.player-gold-number');
+        if (goldNumberElement) {
+            goldNumberElement.textContent = this.goldManager.getPlayerGold();
+        }
+    }
+
+    // Update redraw button after use
+    updateRedrawButton() {
+        const buttonContainer = document.querySelector('.enhanced-redraw-container');
+        if (buttonContainer) {
+            buttonContainer.outerHTML = this.createRedrawButtonHTML();
+        }
+    }
+
+    // Reset redraw cost when starting new reward session
+    resetRedrawCost() {
+        this.redrawCost = 1;
+    }
     
     generateHeroRewards(count = 3) {
         // Get heroes that the player doesn't already have in formation
@@ -1396,6 +2149,8 @@ export class CardRewardManager {
             
             if (addedCardsCount > 0) {
                 console.log(`Successfully added ${addedCardsCount} cards from ${heroName} to deck`);
+                
+                this.awardCalculatedGold();
                 
                 // Add 1 random hero card to hand
                 if (this.handManager && heroCards.length > 0) {
@@ -1604,6 +2359,8 @@ export class CardRewardManager {
             
             if (success) {
                 console.log(`Successfully added ${cardName} to deck`);
+            
+                this.awardCalculatedGold();
                 
                 // Add the reward card to hand + draw 1 additional card
                 if (this.handManager) {
@@ -1814,11 +2571,14 @@ export class CardRewardManager {
                 turn: currentTurn,
                 isHeroReward: isHeroReward,
                 goldBreakdown: this.lastGoldBreakdown, // Include gold breakdown
+                // Add redraw state
+                redrawCost: this.redrawCost,
+                totalRedraws: this.totalRedraws,
                 timestamp: Date.now()
             };
             
             await roomRef.child('gameState').child(rewardKey).set(rewardData);
-            console.log(`Saved pending ${isHeroReward ? 'hero' : 'card'} rewards with gold breakdown to Firebase`);
+            console.log(`Saved pending ${isHeroReward ? 'hero' : 'card'} rewards with gold breakdown and redraw state to Firebase`);
             
         } catch (error) {
             console.error('Error saving pending rewards:', error);
@@ -1851,6 +2611,13 @@ export class CardRewardManager {
                 if (pendingRewards.goldBreakdown) {
                     this.lastGoldBreakdown = pendingRewards.goldBreakdown;
                     console.log('Restored gold breakdown:', this.lastGoldBreakdown);
+                }
+                
+                // Restore redraw state
+                if (pendingRewards.redrawCost !== undefined) {
+                    this.redrawCost = pendingRewards.redrawCost;
+                    this.totalRedraws = pendingRewards.totalRedraws || 0;
+                    console.log('Restored redraw state:', { redrawCost: this.redrawCost, totalRedraws: this.totalRedraws });
                 }
                 
                 // Check if these are hero rewards or card rewards
@@ -1986,7 +2753,7 @@ export class CardRewardManager {
         }
     }
 
-    // In cardRewardManager.js - Add this as a fallback method
+    // Fallback method to detect battle result from gold manager
     detectBattleResultFromGoldManager() {
         if (!this.heroSelection || !this.heroSelection.goldManager) {
             return 'victory'; // Default fallback
@@ -2006,6 +2773,43 @@ export class CardRewardManager {
         
         return 'victory'; // Default fallback
     }
+
+    // Award the calculated gold to the player
+    awardCalculatedGold() {
+        if (!this.lastGoldBreakdown) {
+            console.error('No gold breakdown available to award');
+            return false;
+        }
+        
+        const totalGold = this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0);
+        
+        if (this.goldManager && totalGold > 0) {
+            this.goldManager.awardGold(totalGold, false, 'battle_reward'); // false = player, not opponent
+            console.log(`✅ Awarded ${totalGold} total gold to player from battle rewards`);
+            
+            // Send gold update to opponent so they know how much we got
+            if (this.heroSelection && this.heroSelection.gameDataSender) {
+                this.heroSelection.gameDataSender('opponent_gold_awarded', {
+                    goldAmount: totalGold,
+                    breakdown: this.lastGoldBreakdown,
+                    timestamp: Date.now()
+                });
+            }
+            
+            return true;
+        }
+        
+        return false;
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.handleRewardRedraw = function() {
+        const overlay = document.getElementById('cardRewardOverlay');
+        if (overlay && window.heroSelection && window.heroSelection.cardRewardManager) {
+            window.heroSelection.cardRewardManager.handleRedraw();
+        }
+    };
 }
 
 // Export for ES6 module compatibility

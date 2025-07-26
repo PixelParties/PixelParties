@@ -14,8 +14,17 @@ export class CardPreviewManager {
         const isRewardScreen = document.getElementById('cardRewardOverlay');
         
         if (isRewardScreen) {
-            // Use dedicated reward preview area instead of floating tooltip
             this.showRewardScreenPreview(cardData);
+            return;
+        }
+        
+        // Check if we're in team building phase (battle formation screen)
+        const isDeckTooltip = document.getElementById('deckTooltipAnchor');
+        const isTeamBuilding = document.querySelector('.team-building-container');
+        
+        if (isDeckTooltip && isTeamBuilding) {
+            // Use the dedicated deck tooltip container
+            this.showDeckTooltip(cardData);
             return;
         }
         
@@ -25,50 +34,93 @@ export class CardPreviewManager {
             tooltipContainer = document.createElement('div');
             tooltipContainer.id = 'cardTooltipContainer';
             tooltipContainer.className = 'card-tooltip-container';
+            tooltipContainer.style.background = 'transparent';
+            tooltipContainer.style.border = 'none';
+            tooltipContainer.style.padding = '0';
+            tooltipContainer.style.margin = '0';
             document.body.appendChild(tooltipContainer);
+        } else {
+            tooltipContainer.style.background = 'transparent';
+            tooltipContainer.style.border = 'none';
+            tooltipContainer.style.padding = '0';
+            tooltipContainer.style.margin = '0';
         }
 
         // Set appropriate z-index for battle screen
         const isBattleScreen = document.getElementById('battleArena');
         if (isBattleScreen) {
-            tooltipContainer.style.zIndex = '10000'; // Higher than battle UI
+            tooltipContainer.style.zIndex = '10000';
         } else {
-            tooltipContainer.style.zIndex = '3000'; // Normal tooltip z-index
+            tooltipContainer.style.zIndex = '3000';
         }
 
         const cardHTML = `
             <div class="large-card-tooltip">
                 <img src="${cardData.imagePath}" 
-                     alt="${cardData.displayName}" 
-                     class="large-card-image"
-                     style="transform: scale(1.5); transform-origin: center;"
-                     onerror="this.src='./Cards/placeholder.png'">
+                    alt="${cardData.displayName}" 
+                    class="large-card-image"
+                    style="transform: scale(1.5); transform-origin: center;"
+                    onerror="this.src='./Cards/placeholder.png'">
                 <div class="card-tooltip-name">${cardData.displayName}</div>
             </div>
         `;
 
-        // Set content and make visible but positioned off-screen for measurement
+        // Set content
         tooltipContainer.innerHTML = cardHTML;
-        tooltipContainer.style.visibility = 'hidden';
         tooltipContainer.style.display = 'block';
         tooltipContainer.style.position = 'fixed';
-        tooltipContainer.style.left = '-9999px';
-        tooltipContainer.style.top = '-9999px';
         
-        // Force a synchronous layout/reflow to get accurate measurements
+        // Get the tooltip content element
         const tooltipContent = tooltipContainer.querySelector('.large-card-tooltip');
-        tooltipContent.offsetHeight; // Force reflow
         
-        // Now position the tooltip with accurate measurements
+        // Force layout recalculation before positioning
+        const deckColumn = document.querySelector('.team-building-right');
+        if (deckColumn) {
+            // Force the browser to recalculate all layout
+            deckColumn.offsetWidth; // Force reflow
+            deckColumn.getBoundingClientRect(); // Force bounds calculation
+        }
+        
+        // Position the tooltip
         this.positionCardTooltipFixed(tooltipContainer, tooltipContent);
         
-        // Make visible at correct position
-        tooltipContainer.style.visibility = 'visible';
-
         console.log(`Showing large card tooltip for: ${cardData.displayName} (z-index: ${tooltipContainer.style.zIndex})`);
     }
 
-    // FIXED: Show preview in dedicated reward screen area with stable layout
+    showDeckTooltip(cardData) {
+        const tooltipContent = document.getElementById('deckTooltipContent');
+        if (!tooltipContent) {
+            console.warn('Deck tooltip content container not found!');
+            return;
+        }
+        
+        const cardHTML = `
+            <div class="large-card-tooltip">
+                <img src="${cardData.imagePath}" 
+                    alt="${cardData.displayName}" 
+                    class="large-card-image"
+                    onerror="this.src='./Cards/placeholder.png'">
+                <div class="card-tooltip-name">${cardData.displayName}</div>
+            </div>
+        `;
+        
+        tooltipContent.innerHTML = cardHTML;
+        tooltipContent.style.display = 'flex';
+        
+        console.log(`Showing deck tooltip for: ${cardData.displayName}`);
+    }
+
+    forceLayoutRecalculation() {
+        const deckColumn = document.querySelector('.team-building-right');
+        if (deckColumn) {
+            // Force the browser to recalculate layout
+            deckColumn.style.display = 'none';
+            deckColumn.offsetHeight; // Force reflow
+            deckColumn.style.display = '';
+        }
+    }
+
+    // Show preview in dedicated reward screen area with stable layout
     showRewardScreenPreview(cardData) {
         const previewArea = document.getElementById('rewardCardPreview');
         if (!previewArea) {
@@ -155,9 +207,14 @@ export class CardPreviewManager {
         const isRewardScreen = document.getElementById('cardRewardOverlay');
         
         if (isRewardScreen) {
-            // Hide reward screen preview instead of floating tooltip
             this.hideRewardScreenPreview();
             return;
+        }
+        
+        // Hide deck tooltip if it exists
+        const deckTooltip = document.getElementById('deckTooltipContent');
+        if (deckTooltip) {
+            deckTooltip.style.display = 'none';
         }
         
         // Continue with original logic for other screens
@@ -171,15 +228,41 @@ export class CardPreviewManager {
     positionCardTooltipFixed(tooltipContainer, tooltipContent) {
         // Get actual tooltip dimensions after rendering
         const tooltipRect = tooltipContent.getBoundingClientRect();
-        const tooltipWidth = tooltipRect.width || 300; // fallback to 300 if measurement fails
-        const tooltipHeight = tooltipRect.height || 420; // fallback to 420 if measurement fails
+        const tooltipWidth = tooltipRect.width || 300;
+        const tooltipHeight = tooltipRect.height || 420;
 
         // Check if we're in the battle screen (but not reward screen)
         const isBattleScreen = document.getElementById('battleArena') && !document.getElementById('cardRewardOverlay');
         
         if (isBattleScreen) {
-            // Battle screen positioning - use battle screen logic
-            this.positionTooltipForBattleScreenFixed(tooltipContent, tooltipWidth, tooltipHeight);
+            // Battle screen positioning
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            const battleInterfacePanel = document.querySelector('.battle-interface-panel');
+            let finalX, finalY;
+            
+            if (battleInterfacePanel) {
+                const panelRect = battleInterfacePanel.getBoundingClientRect();
+                finalX = panelRect.left + 20;
+                finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2));
+                
+                if (finalX + tooltipWidth > panelRect.right - 20) {
+                    finalX = panelRect.right - tooltipWidth - 20;
+                }
+                
+                if (finalY + tooltipHeight > viewportHeight - 20) {
+                    finalY = viewportHeight - tooltipHeight - 20;
+                }
+                if (finalY < 20) {
+                    finalY = 20;
+                }
+            } else {
+                finalX = Math.max(20, viewportWidth * 0.75 - (tooltipWidth / 2));
+                finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2));
+            }
+            
+            this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false);
         } else {
             // Regular game positioning - near deck area
             this.positionTooltipForGameScreenFixed(tooltipContent, tooltipWidth, tooltipHeight);
@@ -187,80 +270,94 @@ export class CardPreviewManager {
     }
 
     // FIXED position tooltip for battle screen with measured dimensions
-    positionTooltipForBattleScreenFixed(tooltipContent, tooltipWidth, tooltipHeight) {
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
-        // Find the battle interface panel to position tooltip within it
-        const battleInterfacePanel = document.querySelector('.battle-interface-panel');
-        let finalX, finalY;
-        
-        if (battleInterfacePanel) {
-            const panelRect = battleInterfacePanel.getBoundingClientRect();
-            
-            // Position tooltip within the battle interface panel
-            finalX = panelRect.left + 20; // 20px from left edge of panel
-            finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2)); // Vertically centered
-            
-            // Ensure tooltip doesn't go off-screen to the right
-            if (finalX + tooltipWidth > panelRect.right - 20) {
-                finalX = panelRect.right - tooltipWidth - 20;
-            }
-            
-            // Ensure tooltip doesn't go off-screen vertically
-            if (finalY + tooltipHeight > viewportHeight - 20) {
-                finalY = viewportHeight - tooltipHeight - 20;
-            }
-            if (finalY < 20) {
-                finalY = 20;
-            }
-            
-            console.log(`Positioned tooltip within battle interface panel: x=${finalX}, y=${finalY}, w=${tooltipWidth}, h=${tooltipHeight}`);
-        } else {
-            // Fallback positioning if battle interface panel not found
-            finalX = Math.max(20, viewportWidth * 0.75 - (tooltipWidth / 2));
-            finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2));
-            console.log(`Using fallback positioning for battle screen: x=${finalX}, y=${finalY}`);
-        }
-        
-        this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false); // Pass false for battle screen
-    }
-
-    // FIXED position tooltip for game screen with measured dimensions
     positionTooltipForGameScreenFixed(tooltipContent, tooltipWidth, tooltipHeight) {
         const deckColumn = document.querySelector('.team-building-right');
         if (!deckColumn) {
-            // Fallback to center if deck column not found
             this.positionTooltipFallbackFixed(tooltipContent, tooltipWidth, tooltipHeight);
             return;
         }
 
-        const deckRect = deckColumn.getBoundingClientRect();
+        const tooltipContainer = tooltipContent.parentElement || tooltipContent;
+        const isBattleFormation = document.querySelector('.team-building-container') !== null;
         
-        // Position relative to deck area
-        const centerX = deckRect.left + (deckColumn.offsetWidth / 2);
-        let finalX = centerX - (tooltipWidth / 2) + 5;
-        let finalY = deckRect.top - tooltipHeight + 650;
-        
-        // Ensure tooltip stays within viewport
-        const margin = 20;
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        
-        if (finalX < margin) {
-            finalX = margin;
-        } else if (finalX + tooltipWidth > viewportWidth - margin) {
-            finalX = viewportWidth - tooltipWidth - margin;
+        if (isBattleFormation) {
+            // Try using offset properties instead of getBoundingClientRect
+            const parent = deckColumn.offsetParent || document.body;
+            let left = deckColumn.offsetLeft;
+            let top = deckColumn.offsetTop;
+            
+            // Walk up the offset parent chain to get absolute position
+            let element = deckColumn;
+            while (element.offsetParent && element.offsetParent !== document.body) {
+                element = element.offsetParent;
+                left += element.offsetLeft;
+                top += element.offsetTop;
+            }
+            
+            const width = deckColumn.offsetWidth;
+            const height = deckColumn.offsetHeight;
+            
+            console.log('Deck position via offset:', { left, top, width, height });
+            
+            if (width === 0 || left === 0) {
+                // Still invalid, use fallback
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                const finalX = viewportWidth * 0.75 - (tooltipWidth / 2);
+                const finalY = viewportHeight * 0.5 - (tooltipHeight / 2);
+                
+                this.applyTooltipPositioning(tooltipContainer, tooltipContent, 
+                    Math.max(20, Math.min(finalX, viewportWidth - tooltipWidth - 20)),
+                    Math.max(20, Math.min(finalY, viewportHeight - tooltipHeight - 20))
+                );
+            } else {
+                // Use offset-based positioning
+                const deckCenterX = left + (width / 2);
+                const deckCenterY = top + (height / 2);
+                
+                const finalX = deckCenterX;
+                const finalY = deckCenterY - height/5;
+                
+                this.applyTooltipPositioning(tooltipContainer, tooltipContent, finalX, Math.max(20, finalY));
+            }
+        } else {
+            // Original positioning for other screens
+            const deckRect = deckColumn.getBoundingClientRect();
+            const centerX = deckRect.left + (deckColumn.offsetWidth / 2);
+            const finalX = centerX - (tooltipWidth / 2) + 5;
+            const finalY = deckRect.top - tooltipHeight + 650;
+            
+            this.applyTooltipStylesFixed(tooltipContent, 
+                Math.max(20, Math.min(finalX, window.innerWidth - tooltipWidth - 20)),
+                Math.max(20, Math.min(finalY, window.innerHeight - tooltipHeight - 20)),
+                false
+            );
         }
-        
-        if (finalY < margin) {
-            finalY = margin;
-        } else if (finalY + tooltipHeight > viewportHeight - margin) {
-            finalY = viewportHeight - tooltipHeight - margin;
+    }
+
+    applyTooltipPositioning(container, content, x, y) {
+        if (container && container.id === 'cardTooltipContainer') {
+            // Ensure container has no background
+            container.style.background = 'transparent';
+            container.style.border = 'none';
+            container.style.padding = '0';
+            container.style.margin = '0';
+            container.style.width = 'auto';
+            container.style.height = 'auto';
+            
+            // Position the container
+            container.style.position = 'fixed';
+            container.style.left = Math.floor(x) + 'px';
+            container.style.top = Math.floor(y) + 'px';
+            container.style.transform = 'none';
+            
+            // Ensure content is relatively positioned within container
+            content.style.position = 'relative';
+            content.style.left = '0';
+            content.style.top = '0';
+            content.style.transform = 'none';
         }
-        
-        this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false); // Pass false for normal screen
-        console.log(`Positioned tooltip for game screen: x=${finalX}, y=${finalY}, w=${tooltipWidth}, h=${tooltipHeight}`);
     }
 
     // Fallback positioning with measured dimensions
@@ -277,6 +374,15 @@ export class CardPreviewManager {
 
     // FIXED apply tooltip styles without changing dimensions
     applyTooltipStylesFixed(tooltipContent, x, y, isRewardScreen = false) {
+        // First ensure the container (parent) has no background
+        const tooltipContainer = tooltipContent.parentElement;
+        if (tooltipContainer && tooltipContainer.id === 'cardTooltipContainer') {
+            tooltipContainer.style.background = 'transparent';
+            tooltipContainer.style.border = 'none';
+            tooltipContainer.style.padding = '0';
+            tooltipContainer.style.margin = '0';
+        }
+        
         tooltipContent.style.position = 'fixed';
         tooltipContent.style.left = x + 'px';
         tooltipContent.style.top = y + 'px';
@@ -321,6 +427,13 @@ export class CardPreviewManager {
     // Comprehensive tooltip cleanup - removes ALL possible tooltips
     clearAllTooltips() {
         console.log('Clearing all tooltips...');
+    
+        // Clear deck tooltip
+        const deckTooltip = document.getElementById('deckTooltipContent');
+        if (deckTooltip) {
+            deckTooltip.style.display = 'none';
+            deckTooltip.innerHTML = '';
+        }
         
         // Clear reward screen preview if present
         this.hideRewardScreenPreview();

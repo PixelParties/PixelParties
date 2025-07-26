@@ -455,6 +455,22 @@ export class HandManager {
             // Check if this is a spell card
             const isSpellCard = window.heroSelection?.heroSpellbookManager?.isSpellCard(cardName) || false;
             
+            // Check if this is an artifact and if it's unaffordable
+            let isUnaffordable = false;
+            let dataCardType = 'other';
+            if (isAbilityCard) {
+                dataCardType = 'ability';
+            } else if (isSpellCard) {
+                dataCardType = 'spell';
+            } else if (cardInfo && cardInfo.cardType === 'Artifact') {
+                dataCardType = 'artifact';
+                // Check if player can afford it
+                if (cardInfo.cost && cardInfo.cost > 0) {
+                    const playerGold = window.heroSelection?.goldManager?.getPlayerGold() || 0;
+                    isUnaffordable = playerGold < cardInfo.cost;
+                }
+            }
+            
             // Determine if card can be played
             const canPlay = !requiresAction || hasActions;
             
@@ -473,16 +489,24 @@ export class HandManager {
             if (isSpellCard) cardClasses += ' spell-card';
             if (!canPlay) cardClasses += ' no-actions-available';
 
+            // Add clickable class for special cards
+            let clickableClass = '';
+            if (cardName === 'TreasureChest' || dataCardType === 'artifact') {
+                clickableClass = ' clickable';
+            }
+
             handHTML += `
-                <div class="${cardClasses}" 
+                <div class="${cardClasses}${clickableClass}" 
                     data-card-index="${index}" 
                     data-card-name="${cardName}"
-                    data-card-type="${isAbilityCard ? 'ability' : (isSpellCard ? 'spell' : 'other')}"
+                    data-card-type="${dataCardType}"
                     data-requires-action="${requiresAction}"
                     data-can-play="${canPlay}"
-                    draggable="${canPlay ? 'true' : 'false'}"
-                    ondragstart="${canPlay ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
+                    data-unaffordable="${isUnaffordable}"
+                    draggable="${canPlay && !isUnaffordable ? 'true' : 'false'}"
+                    ondragstart="${canPlay && !isUnaffordable ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
                     ondragend="onHandCardDragEnd(event)"
+                    onclick="onHandCardClick(event, ${index}, '${cardName}')"
                     onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
                     onmouseleave="window.hideCardTooltip()">
                     <img src="${cardPath}" 
@@ -630,9 +654,126 @@ export class HandManager {
     }
 }
 
+// ===== ARTIFACT GOLD CHECK HELPER FUNCTIONS =====
+
+// Check if player can afford to play an artifact
+function canPlayerAffordArtifact(cardName) {
+    if (!window.heroSelection) {
+        return { canAfford: false, reason: 'Game not initialized' };
+    }
+    
+    // Get card info
+    const cardInfo = window.heroSelection.getCardInfo(cardName);
+    if (!cardInfo) {
+        return { canAfford: true }; // If no info, allow play
+    }
+    
+    // Check if it's an artifact
+    if (cardInfo.cardType !== 'Artifact') {
+        return { canAfford: true }; // Not an artifact, no gold check needed
+    }
+    
+    // Get artifact cost
+    const artifactCost = cardInfo.cost || 0;
+    if (artifactCost <= 0) {
+        return { canAfford: true }; // No cost or free artifact
+    }
+    
+    // Get player's current gold
+    const playerGold = window.heroSelection.getGoldManager().getPlayerGold();
+    
+    // Check if player can afford it
+    if (playerGold >= artifactCost) {
+        return { canAfford: true };
+    } else {
+        return { 
+            canAfford: false, 
+            reason: `You need ${artifactCost} Gold to play this card!`,
+            cost: artifactCost,
+            currentGold: playerGold,
+            shortBy: artifactCost - playerGold
+        };
+    }
+}
+
+// Show gold error message
+function showGoldError(message, event) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'gold-error-popup';
+    errorDiv.innerHTML = `
+        <div class="gold-error-content">
+            <span class="gold-error-icon">💰</span>
+            <span class="gold-error-text">${message}</span>
+        </div>
+    `;
+    
+    // Position near the cursor or card
+    const x = event ? event.clientX : window.innerWidth / 2;
+    const y = event ? event.clientY : window.innerHeight / 2;
+    
+    errorDiv.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y - 50}px;
+        transform: translateX(-50%);
+        background: rgba(220, 53, 69, 0.95);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 10000;
+        pointer-events: none;
+        animation: goldErrorBounce 0.5s ease-out;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    // Remove after animation
+    setTimeout(() => {
+        errorDiv.style.animation = 'goldErrorFade 0.3s ease-out forwards';
+        setTimeout(() => errorDiv.remove(), 300);
+    }, 2000);
+}
+
+// Generic artifact handler (can be expanded for other artifacts)
+async function handleArtifactUse(cardIndex, cardName) {
+    if (!window.heroSelection) {
+        console.error('Hero selection not available');
+        return;
+    }
+    
+    try {
+        // Try to dynamically import the artifact module
+        // Convert card name to module path (e.g., "TreasureChest" -> "./Artifacts/treasureChest.js")
+        const moduleName = cardName.charAt(0).toLowerCase() + cardName.slice(1);
+        const module = await import(`./Artifacts/${moduleName}.js`);
+        
+        if (module[`${moduleName}Artifact`]) {
+            await module[`${moduleName}Artifact`].handleClick(cardIndex, cardName, window.heroSelection);
+        } else {
+            console.log(`No artifact handler found for ${cardName}`);
+        }
+    } catch (error) {
+        console.log(`No artifact module found for ${cardName}`, error);
+    }
+}
+
+// ===== GLOBAL HAND CARD DRAG FUNCTIONS =====
+
 // Global hand card drag functions (matching hero drag pattern)
 function onHandCardDragStart(event, cardIndex, cardName) {
     if (window.handManager && window.heroSelection) {
+        // First check if it's an artifact and if player can afford it
+        const affordCheck = canPlayerAffordArtifact(cardName);
+        if (!affordCheck.canAfford) {
+            event.preventDefault();
+            showGoldError(affordCheck.reason, event);
+            return false;
+        }
+        
         // Get card info
         const cardInfo = window.heroSelection.getCardInfo ? 
             window.heroSelection.getCardInfo(cardName) : null;
@@ -866,6 +1007,24 @@ function createOptimizedDragImage(cardElement) {
 
 function onHandCardDragEnd(event) {
     if (window.handManager) {
+        // Check if this was a TreasureChest card dragged outside the hand
+        const dragState = window.handManager.getHandDragState();
+        if (dragState.isDragging && dragState.draggedCardName === 'TreasureChest') {
+            // Check if the drop occurred outside the hand container
+            const handContainer = document.querySelector('.hand-cards');
+            if (handContainer) {
+                const rect = handContainer.getBoundingClientRect();
+                const x = event.clientX;
+                const y = event.clientY;
+                
+                // If dropped outside the hand container (ANYWHERE outside)
+                if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                    // Consume the treasure chest no matter where it was dropped
+                    handleTreasureChestUse(dragState.draggedCardIndex, dragState.draggedCardName);
+                }
+            }
+        }
+        
         window.handManager.endHandCardDrag();
         console.log('Hand card drag ended');
     }
@@ -894,6 +1053,63 @@ function onHandZoneDrop(event) {
         return window.handManager.onZoneDrop(event);
     }
 }
+
+// Global hand card click handler
+async function onHandCardClick(event, cardIndex, cardName) {
+    // Prevent click from bubbling to parent elements
+    event.stopPropagation();
+    
+    console.log(`Hand card clicked: ${cardName} at index ${cardIndex}`);
+    
+    // First check if it's an artifact and if player can afford it
+    const affordCheck = canPlayerAffordArtifact(cardName);
+    if (!affordCheck.canAfford) {
+        showGoldError(affordCheck.reason, event);
+        return;
+    }
+    
+    // Handle special clickable cards
+    switch (cardName) {
+        case 'TreasureChest':
+            await handleTreasureChestUse(cardIndex, cardName);
+            break;
+        
+        // Add other clickable cards here in the future
+        default:
+            // Check if this is an artifact that should be clickable
+            if (window.heroSelection) {
+                const cardInfo = window.heroSelection.getCardInfo(cardName);
+                if (cardInfo && cardInfo.cardType === 'Artifact') {
+                    // Try to load and use the artifact module
+                    await handleArtifactUse(cardIndex, cardName);
+                } else {
+                    // Default behavior - do nothing
+                    console.log(`No click handler for card: ${cardName}`);
+                }
+            }
+            break;
+    }
+}
+
+// Handle TreasureChest card usage
+async function handleTreasureChestUse(cardIndex, cardName) {
+    if (!window.heroSelection) {
+        console.error('Hero selection not available');
+        return;
+    }
+    
+    try {
+        // Dynamically import the TreasureChest module
+        const { treasureChestArtifact } = await import('./Artifacts/treasureChest.js');
+        
+        // Use the artifact
+        await treasureChestArtifact.handleClick(cardIndex, cardName, window.heroSelection);
+    } catch (error) {
+        console.error('Failed to load TreasureChest artifact:', error);
+    }
+}
+
+// ===== STYLES =====
 
 const actionIndicatorStyle = document.createElement('style');
 actionIndicatorStyle.textContent = `
@@ -964,6 +1180,82 @@ actionIndicatorStyle.textContent = `
     }
 `;
 
+// Add CSS for gold error popup
+if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles')) {
+    const style = document.createElement('style');
+    style.id = 'goldErrorStyles';
+    style.textContent = `
+        @keyframes goldErrorBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-5px) scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes goldErrorFade {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
+        }
+        
+        .gold-error-popup {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .gold-error-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .gold-error-icon {
+            font-size: 20px;
+            filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.8));
+        }
+        
+        .gold-error-text {
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Visual indicator for unaffordable artifacts in hand */
+        .hand-card[data-card-type="artifact"][data-unaffordable="true"] {
+            position: relative;
+            opacity: 0.7;
+        }
+        
+        .hand-card[data-card-type="artifact"][data-unaffordable="true"]::after {
+            content: "💰";
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 20px;
+            filter: drop-shadow(0 0 3px rgba(220, 53, 69, 0.8));
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 // Attach global functions to window for cross-module access
 if (typeof window !== 'undefined') {
     window.onHandCardDragStart = onHandCardDragStart;
@@ -972,6 +1264,9 @@ if (typeof window !== 'undefined') {
     window.onHandZoneDragOver = onHandZoneDragOver;
     window.onHandZoneDragLeave = onHandZoneDragLeave;
     window.onHandZoneDrop = onHandZoneDrop;
+    window.onHandCardClick = onHandCardClick;
+    window.canPlayerAffordArtifact = canPlayerAffordArtifact;
+    window.showGoldError = showGoldError;
     
     console.log('Opera-compatible hand card drag functions attached to window');
 }

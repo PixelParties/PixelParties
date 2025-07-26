@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Pixel Parties</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Project Pixel Parties</h1>
+        <div class="game-subtitle">🃏 Pixel Art Auto Battler 🎯</div>
+        
+        <div id="menu" class="menu-buttons">
+            <div class="input-section">
+                <label for="usernameInput">👤 Username:</label>
+                <input type="text" id="usernameInput" class="text-input" placeholder="Enter your username" maxlength="20" value="Player">
+            </div>
+            
+            <div id="passwordSection" class="input-section password-section hidden">
+                <label for="passwordInput">🔒 Room Password (Optional):</label>
+                <input type="password" id="passwordInput" class="text-input" placeholder="Leave empty for public room" maxlength="50">
+                <div class="password-hint">Leave empty to create a public room, or set a password for private access.</div>
+            </div>
+            
+            <button id="startBtn" class="btn btn-primary">🎯 Create Party</button>
+            <button id="confirmCreateBtn" class="btn btn-primary hidden">🎮 Create Game</button>
+            <button id="cancelCreateBtn" class="btn btn-secondary hidden">❌ Cancel</button>
+            <button id="joinBtn" class="btn btn-secondary">⚔️ Browse Battles</button>
+            <button id="leaveBtn" class="btn btn-danger hidden">🚪 Leave Party</button>
+        </div>
+
+        <!-- Room Browser Interface -->
+        <div id="roomBrowser" class="room-browser hidden">
+            <div class="browser-header">
+                <h2>🎮 Available Battle Rooms</h2>
+                <button id="backToMenuBtn" class="btn-back">← Back to Menu</button>
+            </div>
+            <div id="roomsList" class="rooms-list">
+                <div class="loading-rooms">🔍 Searching for battles...</div>
+            </div>
+            <div class="browser-footer">
+                <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <div id="status" class="status hidden"></div>
+        <div id="roomInfo" class="room-info hidden"></div>
+        <div id="playersList" class="players-list hidden"></div>
+        <div id="connectionDetails" class="connection-details hidden"></div>
+    </div>
+
+    <!-- Game Screen - Full Width -->
+    <div id="gameScreen" class="game-screen hidden">
+        <!-- Hero Selection Area - Will be dynamically populated -->
+        <div class="hero-selection-screen">
+            <div class="loading-heroes">
+                <h2>🎮 Loading Heroes...</h2>
+                <div class="loading-spinner"></div>
+            </div>
+        </div>
+        
+        <!-- Surrender Button (shown only after character selection) -->
+        <button id="surrenderBtn" class="surrender-button hidden">🏳️ Surrender</button>
+    </div>
+
+    <!-- Password Prompt Modal -->
+    <div id="passwordModal" class="modal-overlay hidden">
+        <div class="password-modal">
+            <div class="modal-title">🔒 Password Required</div>
+            <div class="modal-description">This room is password protected. Please enter the password to join:</div>
+            <div id="passwordError" class="password-error hidden">❌ Wrong password! Please try again.</div>
+            <div class="input-section">
+                <input type="password" id="modalPasswordInput" class="text-input" placeholder="Enter room password" maxlength="50">
+            </div>
+            <div class="modal-buttons">
+                <button id="modalCancelBtn" class="btn-modal secondary">Cancel</button>
+                <button id="modalJoinBtn" class="btn-modal primary">Join Room</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Surrender Confirmation Modal -->
+    <div id="surrenderModal" class="modal-overlay hidden">
+        <div class="surrender-modal">
+            <div class="surrender-title">🏳️ Surrender Battle</div>
+            <div class="surrender-description">Do you really want to give up?</div>
+            <div class="surrender-buttons">
+                <button id="surrenderNoBtn" class="btn-surrender-confirm no">No</button>
+                <button id="surrenderYesBtn" class="btn-surrender-confirm yes">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-database-compat.min.js"></script>
+
+    <!-- Application Modules -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>

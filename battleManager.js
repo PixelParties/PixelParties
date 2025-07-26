@@ -6,7 +6,7 @@ import { Hero } from './hero.js';
 
 import { NecromancyManager } from './Abilities/necromancy.js';
 
-import JigglesCreature from '../Creatures/jiggles.js';
+import JigglesCreature from './Creatures/jiggles.js';
 
 
 export class BattleManager {

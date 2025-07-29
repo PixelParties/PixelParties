@@ -1555,7 +1555,8 @@ export class BattleManager {
         const startTime = Date.now();
         
         // Apply speed adjustment to the timeout
-        const adjustedTimeout = this.getSpeedAdjustedDelay(timeout);
+        //const adjustedTimeout = this.getSpeedAdjustedDelay(timeout);
+        const adjustedTimeout = 1;
         
         return new Promise((resolve) => {
             const timeoutId = setTimeout(() => {

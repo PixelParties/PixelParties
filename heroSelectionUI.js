@@ -278,56 +278,67 @@ export class HeroSelectionUI {
             }
         };
         
-        // Create animated creatures HTML with drag and drop functionality
-        let creaturesHTML = '';
+        // FIXED: Always create the creatures container, even if empty
+        // This ensures drop zones exist for Guard Change mode
+        let creaturesHTML = `
+            <div class="hero-creatures" 
+                data-hero-position="${position}"
+                ondragover="window.onCreatureContainerDragOver(event, '${position}')"
+                ondrop="window.onCreatureContainerDrop(event, '${position}')"
+                ondragleave="window.onCreatureContainerDragLeave(event)">
+        `;
+        
+        // Add creatures if they exist
         if (creatures && creatures.length > 0) {
-            creaturesHTML = `
-                <div class="hero-creatures" 
-                    data-hero-position="${position}"
-                    ondragover="window.onCreatureContainerDragOver(event, '${position}')"
-                    ondrop="window.onCreatureContainerDrop(event, '${position}')"
-                    ondragleave="window.onCreatureContainerDragLeave(event)">
-                    ${creatures.map((creature, index) => {
-                        const creatureSprite = `./Creatures/${creature.name}.png`;
-                        const cardData = {
-                            imagePath: creature.image,
-                            displayName: this.formatCardName(creature.name),
-                            cardType: 'creature'
-                        };
-                        const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
-                        
-                        // Prepare creature data for drag operations
-                        const creatureDataJson = JSON.stringify({
-                            name: creature.name,
-                            heroPosition: position,
-                            index: index
-                        }).replace(/"/g, '&quot;');
-                        
-                        // Vary animation speed for visual interest
-                        const speedClasses = ['speed-slow', 'speed-normal', 'speed-fast'];
-                        const speedClass = speedClasses[index % speedClasses.length];
-                        
-                        return `
-                            <div class="creature-icon" 
-                                data-creature-index="${index}"
-                                data-hero-position="${position}"
-                                draggable="true"
-                                ondragstart="window.onCreatureDragStart(event, '${creatureDataJson}')"
-                                ondragend="window.onCreatureDragEnd(event)"
-                                onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
-                                onmouseleave="window.hideCardTooltip()">
-                                <div class="creature-sprite-container">
-                                    <img src="${creatureSprite}" 
-                                        alt="${creature.name}" 
-                                        class="creature-sprite ${speedClass}"
-                                        onerror="this.src='./Creatures/placeholder.png'">
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
+            creaturesHTML += creatures.map((creature, index) => {
+                const creatureSprite = `./Creatures/${creature.name}.png`;
+                const cardData = {
+                    imagePath: creature.image,
+                    displayName: this.formatCardName(creature.name),
+                    cardType: 'creature'
+                };
+                const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
+                
+                // Prepare creature data for drag operations
+                const creatureDataJson = JSON.stringify({
+                    name: creature.name,
+                    heroPosition: position,
+                    index: index
+                }).replace(/"/g, '&quot;');
+                
+                // Vary animation speed for visual interest
+                const speedClasses = ['speed-slow', 'speed-normal', 'speed-fast'];
+                const speedClass = speedClasses[index % speedClasses.length];
+                
+                return `
+                    <div class="creature-icon" 
+                        data-creature-index="${index}"
+                        data-hero-position="${position}"
+                        draggable="true"
+                        ondragstart="window.onCreatureDragStart(event, '${creatureDataJson}')"
+                        ondragend="window.onCreatureDragEnd(event)"
+                        onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
+                        onmouseleave="window.hideCardTooltip()">
+                        <div class="creature-sprite-container">
+                            <img src="${creatureSprite}" 
+                                alt="${creature.name}" 
+                                class="creature-sprite ${speedClass}"
+                                onerror="this.src='./Creatures/placeholder.png'">
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            // Add empty state placeholder (optional visual enhancement)
+            creaturesHTML += `
+                <div class="creature-empty-placeholder" style="display: none;">
+                    <!-- Hidden placeholder for empty creature areas -->
                 </div>
             `;
         }
+        
+        // Close the creatures container
+        creaturesHTML += '</div>';
         
         return `
             <div class="hero-ability-zones" data-hero-position="${position}">
@@ -603,6 +614,18 @@ function onTeamSlotDragOver(event, position) {
 
         // Check if it's a spell card
         if (window.heroSelection.heroSpellbookManager.isSpellCard(cardName)) {
+            // NEW: Check if it's a global spell - if so, just prevent default and return
+            if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Add visual indicator that this is a global spell
+                const slot = event.currentTarget;
+                slot.classList.add('global-spell-hover');
+                
+                return; // Don't show any tooltips
+            }
+            
             event.preventDefault();
             
             const slot = event.currentTarget;
@@ -759,6 +782,7 @@ function onTeamSlotDragLeave(event) {
         y < rect.top - margin || y > rect.bottom + margin) {
         
         slot.classList.remove('drag-over', 'ability-drop-ready', 'ability-drop-invalid');
+        slot.classList.remove('global-spell-hover'); // NEW: Remove global spell hover class
         
         // Remove tooltip if this is the current tooltip slot
         if (currentTooltipSlot === slot) {
@@ -845,7 +869,7 @@ if (typeof document !== 'undefined') {
     });
 }
 
-// ===== NEW: CREATURE DRAG AND DROP HANDLERS =====
+// ===== CREATURE DRAG AND DROP HANDLERS =====
 
 // Global creature drag state tracking
 let creatureDragState = {
@@ -964,14 +988,18 @@ function onCreatureContainerDragOver(event, heroPosition) {
     
     const container = event.currentTarget;
     
-    // Check if this is the same hero as the dragged creature
-    if (heroPosition === creatureDragState.draggedFromHero) {
-        // Valid drop zone - same hero
+    // Check if Guard Change mode is active
+    const isGuardChangeActive = window.globalSpellManager?.isGuardChangeModeActive() || false;
+    const isSameHero = heroPosition === creatureDragState.draggedFromHero;
+    
+    // Allow drop if same hero OR Guard Change mode is active
+    if (isSameHero || isGuardChangeActive) {
+        // Valid drop zone
         container.classList.add('creature-drop-ready');
         container.classList.remove('creature-drop-invalid');
         event.dataTransfer.dropEffect = 'move';
     } else {
-        // Invalid drop zone - different hero
+        // Invalid drop zone - different hero and no Guard Change
         container.classList.add('creature-drop-invalid');
         container.classList.remove('creature-drop-ready');
         event.dataTransfer.dropEffect = 'none';
@@ -996,7 +1024,7 @@ function onCreatureContainerDragLeave(event) {
 }
 
 // Creature container drop handler
-async function onCreatureContainerDrop(event, heroPosition) {
+async function onCreatureContainerDrop(event, heroPosition) {    
     event.preventDefault();
     event.stopPropagation();
     
@@ -1007,24 +1035,45 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Only handle creature drags
     if (!creatureDragState.isDragging) {
+        console.log('❌ Global creatureDragState.isDragging is false, returning');
         return false;
     }
     
-    // Only allow drops within the same hero
-    if (heroPosition !== creatureDragState.draggedFromHero) {
-        console.log('Cannot move creature to different hero - ignoring drop');
+    // Check if Guard Change mode is active
+    const isGuardChangeActive = window.globalSpellManager?.isGuardChangeModeActive() || false;
+    const isSameHero = heroPosition === creatureDragState.draggedFromHero;
+    
+    // Allow drops within same hero OR if Guard Change mode is active
+    if (!isSameHero && !isGuardChangeActive) {
+        console.log('❌ Cannot move creature to different hero - Guard Change mode not active');
         return false;
     }
     
-    // Handle the reorder using the creature manager
+    // Check if target hero exists (for cross-hero moves)
+    if (!isSameHero && window.heroSelection?.heroCreatureManager) {
+        const hasTargetHero = window.heroSelection.heroCreatureManager.hasHeroAtPosition(heroPosition);
+        console.log('🔍 hasTargetHero:', hasTargetHero);
+        if (!hasTargetHero) {
+            console.log(`❌ Cannot move creature to ${heroPosition} - no hero at that position`);
+            return false;
+        }
+    }
+    
+    // Handle the drop using the creature manager
     if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+        console.log('🔍 About to call handleCreatureDrop...');
+        
         const success = window.heroSelection.heroCreatureManager.handleCreatureDrop(
             heroPosition,
             event.clientX,
             container
         );
         
+        console.log('🔍 handleCreatureDrop returned:', success);
+        
         if (success) {
+            console.log('✅ Move successful, updating UI...');
+            
             // Update the UI
             if (window.heroSelection.updateBattleFormationUI) {
                 window.heroSelection.updateBattleFormationUI();
@@ -1039,11 +1088,19 @@ async function onCreatureContainerDrop(event, heroPosition) {
             if (window.heroSelection.sendFormationUpdate) {
                 await window.heroSelection.sendFormationUpdate();
             }
+            
+            // Log successful cross-hero move
+            if (!isSameHero) {
+                console.log(`🛡️ Guard Change: Successfully moved creature from ${creatureDragState.draggedFromHero} to ${heroPosition}`);
+            }
+        } else {
+            console.log('❌ Move failed');
         }
         
         return success;
     }
     
+    console.log('❌ No heroSelection or heroCreatureManager found');
     return false;
 }
 

@@ -8,12 +8,15 @@ import { CardPreviewManager } from './cardPreviewManager.js';
 import { FormationManager } from './formationManager.js';
 import { HeroSelectionUI } from './heroSelectionUI.js';
 import { TurnTracker } from './turnTracker.js';
-import { BattleReconnectionManager } from './battleReconnection.js';
 import { HeroAbilitiesManager } from './heroAbilities.js';
 import { getHeroInfo, getCardInfo } from './cardDatabase.js';
 import { HeroSpellbookManager } from './heroSpellbook.js';
 import { ActionManager } from './actionManager.js';
 import { HeroCreatureManager } from './creatures.js';
+import { GameStateMachine } from './gameStateMachine.js';
+import { globalSpellManager } from './globalSpellManager.js';
+
+
 import { leadershipAbility } from './Abilities/leadership.js';
 
 export class HeroSelection {
@@ -28,16 +31,13 @@ export class HeroSelection {
         this.onSelectionComplete = null; // Callback when selection is done
         this.roomManager = null; // Reference to room manager for Firebase access
         this.battleStateListener = null; // Firebase listener for battle state
+        this.globalSpellManager = globalSpellManager;
+
+
+        // Guard Change mode tracking
+        this.guardChangeMode = false;
         
-        // Battle state management flags
-        this.isReturningFromBattle = false;
-        this.battleStateCleanupInProgress = false;
-        this.listenerTemporarilyDisabled = false;
-        this.isTransitioningToBattle = false;
-        this.isRestoringFromSave = false; 
-        
-        // Battle reconnection manager
-        this.battleReconnectionManager = null;
+        this.stateMachine = new GameStateMachine();
         
         // Store opponent abilities data with enhanced debugging
         this.opponentAbilitiesData = null;
@@ -104,8 +104,7 @@ export class HeroSelection {
             window.leadershipAbility = leadershipAbility;
         }
         
-        // UI state
-        this.currentPhase = 'selection'; // 'loading', 'selection', 'team_building', 'battle_active'
+        // UI state (REMOVED currentPhase - now using state machine)
         this.stateInitialized = false;
         
         // Character card mappings
@@ -128,6 +127,9 @@ export class HeroSelection {
 
     // Initialize with game context and setup turn tracker
     async init(isHost, gameDataSender, onSelectionComplete, roomManager) {
+        // Transition to initializing state
+        this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
+        
         this.isHost = isHost;
         this.gameDataSender = gameDataSender;
         this.onSelectionComplete = onSelectionComplete;
@@ -140,20 +142,26 @@ export class HeroSelection {
             (turnChangeData) => this.onTurnChange(turnChangeData)
         );
 
-        
-    // Initialize action manager with callback
+        // Initialize action manager with callback
         this.actionManager.init((actionChangeData) => {
-            // Update UI when actions change
             this.updateActionDisplay();
-            
-            // Sync with opponent
             if (actionChangeData.player) {
                 this.syncActionsWithOpponent();
             }
         });
         
+        // Initialize reconnection manager
+        const { ReconnectionManager } = await import('./reconnectionManager.js');
+        this.reconnectionManager = new ReconnectionManager();
+        this.reconnectionManager.init(this, roomManager, gameDataSender, isHost);
+        
         // Set up battle state listener
         this.setupBattleStateListener();
+        
+        // Add state change listener for debugging
+        this.stateMachine.onStateChange((fromState, toState, context) => {
+            console.log(`HeroSelection state changed: ${fromState} -> ${toState}`, context);
+        });
         
         return this.loadCharacters();
     }
@@ -218,8 +226,8 @@ export class HeroSelection {
         
         // Set up new listener
         this.battleStateListener = roomRef.child('gameState').on('value', async (snapshot) => {
-            // Skip processing if listener is temporarily disabled or cleanup is in progress
-            if (this.listenerTemporarilyDisabled || this.battleStateCleanupInProgress) {
+            // Skip processing if in cleanup state
+            if (this.stateMachine.isInState(this.stateMachine.states.CLEANING_UP)) {
                 return;
             }
             
@@ -230,28 +238,24 @@ export class HeroSelection {
             const guestReady = gameState.guestBattleReady || false;
             const battleStarted = gameState.battleStarted || false;
             
-            // Don't clear battle state if we're actively transitioning
-            if (this.getCurrentPhase() === 'team_building' && 
+            // Don't clear battle state if we're actively transitioning or in battle
+            if (this.stateMachine.isInState(this.stateMachine.states.TEAM_BUILDING) && 
                 battleStarted && 
-                !this.isReturningFromBattle && 
-                !this.isTransitioningToBattle &&
-                !this.isRestoringFromSave) {
+                !this.stateMachine.isInState(this.stateMachine.states.RECONNECTING)) {
                 
                 await this.emergencyBattleStateClear();
                 return; // Skip rest of processing to let the clear take effect
             }
             
-            // Only update button state if we're in team building phase AND not returning from battle AND not transitioning
-            if (this.getCurrentPhase() === 'team_building' && 
-                !this.isReturningFromBattle && 
-                !this.isTransitioningToBattle) {
+            // Only update button state if we're in team building phase
+            if (this.stateMachine.isInState(this.stateMachine.states.TEAM_BUILDING)) {
                 
                 const toBattleBtn = document.querySelector('.to-battle-button');
                 if (toBattleBtn) {
                     const myReady = this.isHost ? hostReady : guestReady;
                     const opponentReady = this.isHost ? guestReady : hostReady;
                     
-                    // IMPROVED: Only disable if we're ready but opponent isn't, or if battle started
+                    // Only disable if we're ready but opponent isn't, or if battle started
                     const shouldDisable = (myReady && !opponentReady) || battleStarted;
                     toBattleBtn.disabled = shouldDisable;
                 }
@@ -260,10 +264,13 @@ export class HeroSelection {
             // Check if we're waiting and opponent just became ready
             const waitingOverlay = document.getElementById('battleFormationWaitingOverlay');
             if (waitingOverlay && waitingOverlay.style.display === 'flex') {
-                if (hostReady && guestReady && !battleStarted && !this.isTransitioningToBattle) {
+                if (hostReady && guestReady && !battleStarted && 
+                    this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
                     
-                    // Set transition flag BEFORE making any changes
-                    this.isTransitioningToBattle = true;
+                    // Transition to battle starting
+                    this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
+                        reason: 'firebase_both_ready'
+                    });
                     
                     // Only host marks battle as started
                     if (this.isHost) {
@@ -274,7 +281,9 @@ export class HeroSelection {
                     }
                 }
                 
-                if (battleStarted && this.isTransitioningToBattle) {
+                // Only transition if we're in the correct state and battle has started
+                if (battleStarted && 
+                    this.stateMachine.isInState(this.stateMachine.states.TRANSITIONING_TO_BATTLE)) {
                     // Transition to battle
                     this.transitionToBattleScreen();
                 }
@@ -282,9 +291,7 @@ export class HeroSelection {
             
             // Handle case where we load into a game where opponent is already waiting
             if (!battleStarted && 
-                this.getCurrentPhase() === 'team_building' && 
-                !this.isReturningFromBattle && 
-                !this.isTransitioningToBattle) {
+                this.stateMachine.isInState(this.stateMachine.states.TEAM_BUILDING)) {
                 
                 const myReady = this.isHost ? hostReady : guestReady;
                 const opponentReady = this.isHost ? guestReady : hostReady;
@@ -402,268 +409,122 @@ export class HeroSelection {
         }
     }
 
+    async setGamePhase(phase) {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return false;
+        }
+
+        try {
+            await this.roomManager.getRoomRef().child('gameState').update({
+                gamePhase: phase,
+                gamePhaseUpdated: Date.now()
+            });
+            console.log(`🎯 Game phase set to: ${phase}`);
+            return true;
+        } catch (error) {
+            console.error('Error setting game phase:', error);
+            return false;
+        }
+    }
+
     // Restore game state method with battle reconnection support and ability debugging
     async restoreGameState() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
             return false;
         }
         
-        this.isRestoringFromSave = true;
-
         try {
             const roomRef = this.roomManager.getRoomRef();
             const snapshot = await roomRef.child('gameState').once('value');
             const gameState = snapshot.val();
             
-            if (!gameState) {
-                console.log('No game state found to restore');
-                return false;
+            // Check if game state exists AND has character assignments
+            if (!gameState || 
+                !gameState.hostCharacters || gameState.hostCharacters.length === 0 ||
+                !gameState.guestCharacters || gameState.guestCharacters.length === 0) {
+                
+                console.log('No valid game state found - starting fresh game');
+                
+                // Transition to initializing state for fresh game
+                this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
+                
+                // Start character selection for new game
+                const selectionStarted = await this.startSelection();
+                
+                if (!selectionStarted) {
+                    console.error('Failed to start character selection for new game');
+                    this.stateMachine.transitionTo(this.stateMachine.states.ERROR, {
+                        error: 'Failed to start character selection'
+                    });
+                    return false;
+                }
+                
+                console.log('✅ New game character selection started successfully');
+                
+                // Update UI
+                if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                    window.updateHeroSelectionUI();
+                }
+                
+                return false; // Indicate no state was restored (this is a new game)
             }
-
-            console.log('Restoring game state from Firebase');
-
-            // Restore turn using TurnTracker
-            await this.turnTracker.importTurnData(gameState);
-
-            // STEP 1: First restore all character assignments and selections
-            let charactersRestored = false;
             
-            // Restore character assignments if they exist
-            if (gameState.hostCharacters && gameState.guestCharacters) {
-                if (this.isHost) {
-                    this.playerCharacters = gameState.hostCharacters || [];
-                    this.opponentCharacters = gameState.guestCharacters || [];
-                } else {
-                    this.playerCharacters = gameState.guestCharacters || [];
-                    this.opponentCharacters = gameState.hostCharacters || [];
-                }
-
-                charactersRestored = true;
-                console.log('Characters restored:', {
-                    playerCount: this.playerCharacters.length,
-                    opponentCount: this.opponentCharacters.length
-                });
-            }
-
-            // Restore player selections and formations
-            if (this.isHost && gameState.hostSelected) {
-                this.selectedCharacter = gameState.hostSelected;
-                console.log('Host character selected:', this.selectedCharacter.name);
-                
-                // Restore formations using FormationManager
-                if (gameState.hostBattleFormation) {
-                    this.formationManager.importFormationState({
-                        battleFormation: gameState.hostBattleFormation,
-                        opponentBattleFormation: gameState.guestBattleFormation ? 
-                            this.formationManager.alignOpponentFormation(gameState.guestBattleFormation) : null
-                    }, true);
-                } else {
-                    this.formationManager.initWithCharacter(this.selectedCharacter);
-                }
-
-                // Restore other host data including gold
-                this.restorePlayerData(gameState.hostDeck, gameState.hostHand, gameState.hostLifeData, gameState.hostGoldData);
-                
-            } else if (!this.isHost && gameState.guestSelected) {
-                this.selectedCharacter = gameState.guestSelected;
-                console.log('Guest character selected:', this.selectedCharacter.name);
-                
-                // Restore formations using FormationManager
-                if (gameState.guestBattleFormation) {
-                    this.formationManager.importFormationState({
-                        battleFormation: gameState.guestBattleFormation,
-                        opponentBattleFormation: gameState.hostBattleFormation ? 
-                            this.formationManager.alignOpponentFormation(gameState.hostBattleFormation) : null
-                    }, false);
-                } else {
-                    this.formationManager.initWithCharacter(this.selectedCharacter);
-                }
-
-                // Restore other guest data including gold
-                this.restorePlayerData(gameState.guestDeck, gameState.guestHand, gameState.guestLifeData, gameState.guestGoldData);
-            }
-
-            // Restore abilities
-            let abilitiesRestored = false;
+            // Valid game state found with character assignments - proceed with reconnection
+            console.log('🔄 Valid game state found with character assignments');
             
-            if (this.isHost && gameState.hostAbilitiesState) {
-                abilitiesRestored = this.heroAbilitiesManager.importAbilitiesState(gameState.hostAbilitiesState);
-                
-                if (abilitiesRestored) {
-                    // Verify Fighting abilities were restored
-                    this.verifyRestoredAbilities('HOST');
-                }
-            } else if (!this.isHost && gameState.guestAbilitiesState) {
-                abilitiesRestored = this.heroAbilitiesManager.importAbilitiesState(gameState.guestAbilitiesState);
-                
-                if (abilitiesRestored) {
-                    // Verify Fighting abilities were restored
-                    this.verifyRestoredAbilities('GUEST');
-                }
-            } else {
-                // If no saved abilities state, initialize from current formation
-                const formation = this.formationManager.getBattleFormation();
-                for (const position of ['left', 'center', 'right']) {
-                    if (formation[position]) {
-                        const heroInfo = getHeroInfo(formation[position].name);
-                        if (heroInfo) {
-                            this.heroAbilitiesManager.updateHeroPlacement(position, heroInfo);
-                        }
-                    }
-                }
-                abilitiesRestored = true;
-                this.verifyRestoredAbilities('INITIALIZED');
-            }
-
-            // Restore opponent abilities data with verification
-            if (this.isHost && gameState.guestAbilitiesData) {
-                this.opponentAbilitiesData = gameState.guestAbilitiesData;
-                this.verifyOpponentAbilities('GUEST');
-            } else if (!this.isHost && gameState.hostAbilitiesData) {
-                this.opponentAbilitiesData = gameState.hostAbilitiesData;
-                this.verifyOpponentAbilities('HOST');
-            }
-
-            // Restore Spellbooks
-            let spellbooksRestored = false;
-
-            if (this.isHost && gameState.hostSpellbooksState) {
-                spellbooksRestored = this.heroSpellbookManager.importSpellbooksState(gameState.hostSpellbooksState);
-                console.log('Host spellbooks restored:', spellbooksRestored);
-            } else if (!this.isHost && gameState.guestSpellbooksState) {
-                spellbooksRestored = this.heroSpellbookManager.importSpellbooksState(gameState.guestSpellbooksState);
-                console.log('Guest spellbooks restored:', spellbooksRestored);
-            }
-
-            // Store opponent spellbooks data
-            if (this.isHost && gameState.guestSpellbooksData) {
-                this.opponentSpellbooksData = gameState.guestSpellbooksData;
-            } else if (!this.isHost && gameState.hostSpellbooksData) {
-                this.opponentSpellbooksData = gameState.hostSpellbooksData;
-            }
-
-            // Restore creatures
-            let creaturesRestored = false;
-
-            if (this.isHost && gameState.hostCreaturesState) {
-                creaturesRestored = this.heroCreatureManager.importCreaturesState(gameState.hostCreaturesState);
-                console.log('Host creatures restored:', creaturesRestored);
-            } else if (!this.isHost && gameState.guestCreaturesState) {
-                creaturesRestored = this.heroCreatureManager.importCreaturesState(gameState.guestCreaturesState);
-                console.log('Guest creatures restored:', creaturesRestored);
-            }
-
-            // Store opponent creatures data
-            if (this.isHost && gameState.guestCreaturesData) {
-                this.opponentCreaturesData = gameState.guestCreaturesData;
-            } else if (!this.isHost && gameState.hostCreaturesData) {
-                this.opponentCreaturesData = gameState.hostCreaturesData;
-            }
-
-            // Restore action data
-            let actionsRestored = false;
+            // Transition to reconnecting state
+            this.stateMachine.transitionTo(this.stateMachine.states.RECONNECTING, {
+                reason: 'restoring_saved_state'
+            });
             
-            if (this.isHost && gameState.hostActionData) {
-                actionsRestored = this.actionManager.importActionData(gameState.hostActionData);
-                console.log('Host actions restored:', actionsRestored, gameState.hostActionData);
-            } else if (!this.isHost && gameState.guestActionData) {
-                actionsRestored = this.actionManager.importActionData(gameState.guestActionData);
-                console.log('Guest actions restored:', actionsRestored, gameState.guestActionData);
-            } else {
-                // If no saved action state, reset to defaults
-                this.actionManager.resetActions();
-                console.log('No saved action state, reset to defaults');
-                actionsRestored = true;
-            }
-
-            // Restore opponent selection
-            if (this.isHost && gameState.guestSelected) {
-                this.opponentSelectedCharacter = gameState.guestSelected;
-                console.log('Opponent (guest) character:', this.opponentSelectedCharacter.name);
-            } else if (!this.isHost && gameState.hostSelected) {
-                this.opponentSelectedCharacter = gameState.hostSelected;
-                console.log('Opponent (host) character:', this.opponentSelectedCharacter.name);
-            }
-
-            // Determine current phase based on selections
-            if (charactersRestored) {
-                const hasPlayerSelected = this.isHost ? gameState.hostSelected : gameState.guestSelected;
-                const hasOpponentSelected = this.isHost ? gameState.guestSelected : gameState.hostSelected;
-                
-                if (hasPlayerSelected) {
-                    this.currentPhase = 'team_building';
-                    console.log('Current phase: team_building');
-                } else {
-                    this.currentPhase = 'selection';
-                    console.log('Current phase: selection');
-                }
-            } else {
-                console.log('No characters restored, cannot determine phase');
-                return false;
-            }
-
-            // Initialize life manager with turn tracker
-            this.initializeLifeManagerWithTurnTracker();
-
-            // STEP 2: NOW check for battle reconnection AFTER characters are restored
-            if (BattleReconnectionManager.shouldHandleBattleReconnection(gameState)) {
-                console.log('Battle reconnection detected');
-                
-                // Verify we have both characters selected before attempting battle reconnection
-                if (!this.selectedCharacter || !this.opponentSelectedCharacter) {
-                    console.log('Cannot handle battle reconnection - missing character selections');
-                    // Cannot handle battle reconnection - missing character selections
-                    // Fall back to normal restoration
-                } else {
-                    // Initialize battle reconnection manager
-                    this.battleReconnectionManager = new BattleReconnectionManager(this);
-                    
-                    // Handle battle reconnection
-                    const reconnectionHandled = await this.battleReconnectionManager.detectAndHandleBattleReconnection(gameState);
-                    
-                    if (reconnectionHandled) {
-                        console.log('Battle reconnection handled successfully');
-                        this.stateInitialized = true;
-                        return true;
-                    } else {
-                        console.log('Battle reconnection failed, continuing with normal restoration');
-                        // Continue with normal restoration as fallback
-                    }
-                }
-            }
-
-            // STEP 3: Handle normal game flow (non-battle or fallback)
+            console.log('🔄 Delegating reconnection to ReconnectionManager');
             
-            // Check if selection is complete
-            if (this.selectedCharacter && this.opponentSelectedCharacter) {
-                setTimeout(() => {
-                    if (this.onSelectionComplete) {
-                        this.onSelectionComplete({
-                            playerCharacter: this.selectedCharacter,
-                            opponentCharacter: this.opponentSelectedCharacter
-                        });
-                    }
-                }, 100);
+            // Initialize reconnection manager if not already done
+            if (!this.reconnectionManager) {
+                const { ReconnectionManager } = await import('./reconnectionManager.js');
+                this.reconnectionManager = new ReconnectionManager();
+                this.reconnectionManager.init(
+                    this,
+                    this.roomManager, 
+                    this.gameDataSender,
+                    this.isHost
+                );
             }
+            
+            // Delegate all reconnection logic to the centralized manager
+            const success = await this.reconnectionManager.handleReconnection(gameState);
+            
+            return success;
 
-            this.stateInitialized = true;
-            
-            // Check for pending rewards AFTER state restoration
-            setTimeout(async () => {
-                this.isRestoringFromSave = false; 
-                if (this.currentPhase === 'team_building') {
-                    const hasRewards = await this.cardRewardManager.checkAndRestorePendingRewards(this);
-                    if (hasRewards) {
-                        console.log('Pending card rewards restored');
-                    }
-                }
-            }, 100);
-            
-            console.log('Game state restoration complete');
-            return true;
         } catch (error) {
             console.error('Error restoring game state:', error);
-            this.isRestoringFromSave = false; 
+            
+            // On error, assume fresh game
+            console.log('Error during restore - treating as fresh game');
+            
+            this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
+            
+            // Try to start fresh game
+            try {
+                const selectionStarted = await this.startSelection();
+                if (selectionStarted) {
+                    console.log('✅ Recovery successful - started fresh game');
+                    
+                    if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                        window.updateHeroSelectionUI();
+                    }
+                    
+                    return false;
+                }
+            } catch (startError) {
+                console.error('Failed to start fresh game after restore error:', startError);
+            }
+            
+            // If all else fails, transition to error state
+            this.stateMachine.transitionTo(this.stateMachine.states.ERROR, {
+                error: error.message
+            });
+            
             return false;
         }
     }
@@ -714,13 +575,6 @@ export class HeroSelection {
         });
     }
 
-    // Handle reconnection messages
-    handleReconnectionMessage(type, data) {
-        if (this.battleReconnectionManager) {
-            this.battleReconnectionManager.handleReconnectionMessage(type, data);
-        }
-    }
-
     // Initialize life manager with turn tracker reference
     initializeLifeManagerWithTurnTracker() {
         if (this.lifeManager) {
@@ -761,6 +615,8 @@ export class HeroSelection {
                 guestCharacters: this.isHost ? this.opponentCharacters : this.playerCharacters,
                 // Use TurnTracker for turn data
                 ...this.turnTracker.exportTurnData(),
+                // REMOVED: ...this.globalSpellManager.exportGlobalSpellState(), 
+                // Guard Change state is now saved per player below
                 lastUpdated: Date.now()
             };
 
@@ -799,6 +655,10 @@ export class HeroSelection {
                 const creaturesState = this.heroCreatureManager.exportCreaturesState();
                 gameState.hostCreaturesState = sanitizeForFirebase(creaturesState);
 
+                // NEW: Save Guard Change state for HOST only
+                const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
+                gameState.hostGlobalSpellState = sanitizeForFirebase(globalSpellState);
+
                 // Save opponent abilities data if we have it
                 if (this.opponentAbilitiesData) {
                     gameState.guestAbilitiesData = sanitizeForFirebase(this.opponentAbilitiesData);
@@ -817,6 +677,11 @@ export class HeroSelection {
                 // Save action data for host
                 if (this.actionManager) {
                     gameState.hostActionData = sanitizeForFirebase(this.actionManager.exportActionData());
+                }
+
+                // Save magnetic glove state for host
+                if (window.magneticGloveArtifact) {
+                    gameState.hostMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
 
             } else if (!this.isHost && this.selectedCharacter) {
@@ -853,6 +718,10 @@ export class HeroSelection {
                 const creaturesState = this.heroCreatureManager.exportCreaturesState();
                 gameState.guestCreaturesState = sanitizeForFirebase(creaturesState);
 
+                // NEW: Save Guard Change state for GUEST only
+                const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
+                gameState.guestGlobalSpellState = sanitizeForFirebase(globalSpellState);
+
                 // Save opponent abilities data if we have it
                 if (this.opponentAbilitiesData) {
                     gameState.hostAbilitiesData = sanitizeForFirebase(this.opponentAbilitiesData);
@@ -871,6 +740,11 @@ export class HeroSelection {
                 // Save action data for guest
                 if (this.actionManager) {
                     gameState.guestActionData = sanitizeForFirebase(this.actionManager.exportActionData());
+                }
+
+                // Save magnetic glove state for guest
+                if (window.magneticGloveArtifact) {
+                    gameState.guestMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
             }
 
@@ -928,7 +802,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -954,6 +828,44 @@ export class HeroSelection {
             const goldRestored = this.goldManager.importGoldData(goldData);
         }
         
+        // Restore player-specific global spell state (including Guard Change mode)
+        if (globalSpellData && this.globalSpellManager) {
+            console.log('🔄 Restoring player-specific global spell state:', globalSpellData);
+            const globalSpellRestored = this.globalSpellManager.importGlobalSpellState(globalSpellData);
+            
+            if (globalSpellRestored) {
+                // CRITICAL: Sync the Guard Change mode with HeroCreatureManager
+                const isGuardChangeActive = this.globalSpellManager.isGuardChangeModeActive();
+                console.log('🔄 Syncing Guard Change mode with HeroCreatureManager:', isGuardChangeActive);
+                
+                if (this.heroCreatureManager) {
+                    this.heroCreatureManager.setGuardChangeMode(isGuardChangeActive);
+                }
+                
+                // Update UI to show Guard Change indicator if active
+                if (isGuardChangeActive) {
+                    console.log('🛡️ Guard Change mode restored and active');
+                    // UI will be updated by the importGlobalSpellState method
+                    
+                    // Ensure body class is properly set for reconnection
+                    if (typeof document !== 'undefined') {
+                        document.body.classList.add('guard-change-active');
+                    }
+                }
+                
+                console.log('✅ Player-specific global spell state restored successfully');
+            } else {
+                console.log('⚠️ No player-specific global spell state to restore');
+            }
+        } else {
+            console.log('📝 No global spell data found for this player - ensuring Guard Change is off');
+            
+            // Ensure Guard Change mode is off if no data
+            if (this.globalSpellManager) {
+                this.globalSpellManager.setGuardChangeMode(false, this);
+            }
+        }
+        
         // Initialize life manager with turn tracker after restoration
         this.initializeLifeManagerWithTurnTracker();
     }
@@ -966,6 +878,9 @@ export class HeroSelection {
 
         // Check if we already have character assignments (from restoration)
         if (this.playerCharacters.length > 0 && this.opponentCharacters.length > 0) {
+            // Transition to selecting hero state
+            this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
+            
             // Update the UI with existing assignments
             if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                 window.updateHeroSelectionUI();
@@ -976,7 +891,8 @@ export class HeroSelection {
 
         // Only the HOST should generate character selections, and only if no characters exist
         if (!this.isHost) {
-            this.currentPhase = 'selection';
+            // Transition to selecting hero state
+            this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
             if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                 window.updateHeroSelectionUI();
             }
@@ -991,7 +907,8 @@ export class HeroSelection {
         }
 
         // Host generates NEW character selection only if none exists
-        this.currentPhase = 'selection';
+        // Transition to selecting hero state
+        this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
         
         // Clear any previous selections to ensure fresh start
         this.selectedCharacter = null;
@@ -1057,7 +974,7 @@ export class HeroSelection {
             if (data.hostCharacters && data.guestCharacters) {
                 this.opponentCharacters = data.hostCharacters;
                 this.playerCharacters = data.guestCharacters;
-                this.currentPhase = 'selection';
+                this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
                 
                 // Guest should also save the state after receiving characters
                 this.saveGameState();
@@ -1077,7 +994,9 @@ export class HeroSelection {
         }
 
         this.selectedCharacter = character;
-        this.currentPhase = 'team_building';
+        
+        // Transition to team building state
+        this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING);
 
         // Calculate and award starting gold
         const startingGold = this.calculateStartingGold(character);
@@ -1263,7 +1182,7 @@ export class HeroSelection {
             this.opponentAbilitiesData = data.abilities;
             
             // If we're in team building phase, update display
-            if (this.currentPhase === 'team_building') {
+            if (this.stateMachine.isInState(this.stateMachine.states.TEAM_BUILDING)) {
                 this.updateOpponentAbilityDisplay();
             }
         }
@@ -1539,16 +1458,18 @@ export class HeroSelection {
 
     // Return to formation screen with more aggressive cleanup
     async returnToFormationScreenAfterBattle() {
-        // Set flag to prevent Firebase listener from interfering
-        this.isReturningFromBattle = true;
-        this.battleStateCleanupInProgress = true;
-        this.listenerTemporarilyDisabled = true;
-        this.isTransitioningToBattle = false;
+        console.log('🛡️ Returning to formation screen after battle');
+        
+        // Transition to cleanup state
+        this.stateMachine.transitionTo(this.stateMachine.states.CLEANING_UP, {
+            reason: 'returning_from_battle'
+        });
         
         try {
-            // STEP 1: IMMEDIATE UI UPDATES (no waiting for Firebase)
+            // STEP 1: Set game phase to Formation immediately
+            await this.setGamePhase('Formation');
             
-            // Clear all tooltips
+            // STEP 2: IMMEDIATE UI UPDATES (no waiting for Firebase)
             this.clearAllTooltips();
             
             // Hide battle arena
@@ -1563,17 +1484,14 @@ export class HeroSelection {
                 heroSelectionScreen.style.display = 'flex';
                 heroSelectionScreen.dataset.postBattle = 'true';
                 
-                // Force layout recalculation
                 setTimeout(() => {
-                    // Force reflow on the deck column
                     const deckColumn = document.querySelector('.team-building-right');
                     if (deckColumn) {
                         deckColumn.style.display = 'none';
-                        deckColumn.offsetHeight; // Force reflow
+                        deckColumn.offsetHeight;
                         deckColumn.style.display = '';
                     }
                     
-                    // Clear the post-battle flag after layout stabilizes
                     setTimeout(() => {
                         delete heroSelectionScreen.dataset.postBattle;
                     }, 300);
@@ -1584,13 +1502,13 @@ export class HeroSelection {
                 this.cardPreviewManager.forceLayoutRecalculation();
             }
             
-            // Force button to enabled state IMMEDIATELY
+            // Force button to enabled state
             const toBattleBtn = document.querySelector('.to-battle-button');
             if (toBattleBtn) {
                 toBattleBtn.disabled = false;
             }
             
-            // Reset turn-based ability tracking for the new turn!
+            // Reset turn-based ability tracking
             if (this.heroAbilitiesManager) {
                 this.heroAbilitiesManager.resetTurnBasedTracking();
             }
@@ -1601,7 +1519,10 @@ export class HeroSelection {
                 console.log('✨ Actions reset for new turn after battle');
             }
             
-            // Update UI to show team building
+            // STEP 3: Transition to team building state BEFORE updating UI
+            this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING);
+            
+            // STEP 4: NOW update UI to show team building
             if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                 window.updateHeroSelectionUI();
             }
@@ -1609,52 +1530,18 @@ export class HeroSelection {
             // Update deck display immediately
             this.updateDeckDisplay();
             
-            // STEP 2: FIREBASE CLEANUP (non-blocking, happens in background)
-            // Start Firebase cleanup but don't await it - let it happen in background
+            // STEP 5: Background Firebase cleanup
             this.aggressiveBattleStateClear().then(() => {
                 console.log('Background Firebase cleanup completed');
             }).catch(error => {
                 console.log('Background Firebase cleanup failed, but UI already updated');
             });
             
-            // Extra Firebase cleanup (also non-blocking)
-            if (this.roomManager && this.roomManager.getRoomRef()) {
-                const roomRef = this.roomManager.getRoomRef();
-                Promise.all([
-                    roomRef.child('gameState/hostBattleReady').set(false),
-                    roomRef.child('gameState/guestBattleReady').set(false),
-                    roomRef.child('gameState/battleStarted').set(false),
-                    roomRef.child('gameState/battleStartTime').remove(),
-                    roomRef.child('gameState/hostBattleReadyTime').remove(),
-                    roomRef.child('gameState/guestBattleReadyTime').remove()
-                ]).catch(error => {
-                    // Error occurred but UI is already updated
-                });
-            }
-            
-            // STEP 3: Re-enable Firebase listener after a delay (non-blocking)
-            setTimeout(() => {
-                this.isReturningFromBattle = false;
-                this.battleStateCleanupInProgress = false;
-                this.listenerTemporarilyDisabled = false;
-                
-                // Final verification that states are cleared
-                if (this.roomManager && this.roomManager.getRoomRef()) {
-                    this.roomManager.getRoomRef().child('gameState').once('value', (snapshot) => {
-                        const state = snapshot.val();
-                        if (state && (state.hostBattleReady || state.guestBattleReady || state.battleStarted)) {
-                            this.emergencyBattleStateClear();
-                        }
-                    });
-                }
-            }, 2000);
-            
         } catch (error) {
-            // Even if cleanup fails, try to return to formation
-            this.isReturningFromBattle = false;
-            this.battleStateCleanupInProgress = false;
-            this.listenerTemporarilyDisabled = false;
-            this.isTransitioningToBattle = false;
+            console.error('Error returning to formation screen:', error);
+            this.stateMachine.transitionTo(this.stateMachine.states.ERROR, {
+                error: error.message
+            });
         }
     }
 
@@ -1700,6 +1587,13 @@ export class HeroSelection {
 
     // Handle To Battle click with improved state management
     async handleToBattleClick() {
+        console.log('To Battle clicked');
+        
+        // Can only go to battle from team building state
+        if (!this.stateMachine.isInState(this.stateMachine.states.TEAM_BUILDING)) {
+            console.log('Not in correct state to go to battle');
+            return;
+        }
         
         // Prevent multiple clicks
         const toBattleBtn = document.querySelector('.to-battle-button');
@@ -1711,6 +1605,9 @@ export class HeroSelection {
         if (toBattleBtn) {
             toBattleBtn.disabled = true;
         }
+        
+        // Transition to waiting state
+        this.stateMachine.transitionTo(this.stateMachine.states.WAITING_FOR_BATTLE);
         
         // Set player ready state
         await this.setPlayerBattleReady(true);
@@ -1759,12 +1656,24 @@ export class HeroSelection {
             
             // If battle already started, join it
             if (battleStarted) {
+                // Ensure we're in the right state before transitioning
+                if (!this.stateMachine.isInState(this.stateMachine.states.TRANSITIONING_TO_BATTLE)) {
+                    this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
+                        reason: 'battle_already_started'
+                    });
+                }
                 this.transitionToBattleScreen();
                 return;
             }
             
             // If both are ready and battle hasn't started yet
-            if (hostReady && guestReady && !battleStarted) {
+            if (hostReady && guestReady && !battleStarted && 
+                this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
+                
+                // Transition to battle starting
+                this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
+                    reason: 'both_players_ready'
+                });
                 
                 // Only HOST should mark battle as started
                 if (this.isHost) {
@@ -1781,14 +1690,14 @@ export class HeroSelection {
                     }
                 }
                 
-                // Both players transition
+                // Both players transition to battle
                 this.transitionToBattleScreen();
             } else {
                 // Show waiting overlay
                 this.showBattleWaitingOverlay();
             }
         } catch (error) {
-            // Error occurred but don't log it
+            console.error('Error in checkAndHandleBattleTransition:', error);
         }
     }
     
@@ -1835,6 +1744,10 @@ export class HeroSelection {
     
     // Cancel battle ready
     async cancelBattleReady() {
+        // Transition back to team building from waiting state
+        this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING, {
+            reason: 'battle_ready_cancelled'
+        });
         
         // Re-enable To Battle button
         const toBattleBtn = document.querySelector('.to-battle-button');
@@ -1845,19 +1758,38 @@ export class HeroSelection {
         // Hide waiting overlay
         this.hideBattleWaitingOverlay();
         
-        // Clear ready state
+        // Clear ready state in Firebase
         await this.setPlayerBattleReady(false);
-        
-        // Ensure the other player's ready state is also considered cleared locally
-        this.isPlayerReady = false;
-        this.isOpponentReady = false;
     }
     
     // Transition to battle screen (called when both are ready)
     transitionToBattleScreen() {
+        console.log('🔥 Transitioning to battle screen');
+
+        this.globalSpellManager.clearGuardChangeMode(this);
         
-        // Keep transition flag true during the transition
-        this.isTransitioningToBattle = true;
+        // Check if we're in a valid state to transition to battle
+        const validStates = [
+            this.stateMachine.states.TRANSITIONING_TO_BATTLE,
+            this.stateMachine.states.WAITING_FOR_BATTLE  // Allow from waiting state too
+        ];
+        
+        if (!this.stateMachine.isInAnyState(validStates)) {
+            console.warn('Not in correct state to transition to battle. Current state:', this.stateMachine.getState());
+            
+            // Try to fix the state if we know battle should be starting
+            if (this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
+                console.log('Fixing state: WAITING_FOR_BATTLE -> TRANSITIONING_TO_BATTLE');
+                this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
+                    reason: 'state_fix_for_battle'
+                });
+            } else {
+                return;
+            }
+        }
+        
+        // Set game phase to Battle
+        this.setGamePhase('Battle');
         
         // Hide any waiting overlay
         this.hideBattleWaitingOverlay();
@@ -1878,14 +1810,14 @@ export class HeroSelection {
         if (this.battleScreen) {
             this.battleScreen.showBattleArena();
             
+            // Transition to in battle state
+            this.stateMachine.transitionTo(this.stateMachine.states.IN_BATTLE, {
+                reason: 'battle_screen_initialized'
+            });
+            
             // Start the battle!
             this.battleScreen.startBattle();
         }
-        
-        // Clear transition flag after battle starts
-        setTimeout(() => {
-            this.isTransitioningToBattle = false;
-        }, 1000);
     }
     
     // Simplified battle receive handler (now handled by Firebase listener)
@@ -2187,7 +2119,22 @@ export class HeroSelection {
 
     // Getter methods
     getCurrentPhase() {
-        return this.currentPhase;
+        // Map state machine states to old phase names for compatibility
+        const state = this.stateMachine.getState();
+        const stateMap = {
+            [this.stateMachine.states.INITIALIZING]: 'loading',
+            [this.stateMachine.states.SELECTING_HERO]: 'selection',
+            [this.stateMachine.states.TEAM_BUILDING]: 'team_building',
+            [this.stateMachine.states.WAITING_FOR_BATTLE]: 'team_building',
+            [this.stateMachine.states.TRANSITIONING_TO_BATTLE]: 'battle_active',
+            [this.stateMachine.states.IN_BATTLE]: 'battle_active',
+            [this.stateMachine.states.VIEWING_REWARDS]: 'team_building',
+            [this.stateMachine.states.RECONNECTING]: 'loading',
+            [this.stateMachine.states.CLEANING_UP]: 'loading',
+            [this.stateMachine.states.ERROR]: 'loading'
+        };
+        
+        return stateMap[state] || 'loading';
     }
 
     getPlayerCharacters() {
@@ -2359,6 +2306,11 @@ export class HeroSelection {
 
     // Spell drop handler
     async handleSpellDrop(targetSlot) {
+        // Check if this is a global spell being dropped on a hero slot
+        if (this.globalSpellManager.isDraggingGlobalSpell(this)) {
+            return this.globalSpellManager.handleGlobalSpellDropOnHero(targetSlot, this);
+        }
+
         const dragState = this.handManager.getHandDragState();
         const spellCardName = dragState.draggedCardName;
         const cardIndex = dragState.draggedCardIndex;
@@ -2519,19 +2471,13 @@ export class HeroSelection {
     }
 
     reset() {        
-        // Set cleanup flags
-        this.isReturningFromBattle = false;
-        this.battleStateCleanupInProgress = false;
-        this.listenerTemporarilyDisabled = false;
-        this.isTransitioningToBattle = false;
-        
         // Clear opponent abilities data
         this.opponentAbilitiesData = null;
         
-        // Cleanup battle reconnection manager
-        if (this.battleReconnectionManager) {
-            this.battleReconnectionManager.cleanup();
-            this.battleReconnectionManager = null;
+        // Cleanup reconnection manager
+        if (this.reconnectionManager) {
+            this.reconnectionManager.cleanup();
+            this.reconnectionManager = null;
         }
         
         // Remove battle state listener
@@ -2543,9 +2489,8 @@ export class HeroSelection {
         // Clear all tooltips first
         this.clearAllTooltips();
         
-        this.isPlayerReady = false;
-        this.isOpponentReady = false;
-        this.battleActive = false;
+        // Reset state machine instead of individual flags
+        this.stateMachine.reset();
         
         // Clear any pending card rewards
         this.clearAnyActiveCardRewards();
@@ -2553,8 +2498,9 @@ export class HeroSelection {
         // Reset turn tracker
         this.turnTracker.reset();
         this.heroSpellbookManager.reset();
-
         this.heroCreatureManager.reset();
+        this.globalSpellManager.reset();
+
 
         // Reset action manager
         if (this.actionManager) {
@@ -2651,10 +2597,15 @@ export class HeroSelection {
                 <!-- Left Column - Team Formation -->
                 <div class="team-building-left">
                     <div class="team-header">
-                        <h2>🛡️ Your Battle Formation</h2>
+                        <div class="team-header-title">
+                            <h2>🛡️ Your Battle Formation</h2>
+                            ${this.globalSpellManager.isGuardChangeModeActive() ? 
+                            '<div class="guard-change-indicator">🛡️ Guard Change Active</div>' : 
+                            ''}
+                        </div>
                         <p class="drag-hint">💡 Drag and drop heroes to rearrange your formation!</p>
                         <p class="drag-hint">🎯 Drag ability cards to any hero slot to attach them!</p>
-                        <p class="drag-hint">📜 Drag spell cards to heroes to add them to their spellbook!</p>
+                        <p class="drag-hint">📜 Drag spell cards to heroes to add them to their Spellbook!</p>
                         <p class="drag-hint">🐾 Drag creatures to reorder them within the same hero!</p>
                     </div>
                     
@@ -2706,7 +2657,10 @@ export class HeroSelection {
         }
         
         const dragState = this.handManager.getHandDragState();
-        return this.heroSpellbookManager.isSpellCard(dragState.draggedCardName);
+        const cardName = dragState.draggedCardName; // FIX: Get cardName from dragState
+        
+        return this.heroSpellbookManager.isSpellCard(cardName) && 
+            !this.globalSpellManager.isGlobalSpell(cardName, this);
     }
 
     // Check if hero can learn a spell

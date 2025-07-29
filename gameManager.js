@@ -105,8 +105,28 @@ export class GameManager {
         this.webRTCManager.registerMessageHandler('battle_transition_start', (data) => {
             console.log('Received battle transition start via P2P:', data);
             if (this.heroSelection) {
-                // Guest should also transition when receiving this
-                this.heroSelection.transitionToBattleScreen();
+                // Only transition if we're in a valid state
+                const validStates = [
+                    this.heroSelection.stateMachine.states.WAITING_FOR_BATTLE,
+                    this.heroSelection.stateMachine.states.TRANSITIONING_TO_BATTLE
+                ];
+                
+                if (this.heroSelection.stateMachine.isInAnyState(validStates)) {
+                    // Ensure we're in transitioning state before calling transition
+                    if (!this.heroSelection.stateMachine.isInState(
+                        this.heroSelection.stateMachine.states.TRANSITIONING_TO_BATTLE)) {
+                        
+                        this.heroSelection.stateMachine.transitionTo(
+                            this.heroSelection.stateMachine.states.TRANSITIONING_TO_BATTLE,
+                            { reason: 'p2p_battle_start' }
+                        );
+                    }
+                    
+                    this.heroSelection.transitionToBattleScreen();
+                } else {
+                    console.warn('Received battle_transition_start but not in valid state:', 
+                                this.heroSelection.stateMachine.getState());
+                }
             }
         });
 
@@ -279,44 +299,55 @@ export class GameManager {
     }
 
     // Show game screen and initialize hero selection - FIXED for immediate hero selection
-    async showGameScreen(isReconnection = false) {
+    async showGameScreen() {
         // Prevent multiple calls during transition
-        if (this.gameState === 'starting' || this.gameState === 'selection') {
+        const currentState = this.gameState;
+        if (currentState === 'starting' || currentState === 'selection') {
             console.log('Game screen already being shown or shown, skipping...');
             return;
         }
         
+        // Check if this is a reconnection by examining hero selection state
+        const isReconnection = this.heroSelection && 
+                            this.heroSelection.stateMachine.isInState(
+                                this.heroSelection.stateMachine.states.RECONNECTING
+                            );
+        
         console.log(`GameManager: Showing game screen... (${isReconnection ? 'reconnection' : 'new game'})`);
         this.gameState = 'selection';
-        this.isReconnecting = isReconnection;
         
-        // ENHANCED: Clear all tooltips before transition
+        // Clear all tooltips before transition
         this.clearAllTooltipsGlobally();
         
-        // FIXED: Show loading overlay IMMEDIATELY to prevent any flashing
+        // Show loading overlay
         this.showGameLoadingOverlay();
         
-        // STEP 1: Show the game screen UI but hide content during loading
+        // Show the game screen UI
         this.uiManager.showGameScreen();
         
-        // STEP 2: Wait a moment for UI to settle
+        // Wait for UI to settle
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // STEP 3: Initialize hero selection with proper context
+        // Initialize hero selection
         await this.initializeHeroSelection();
         
-        // STEP 4: Hide loading overlay and show hero selection
+        // Hide loading overlay
         this.hideGameLoadingOverlay();
         
-        // STEP 5: Force UI update after everything is ready
-        setTimeout(() => {
-            console.log('GameManager: Force updating hero selection UI...');
-            if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
-                window.updateHeroSelectionUI();
-            }
-        }, 50);
+        // For reconnections, let the reconnection manager handle the flow
+        if (isReconnection) {
+            console.log('🔄 Reconnection detected - reconnection manager will handle state restoration');
+            // The reconnectionManager.handleReconnection() will be called during heroSelection.restoreGameState()
+        } else {
+            // Force UI update for new games
+            setTimeout(() => {
+                if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                    window.updateHeroSelectionUI();
+                }
+            }, 50);
+        }
         
-        console.log('Game screen displayed - hero selection should be visible!');
+        console.log('Game screen displayed');
     }
 
     // NEW: Show loading overlay to prevent flashing during transition
@@ -425,10 +456,18 @@ export class GameManager {
 
     // Enhanced initialize hero selection with proper new game vs reconnection logic
     async initializeHeroSelection() {
-        console.log('Initializing hero selection...', this.isReconnecting ? '(reconnection)' : '(new game)');
+        console.log('Initializing hero selection...');
+        
+        // Determine if this is a reconnection based on existing hero selection state
+        const isReconnection = this.heroSelection && 
+                            (this.heroSelection.stateMachine.isInState(
+                                this.heroSelection.stateMachine.states.RECONNECTING
+                            ) || 
+                            this.heroSelection.stateMachine.previousState === 
+                                this.heroSelection.stateMachine.states.RECONNECTING);
         
         // Clean up any existing instance if this is a new game
-        if (!this.isReconnecting && this.heroSelection) {
+        if (!isReconnection && this.heroSelection) {
             console.log('Cleaning up existing hero selection for new game...');
             this.heroSelection.reset();
             this.heroSelection = null;
@@ -489,18 +528,25 @@ export class GameManager {
             if (playerCharacters.length > 0) {
                 console.log('Characters already loaded from restored state');
                 
-                // Check if there are pending card rewards to show
-                if (this.heroSelection.getCurrentPhase() === 'team_building') {
-                    setTimeout(async () => {
-                        const hasRewards = await this.heroSelection.checkAndRestorePendingCardRewards();
-                        if (hasRewards) {
-                            console.log('Restored pending card rewards');
-                        }
-                    }, 50);
+                // For reconnections, the restore process now handles showing the correct screen
+                // (Formation, Battle, or Reward) based on the gamePhase
+                if (isReconnection) {
+                    console.log('🔄 Reconnection: State restoration will handle screen determination');
+                    // The heroSelection.restoreGameState() method will determine the correct screen
+                } else {
+                    // For non-reconnections with existing data, check for pending rewards
+                    if (this.heroSelection.getCurrentPhase() === 'team_building') {
+                        setTimeout(async () => {
+                            const hasRewards = await this.heroSelection.checkAndRestorePendingCardRewards();
+                            if (hasRewards) {
+                                console.log('Restored pending card rewards');
+                            }
+                        }, 50);
+                    }
                 }
             } else {
                 // No existing characters - start fresh selection (only for new games)
-                if (!this.isReconnecting) {
+                if (!isReconnection) {
                     console.log('Starting fresh character selection for new game');
                     await this.heroSelection.startSelection();
                     // UI update is handled inside startSelection() method
@@ -523,9 +569,6 @@ export class GameManager {
                 `;
             }
         }
-        
-        // Reset reconnection flag
-        this.isReconnecting = false;
     }
 
     // Handle hero selection completion - FIXED to preserve existing hand
@@ -708,10 +751,36 @@ export class GameManager {
 
     // Handle room update for game state
     handleGameStateUpdate(room) {
-        if (room.gameInProgress && this.gameState === 'lobby') {
-            // Game started, transition to game screen - this is a reconnection
-            console.log('Game started by other player, transitioning to game screen (reconnection)');
-            this.showGameScreen(true); // true = reconnection
+        // Check for game phase changes
+        const gamePhase = room.gameState?.gamePhase || 'Formation';
+        
+        // Determine if this is a reconnection by checking if we have hero selection with reconnecting state
+        const isReconnection = this.heroSelection && 
+                            this.heroSelection.stateMachine.isInState(
+                                this.heroSelection.stateMachine.states.RECONNECTING
+                            );
+        
+        // NEW: Check if we're in the middle of a normal game flow transition
+        const isInGameFlow = this.heroSelection && 
+                        this.heroSelection.stateMachine.isInAnyState([
+                            this.heroSelection.stateMachine.states.TEAM_BUILDING,
+                            this.heroSelection.stateMachine.states.VIEWING_REWARDS,
+                            this.heroSelection.stateMachine.states.CLEANING_UP
+                        ]);
+        
+        if (room.gameInProgress && this.gameState === 'lobby' && !isInGameFlow) {
+            // Game started, transition to game screen (reconnection)
+            console.log(`🔄 Reconnection detected with gamePhase: ${gamePhase}`);
+            
+            // Set hero selection to reconnecting state if not already
+            if (this.heroSelection && !isReconnection) {
+                this.heroSelection.stateMachine.transitionTo(
+                    this.heroSelection.stateMachine.states.RECONNECTING,
+                    { reason: 'game_state_update' }
+                );
+            }
+            
+            this.showGameScreen(); // ReconnectionManager will handle the rest
         } else if (!room.gameInProgress && this.gameState !== 'lobby') {
             // Game ended (surrender), return to lobby
             console.log('Game ended, returning to lobby');
@@ -722,13 +791,15 @@ export class GameManager {
                 const surrendererName = room.lastSurrender === 'host' ? room.hostName : room.guestName;
                 this.uiManager.showStatus(`🏳️ ${surrendererName} (${surrendererRole}) surrendered - back to lobby`, 'connected');
             }
+        } else if (isInGameFlow) {
+            // We're in normal game flow - don't trigger reconnection logic
+            console.log(`🎮 Normal game flow detected - gamePhase: ${gamePhase}, state: ${this.heroSelection?.stateMachine.getState()}`);
         }
     }
 
     // Reset game state
     reset() {
         this.gameState = 'lobby';
-        this.isReconnecting = false;
         
         // Clear any loading overlay
         this.hideGameLoadingOverlay();
@@ -742,6 +813,17 @@ export class GameManager {
             window.heroSelection = null;
         }
         
-        console.log('Game manager reset completed');
+        // Reset game phase to Formation if we have room access
+        if (this.roomManager && this.roomManager.getRoomRef()) {
+            this.roomManager.getRoomRef().child('gameState').update({
+                gamePhase: 'Formation',
+                gamePhaseUpdated: Date.now(),
+                gameManagerReset: Date.now()
+            }).catch(error => {
+                console.log('Could not reset game phase during game manager reset:', error.message);
+            });
+        }
+        
+        console.log('Game manager reset completed with game phase cleanup');
     }
 }

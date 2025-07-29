@@ -5772,3 +5772,578 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
     transform: translateX(-33.33%) !important; /* Shift left to show middle frame */
     position: relative !important;
 }
+
+.gold-line-item.thieving-bonus {
+    background: rgba(255, 215, 0, 0.15);
+    border-color: rgba(255, 215, 0, 0.4);
+}
+
+.gold-line-item.thieving-penalty {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.4);
+}
+
+.gold-line-item.thieving-penalty .gold-amount {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.thieving-details {
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(255, 215, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.thieving-detail-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 6px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 215, 0, 0.05);
+    border-radius: 4px;
+}
+
+.thieving-level {
+    font-size: 0.75rem;
+    color: rgba(255, 215, 0, 0.8);
+}
+
+.thieving-gold {
+    font-weight: 600;
+    color: #ffd700;
+}
+
+/* Guard Change Mode Indicator Styles */
+.team-header-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+}
+
+.guard-change-indicator {
+    position: relative;
+    background: linear-gradient(135deg, 
+        rgba(76, 175, 80, 0.15) 0%, 
+        rgba(129, 199, 132, 0.15) 100%);
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #2E7D32;
+    box-shadow: 
+        0 2px 8px rgba(76, 175, 80, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    animation: guardChangeGlow 2s ease-in-out infinite alternate;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.guard-change-indicator::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid #4CAF50;
+}
+
+@keyframes guardChangeGlow {
+    0% {
+        box-shadow: 
+            0 2px 8px rgba(76, 175, 80, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    100% {
+        box-shadow: 
+            0 4px 16px rgba(76, 175, 80, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+}
+
+/* Add to globalSpellManagerStyles in globalSpellManager.js */
+.team-slot.global-spell-hover {
+    background: rgba(54, 162, 235, 0.1);
+    border-color: rgba(54, 162, 235, 0.5);
+    cursor: not-allowed;
+}
+
+.team-slot.global-spell-hover::after {
+    content: "🌍 Global spell - drop anywhere outside hand to activate!";
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(54, 162, 235, 0.95);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+}
+
+body.dragging-global-spell {
+    cursor: copy !important;
+}
+
+body.dragging-global-spell * {
+    cursor: copy !important;
+}
+
+/* Ensure empty creature containers still have proper styling and drop zone behavior */
+.hero-creatures {
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 4px;
+    min-height: 40px; /* Ensures clickable area even when empty */
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+/* Empty creature containers should still show drop feedback */
+.hero-creatures:empty,
+.hero-creatures:has(.creature-empty-placeholder) {
+    min-height: 40px;
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced drop zone styling for Guard Change mode */
+.hero-creatures.creature-drop-ready {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.5);
+    border-style: solid; /* Override dashed style when drop ready */
+}
+
+.hero-creatures.creature-drop-invalid {
+    background-color: rgba(244, 67, 54, 0.1);
+    border-color: rgba(244, 67, 54, 0.5);
+    border-style: solid; /* Override dashed style when drop invalid */
+}
+
+/* Show a subtle hint when Guard Change is active and containers are empty */
+body.guard-change-active .hero-creatures:empty::after,
+body.guard-change-active .hero-creatures:has(.creature-empty-placeholder)::after {
+    content: "Drop creatures here";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+/* Hide the hint when actively dragging over */
+.hero-creatures.creature-drop-ready::after,
+.hero-creatures.creature-drop-invalid::after {
+    display: none;
+}
+
+
+.battle-field {
+    position: relative;
+    overflow: visible;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.battle-row {
+    margin-bottom: 20px;
+}
+
+.opponent-row {
+    margin-bottom: 40px;
+}
+
+.player-row {
+    margin-top: 40px;
+}
+
+/* Add these updated styles to styles.css - Replace existing battle-related styles */
+
+/* ============================================
+   UPDATED BATTLE ARENA LAYOUT
+   ============================================ */
+
+.battle-field {
+    flex: 0 0 75%;
+    display: flex;
+    flex-direction: column;
+    padding: 5px 20px 30px 20px;
+    gap: 20px; /* Increased gap for larger hero slots */
+    position: relative;
+    min-height: 600px; /* Ensure minimum height for larger slots */
+}
+
+.battle-row {
+    flex: 0 0 auto; /* Changed from flex: 1 to fixed height */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+    padding: 10px 40px; /* Increased padding for larger slots */
+    position: relative;
+}
+
+.opponent-row {
+    justify-content: center;
+    padding-bottom: 10px;
+}
+
+.player-row {
+    justify-content: center;
+    padding-top: 10px;
+}
+
+/* UPDATED: Hero slots made 20% larger */
+.battle-hero-slot {
+    width: 317px;  /* Previously 264px - 20% increase */
+    height: 432px; /* Previously 360px - 20% increase */
+    position: relative;
+    transition: var(--transition-medium);
+}
+
+/* Speed Control Panel Container positioned at far right */
+.battle-speed-panel-container {
+    position: absolute;
+    right: 5%; 
+    top: 50%;
+    width: 120px; /* Fixed width for speed controls */
+    height: 200px; /* Fixed height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10; /* Ensure it's above other elements */
+    
+    /* Container is now completely invisible */
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    box-shadow: none;
+}
+
+/* Remove hover effects since container should be invisible */
+
+/* Remove the old battle-center styles since we're not using them anymore */
+.battle-center {
+    display: none; /* Hide the old center area */
+}
+
+/* Updated battle field container to accommodate larger hero slots */
+.battle-field-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    min-height: 700px; /* Increased minimum height for larger slots */
+}
+
+/* Ensure hero cards scale properly with the larger slots */
+.battle-hero-card {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        rgba(45, 45, 68, 0.95) 0%, 
+        rgba(31, 31, 51, 0.95) 100%);
+    border: 3px solid rgba(102, 126, 234, 0.6);
+    border-radius: var(--radius-large);
+    overflow: hidden;
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.4),
+        var(--shadow-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    position: relative;
+    transition: var(--transition-medium);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+}
+
+/* Update hover effects for larger cards */
+.battle-hero-card:hover {
+    transform: translateY(-8px) scale(1.02); /* Slightly reduced scale for larger cards */
+    box-shadow: 
+        0 15px 40px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(102, 126, 234, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    border-color: rgba(102, 126, 234, 0.8);
+    z-index: 10;
+}
+
+/* Update empty hero slot styling for larger size */
+.battle-hero-slot.empty-hero-slot {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.03) 0%, 
+        rgba(128, 128, 128, 0.05) 100%);
+    border: 3px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.empty-hero-placeholder {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.empty-icon {
+    font-size: 60px; /* Increased for larger slots */
+    margin-bottom: 15px; /* Increased margin */
+    opacity: 0.6;
+}
+
+.empty-text {
+    font-size: 22px; /* Increased font size */
+    font-weight: 600;
+    font-style: italic;
+}
+
+/* Update hero image container for larger slots */
+.hero-image-container {
+    width: 100%;
+    height: 70%;
+    overflow: hidden;
+    border-radius: 17px 17px 0 0;
+    position: relative;
+}
+
+.hero-info-bar {
+    height: 30%;
+    padding: 10px 18px 12px 18px; /* Increased padding */
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.8) 0%, 
+        rgba(0, 0, 0, 0.6) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px; /* Increased gap */
+}
+
+.battle-hero-name {
+    color: white;
+    font-size: 18px; /* Increased font size */
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.health-bar {
+    height: 20px; /* Increased height */
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Update attack display for larger slots */
+.battle-hero-attack {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* Increased gap */
+    padding: 6px 10px; /* Increased padding */
+    background: linear-gradient(135deg, 
+        rgba(255, 107, 107, 0.15) 0%, 
+        rgba(238, 90, 36, 0.15) 100%);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: var(--radius-medium);
+    backdrop-filter: blur(5px);
+    transition: var(--transition-medium);
+}
+
+.attack-icon {
+    font-size: 18px; /* Increased size */
+    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.attack-value {
+    display: flex;
+    align-items: baseline;
+    gap: 3px; /* Increased gap */
+    font-size: 18px; /* Increased font size */
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 5px rgba(255, 107, 107, 0.3);
+}
+
+.attack-bonus {
+    font-size: 16px; /* Increased font size */
+    font-weight: bold;
+    margin-left: 3px; /* Increased margin */
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 8px currentColor;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   RESPONSIVE UPDATES FOR LARGER HERO SLOTS
+   ============================================ */
+
+@media (max-width: 1400px) {
+    .battle-hero-slot {
+        width: 280px;  /* Scaled down for medium screens */
+        height: 380px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 100px;
+        height: 160px;
+        right: 15px; /* ADJUST THIS VALUE for different X position on medium screens */
+    }
+    
+    .battle-row {
+        gap: 30px;
+        padding: 8px 30px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .battle-hero-slot {
+        width: 240px;  /* Further scaled down */
+        height: 320px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 80px;
+        height: 120px;
+        right: 10px; /* ADJUST THIS VALUE for different X position on smaller screens */
+    }
+    
+    .battle-row {
+        gap: 25px;
+        padding: 5px 25px;
+    }
+    
+    .hero-info-bar {
+        padding: 8px 15px 10px 15px;
+        gap: 6px;
+    }
+    
+    .battle-hero-name {
+        font-size: 16px;
+    }
+    
+    .health-bar {
+        height: 18px;
+    }
+    
+    .attack-icon {
+        font-size: 16px;
+    }
+    
+    .attack-value {
+        font-size: 16px;
+        gap: 2px;
+    }
+    
+    .attack-bonus {
+        font-size: 14px;
+        margin-left: 2px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .battle-hero-slot {
+        width: 200px;  /* Mobile scaling */
+        height: 280px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 70px;
+        height: 100px;
+        right: 8px; /* ADJUST THIS VALUE for different X position on mobile */
+    }
+    
+    .battle-row {
+        gap: 20px;
+        padding: 5px 20px;
+    }
+    
+    .empty-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+    
+    .empty-text {
+        font-size: 18px;
+    }
+}
+
+@media (max-width: 768px) {
+    .battle-hero-slot {
+        width: 160px;  /* Small mobile scaling */
+        height: 220px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 60px;
+        height: 80px;
+        right: 5px; /* ADJUST THIS VALUE for different X position on small mobile */
+    }
+    
+    .battle-row {
+        gap: 15px;
+        padding: 5px 15px;
+    }
+    
+    .battle-hero-name {
+        font-size: 14px;
+    }
+    
+    .health-bar {
+        height: 15px;
+    }
+    
+    .hero-info-bar {
+        padding: 6px 12px 8px 12px;
+        gap: 4px;
+    }
+    
+    .attack-icon {
+        font-size: 14px;
+    }
+    
+    .attack-value {
+        font-size: 14px;
+    }
+    
+    .attack-bonus {
+        font-size: 12px;
+    }
+    
+    .empty-icon {
+        font-size: 36px;
+        margin-bottom: 8px;
+    }
+    
+    .empty-text {
+        font-size: 14px;
+    }
+}

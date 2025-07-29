@@ -21,7 +21,7 @@ export class JigglesCreature {
         return creatureName === 'Jiggles';
     }
 
-    // Execute Jiggles special attack
+    // Execute Jiggles special attack with synchronized animations
     async executeSpecialAttack(jigglesActor, position) {
         if (!this.battleManager.isAuthoritative) return;
 
@@ -68,14 +68,18 @@ export class JigglesCreature {
             attackerSide === 'player' ? 'success' : 'error'
         );
 
-        // Create visual tethers and apply damage simultaneously
-        await this.executeEnergyBlastFast(jigglesActor, selectedTargets, position);
-
-        // Send synchronization data to guest
+        // FIXED: Send synchronization data to guest BEFORE starting host animation
+        // This allows both sides to start animations simultaneously
         this.sendSpecialAttackUpdate(jigglesActor, selectedTargets, position);
+
+        // Short delay to ensure guest receives the message and can start their animation
+        await this.battleManager.delay(50);
+
+        // Create visual tethers and apply damage simultaneously with guest
+        await this.executeEnergyBlastFast(jigglesActor, selectedTargets, position);
     }
 
-    // Execute the energy blast with visual effects
+    // Execute the energy blast with visual effects (host side)
     async executeEnergyBlastFast(jigglesActor, targets, position) {
         const attackerSide = jigglesActor.hero.side;
         const jigglesElement = this.getJigglesElement(attackerSide, position, jigglesActor.index);
@@ -126,6 +130,7 @@ export class JigglesCreature {
         }
 
         // Apply damage only to valid targets while tethers are visible
+        // NOTE: Only the host (authoritative) applies actual damage
         for (const target of validTargets) {
             this.applyJigglesDamage(target);
         }
@@ -342,7 +347,7 @@ export class JigglesCreature {
                 return null;
             }
 
-            // Create the main tether element (rest of method unchanged)
+            // Create the main tether element
             const tether = document.createElement('div');
             tether.className = 'jiggles-energy-tether';
             tether.style.cssText = `
@@ -402,15 +407,9 @@ export class JigglesCreature {
             return;
         }
 
-        // ALTERNATIVE FIX: Set the rotation CSS variable before fadeout
+        // Add fadeout class to all valid tethers
         validTethers.forEach(tether => {
             try {
-                // Extract the current rotation from the transform style
-                const computedStyle = window.getComputedStyle(tether);
-                const transform = computedStyle.transform;
-                
-                // Parse rotation from matrix (if needed for scaling effect)
-                // For now, just fade without rotation change
                 tether.classList.add('jiggles-tether-fadeout');
                 this.activeTethers.delete(tether);
             } catch (error) {
@@ -431,7 +430,7 @@ export class JigglesCreature {
         });
     }
 
-    // Send special attack data to guest for synchronization
+    // Send special attack data to guest for synchronization (FIXED with absoluteSide)
     sendSpecialAttackUpdate(jigglesActor, targets, position) {
         const attackerSide = jigglesActor.hero.side;
         
@@ -440,11 +439,13 @@ export class JigglesCreature {
                 side: attackerSide,
                 position: position,
                 creatureIndex: jigglesActor.index,
-                name: jigglesActor.data.name
+                name: jigglesActor.data.name,
+                absoluteSide: jigglesActor.hero.absoluteSide  // FIXED: Send absolute side
             },
             targets: targets.map(target => ({
                 type: target.type,
-                side: target.side,
+                side: target.side,  // Keep relative side for backwards compatibility
+                absoluteSide: target.hero.absoluteSide,  // FIXED: Send absolute side of target
                 position: target.position,
                 creatureIndex: target.creatureIndex || null,
                 heroName: target.hero ? target.hero.name : null,
@@ -455,24 +456,24 @@ export class JigglesCreature {
         });
     }
 
-    // Handle Jiggles special attack on guest side
+    // Handle Jiggles special attack on guest side (FIXED: starts immediately)
     handleGuestSpecialAttack(data) {
         const { jigglesData, targets, damage, tetherDuration } = data;
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
-        const jigglesLocalSide = (jigglesData.side === myAbsoluteSide) ? 'player' : 'opponent';
+        const jigglesLocalSide = (jigglesData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         
         this.battleManager.addCombatLog(
             `🎯 ${jigglesData.name} unleashes devastating energy bolts!`, 
             jigglesLocalSide === 'player' ? 'success' : 'error'
         );
 
-        // Create visual tethers on guest
+        // Start guest animation immediately (no await - fire and forget)
         this.createGuestTethers(jigglesData, targets, tetherDuration, myAbsoluteSide);
     }
 
-    // Create tethers on guest side
+    // Create tethers on guest side (FIXED with absoluteSide mapping)
     async createGuestTethers(jigglesData, targets, duration, myAbsoluteSide) {
-        const jigglesLocalSide = (jigglesData.side === myAbsoluteSide) ? 'player' : 'opponent';
+        const jigglesLocalSide = (jigglesData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const jigglesElement = this.getJigglesElement(
             jigglesLocalSide,
             jigglesData.position,
@@ -487,7 +488,8 @@ export class JigglesCreature {
         const tetherElements = [];
 
         for (const targetData of targets) {
-            const targetLocalSide = (targetData.side === myAbsoluteSide) ? 'player' : 'opponent';
+            // FIXED: Use absoluteSide instead of relative side
+            const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
             let targetElement = null;
             
             if (targetData.type === 'hero') {
@@ -513,7 +515,7 @@ export class JigglesCreature {
                     this.activeTethers.add(tether);
                 }
 
-                // Log damage for each target
+                // Log damage for each target (but don't apply actual damage - host handles that)
                 const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
                 this.battleManager.addCombatLog(
                     `⚡ ${targetName} is struck by crackling energy for ${this.DAMAGE_PER_TARGET} damage!`, 
@@ -524,11 +526,13 @@ export class JigglesCreature {
             }
         }
 
-        // Remove tethers after duration
-        setTimeout(async () => {
-            await this.removeTethers(tetherElements);
-            this.battleManager.addCombatLog(`💥 The energy field dissipates!`, 'info');
-        }, duration);
+        console.log(`🎯 Guest created ${tetherElements.length} tethers`);
+
+        // Remove tethers after duration (same timing as host)
+        await this.battleManager.delay(duration);
+        await this.removeTethers(tetherElements);
+        
+        this.battleManager.addCombatLog(`💥 The energy field dissipates!`, 'info');
     }
 
     // Clean up all active tethers (called on battle end/reset)
@@ -627,11 +631,9 @@ export class JigglesCreature {
             @keyframes jigglesTetherFadeOut {
                 0% { 
                     opacity: 1;
-                    /* Removed: transform: rotate(var(--rotation)) scale(1); */
                 }
                 100% { 
                     opacity: 0;
-                    /* Removed: transform: rotate(var(--rotation)) scale(0.8); */
                 }
             }
 

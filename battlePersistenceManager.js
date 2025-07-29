@@ -9,7 +9,7 @@ export class BattlePersistenceManager {
         this.saveQueue = [];
         this.isSaving = false;
         this.lastSavedStateHash = null;
-        this.saveThrottleDelay = 100; // Minimum time between saves (ms)
+        this.baseSaveThrottleDelay = 100; // Base minimum time between saves (ms)
         this.lastSaveTime = 0;
         
         // Battle state version for future expansion - UPDATED for necromancy support
@@ -25,9 +25,12 @@ export class BattlePersistenceManager {
             return false;
         }
 
+        // Calculate speed-adjusted throttle delay
+        const currentThrottleDelay = this.getSpeedAdjustedDelay(this.baseSaveThrottleDelay, battleManager);
+        
         // Only save if enough time has passed (throttling)
         const now = Date.now();
-        if (now - this.lastSaveTime < this.saveThrottleDelay) {
+        if (now - this.lastSaveTime < currentThrottleDelay) {
             // Queue the save for later
             this.queueSave(battleManager);
             return false;
@@ -284,10 +287,13 @@ export class BattlePersistenceManager {
         // Replace any existing queued save
         this.saveQueue = [battleManager];
         
+        // Calculate speed-adjusted throttle delay
+        const currentThrottleDelay = this.getSpeedAdjustedDelay(this.baseSaveThrottleDelay, battleManager);
+        
         // Process queue after throttle delay
         setTimeout(() => {
             this.processQueuedSaves();
-        }, this.saveThrottleDelay);
+        }, currentThrottleDelay);
     }
 
     // Process any queued saves
@@ -730,5 +736,17 @@ export class BattlePersistenceManager {
         this.isSaving = false;
         this.lastSavedStateHash = null;
         console.log('BattlePersistenceManager cleanup completed');
+    }
+
+    getSpeedAdjustedDelay(ms, battleManager = null) {
+        // Try to get speed from battle manager if provided
+        if (battleManager && battleManager.speedManager) {
+            return battleManager.speedManager.calculateAdjustedDelay(ms);
+        } else if (battleManager && battleManager.battleSpeed) {
+            return Math.max(1, Math.floor(ms / battleManager.battleSpeed));
+        }
+        // For persistence operations, we might want to keep them at normal speed
+        // since they're background operations that don't affect visual timing
+        return ms;
     }
 }

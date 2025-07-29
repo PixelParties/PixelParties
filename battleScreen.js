@@ -1,4 +1,4 @@
-// battleScreen.js - Battle Screen Module with Hero Abilities Support and Necromancy Integration
+// battleScreen.js - Battle Screen Module with Hero Abilities Support, Necromancy Integration, and Speed Control
 
 import BattleManager from './battleManager.js';
 import { getCardInfo } from './cardDatabase.js';
@@ -18,6 +18,22 @@ export class BattleScreen {
         
         // Initialize battle manager with synchronization support
         this.battleManager = new BattleManager();
+    }
+
+    // Speed-aware delay method
+    getSpeedAdjustedDelay(ms) {
+        if (this.battleManager && this.battleManager.speedManager) {
+            return this.battleManager.speedManager.calculateAdjustedDelay(ms);
+        } else if (this.battleManager && this.battleManager.battleSpeed) {
+            return Math.max(1, Math.floor(ms / this.battleManager.battleSpeed));
+        }
+        return ms;
+    }
+
+    // Speed-aware async delay method
+    async delay(ms) {
+        const adjustedMs = this.getSpeedAdjustedDelay(ms);
+        return new Promise(resolve => setTimeout(resolve, adjustedMs));
     }
 
     // Initialize battle screen with abilities
@@ -97,7 +113,7 @@ export class BattleScreen {
         this.createBattleScreen();
     }
 
-    // Start the battle directly
+    // Start the battle directly with speed-aware delays
     startBattle() {
         // Add initial log message
         this.addCombatLogMessage('⚔️ Battle begins with Hero abilities!', 'success');
@@ -116,6 +132,33 @@ export class BattleScreen {
                     this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
                 }
                 
+                // Initialize speed control UI with debugging
+                console.log('🎛️ About to initialize speed control UI...');
+                console.log('🎛️ this.battleManager exists:', !!this.battleManager);
+                console.log('🎛️ this.battleManager.speedManager exists:', !!(this.battleManager && this.battleManager.speedManager));
+                
+                if (this.battleManager && this.battleManager.speedManager) {
+                    console.log('🎛️ speedManager.battleManager exists:', !!this.battleManager.speedManager.battleManager);
+                    console.log('🎛️ speedManager.battleManager value:', this.battleManager.speedManager.battleManager);
+                }
+                
+                const speedUISuccess = this.initializeSpeedControlUI();
+                if (!speedUISuccess) {
+                    console.error('❌ Speed control UI initialization failed!');
+                    // Try to add a fallback message to the battle center
+                    const battleCenter = document.getElementById('battleCenter');
+                    if (battleCenter) {
+                        battleCenter.innerHTML = `
+                            <div class="speed-control-error">
+                                <p>⚠️ Speed controls unavailable</p>
+                                <p style="font-size: 12px; color: #aaa;">Host: ${this.isHost}, BM: ${!!this.battleManager}, SM: ${!!(this.battleManager && this.battleManager.speedManager)}</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    console.log('✅ Speed control UI initialized successfully');
+                }
+                
                 // Start the synchronized battle
                 this.battleManager.startBattle();
                 
@@ -126,7 +169,7 @@ export class BattleScreen {
                         synchronized: true
                     });
                 }
-            }, 500);
+            }, this.getSpeedAdjustedDelay(500));
         }
     }
 
@@ -137,6 +180,9 @@ export class BattleScreen {
             if (this.battleManager.necromancyManager) {
                 this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
             }
+            
+            // Initialize speed control UI for guest
+            this.initializeSpeedControlUI();
             
             this.battleManager.startBattle();
         }
@@ -155,12 +201,9 @@ export class BattleScreen {
     onBattleEnd(result) {
         console.log('🏆 Battle ended with result:', result);
         
-        // Increment turn
-        this.incrementTurnAfterBattle();
-        
         // Show card rewards with the battle result
         setTimeout(() => {
-            this.showCardRewardsAndReturn(result); // Make sure result is passed
+            this.showCardRewardsAndReturn(result);
         }, 0);
     }
     
@@ -181,7 +224,7 @@ export class BattleScreen {
         }
     }
     
-    // Show card rewards then return to formation
+    // Show card rewards then return to formation with speed-aware delays
     async showCardRewardsAndReturn(result) {
         console.log('🎁 Showing card rewards for battle result:', result);
         
@@ -333,7 +376,7 @@ export class BattleScreen {
         }
     }
 
-    // Generate battle screen HTML with new row layout
+    // Generate battle screen HTML with speed controls in battle center
     generateBattleScreenHTML() {
         // Player formation (bottom row)
         const playerFormation = this.playerFormation;
@@ -351,15 +394,16 @@ export class BattleScreen {
                         ${this.createBattleHeroSlot(opponentFormation.right, 'opponent', 'right')}
                     </div>
                     
-                    <!-- Battle Center Area -->
-                    <div class="battle-center">
-                    </div>
-                    
                     <!-- Player Heroes Row (Bottom) -->
                     <div class="battle-row player-row">
                         ${this.createBattleHeroSlot(playerFormation.left, 'player', 'left')}
                         ${this.createBattleHeroSlot(playerFormation.center, 'player', 'center')}
                         ${this.createBattleHeroSlot(playerFormation.right, 'player', 'right')}
+                    </div>
+                    
+                    <!-- Speed Control Panel (Far Right) -->
+                    <div class="battle-speed-panel-container" id="battleCenter">
+                        <!-- Speed controls will be inserted here by BattleSpeedManager -->
                     </div>
                 </div>
                 
@@ -405,6 +449,47 @@ export class BattleScreen {
                 </div>
             </div>
         `;
+    }
+
+    // Initialize speed control UI - NEW METHOD
+    initializeSpeedControlUI() {
+        console.log('🎛️ Initializing speed control UI...');
+        
+        // Get the battle center container
+        const battleCenter = document.getElementById('battleCenter');
+        if (!battleCenter) {
+            console.error('❌ Battle center container not found for speed controls');
+            console.log('Available elements:', document.querySelectorAll('.battle-center'));
+            return false;
+        }
+        
+        console.log('✅ Battle center container found:', battleCenter);
+        
+        // Check if battle manager exists
+        if (!this.battleManager) {
+            console.error('❌ BattleManager not available for speed control initialization');
+            return false;
+        }
+        
+        console.log('✅ BattleManager available');
+        
+        // Check if speed manager exists
+        if (!this.battleManager.speedManager) {
+            console.error('❌ SpeedManager not available for speed control initialization');
+            console.log('BattleManager properties:', Object.keys(this.battleManager));
+            return false;
+        }
+        
+        console.log('✅ SpeedManager available');
+        
+        // Initialize speed manager UI
+        const success = this.battleManager.speedManager.initializeUI(battleCenter);
+        if (success) {
+            console.log('✅ Speed control UI initialized successfully');
+        } else {
+            console.error('❌ Failed to initialize speed control UI');
+        }
+        return success;
     }
 
     // Create individual battle hero slot with enhanced styling and ability indicators
@@ -1098,12 +1183,12 @@ export class BattleScreen {
         return element;
     }
 
-    // Hide hero abilities and spellbook tooltip
+    // Hide hero abilities and spellbook tooltip with speed-aware animation
     hideHeroInBattleTooltip() {
         const tooltip = document.querySelector('.hero-abilities-debug');
         if (tooltip) {
             tooltip.style.animation = 'fadeOut 0.3s ease-out';
-            setTimeout(() => tooltip.remove(), 300);
+            setTimeout(() => tooltip.remove(), this.getSpeedAdjustedDelay(300));
         }
     }
 
@@ -1186,6 +1271,11 @@ export class BattleScreen {
         // Reset battle manager with synchronization state
         if (this.battleManager) {
             this.battleManager.reset();
+        }
+        
+        // Clean up speed manager if it exists
+        if (this.battleManager && this.battleManager.speedManager) {
+            this.battleManager.speedManager.cleanup();
         }
         
         // Clear ability data
@@ -1608,23 +1698,37 @@ if (!document.getElementById('battleScreenStyles')) {
         }
 
         /* ============================================
-        BATTLE LAYOUT ADJUSTMENTS
+        BATTLE LAYOUT ADJUSTMENTS WITH SPEED CONTROLS
         ============================================ */
 
-        /* Adjust battle row spacing to accommodate creatures with HP bars */
-        .battle-row {
-            margin-bottom: 70px;
-        }
-
-        .opponent-row {
-            margin-bottom: 60px;
-        }
-
-        /* Ensure the entire battle field allows overflow */
+        /* Adjust battle row spacing to accommodate creatures with HP bars AND speed controls */
         .battle-field {
+            position: relative;
             overflow: visible;
             padding-top: 40px; /* Extra padding for opponent creature HP bars */
             padding-bottom: 40px; /* Extra padding for player creature HP bars */
+        }
+
+        .battle-row {
+            margin-bottom: 20px;
+        }
+
+        .opponent-row {
+            margin-bottom: 40px;
+        }
+
+        .player-row {
+            margin-top: 40px;
+        }
+
+        /* Battle center area for speed controls */
+        .battle-center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 80px;
+            position: relative;
+            margin: 20px 0;
         }
 
         .battle-hero-card.attacking {

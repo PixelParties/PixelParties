@@ -11,6 +11,9 @@ export class HeroCreatureManager {
             center: [],
             right: []
         };
+
+        // Guard Change Mode: Can swap Creatures between Heroes
+        this.guardChangeMode = false;
         
         // References to other managers (will be set by heroSelection)
         this.handManager = null;
@@ -41,6 +44,82 @@ export class HeroCreatureManager {
     isCreatureSpell(cardName) {
         const cardInfo = getCardInfo(cardName);
         return cardInfo && cardInfo.cardType === 'Spell' && cardInfo.subtype === 'Creature';
+    }
+
+    // Set Guard Change mode (called by GlobalSpellManager)
+    setGuardChangeMode(active) {
+        console.log('🔍 HeroCreatureManager.setGuardChangeMode called with active:', active);
+        console.log('🔍 Previous guardChangeMode value:', this.guardChangeMode);
+        
+        this.guardChangeMode = active;
+        
+        console.log('🔍 New guardChangeMode value:', this.guardChangeMode);
+        console.log(`🛡️ HeroCreatureManager: Guard Change mode ${active ? 'ACTIVATED' : 'DEACTIVATED'}`);
+    }
+
+    // Move creature between different heroes (only allowed in Guard Change mode)
+    moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, toHeroPosition, toIndex) {
+        console.log('🔍 moveCreatureBetweenHeroes called');
+        console.log('🔍 fromHeroPosition:', fromHeroPosition);
+        console.log('🔍 fromIndex:', fromIndex);
+        console.log('🔍 toHeroPosition:', toHeroPosition);
+        console.log('🔍 toIndex:', toIndex);
+        console.log('🔍 this.guardChangeMode:', this.guardChangeMode);
+        
+        if (!this.guardChangeMode) {
+            console.error('❌ Cannot move creatures between heroes - Guard Change mode not active');
+            return false;
+        }
+        
+        if (!this.heroCreatures.hasOwnProperty(fromHeroPosition) || 
+            !this.heroCreatures.hasOwnProperty(toHeroPosition)) {
+            console.error(`❌ Invalid hero positions: ${fromHeroPosition} or ${toHeroPosition}`);
+            return false;
+        }
+        
+        if (!this.hasHeroAtPosition(toHeroPosition)) {
+            console.log('❌ Cannot move creature to empty hero slot');
+            return false;
+        }
+        
+        const fromCreatures = this.heroCreatures[fromHeroPosition];
+        const toCreatures = this.heroCreatures[toHeroPosition];
+        
+        console.log('🔍 fromCreatures length:', fromCreatures.length);
+        console.log('🔍 toCreatures length:', toCreatures.length);
+        console.log('🔍 fromCreatures:', fromCreatures.map(c => c.name));
+        console.log('🔍 toCreatures:', toCreatures.map(c => c.name));
+        
+        if (fromIndex < 0 || fromIndex >= fromCreatures.length) {
+            console.error(`❌ Invalid source creature index: ${fromIndex}`);
+            return false;
+        }
+        
+        if (toIndex < 0 || toIndex > toCreatures.length) {
+            console.error(`❌ Invalid target creature index: ${toIndex}`);
+            return false;
+        }
+        
+        console.log('🔍 About to move creature:', fromCreatures[fromIndex].name);
+        
+        // Move the creature
+        const [movedCreature] = fromCreatures.splice(fromIndex, 1);
+        toCreatures.splice(toIndex, 0, movedCreature);
+        
+        console.log('✅ Creature moved successfully!');
+        console.log('🔍 fromCreatures after move:', fromCreatures.map(c => c.name));
+        console.log('🔍 toCreatures after move:', toCreatures.map(c => c.name));
+        
+        console.log(`🛡️ Guard Change: Moved creature ${movedCreature.name} from ${fromHeroPosition}[${fromIndex}] to ${toHeroPosition}[${toIndex}]`);
+        
+        if (this.onStateChange) {
+            console.log('🔍 Calling onStateChange callback');
+            this.onStateChange();
+        } else {
+            console.log('⚠️ No onStateChange callback set');
+        }
+        
+        return true;
     }
 
     // Check if there's a hero at the given position
@@ -245,37 +324,77 @@ export class HeroCreatureManager {
         };
     }
 
-    // NEW: Check if currently dragging a creature
+    // Check if currently dragging a creature
     isCreatureDragging() {
         return this.dragState.isDragging;
     }
 
-    // NEW: Get current drag state
+    // Get current drag state
     getCreatureDragState() {
         return { ...this.dragState };
     }
 
-    // NEW: Handle creature drop operation
+    // Handle creature drop operation
     handleCreatureDrop(targetHeroPosition, dropX, targetContainer) {
+        console.log('🔍 HeroCreatureManager.handleCreatureDrop called');
+        console.log('🔍 targetHeroPosition:', targetHeroPosition);
+        console.log('🔍 this.dragState:', this.dragState);
+        
         if (!this.dragState.isDragging) {
-            console.log('No creature drag in progress');
+            console.log('❌ No creature drag in progress (this.dragState.isDragging is false)');
             return false;
         }
 
-        // Only allow drops within the same hero
-        if (targetHeroPosition !== this.dragState.draggedFromHero) {
-            console.log('Cannot move creature to different hero - returning to original position');
+        const fromHeroPosition = this.dragState.draggedFromHero;
+        const fromIndex = this.dragState.draggedFromIndex;
+        
+        console.log('🔍 fromHeroPosition:', fromHeroPosition);
+        console.log('🔍 fromIndex:', fromIndex);
+        console.log('🔍 targetHeroPosition:', targetHeroPosition);
+        
+        // Same hero - handle reordering within hero
+        if (targetHeroPosition === fromHeroPosition) {
+            console.log(`🔄 Reordering creature within ${targetHeroPosition} hero`);
+            
+            const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
+            console.log('🔍 targetIndex for reorder:', targetIndex);
+            
+            const success = this.reorderCreaturesWithinHero(targetHeroPosition, fromIndex, targetIndex);
+            console.log('🔍 reorderCreaturesWithinHero result:', success);
+            
+            this.endCreatureDrag();
+            return success;
+        }
+        
+        // Different hero - check if Guard Change mode is active
+        console.log('🔍 this.guardChangeMode:', this.guardChangeMode);
+        
+        if (!this.guardChangeMode) {
+            console.log('❌ Cannot move creature to different hero - Guard Change mode not active in manager');
             this.endCreatureDrag();
             return false;
         }
 
-        // Calculate target index based on drop position
-        const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
-        const fromIndex = this.dragState.draggedFromIndex;
+        // Guard Change mode is active - allow cross-hero movement
+        console.log(`🛡️ Guard Change mode: Moving creature from ${fromHeroPosition} to ${targetHeroPosition}`);
 
-        // Perform the reorder
-        const success = this.reorderCreaturesWithinHero(targetHeroPosition, fromIndex, targetIndex);
+        // Check if target hero exists
+        const hasTargetHero = this.hasHeroAtPosition(targetHeroPosition);
+        console.log('🔍 hasTargetHero (from manager):', hasTargetHero);
         
+        if (!hasTargetHero) {
+            console.log(`❌ Cannot move creature to ${targetHeroPosition} - no hero at that position`);
+            this.endCreatureDrag();
+            return false;
+        }
+
+        const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
+        console.log('🔍 targetIndex for cross-hero move:', targetIndex);
+        
+        console.log('🔍 About to call moveCreatureBetweenHeroes...');
+        const success = this.moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, targetHeroPosition, targetIndex);
+        console.log('🔍 moveCreatureBetweenHeroes result:', success);
+
         this.endCreatureDrag();
         return success;
     }
@@ -407,6 +526,9 @@ export class HeroCreatureManager {
         this.formationManager = null;
         this.onStateChange = null;
         
+        this.guardChangeMode = false;
+
+
         // Reset drag state
         this.dragState = {
             isDragging: false,

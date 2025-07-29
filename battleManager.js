@@ -3,6 +3,7 @@
 import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
 import { Hero } from './hero.js';
+import { BattleSpeedManager } from './battleSpeedManager.js';
 
 import { NecromancyManager } from './Abilities/necromancy.js';
 
@@ -39,14 +40,11 @@ export class BattleManager {
         this.pauseStartTime = null;
         this.totalPauseTime = 0;
         
-
         //ABILITY STUFF
         this.necromancyManager = null; 
 
-
         //CREATURE STUFF
         this.jigglesManager = null;
-
 
         // OPTIMIZED SYNCHRONIZATION
         this.pendingAcks = {};
@@ -65,6 +63,11 @@ export class BattleManager {
         this.weatherEffects = null;
         this.terrainModifiers = [];
         this.specialRules = [];
+
+        // BATTLE SPEED CONTROL - Initialize the speed manager
+        this.speedManager = new BattleSpeedManager();
+        this.battleSpeed = 1; // 1x = normal, 2x = fast, 4x = super fast
+        this.speedLocked = false; // Prevent speed changes during critical moments
 
         this.tabWasHidden = false;
         this.setupTabVisibilityListener();
@@ -87,6 +90,8 @@ export class BattleManager {
         this.onBattleEnd = onBattleEnd;
         this.roomManager = roomManager;
         this.isAuthoritative = isHost;
+        
+        this.speedManager.init(this, isHost);
         
         // Initialize persistence manager
         if (this.roomManager) {
@@ -113,24 +118,74 @@ export class BattleManager {
         this.initializeHeroes();
     }
 
+    setBattleSpeed(speed) {
+        if (this.speedManager) {
+            return this.speedManager.changeSpeed(speed);
+        } else {
+            // Fallback to the old method if speed manager not available
+            if (this.speedLocked || !this.isAuthoritative) {
+                return; // Only host can change speed, and not during locked periods
+            }
+            
+            const validSpeeds = [1, 2, 4];
+            if (!validSpeeds.includes(speed)) {
+                console.warn('Invalid battle speed:', speed);
+                return;
+            }
+            
+            const oldSpeed = this.battleSpeed;
+            this.battleSpeed = speed;
+            
+            const speedNames = { 1: 'Normal', 2: 'Fast', 4: 'Super Fast' };
+            this.addCombatLog(`⚡ Battle speed changed to ${speedNames[speed]} (${speed}x)`, 'info');
+            
+            // Sync speed change to guest
+            this.sendBattleUpdate('speed_change', {
+                speed: speed,
+                speedName: speedNames[speed],
+                timestamp: Date.now()
+            });
+        }
+    }
+    
+    guest_handleSpeedChange(data) {
+        
+        if (this.isAuthoritative) {
+            console.warn('Host should not receive speed change messages');
+            return;
+        }
+
+        if (this.speedManager) {
+            this.speedManager.handleSpeedChange(data);
+        } else {
+            console.error('❌ GUEST: speedManager not available!');
+        }
+    }
+
     setupTabVisibilityListener() {
         if (typeof document !== 'undefined') {
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     this.tabWasHidden = true;
-                    console.log('Tab became hidden - marking for graceful handling');
                 } else if (this.tabWasHidden) {
                     this.tabWasHidden = false;
-                    console.log('Tab became visible again - checking for stuck overlays');
-                    // Clear any stuck pause overlays after a brief delay
+                    // Clear any stuck pause overlays after a brief delay (speed-adjusted)
                     setTimeout(() => {
                         if (this.opponentConnected && this.battlePaused) {
-                            console.log('Force resuming battle - tab was just hidden');
                             this.resumeBattle('Tab visibility restored');
                         }
-                    }, 1000);
+                    }, this.getSpeedAdjustedDelay(1000));
                 }
             });
+        }
+    }
+
+    getSpeedAdjustedDelay(ms) {
+        if (this.speedManager) {
+            return this.speedManager.calculateAdjustedDelay(ms);
+        } else {
+            // Fallback
+            return Math.max(1, Math.floor(ms / this.battleSpeed));
         }
     }
 
@@ -167,7 +222,7 @@ export class BattleManager {
                         if (!this.opponentConnected && this.battleActive) {
                             this.pauseBattle('Guest disconnected');
                         }
-                    }, 3000); // Wait 3 seconds before pausing
+                    }, this.getSpeedAdjustedDelay(3000)); // Wait 3 seconds before pausing (speed-adjusted)
                 } else {
                     this.pauseBattle('Guest disconnected');
                 }
@@ -373,7 +428,6 @@ export class BattleManager {
                         if (hero.hasAbility('SummoningMagic')) {
                             const summoningMagicLevel = hero.getAbilityStackCount('SummoningMagic');
                             hpMultiplier = 1 + (0.1 * summoningMagicLevel); // +10% per level
-                            console.log(`${hero.name}'s ${creature.name} gets ${(summoningMagicLevel * 10)}% HP bonus from SummoningMagic level ${summoningMagicLevel}`);
                         }
                         
                         const finalHp = Math.floor(baseHp * hpMultiplier);
@@ -537,7 +591,7 @@ export class BattleManager {
     }
 
     // Start the battle
-     async startBattle() {
+    async startBattle() {
         if (this.battleActive) {
             return;
         }
@@ -553,6 +607,11 @@ export class BattleManager {
         this.battlePaused = false;
         this.pauseStartTime = null;
         this.totalPauseTime = 0;
+
+        // Initialize speed control UI
+        if (this.battleScreen && this.battleScreen.initializeSpeedControl) {
+            this.battleScreen.initializeSpeedControl(this.isAuthoritative);
+        }
         
         // Initialize extensible state
         this.initializeExtensibleState();
@@ -721,7 +780,7 @@ export class BattleManager {
         const maxActors = Math.max(playerActors.length, opponentActors.length);
         
         for (let i = 0; i < maxActors; i++) {
-            // ADD THIS: Check if battle should end before processing more actors
+            // Check if battle should end before processing more actors
             if (this.checkBattleEnd()) {
                 console.log('Battle ended during actor processing, stopping turn');
                 break;
@@ -767,7 +826,7 @@ export class BattleManager {
             // Execute actor actions
             await this.executeActorActions(playerActor, opponentActor, position);
             
-            await this.delay(300); // Brief pause between actor pairs
+            await this.delay(300); // Brief pause between actor pairs (now speed-adjusted)
         }
         
         this.clearTurnModifiers(playerHero, opponentHero, position);
@@ -913,9 +972,7 @@ export class BattleManager {
         }
         
         // If we have both Jiggles attacks and hero actions, start them simultaneously
-        if (hasJigglesAttacks && hasHeroActions) {
-            console.log('🎯 Starting Jiggles attacks and hero actions simultaneously');
-            
+        if (hasJigglesAttacks && hasHeroActions) {            
             // Start hero actions without awaiting
             const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;
             const opponentHeroAction = opponentActor && opponentActor.type === 'hero' ? opponentActor : null;
@@ -930,7 +987,6 @@ export class BattleManager {
             
             // Check if battle ended after all actions
             if (this.checkBattleEnd()) {
-                console.log('Battle ended after simultaneous actions');
                 return;
             }
         } 
@@ -940,7 +996,6 @@ export class BattleManager {
             
             // Check if battle ended after Jiggles attacks
             if (this.checkBattleEnd()) {
-                console.log('Battle ended after Jiggles special attacks');
                 return;
             }
         }
@@ -948,7 +1003,6 @@ export class BattleManager {
         else if (hasHeroActions) {
             // Final check before hero actions
             if (this.checkBattleEnd()) {
-                console.log('Battle ended before hero actions, skipping');
                 return;
             }
             
@@ -1045,7 +1099,7 @@ export class BattleManager {
         // Add glow effect during shake
         creatureElement.style.filter = 'brightness(1.5) drop-shadow(0 0 10px rgba(255, 255, 100, 0.8))';
         
-        await this.delay(400);
+        await this.delay(400); // Now uses speed-adjusted delay
         
         creatureElement.classList.remove('creature-shaking');
         creatureElement.style.filter = '';
@@ -1248,6 +1302,28 @@ export class BattleManager {
     }
 
     // Animate simultaneous hero attacks
+    async animateCollisionAttackTowards(attacker, targetElement, attackerSide) {
+        const attackerElement = this.getHeroElement(attackerSide, attacker.position);
+        if (!attackerElement || !targetElement) return;
+
+        const attackerCard = attackerElement.querySelector('.battle-hero-card');
+        if (!attackerCard) return;
+
+        const attackerRect = attackerElement.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        
+        const deltaX = (targetRect.left - attackerRect.left) * 0.5;
+        const deltaY = (targetRect.top - attackerRect.top) * 0.5;
+        
+        attackerCard.classList.add('attacking');
+        attackerCard.style.transition = `transform ${this.getSpeedAdjustedDelay(80)}ms ease-out`;
+        attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1)`;
+        
+        await this.delay(80);
+        this.createCollisionEffect();
+    }
+
+    // Animate simultaneous hero attacks
     async animateSimultaneousHeroAttacks(playerAttack, opponentAttack) {
         const animations = [];
         
@@ -1302,9 +1378,9 @@ export class BattleManager {
         
         const deltaX = creatureRect.left + creatureRect.width/2 - (heroRect.left + heroRect.width/2);
         const deltaY = creatureRect.top + creatureRect.height/2 - (heroRect.top + heroRect.height/2);
-        
+            
         heroCard.classList.add('attacking');
-        heroCard.style.transition = 'transform 0.12s ease-out';
+        heroCard.style.transition = `transform ${this.getSpeedAdjustedDelay(120)}ms ease-out`;
         heroCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
         
         await this.delay(120);
@@ -1430,11 +1506,11 @@ export class BattleManager {
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
             z-index: 200;
             pointer-events: none;
-            animation: floatUp 0.5s ease-out forwards;
+            animation: floatUp ${this.getSpeedAdjustedDelay(500)}ms ease-out forwards;
         `;
         
         creatureElement.appendChild(damageNumber);
-        setTimeout(() => damageNumber.remove(), 500);
+        setTimeout(() => damageNumber.remove(), this.getSpeedAdjustedDelay(500));
     }
 
     // Handle creature death
@@ -1478,6 +1554,9 @@ export class BattleManager {
     async waitForGuestAcknowledgment(ackType, timeout = 500) {
         const startTime = Date.now();
         
+        // Apply speed adjustment to the timeout
+        const adjustedTimeout = this.getSpeedAdjustedDelay(timeout);
+        
         return new Promise((resolve) => {
             const timeoutId = setTimeout(() => {
                 delete this.pendingAcks[ackType];
@@ -1485,7 +1564,7 @@ export class BattleManager {
                 
                 this.connectionLatency = Math.min(this.connectionLatency * 1.2, 500);
                 resolve();
-            }, timeout);
+            }, adjustedTimeout);
             
             this.pendingAcks[ackType] = () => {
                 const responseTime = Date.now() - startTime;
@@ -1543,20 +1622,26 @@ export class BattleManager {
     }
 
     // Receive battle data from host (for GUEST)
-    receiveBattleData(message) {
+    receiveBattleData(message) {        
+        // Handle host-specific messages first
         if (this.isAuthoritative) {
-            // Host receives guest's ready signal
             if (message.type === 'guest_reconnection_ready') {
                 this.handleGuestReconnectionReady();
             }
+            // Don't return early - let host process other messages too if needed
             return;
         }
 
+        // Guest message processing
         const { type, data } = message;
         
         switch (type) {
             case 'turn_start':
                 this.guest_handleTurnStart(data);
+                break;
+                
+            case 'speed_change':
+                this.guest_handleSpeedChange(data);
                 break;
                 
             case 'creature_action':
@@ -1952,7 +2037,19 @@ export class BattleManager {
     async guest_handleBattleEnd(data) {
         this.battleActive = false;
         
-        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold } = data;
+        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn } = data;
+        
+        // 🔥 NEW: Update turn from the battle_end message BEFORE showing rewards
+        if (newTurn && this.battleScreen && this.battleScreen.turnTracker) {
+            this.battleScreen.turnTracker.setCurrentTurn(newTurn);
+            console.log(`🎯 Guest updated turn to ${newTurn} from battle_end message`);
+            
+            // Reset ability tracking for the new turn
+            if (window.heroSelection && window.heroSelection.heroAbilitiesManager) {
+                window.heroSelection.heroAbilitiesManager.resetTurnBasedTracking();
+                console.log('✅ Guest reset ability tracking after turn update');
+            }
+        }
         
         const myResult = this.isHost ? hostResult : guestResult;
         
@@ -1966,12 +2063,10 @@ export class BattleManager {
             
             if (myWealthBonus > 0) {
                 this.goldManager.addPlayerGold(myWealthBonus);
-                console.log(`Applied ${myWealthBonus} Wealth bonus gold for guest`);
             }
             
             if (opponentWealthBonus > 0) {
                 this.goldManager.addOpponentGold(opponentWealthBonus);
-                console.log(`Applied ${opponentWealthBonus} Wealth bonus gold for opponent`);
             }
         }
         
@@ -1982,8 +2077,11 @@ export class BattleManager {
         
         await this.showBattleResult(myMessage);
         
-        if (this.onBattleEnd) {
-            this.onBattleEnd(myResult);
+        // Show rewards with the correct turn number (already updated above)
+        if (this.battleScreen && this.battleScreen.showCardRewardsAndReturn) {
+            setTimeout(() => {
+                this.battleScreen.showCardRewardsAndReturn(myResult);
+            }, 0);
         }
     }
 
@@ -1997,14 +2095,8 @@ export class BattleManager {
                 const wealthLevel = hero.getAbilityStackCount('Wealth');
                 const bonusGold = wealthLevel * 4; // 4 gold per Wealth level
                 totalWealthBonus += bonusGold;
-                
-                console.log(`${hero.name} (${position}) has Wealth level ${wealthLevel} - adding ${bonusGold} bonus gold`);
             }
         });
-        
-        if (totalWealthBonus > 0) {
-            console.log(`Total Wealth bonus: +${totalWealthBonus} gold`);
-        }
         
         return totalWealthBonus;
     }
@@ -2122,10 +2214,10 @@ export class BattleManager {
         const targetRect = targetElement.getBoundingClientRect();
         
         const deltaX = targetRect.left - attackerRect.left;
-        const deltaY = targetRect.top - attackerRect.top;
+        const deltaY = targetRect.top - targetRect.top;
         
         attackerCard.classList.add('attacking');
-        attackerCard.style.transition = 'transform 0.12s ease-out';
+        attackerCard.style.transition = `transform ${this.getSpeedAdjustedDelay(120)}ms ease-out`;
         attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
         
         await this.delay(120);
@@ -2140,7 +2232,7 @@ export class BattleManager {
         const card = heroElement.querySelector('.battle-hero-card');
         if (!card) return;
 
-        card.style.transition = 'transform 0.08s ease-in-out';
+        card.style.transition = `transform ${this.getSpeedAdjustedDelay(80)}ms ease-in-out`;
         card.style.transform = 'translate(0, 0) scale(1)';
         card.classList.remove('attacking');
         
@@ -2158,12 +2250,12 @@ export class BattleManager {
         effect.style.cssText = `
             position: absolute;
             font-size: 48px;
-            animation: collisionPulse 0.2s ease-out;
+            animation: collisionPulse ${this.getSpeedAdjustedDelay(200)}ms ease-out;
             z-index: 100;
         `;
         
         battleCenter.appendChild(effect);
-        setTimeout(() => effect.remove(), 200);
+        setTimeout(() => effect.remove(), this.getSpeedAdjustedDelay(200));
     }
 
     // Create impact effect on target
@@ -2177,12 +2269,12 @@ export class BattleManager {
             left: 50%;
             transform: translate(-50%, -50%);
             font-size: 36px;
-            animation: impactPulse 0.15s ease-out;
+            animation: impactPulse ${this.getSpeedAdjustedDelay(150)}ms ease-out;
             z-index: 100;
         `;
         
         targetElement.appendChild(effect);
-        setTimeout(() => effect.remove(), 150);
+        setTimeout(() => effect.remove(), this.getSpeedAdjustedDelay(150));
     }
 
     // Handle hero death
@@ -2219,11 +2311,11 @@ export class BattleManager {
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
             z-index: 200;
             pointer-events: none;
-            animation: floatUp 0.5s ease-out forwards;
+            animation: floatUp ${this.getSpeedAdjustedDelay(500)}ms ease-out forwards;
         `;
         
         heroElement.appendChild(damageNumber);
-        setTimeout(() => damageNumber.remove(), 500);
+        setTimeout(() => damageNumber.remove(), this.getSpeedAdjustedDelay(500));
     }
 
     // Update hero health bar with HP text
@@ -2342,12 +2434,6 @@ export class BattleManager {
 
     // Check if battle should end
     checkBattleEnd() {
-        // Don't end battle if guest is reconnecting
-        if (this.isAuthoritative && this.guestReconnecting) {
-            console.log('🛑 Delaying battle end check - guest is reconnecting');
-            return false;
-        }
-        
         const playerHeroesAlive = Object.values(this.playerHeroes).filter(hero => hero && hero.alive);
         const opponentHeroesAlive = Object.values(this.opponentHeroes).filter(hero => hero && hero.alive);
         
@@ -2374,6 +2460,24 @@ export class BattleManager {
             
             const { hostResult, guestResult } = this.determineBattleResults(hostHeroesAlive, guestHeroesAlive);
 
+            // Set game phase to Reward BEFORE clearing battle states
+            console.log('🎁 Setting game phase to Reward before cleanup');
+            await this.setGamePhaseToReward();
+
+            // CRITICAL: Mark battle as ended with timestamp for reconnection detection
+            if (this.roomManager && this.roomManager.getRoomRef()) {
+                await this.roomManager.getRoomRef().child('gameState').update({
+                    battleActive: false,
+                    battleStarted: false,
+                    battleEndedAt: Date.now(),
+                    battleResult: {
+                        hostResult,
+                        guestResult,
+                        endedAt: Date.now()
+                    }
+                });
+            }
+
             await this.clearBattleReadyStates();
             
             this.applyLifeChanges(hostResult);
@@ -2383,13 +2487,26 @@ export class BattleManager {
             
             await this.saveBattleStateToPersistence();
             
+            // 🔥 NEW: INCREMENT TURN BEFORE SENDING BATTLE_END MESSAGE
+            let newTurn = 1;
+            if (this.battleScreen && this.battleScreen.turnTracker) {
+                newTurn = await this.battleScreen.turnTracker.incrementTurn();
+                
+                // Reset ability tracking for the new turn
+                if (window.heroSelection && window.heroSelection.heroAbilitiesManager) {
+                    window.heroSelection.heroAbilitiesManager.resetTurnBasedTracking();
+                    console.log('✅ Reset ability tracking after turn increment');
+                }
+            }
+            
             const battleEndData = {
                 hostResult,
                 guestResult,
                 hostLives: this.lifeManager ? this.lifeManager.getPlayerLives() : 10,
                 guestLives: this.lifeManager ? this.lifeManager.getOpponentLives() : 10,
                 hostGold: this.goldManager ? this.goldManager.getPlayerGold() : 0,
-                guestGold: this.goldManager ? this.goldManager.getOpponentGold() : 0
+                guestGold: this.goldManager ? this.goldManager.getOpponentGold() : 0,
+                newTurn: newTurn  // 🔥 NEW: Include the new turn number
             };
             
             this.sendBattleUpdate('battle_end', battleEndData);
@@ -2400,9 +2517,37 @@ export class BattleManager {
             
             await this.cleanupAfterBattle();
             
+            // Cache opponent data for reward calculations BEFORE calling onBattleEnd
+            if (window.heroSelection && window.heroSelection.cardRewardManager) {
+                window.heroSelection.cardRewardManager.cacheOpponentDataForRewards(
+                    this.opponentFormation, 
+                    this.opponentAbilities
+                );
+            }
+
+            // 🔥 MODIFIED: Don't increment turn again, just show rewards
             if (this.onBattleEnd) {
                 this.onBattleEnd(hostResult);
             }
+        }
+    }
+
+    async setGamePhaseToReward() {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return false;
+        }
+
+        try {
+            await this.roomManager.getRoomRef().child('gameState').update({
+                gamePhase: 'Reward',
+                gamePhaseUpdated: Date.now(),
+                battleEndedAt: Date.now()
+            });
+            console.log('🎁 Game phase set to Reward');
+            return true;
+        } catch (error) {
+            console.error('Error setting game phase to Reward:', error);
+            return false;
         }
     }
 
@@ -2432,10 +2577,14 @@ export class BattleManager {
                     hostBattleReady: false,
                     guestBattleReady: false,
                     battleStarted: false,
+                    battleActive: false,  // Battle is no longer active
                     battleStartTime: null,
                     hostBattleReadyTime: null,
-                    guestBattleReadyTime: null
+                    guestBattleReadyTime: null,
+                    // NOTE: We keep gamePhase as 'Reward' and lastBattleStateUpdate for reconnection
+                    battleCleanedAt: Date.now()
                 });
+                console.log('✅ Battle ready states cleared, gamePhase remains as Reward');
             } catch (error) {
                 console.error('Error clearing battle ready states:', error);
             }
@@ -2518,11 +2667,16 @@ export class BattleManager {
                     await gameDataRef.update(updates);
                 }
                 
+                // UPDATED: Don't clear gamePhase here - it should stay as 'Reward'
                 await this.roomManager.getRoomRef().child('gameState').update({
                     battleStarted: false,
                     battleActive: false,
-                    lastBattleStateUpdate: null
+                    lastBattleStateUpdate: null,
+                    battleCleanupCompleted: Date.now()
+                    // NOTE: gamePhase stays as 'Reward'
                 });
+                
+                console.log('✅ Battle cleanup completed, gamePhase preserved for rewards');
             } catch (error) {
                 console.error('Error clearing battle messages:', error);
             }
@@ -2550,14 +2704,14 @@ export class BattleManager {
             align-items: center;
             justify-content: center;
             z-index: 9999;
-            animation: fadeIn 0.3s ease-out;
+            animation: fadeIn ${this.getSpeedAdjustedDelay(300)}ms ease-out;
         `;
         
         document.body.appendChild(resultOverlay);
         
         await this.delay(1000);
         
-        resultOverlay.style.animation = 'fadeOut 0.3s ease-out';
+        resultOverlay.style.animation = `fadeOut ${this.getSpeedAdjustedDelay(300)}ms ease-out`;
         await this.delay(300);
         resultOverlay.remove();
     }
@@ -2574,17 +2728,23 @@ export class BattleManager {
     // Send battle update to guest
     sendBattleUpdate(type, data) {
         if (!this.isAuthoritative) return;
+        
         this.sendBattleData(type, data);
     }
 
     // Send battle data to opponent
     sendBattleData(type, data) {
+        
         if (this.gameDataSender) {
+            
             this.gameDataSender('battle_data', {
                 type: type,
                 data: data,
                 timestamp: Date.now()
             });
+            
+        } else {
+            console.error('❌ HOST: gameDataSender is not available!');
         }
     }
 
@@ -2756,7 +2916,14 @@ export class BattleManager {
 
     // Utility delay function
     delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        if (this.speedManager) {
+            const adjustedMs = this.speedManager.calculateAdjustedDelay(ms);
+            return new Promise(resolve => setTimeout(resolve, adjustedMs));
+        } else {
+            // Fallback
+            const adjustedMs = Math.max(1, Math.floor(ms / this.battleSpeed));
+            return new Promise(resolve => setTimeout(resolve, adjustedMs));
+        }
     }
 
     // Reset battle manager
@@ -2816,6 +2983,7 @@ export class BattleManager {
         }
     }
 
+
     // Clear all visual effects
     clearVisualEffects() {
         const battleCenter = document.querySelector('.battle-effects-area');
@@ -2831,38 +2999,10 @@ export class BattleManager {
         resultOverlays.forEach(overlay => overlay.remove());
     }
 
-
-    //Handshake stuff for safe guest reconnection
-    async handleGuestReconnecting() {
-        if (!this.isAuthoritative) return;
-        
-        console.log('🤝 HOST: Guest is reconnecting, keeping battle paused...');
-        this.guestReconnecting = true;
-        this.guestReconnectionReady = false;
-        
-        // Keep battle paused
-        if (!this.battlePaused) {
-            this.pauseBattle('Guest is reconnecting');
-        }
-        
-        // Set a timeout for reconnection (30 seconds)
-        if (this.reconnectionHandshakeTimeout) {
-            clearTimeout(this.reconnectionHandshakeTimeout);
-        }
-        
-        this.reconnectionHandshakeTimeout = setTimeout(() => {
-            console.log('⏱️ HOST: Guest reconnection timeout - resuming battle');
-            this.guestReconnecting = false;
-            this.handleGuestReconnectionTimeout();
-        }, 30000);
-    }
-
     handleGuestReconnectionReady() {
         if (!this.isAuthoritative) return;
         
         console.log('✅ HOST: Guest signaled ready after reconnection');
-        this.guestReconnecting = false;
-        this.guestReconnectionReady = true;
         
         // Clear timeout
         if (this.reconnectionHandshakeTimeout) {
@@ -2870,12 +3010,12 @@ export class BattleManager {
             this.reconnectionHandshakeTimeout = null;
         }
         
-        // Add a small delay to ensure guest is fully ready
+        // Add a small delay to ensure guest is fully ready (speed-adjusted)
         setTimeout(() => {
             if (this.opponentConnected && !this.checkBattleEnd()) {
                 this.resumeBattle('Guest reconnected and ready');
             }
-        }, 500);
+        }, this.getSpeedAdjustedDelay(500));
     }
 
     handleGuestReconnectionTimeout() {

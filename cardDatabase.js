@@ -981,11 +981,12 @@ const CARD_DATABASE = {
         name: 'GuardChange',
         image: './Cards/All/GuardChange.png',
         cardType: 'Spell',
-        level: 1,
+        level: 0,
         cost: 0,
         action: false,
-        spellSchool: 'SupportMagic',
-        subtype: 'Quick'
+        spellSchool: 'MagicArts',
+        subtype: 'Quick',
+        global: true
     },
     'TharxianHorse': {
         name: 'TharxianHorse',
@@ -1252,9 +1253,14 @@ export function getCardInfo(cardName) {
         baseInfo.level = cardInfo.level;
     }
     
-    // Only add level if it exists (for spell cards)
+    // Only add hp if it exists (for spell cards)
     if (cardInfo.hp !== undefined) {
         baseInfo.hp = cardInfo.hp;
+    }
+    
+    // Only add global if it exists (for spell cards)
+    if (cardInfo.global !== undefined) {
+        baseInfo.global = cardInfo.global;
     }
 
     // Add hero-specific properties if this is a hero card

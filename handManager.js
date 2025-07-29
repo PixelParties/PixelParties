@@ -1,4 +1,8 @@
-// handManager.js - Fixed Hand Management with Opera-Compatible Drag & Drop
+// handManager.js - Fixed Hand Management with Opera-Compatible Drag & Drop and Centralized Artifact Handling
+
+// Import the centralized artifact handler
+import { artifactHandler } from './artifactHandler.js';
+import { globalSpellManager } from './globalSpellManager.js';
 
 export class HandManager {
     constructor(deckManager) {
@@ -46,6 +50,12 @@ export class HandManager {
                 document.body.classList.add('dragging-ability');
             }
         }
+        
+        // NEW: Check if this is a global spell and add body class
+        if (window.globalSpellManager && window.heroSelection && 
+            window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
+            document.body.classList.add('dragging-global-spell');
+        }
 
         console.log(`Started dragging hand card: ${cardName} from index ${cardIndex}`);
     }
@@ -73,6 +83,9 @@ export class HandManager {
         
         // Remove body class for ability dragging
         document.body.classList.remove('dragging-ability');
+        
+        // NEW: Remove body class for global spell dragging
+        document.body.classList.remove('dragging-global-spell');
 
         this.resetDragState();
     }
@@ -454,14 +467,18 @@ export class HandManager {
             
             // Check if this is a spell card
             const isSpellCard = window.heroSelection?.heroSpellbookManager?.isSpellCard(cardName) || false;
+            const isGlobalSpell = window.globalSpellManager?.isGlobalSpell(cardName, window.heroSelection) || false;
+
             
             // Check if this is an artifact and if it's unaffordable
             let isUnaffordable = false;
             let dataCardType = 'other';
             if (isAbilityCard) {
                 dataCardType = 'ability';
-            } else if (isSpellCard) {
+            } else if (isSpellCard && !isGlobalSpell) {
                 dataCardType = 'spell';
+            } else if (isGlobalSpell) {
+                dataCardType = 'global-spell';
             } else if (cardInfo && cardInfo.cardType === 'Artifact') {
                 dataCardType = 'artifact';
                 // Check if player can afford it
@@ -491,7 +508,7 @@ export class HandManager {
 
             // Add clickable class for special cards
             let clickableClass = '';
-            if (cardName === 'TreasureChest' || dataCardType === 'artifact') {
+            if (dataCardType === 'artifact' || dataCardType === 'global-spell') {
                 clickableClass = ' clickable';
             }
 
@@ -738,27 +755,46 @@ function showGoldError(message, event) {
     }, 2000);
 }
 
-// Generic artifact handler (can be expanded for other artifacts)
-async function handleArtifactUse(cardIndex, cardName) {
-    if (!window.heroSelection) {
-        console.error('Hero selection not available');
-        return;
-    }
+// Show action error message
+function showActionError(message, event) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'action-error-popup';
+    errorDiv.innerHTML = `
+        <div class="action-error-content">
+            <span class="action-error-icon">⚡</span>
+            <span class="action-error-text">${message}</span>
+        </div>
+    `;
     
-    try {
-        // Try to dynamically import the artifact module
-        // Convert card name to module path (e.g., "TreasureChest" -> "./Artifacts/treasureChest.js")
-        const moduleName = cardName.charAt(0).toLowerCase() + cardName.slice(1);
-        const module = await import(`./Artifacts/${moduleName}.js`);
-        
-        if (module[`${moduleName}Artifact`]) {
-            await module[`${moduleName}Artifact`].handleClick(cardIndex, cardName, window.heroSelection);
-        } else {
-            console.log(`No artifact handler found for ${cardName}`);
-        }
-    } catch (error) {
-        console.log(`No artifact module found for ${cardName}`, error);
-    }
+    // Position near the cursor
+    const x = event ? event.clientX : window.innerWidth / 2;
+    const y = event ? event.clientY : window.innerHeight / 2;
+    
+    errorDiv.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y - 50}px;
+        transform: translateX(-50%);
+        background: rgba(255, 193, 7, 0.95);
+        color: #212529;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 10000;
+        pointer-events: none;
+        animation: actionErrorBounce 0.5s ease-out;
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    // Remove after animation
+    setTimeout(() => {
+        errorDiv.style.animation = 'actionErrorFade 0.3s ease-out forwards';
+        setTimeout(() => errorDiv.remove(), 300);
+    }, 2000);
 }
 
 // ===== GLOBAL HAND CARD DRAG FUNCTIONS =====
@@ -784,7 +820,7 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             
             if (!actionCheck.canPlay) {
                 event.preventDefault();
-                window.showActionError(actionCheck.reason, event);
+                showActionError(actionCheck.reason, event);
                 return false;
             }
         }
@@ -1007,9 +1043,9 @@ function createOptimizedDragImage(cardElement) {
 
 function onHandCardDragEnd(event) {
     if (window.handManager) {
-        // Check if this was a TreasureChest card dragged outside the hand
+        // Check if any card was dragged outside the hand
         const dragState = window.handManager.getHandDragState();
-        if (dragState.isDragging && dragState.draggedCardName === 'TreasureChest') {
+        if (dragState.isDragging) {
             // Check if the drop occurred outside the hand container
             const handContainer = document.querySelector('.hand-cards');
             if (handContainer) {
@@ -1019,8 +1055,27 @@ function onHandCardDragEnd(event) {
                 
                 // If dropped outside the hand container (ANYWHERE outside)
                 if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-                    // Consume the treasure chest no matter where it was dropped
-                    handleTreasureChestUse(dragState.draggedCardIndex, dragState.draggedCardName);
+                    // First check if it's a global spell
+                    if (window.globalSpellManager && window.heroSelection && 
+                        window.globalSpellManager.isGlobalSpell(dragState.draggedCardName, window.heroSelection)) {
+                        
+                        console.log(`🌍 Global spell ${dragState.draggedCardName} dropped outside hand - activating`);
+                        
+                        // Activate the global spell
+                        window.globalSpellManager.handleGlobalSpellActivation(
+                            dragState.draggedCardIndex,
+                            dragState.draggedCardName,
+                            window.heroSelection
+                        );
+                    }
+                    // Then check for artifacts (existing code)
+                    else if (window.artifactHandler) {
+                        window.artifactHandler.handleArtifactDrag(
+                            dragState.draggedCardIndex, 
+                            dragState.draggedCardName, 
+                            window.heroSelection
+                        );
+                    }
                 }
             }
         }
@@ -1054,7 +1109,7 @@ function onHandZoneDrop(event) {
     }
 }
 
-// Global hand card click handler
+// Global hand card click handler - Updated to use ArtifactHandler
 async function onHandCardClick(event, cardIndex, cardName) {
     // Prevent click from bubbling to parent elements
     event.stopPropagation();
@@ -1067,46 +1122,24 @@ async function onHandCardClick(event, cardIndex, cardName) {
         showGoldError(affordCheck.reason, event);
         return;
     }
-    
-    // Handle special clickable cards
-    switch (cardName) {
-        case 'TreasureChest':
-            await handleTreasureChestUse(cardIndex, cardName);
-            break;
-        
-        // Add other clickable cards here in the future
-        default:
-            // Check if this is an artifact that should be clickable
-            if (window.heroSelection) {
-                const cardInfo = window.heroSelection.getCardInfo(cardName);
-                if (cardInfo && cardInfo.cardType === 'Artifact') {
-                    // Try to load and use the artifact module
-                    await handleArtifactUse(cardIndex, cardName);
-                } else {
-                    // Default behavior - do nothing
-                    console.log(`No click handler for card: ${cardName}`);
-                }
-            }
-            break;
-    }
-}
 
-// Handle TreasureChest card usage
-async function handleTreasureChestUse(cardIndex, cardName) {
-    if (!window.heroSelection) {
-        console.error('Hero selection not available');
+    // Check if it's a global spell
+    if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
+        console.log(`🌍 Global spell clicked: ${cardName}`);
+        const result = await window.globalSpellManager.handleGlobalSpellActivation(cardIndex, cardName, window.heroSelection);
         return;
     }
     
-    try {
-        // Dynamically import the TreasureChest module
-        const { treasureChestArtifact } = await import('./Artifacts/treasureChest.js');
-        
-        // Use the artifact
-        await treasureChestArtifact.handleClick(cardIndex, cardName, window.heroSelection);
-    } catch (error) {
-        console.error('Failed to load TreasureChest artifact:', error);
+    // Use artifact handler for all artifacts
+    if (window.artifactHandler) {
+        const handled = await window.artifactHandler.handleArtifactClick(cardIndex, cardName, window.heroSelection);
+        if (handled) {
+            return; // Artifact was successfully handled
+        }
     }
+    
+    // Fallback for non-artifacts or if artifact handler failed
+    console.log(`No click handler for card: ${cardName}`);
 }
 
 // ===== STYLES =====
@@ -1211,6 +1244,32 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
             }
         }
         
+        @keyframes actionErrorBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-5px) scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes actionErrorFade {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
+        }
+        
         .gold-error-popup {
             display: flex;
             align-items: center;
@@ -1229,6 +1288,26 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
         }
         
         .gold-error-text {
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        .action-error-popup {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .action-error-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-error-icon {
+            font-size: 20px;
+        }
+        
+        .action-error-text {
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
         
@@ -1254,6 +1333,23 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
         }
     `;
     document.head.appendChild(style);
+}
+
+// Load artifact handler for state restoration and centralized artifact management
+if (typeof window !== 'undefined') {
+    // Import and initialize artifact handler
+    import('./artifactHandler.js').then(module => {
+        window.artifactHandler = module.artifactHandler;
+        console.log('✅ Artifact handler loaded');
+        
+        // Pre-load all artifacts
+        window.artifactHandler.preloadAllArtifacts();
+    }).catch(error => {
+        console.log('Could not load artifact handler:', error);
+    });
+    
+    // Global error handlers
+    window.showActionError = showActionError;
 }
 
 // Attach global functions to window for cross-module access

@@ -3,6 +3,8 @@
 import { CardPreviewManager } from './cardPreviewManager.js';
 import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js';
 
+import ThievingManager from './Abilities/thieving.js';
+
 export class CardRewardManager {
     constructor(deckManager, handManager, goldManager) {
         this.deckManager = deckManager;
@@ -15,6 +17,9 @@ export class CardRewardManager {
         
         // Store gold breakdown for display
         this.lastGoldBreakdown = null;
+        
+        // Initialize thieving manager
+        this.thievingManager = new ThievingManager();
         
         // Define all available heroes and their card sets
         this.allHeroes = [
@@ -55,8 +60,8 @@ export class CardRewardManager {
         this.currentRewardCards = []; // Store current rewards for redraw
         this.currentRewardType = null; // 'cards' or 'heroes'
         this.isRedrawing = false; // Prevent multiple redraws at once
-    
-        console.log('CardRewardManager initialized with enhanced redraw and gold display');
+
+        console.log('CardRewardManager initialized with enhanced redraw, gold display, and Thieving system');
     }
 
     // Calculate and store gold breakdown for current battle result
@@ -75,7 +80,10 @@ export class CardRewardManager {
             battleBonus: 0,
             wealthBonus: 0,
             wealthDetails: [],
-            semiBonus: 0, 
+            semiBonus: 0,
+            thievingGained: 0,      
+            thievingLost: 0,       
+            thievingDetails: [],   
             total: 0
         };
 
@@ -154,10 +162,17 @@ export class CardRewardManager {
             }
         }
 
-        // Calculate total - INCLUDING the new Semi bonus
-        breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + breakdown.semiBonus;
+        // Calculate thieving effects
+        const thievingResult = this.thievingManager.calculateForRewards(this.heroSelection, this.goldManager);
+        breakdown.thievingGained = thievingResult.thievingGained;
+        breakdown.thievingLost = thievingResult.thievingLost;
+        breakdown.thievingDetails = thievingResult.thievingDetails;
+
+        // Calculate total
+        breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
+                        breakdown.semiBonus + breakdown.thievingGained - breakdown.thievingLost;
         
-        console.log('📊 Final gold breakdown:', breakdown);
+        console.log('📊 Final gold breakdown with thieving:', breakdown);
         return breakdown;
     }
 
@@ -168,6 +183,10 @@ export class CardRewardManager {
 
         this.heroSelection = heroSelection;
         const currentTurn = turnTracker.getCurrentTurn();
+        
+        // IMPORTANT: Set game phase to Reward when showing rewards
+        console.log('🎁 Setting game phase to Reward as rewards are being shown');
+        await this.heroSelection.setGamePhase('Reward');
         
         // Calculate gold breakdown for this battle BEFORE generating rewards
         this.lastGoldBreakdown = this.calculateGoldBreakdown(battleResult);
@@ -292,6 +311,13 @@ export class CardRewardManager {
                         </div>
                     ` : ''}
                     
+                    <!-- NEW: Thieving Section -->
+                    ${this.thievingManager.generateBreakdownHTML({
+                        thievingGained: breakdown.thievingGained,
+                        thievingLost: breakdown.thievingLost,
+                        thievingDetails: breakdown.thievingDetails
+                    })}
+                    
                     <!-- Redraw Deduction (if any) -->
                     ${breakdown.redrawDeduction > 0 ? `
                         <div class="gold-line-item redraw-deduction">
@@ -371,10 +397,6 @@ export class CardRewardManager {
                         Need ${this.redrawCost - totalAvailableGold} more gold
                     </div>
                 ` : `
-                    <div class="redraw-hint-success">
-                        <span class="hint-icon">💡</span>
-                        Click to refresh your options
-                    </div>
                 `}
             </div>
         `;
@@ -485,6 +507,10 @@ export class CardRewardManager {
         
         // Save the pending rewards with the new cards
         await this.savePendingRewards(newRewards, this.currentRewardType === 'heroes');
+        
+        if (this.heroSelection) {
+            await this.heroSelection.saveGameState();
+        }
         
         this.isRedrawing = false;
     }
@@ -2270,14 +2296,12 @@ export class CardRewardManager {
                     window.heroSelection.updateActionDisplay();
                 }
                 
-                // Send formation update to opponent AFTER adding hero
-                if (heroAddedToFormation && this.heroSelection.sendFormationUpdate) {
-                    await this.heroSelection.sendFormationUpdate();
-                    console.log('Sent formation update to opponent with new hero');
-                }
-                
                 // Wait a moment for visual feedback
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // IMPORTANT: Set game phase back to Formation before closing
+                console.log('🛡️ Setting game phase back to Formation after hero reward selection');
+                await this.heroSelection.setGamePhase('Formation');
                 
                 // Close reward overlay and return to formation
                 this.hideRewardOverlay();
@@ -2285,6 +2309,12 @@ export class CardRewardManager {
                 // Return to formation screen
                 if (this.heroSelection) {
                     this.heroSelection.returnToFormationScreenAfterBattle();
+                }
+                
+                // Send formation update to opponent AFTER adding hero
+                if (heroAddedToFormation && this.heroSelection.sendFormationUpdate) {
+                    await this.heroSelection.sendFormationUpdate();
+                    console.log('Sent formation update to opponent with new hero');
                 }
                 
                 // Send sync message to opponent
@@ -2411,6 +2441,10 @@ export class CardRewardManager {
                 
                 // Wait a moment for visual feedback
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // IMPORTANT: Set game phase back to Formation before closing
+                console.log('🛡️ Setting game phase back to Formation after reward selection');
+                await this.heroSelection.setGamePhase('Formation');
                 
                 // Close reward overlay and return to formation
                 this.hideRewardOverlay();
@@ -2783,9 +2817,24 @@ export class CardRewardManager {
         
         const totalGold = this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0);
         
-        if (this.goldManager && totalGold > 0) {
-            this.goldManager.awardGold(totalGold, false, 'battle_reward'); // false = player, not opponent
-            console.log(`✅ Awarded ${totalGold} total gold to player from battle rewards`);
+        if (this.goldManager && totalGold !== 0) { // Allow negative total from thieving
+            // Apply the net gold effect (could be negative if opponent stole more than you gained)
+            if (totalGold > 0) {
+                this.goldManager.awardGold(totalGold, false, 'battle_reward');
+            } else if (totalGold < 0) {
+                // If total is negative due to thieving, subtract the gold
+                this.goldManager.subtractPlayerGold(Math.abs(totalGold));
+            }
+            
+            console.log(`✅ Applied ${totalGold} net gold change to player from battle rewards (including thieving)`);
+            
+            // NEW: Send thieving update to opponent
+            if (this.lastGoldBreakdown.thievingDetails) {
+                this.thievingManager.sendThievingUpdate(
+                    this.lastGoldBreakdown.thievingDetails,
+                    this.heroSelection ? this.heroSelection.gameDataSender : null
+                );
+            }
             
             // Send gold update to opponent so they know how much we got
             if (this.heroSelection && this.heroSelection.gameDataSender) {
@@ -2800,6 +2849,20 @@ export class CardRewardManager {
         }
         
         return false;
+    }
+
+    handleOpponentThievingEffects(thievingData) {
+        this.thievingManager.handleOpponentEffects(thievingData, this.goldManager);
+    }
+
+    cacheOpponentDataForRewards(opponentFormation, opponentAbilities) {
+        if (this.heroSelection) {
+            this.heroSelection.cachedOpponentData = {
+                opponentFormation: opponentFormation,
+                opponentAbilities: opponentAbilities
+            };
+            console.log('📦 Cached opponent data for thieving calculations');
+        }
     }
 }
 

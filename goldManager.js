@@ -12,14 +12,11 @@ export class GoldManager {
         this.lastGoldChange = 0;
         this.goldHistory = [];
         this.maxHistoryLength = 10;
-        
-        console.log('GoldManager initialized with enhanced tracking');
     }
 
     // Initialize with callback for gold changes
     init(goldChangeCallback) {
         this.goldChangeCallback = goldChangeCallback;
-        console.log('GoldManager initialized with callback');
     }
 
     // Get player's gold
@@ -58,9 +55,7 @@ export class GoldManager {
         
         // Record the change
         this.recordGoldChange(amount, reason);
-        
-        console.log(`Player gold: ${oldGold} -> ${this.playerGold} (+${amount}) [${reason}]`);
-        
+                
         // Trigger callback if set
         if (this.goldChangeCallback) {
             this.goldChangeCallback({
@@ -82,9 +77,7 @@ export class GoldManager {
     addOpponentGold(amount, reason = 'manual') {
         const oldGold = this.opponentGold;
         this.opponentGold += amount;
-        
-        console.log(`Opponent gold: ${oldGold} -> ${this.opponentGold} (+${amount}) [${reason}]`);
-        
+                
         // Trigger callback if set
         if (this.goldChangeCallback) {
             this.goldChangeCallback({
@@ -112,9 +105,7 @@ export class GoldManager {
         if (Math.abs(change) > 0) {
             this.recordGoldChange(change, reason);
         }
-        
-        console.log(`Player gold set to: ${this.playerGold} [${reason}]`);
-        
+                
         // Trigger callback if set
         if (this.goldChangeCallback) {
             this.goldChangeCallback({
@@ -131,9 +122,7 @@ export class GoldManager {
     setOpponentGold(amount, reason = 'sync') {
         const oldGold = this.opponentGold;
         this.opponentGold = Math.max(0, amount);
-        
-        console.log(`Opponent gold set to: ${this.opponentGold} [${reason}]`);
-        
+                
         // Trigger callback if set
         if (this.goldChangeCallback) {
             this.goldChangeCallback({
@@ -152,10 +141,8 @@ export class GoldManager {
         
         if (isOpponent) {
             this.addOpponentGold(amount, reason);
-            console.log(`Opponent awarded ${amount} gold from ${reason}`);
         } else {
             this.addPlayerGold(amount, reason);
-            console.log(`Player awarded ${amount} gold from ${reason}`);
         }
         
         return amount;
@@ -357,7 +344,6 @@ export class GoldManager {
             this.goldHistory = goldData.goldHistory.slice(0, this.maxHistoryLength);
         }
         
-        console.log(`Imported gold data - Player: ${this.playerGold}, Opponent: ${this.opponentGold}, Last Change: ${this.lastGoldChange}`);
         return true;
     }
 
@@ -369,8 +355,6 @@ export class GoldManager {
         this.isAnimating = false;
         this.lastGoldChange = 0;
         this.goldHistory = [];
-        
-        console.log('GoldManager reset');
     }
 
     // Get gold statistics with enhanced data
@@ -382,16 +366,5 @@ export class GoldManager {
             lastGoldChange: this.lastGoldChange,
             recentChanges: this.getGoldHistory(3)
         };
-    }
-
-    // Log current gold state (for debugging) with enhanced data
-    logGoldState() {
-        console.log('=== ENHANCED GOLD STATE ===');
-        console.log('Player Gold:', this.playerGold);
-        console.log('Opponent Gold:', this.opponentGold);
-        console.log('Total Gold:', this.playerGold + this.opponentGold);
-        console.log('Last Gold Change:', this.lastGoldChange);
-        console.log('Recent History:', this.getGoldHistory(3));
-        console.log('===========================');
     }
 }

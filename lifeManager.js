@@ -9,16 +9,12 @@ export class LifeManager {
         
         // Reference to centralized turn tracker (injected via init)
         this.turnTracker = null;
-        
-        console.log('LifeManager initialized - Both players start with 10 lives');
     }
 
     // Initialize with callback and turn tracker
     init(onLifeChangeCallback, turnTracker = null) {
         this.onLifeChangeCallback = onLifeChangeCallback;
         this.turnTracker = turnTracker;
-        
-        console.log('LifeManager initialized with dependencies');
     }
 
     // Get current turn from turn tracker
@@ -52,7 +48,6 @@ export class LifeManager {
         this.playerLives = Math.max(0, this.playerLives - amount);
         
         if (previousLives !== this.playerLives) {
-            console.log(`Player took ${amount} damage. Lives: ${previousLives} -> ${this.playerLives}`);
             this.notifyLifeChange('player', previousLives, this.playerLives);
             return true;
         }
@@ -65,7 +60,6 @@ export class LifeManager {
         this.opponentLives = Math.max(0, this.opponentLives - amount);
         
         if (previousLives !== this.opponentLives) {
-            console.log(`Opponent took ${amount} damage. Lives: ${previousLives} -> ${this.opponentLives}`);
             this.notifyLifeChange('opponent', previousLives, this.opponentLives);
             return true;
         }
@@ -78,7 +72,6 @@ export class LifeManager {
         this.playerLives = Math.min(this.maxLives, this.playerLives + amount);
         
         if (previousLives !== this.playerLives) {
-            console.log(`Player healed ${amount}. Lives: ${previousLives} -> ${this.playerLives}`);
             this.notifyLifeChange('player', previousLives, this.playerLives);
             return true;
         }
@@ -91,7 +84,6 @@ export class LifeManager {
         this.opponentLives = Math.min(this.maxLives, this.opponentLives + amount);
         
         if (previousLives !== this.opponentLives) {
-            console.log(`Opponent healed ${amount}. Lives: ${previousLives} -> ${this.opponentLives}`);
             this.notifyLifeChange('opponent', previousLives, this.opponentLives);
             return true;
         }
@@ -104,7 +96,6 @@ export class LifeManager {
         this.playerLives = Math.max(0, Math.min(this.maxLives, lives));
         
         if (previousLives !== this.playerLives) {
-            console.log(`Player lives set to ${this.playerLives}`);
             this.notifyLifeChange('player', previousLives, this.playerLives);
         }
     }
@@ -115,7 +106,6 @@ export class LifeManager {
         this.opponentLives = Math.max(0, Math.min(this.maxLives, lives));
         
         if (previousLives !== this.opponentLives) {
-            console.log(`Opponent lives set to ${this.opponentLives}`);
             this.notifyLifeChange('opponent', previousLives, this.opponentLives);
         }
     }
@@ -253,7 +243,6 @@ export class LifeManager {
             this.maxLives = lifeData.maxLives;
         }
         
-        console.log(`Imported life data - Player: ${this.playerLives}, Opponent: ${this.opponentLives}`);
         return true;
     }
 
@@ -261,7 +250,6 @@ export class LifeManager {
     reset() {
         this.playerLives = this.maxLives;
         this.opponentLives = this.maxLives;
-        console.log('LifeManager reset - Both players back to 10 lives');
     }
 
     // Get life statistics (includes turn from tracker)
@@ -277,19 +265,6 @@ export class LifeManager {
             gameOver: this.isGameOver(),
             winner: this.getWinner()
         };
-    }
-
-    // Log current life state (includes turn from tracker)
-    logLifeState() {
-        console.log('=== LIFE STATE ===');
-        console.log('Current Turn:', this.getCurrentTurn());
-        console.log('Player Lives:', this.playerLives);
-        console.log('Opponent Lives:', this.opponentLives);
-        console.log('Player Trophies:', this.getOpponentLostLives());
-        console.log('Opponent Trophies:', this.getPlayerLostLives());
-        console.log('Game Over:', this.isGameOver());
-        console.log('Winner:', this.getWinner());
-        console.log('==================');
     }
 }
 

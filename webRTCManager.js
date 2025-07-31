@@ -52,9 +52,7 @@ export class WebRTCManager {
 
     // Setup connection state handlers
     setupConnectionStateHandlers() {
-        this.peerConnection.onconnectionstatechange = () => {
-            console.log('WebRTC connection state:', this.peerConnection.connectionState);
-            
+        this.peerConnection.onconnectionstatechange = () => {            
             switch (this.peerConnection.connectionState) {
                 case 'connecting':
                     this.uiManager.showConnectionDetails('🔄 Establishing direct connection...<br>⚡ Setting up P2P tunnel...');
@@ -70,29 +68,22 @@ export class WebRTCManager {
                     break;
                 case 'failed':
                     this.battleSyncEnabled = false;
-                    console.log('P2P connection failed, battle sync will use Firebase relay');
                     this.uiManager.showConnectionDetails('⚠️ Direct P2P failed, using Firebase relay<br>🔄 Connection still functional for game sync<br>📡 Battle sync via Firebase (higher latency)');
                     this.processBattleMessageQueue(); // Process via Firebase fallback
                     break;
                 case 'closed':
                     this.battleSyncEnabled = false;
-                    console.log('P2P connection closed');
                     break;
             }
         };
         
-        this.peerConnection.oniceconnectionstatechange = () => {
-            console.log('ICE connection state:', this.peerConnection.iceConnectionState);
-            
+        this.peerConnection.oniceconnectionstatechange = () => {            
             if (this.peerConnection.iceConnectionState === 'failed') {
-                console.log('ICE failed - TURN servers will attempt relay connection');
                 this.uiManager.showConnectionDetails('🔄 Direct connection failed, using relay servers...<br>📡 TURN servers establishing backup connection...<br>⚔️ Battle sync will use Firebase relay...');
             }
         };
         
-        this.peerConnection.onicegatheringstatechange = () => {
-            console.log('ICE gathering state:', this.peerConnection.iceGatheringState);
-            
+        this.peerConnection.onicegatheringstatechange = () => {           
             if (this.peerConnection.iceGatheringState === 'gathering') {
                 this.uiManager.showConnectionDetails('🔍 Discovering connection routes...<br>🌐 Testing STUN and TURN servers...<br>⚡ Optimizing for battle sync...');
             }
@@ -104,7 +95,6 @@ export class WebRTCManager {
         this.peerConnection.onicecandidate = (event) => {
             const roomRef = this.roomManager.getRoomRef();
             if (event.candidate && roomRef) {
-                console.log('Sending ICE candidate:', event.candidate.type);
                 const candidateRef = roomRef.child('ice_candidates').push();
                 candidateRef.set({
                     candidate: event.candidate,
@@ -113,7 +103,6 @@ export class WebRTCManager {
                     console.error('Error sending ICE candidate:', error);
                 });
             } else if (!event.candidate) {
-                console.log('ICE gathering completed');
             }
         };
     }
@@ -130,20 +119,16 @@ export class WebRTCManager {
             if (!data || !data.candidate || data.from === this.roomManager.playerId) {
                 return; // Skip invalid data or own candidates
             }
-            
-            console.log('Received ICE candidate from peer:', data.candidate.type || 'unknown');
-            
+                        
             if (this.peerConnection && this.peerConnection.remoteDescription) {
                 try {
                     await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    console.log('ICE candidate added successfully');
                 } catch (error) {
                     console.warn('Error adding ICE candidate:', error);
                 }
             } else {
                 // Store candidate for later
                 this.pendingIceCandidates.push(data.candidate);
-                console.log('ICE candidate queued (waiting for remote description)');
             }
         });
     }
@@ -155,7 +140,6 @@ export class WebRTCManager {
                 try {
                     await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
                 } catch (error) {
-                    console.log('Error adding pending ICE candidate:', error);
                 }
             }
             this.pendingIceCandidates = [];
@@ -164,9 +148,7 @@ export class WebRTCManager {
 
     // Setup data channel with battle sync support
     setupDataChannel(channel) {
-        channel.onopen = () => {
-            console.log('P2P data channel opened successfully with battle sync support!');
-            
+        channel.onopen = () => {            
             // Test connection with ping
             const pingStart = Date.now();
             this.sendMessage({
@@ -206,7 +188,6 @@ export class WebRTCManager {
         };
 
         channel.onclose = () => {
-            console.log('P2P data channel closed');
             this.battleSyncEnabled = false;
             if (this.roomManager.getRoomRef()) {
                 this.uiManager.showStatus('🔄 Direct connection lost, using Firebase relay...', 'waiting', true);
@@ -216,7 +197,6 @@ export class WebRTCManager {
         
         channel.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            console.log('Received P2P message:', data.type, data);
             
             // Handle system messages
             if (data.type === 'ping') {
@@ -228,7 +208,6 @@ export class WebRTCManager {
                 });
             } else if (data.type === 'pong') {
                 const latency = Date.now() - data.originalTimestamp;
-                console.log(`P2P latency: ${latency}ms`);
                 
                 const currentDetails = this.uiManager.elements.connectionDetails.innerHTML;
                 const updatedDetails = currentDetails.replace('Latency: Testing...', `Latency: ${latency}ms ⚡`);
@@ -314,23 +293,13 @@ export class WebRTCManager {
         // Priority handling for battle-related messages
         const isBattleMessage = gameDataType === 'battle_data' || gameDataType === 'battle_ack';
         
-        if (isBattleMessage) {
-            console.log(`Sending battle message: ${gameDataType} with sync priority`);
-        }
-        
         // Try P2P first with battle sync awareness
         if (this.battleSyncEnabled && this.sendMessage(message)) {
-            if (isBattleMessage) {
-                console.log(`Battle message sent via optimized P2P: ${gameDataType}`);
-            } else {
-                console.log(`Game data sent via P2P: ${gameDataType}`);
-            }
             return true;
         }
         
         // If P2P fails for battle messages, queue them for retry
         if (isBattleMessage && !this.battleSyncEnabled) {
-            console.log(`P2P not available, queueing battle message: ${gameDataType}`);
             this.battleMessageQueue.push(message);
         }
         
@@ -363,15 +332,12 @@ export class WebRTCManager {
 
     // Process queued battle messages when connection is restored
     processBattleMessageQueue() {
-        if (this.battleMessageQueue.length > 0) {
-            console.log(`Processing ${this.battleMessageQueue.length} queued battle messages`);
-            
+        if (this.battleMessageQueue.length > 0) {            
             const messagesToProcess = [...this.battleMessageQueue];
             this.battleMessageQueue = [];
             
             messagesToProcess.forEach(message => {
                 if (this.battleSyncEnabled && this.sendMessage(message)) {
-                    console.log(`Queued battle message sent via P2P: ${message.type}`);
                 } else {
                     // Still fallback to Firebase if P2P fails
                     const roomRef = this.roomManager.getRoomRef();
@@ -381,7 +347,6 @@ export class WebRTCManager {
                         
                         const gameDataRef = roomRef.child('game_data').push();
                         gameDataRef.set(sanitizedMessage).then(() => {
-                            console.log(`Queued battle message sent via Firebase: ${message.type}`);
                         }).catch(error => {
                             console.error('Failed to send queued battle message:', error);
                         });
@@ -445,7 +410,6 @@ export class WebRTCManager {
         }
         
         this.pendingIceCandidates = [];
-        console.log('WebRTC manager cleanup completed with battle sync reset');
     }
 
     // Check if data channel is open with battle sync status

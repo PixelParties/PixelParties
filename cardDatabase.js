@@ -503,7 +503,7 @@ const CARD_DATABASE = {
         name: 'Fireball',
         image: './Cards/All/Fireball.png',
         cardType: 'Spell',
-        level: 2,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -817,7 +817,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        exclusive: true
     },
     'Stoneskin': {
         name: 'Stoneskin',
@@ -1262,6 +1263,11 @@ export function getCardInfo(cardName) {
     if (cardInfo.global !== undefined) {
         baseInfo.global = cardInfo.global;
     }
+    
+    // Only add exclusive if it exists (for spell cards)
+    if (cardInfo.exclusive !== undefined) {
+        baseInfo.exclusive = cardInfo.exclusive;
+    }
 
     // Add hero-specific properties if this is a hero card
     if (cardInfo.cardType === 'hero') {
@@ -1412,7 +1418,6 @@ export function getDatabaseStats() {
 const initStats = Object.keys(CARD_DATABASE).length;
 const heroCount = Object.values(CARD_DATABASE).filter(card => card.cardType === 'hero').length;
 const abilityCount = initStats - heroCount;
-console.log(`Card Database initialized with ${initStats} total cards: ${heroCount} heroes + ${abilityCount} ability cards`);
 
 // Export the database for debugging purposes (read-only)
 export const CARD_DB_DEBUG = Object.freeze(CARD_DATABASE);

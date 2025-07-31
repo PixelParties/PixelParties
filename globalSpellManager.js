@@ -3,7 +3,6 @@ export class GlobalSpellManager {
     constructor() {
         this.loadedSpells = new Map();
         this.guardChangeMode = false;
-        console.log('GlobalSpellManager initialized');
     }
 
     // Guard Change mode management
@@ -13,7 +12,6 @@ export class GlobalSpellManager {
 
     setGuardChangeMode(active, heroSelection = null) {
         this.guardChangeMode = active;
-        console.log(`🛡️ Guard Change mode ${active ? 'ACTIVATED' : 'DEACTIVATED'}`);
         
         // Add/remove body class for CSS styling
         if (typeof document !== 'undefined') {
@@ -40,7 +38,6 @@ export class GlobalSpellManager {
 
     clearGuardChangeMode(heroSelection = null) {
         if (this.guardChangeMode) {
-            console.log('🛡️ Guard Change mode cleared (battle starting)');
             this.setGuardChangeMode(false, heroSelection);
         }
     }
@@ -74,9 +71,7 @@ export class GlobalSpellManager {
     }
 
     // Handle clicking global spells
-    async handleGlobalSpellActivation(cardIndex, cardName, heroSelection) {
-        console.log(`🌍 Attempting to activate global spell: ${cardName}`);
-        
+    async handleGlobalSpellActivation(cardIndex, cardName, heroSelection) {        
         const cardInfo = heroSelection.getCardInfo(cardName);
         if (!cardInfo || !cardInfo.global) {
             console.error(`${cardName} is not a global spell`);
@@ -94,9 +89,7 @@ export class GlobalSpellManager {
         return await this.handleGlobalSpellClick(cardIndex, cardName, heroSelection);
     }
 
-    async handleGlobalSpellClick(cardIndex, cardName, heroSelection) {
-        console.log(`🌍 GlobalSpellManager: Processing click for ${cardName}`);
-        
+    async handleGlobalSpellClick(cardIndex, cardName, heroSelection) {        
         if (cardName === 'GuardChange') {
             return await this.handleGuardChangeClick(cardIndex, cardName, heroSelection);
         }
@@ -133,14 +126,12 @@ export class GlobalSpellManager {
             
             if (spell) {
                 this.loadedSpells.set(moduleName, spell);
-                console.log(`✅ Loaded global spell: ${moduleName}`);
                 return spell;
             } else {
                 console.error(`Spell export ${spellExportName} not found in ${moduleName}.js`);
                 return null;
             }
         } catch (error) {
-            console.log(`Failed to load spell ${moduleName}:`, error.message);
             return null;
         }
     }
@@ -155,12 +146,7 @@ export class GlobalSpellManager {
         return this.isGlobalSpell(dragState.draggedCardName, heroSelection);
     }
 
-    handleGlobalSpellDropOnHero(targetSlot, heroSelection) {
-        const dragState = heroSelection.handManager.getHandDragState();
-        const spellName = dragState.draggedCardName;
-        
-        console.log(`🌍 Global spell ${spellName} dropped on hero slot - showing hint`);
-        
+    handleGlobalSpellDropOnHero(targetSlot, heroSelection) {                
         heroSelection.handManager.endHandCardDrag();
         
         this.showSpellDropResult(targetSlot, 'Global spells must be clicked to activate!', false, heroSelection);
@@ -209,15 +195,12 @@ export class GlobalSpellManager {
 
     importGlobalSpellState(state) {
         if (!state) {
-            console.log('No global spell state to import');
             return false;
         }
         
         const wasGuardChangeActive = this.guardChangeMode;
         const newGuardChangeMode = state.guardChangeMode || false;
-        
-        console.log(`🛡️ Importing Guard Change mode: ${wasGuardChangeActive} -> ${newGuardChangeMode}`);
-        
+                
         // Use setGuardChangeMode to ensure proper synchronization
         if (newGuardChangeMode !== wasGuardChangeActive) {
             this.setGuardChangeMode(newGuardChangeMode);
@@ -255,8 +238,6 @@ export class GlobalSpellManager {
         if (existingIndicator) {
             existingIndicator.remove();
         }
-        
-        console.log('GlobalSpellManager reset');
     }
 }
 

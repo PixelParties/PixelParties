@@ -120,11 +120,16 @@ export class BattleScreen {
         
         // Only the host should initiate the battle
         if (this.isHost) {
+            // Set game phase to Battle when battle starts
+            if (window.heroSelection && window.heroSelection.reconnectionManager) {
+                window.heroSelection.reconnectionManager.setGamePhaseToBattle();
+            }
+            
             setTimeout(() => {
                 // Re-render creatures after battle manager init
                 this.renderCreaturesAfterInit();
                 
-                // NECROMANCY FIX: Initialize necromancy stacks and displays
+                // Initialize necromancy stacks and displays
                 if (this.battleManager.necromancyManager) {
                     // Initialize necromancy stacks for all heroes
                     this.battleManager.necromancyManager.initializeNecromancyStacks();
@@ -132,19 +137,9 @@ export class BattleScreen {
                     this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
                 }
                 
-                // Initialize speed control UI with debugging
-                console.log('🎛️ About to initialize speed control UI...');
-                console.log('🎛️ this.battleManager exists:', !!this.battleManager);
-                console.log('🎛️ this.battleManager.speedManager exists:', !!(this.battleManager && this.battleManager.speedManager));
-                
-                if (this.battleManager && this.battleManager.speedManager) {
-                    console.log('🎛️ speedManager.battleManager exists:', !!this.battleManager.speedManager.battleManager);
-                    console.log('🎛️ speedManager.battleManager value:', this.battleManager.speedManager.battleManager);
-                }
-                
+                // Initialize speed control UI
                 const speedUISuccess = this.initializeSpeedControlUI();
                 if (!speedUISuccess) {
-                    console.error('❌ Speed control UI initialization failed!');
                     // Try to add a fallback message to the battle center
                     const battleCenter = document.getElementById('battleCenter');
                     if (battleCenter) {
@@ -155,8 +150,6 @@ export class BattleScreen {
                             </div>
                         `;
                     }
-                } else {
-                    console.log('✅ Speed control UI initialized successfully');
                 }
                 
                 // Start the synchronized battle
@@ -343,7 +336,9 @@ export class BattleScreen {
     // Create the battle screen layout with enhanced hero display
     createBattleScreen() {
         const gameScreen = document.getElementById('gameScreen');
-        if (!gameScreen) return;
+        if (!gameScreen) {
+            return;
+        }
         
         // Create battle arena container
         let battleArena = document.getElementById('battleArena');
@@ -356,6 +351,11 @@ export class BattleScreen {
         
         // Generate battle screen HTML
         const battleHTML = this.generateBattleScreenHTML();
+        
+        if (!battleHTML || battleHTML.trim() === '') {
+            return;
+        }
+        
         battleArena.innerHTML = battleHTML;
         battleArena.style.display = 'block';
         
@@ -368,10 +368,9 @@ export class BattleScreen {
         // Display ability info for debugging (can be removed later)
         this.displayAbilityInfo();
         
-        // NECROMANCY FIX: Inject necromancy CSS and initialize displays if battle manager exists
+        // Initialize necromancy displays if battle manager exists
         if (this.battleManager && this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.injectNecromancyCSS();
-            // Initialize displays if heroes are already loaded
             this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
         }
     }
@@ -453,42 +452,24 @@ export class BattleScreen {
 
     // Initialize speed control UI - NEW METHOD
     initializeSpeedControlUI() {
-        console.log('🎛️ Initializing speed control UI...');
-        
         // Get the battle center container
         const battleCenter = document.getElementById('battleCenter');
         if (!battleCenter) {
-            console.error('❌ Battle center container not found for speed controls');
-            console.log('Available elements:', document.querySelectorAll('.battle-center'));
             return false;
         }
-        
-        console.log('✅ Battle center container found:', battleCenter);
         
         // Check if battle manager exists
         if (!this.battleManager) {
-            console.error('❌ BattleManager not available for speed control initialization');
             return false;
         }
-        
-        console.log('✅ BattleManager available');
         
         // Check if speed manager exists
         if (!this.battleManager.speedManager) {
-            console.error('❌ SpeedManager not available for speed control initialization');
-            console.log('BattleManager properties:', Object.keys(this.battleManager));
             return false;
         }
         
-        console.log('✅ SpeedManager available');
-        
         // Initialize speed manager UI
         const success = this.battleManager.speedManager.initializeUI(battleCenter);
-        if (success) {
-            console.log('✅ Speed control UI initialized successfully');
-        } else {
-            console.error('❌ Failed to initialize speed control UI');
-        }
         return success;
     }
 

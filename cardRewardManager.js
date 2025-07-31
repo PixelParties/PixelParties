@@ -61,6 +61,9 @@ export class CardRewardManager {
         this.currentRewardType = null; // 'cards' or 'heroes'
         this.isRedrawing = false; // Prevent multiple redraws at once
 
+        // View mode system
+        this.viewMode = 'rewards'; // 'rewards' or 'battlefield'
+
         console.log('CardRewardManager initialized with enhanced redraw, gold display, and Thieving system');
     }
 
@@ -68,12 +71,8 @@ export class CardRewardManager {
     calculateGoldBreakdown(battleResult) {
         // If no battle result provided, try to detect it
         if (!battleResult || battleResult === undefined) {
-            console.warn('⚠️ No battle result provided, attempting to detect...');
             battleResult = this.detectBattleResultFromGoldManager();
-            console.log('🔍 Detected battle result:', battleResult);
         }
-        
-        console.log('🏆 Calculating gold breakdown for battle result:', battleResult);
         
         const breakdown = {
             baseGold: 4, // Standard base reward
@@ -99,7 +98,6 @@ export class CardRewardManager {
                 breakdown.battleBonus = 1;
                 break;
             default:
-                console.warn('⚠️ Unknown battle result:', battleResult, 'defaulting to participation bonus');
                 breakdown.battleBonus = 1;
                 break;
         }
@@ -107,12 +105,10 @@ export class CardRewardManager {
         // Calculate wealth bonuses from current formation
         if (this.heroSelection && this.heroSelection.heroAbilitiesManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
-            console.log('💰 Checking formation for Wealth abilities:', formation);
             
             ['left', 'center', 'right'].forEach(position => {
                 const hero = formation[position];
                 if (hero && this.heroSelection.heroAbilitiesManager) {
-                    console.log(`🦸 Checking ${hero.name} in ${position} position`);
                     const abilities = this.heroSelection.heroAbilitiesManager.getHeroAbilities(position);
                     if (abilities) {
                         let wealthLevel = 0;
@@ -121,9 +117,6 @@ export class CardRewardManager {
                         ['zone1', 'zone2', 'zone3'].forEach(zone => {
                             if (abilities[zone] && Array.isArray(abilities[zone])) {
                                 const wealthCount = abilities[zone].filter(a => a && a.name === 'Wealth').length;
-                                if (wealthCount > 0) {
-                                    console.log(`💎 Found ${wealthCount} Wealth abilities in ${hero.name}'s ${zone}`);
-                                }
                                 wealthLevel += wealthCount;
                             }
                         });
@@ -136,19 +129,15 @@ export class CardRewardManager {
                                 level: wealthLevel,
                                 gold: goldFromHero
                             });
-                            console.log(`💰 ${hero.name} contributes ${goldFromHero} gold (${wealthLevel} Wealth levels)`);
                         }
                     }
                 }
             });
-        } else {
-            console.warn('⚠️ Hero selection or abilities manager not available for wealth calculation');
         }
 
         // Check for Semi hero bonus
         if (this.heroSelection && this.heroSelection.formationManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
-            console.log('🎯 Checking formation for Semi hero:', formation);
             
             // Check if any hero in the formation is Semi
             const hasSemi = ['left', 'center', 'right'].some(position => {
@@ -158,7 +147,6 @@ export class CardRewardManager {
             
             if (hasSemi) {
                 breakdown.semiBonus = 6;
-                console.log('🌟 Semi hero found in formation! Adding +6 gold bonus');
             }
         }
 
@@ -172,7 +160,6 @@ export class CardRewardManager {
         breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
                         breakdown.semiBonus + breakdown.thievingGained - breakdown.thievingLost;
         
-        console.log('📊 Final gold breakdown with thieving:', breakdown);
         return breakdown;
     }
 
@@ -185,13 +172,10 @@ export class CardRewardManager {
         const currentTurn = turnTracker.getCurrentTurn();
         
         // IMPORTANT: Set game phase to Reward when showing rewards
-        console.log('🎁 Setting game phase to Reward as rewards are being shown');
         await this.heroSelection.setGamePhase('Reward');
         
         // Calculate gold breakdown for this battle BEFORE generating rewards
         this.lastGoldBreakdown = this.calculateGoldBreakdown(battleResult);
-        
-        console.log(`Showing rewards for turn ${currentTurn} with gold breakdown:`, this.lastGoldBreakdown);
         
         // Store the gold breakdown in a local variable to ensure it's not lost
         const goldBreakdown = this.lastGoldBreakdown;
@@ -200,7 +184,6 @@ export class CardRewardManager {
         const isHeroRewardTurn = currentTurn === 3 || currentTurn === 5;
         
         if (isHeroRewardTurn) {
-            console.log(`Turn ${currentTurn} - Showing Hero rewards!`);
             const rewardHeroes = this.generateHeroRewards(3);
             await this.savePendingRewards(rewardHeroes, true); // true = isHeroReward
             // Pass gold breakdown directly to ensure it's available
@@ -209,7 +192,6 @@ export class CardRewardManager {
                 this.displayHeroRewardUI(rewardHeroes, currentTurn);
             }, 100);
         } else {
-            console.log(`Turn ${currentTurn} - Showing ability card rewards`);
             const rewardCards = this.generateRewardCards(3);
             await this.savePendingRewards(rewardCards, false); // false = not hero reward
             // Pass gold breakdown directly to ensure it's available
@@ -224,17 +206,14 @@ export class CardRewardManager {
 
     // Create gold breakdown display HTML with total gold display - FIXED with debug logging
     createGoldBreakdownHTML() {
-        console.log('🎨 Creating gold breakdown HTML. Current breakdown:', this.lastGoldBreakdown);
-        
         if (!this.lastGoldBreakdown) {
-            console.warn('⚠️ No gold breakdown data available!');
             return `
                 <div class="gold-breakdown-container">
                     <div class="gold-breakdown-header">
                         <div class="gold-icon">💰</div>  
                         <h3>Gold Earned</h3>
                     </div>
-                    <div class="gold-breakdown-content">
+                    <div class="gold-breakdown-content-scrollable">
                         <div class="gold-line-item">
                             <span class="gold-source">No data available</span>
                             <span class="gold-arrow">→</span>
@@ -246,19 +225,11 @@ export class CardRewardManager {
         }
 
         const breakdown = this.lastGoldBreakdown;
-        console.log('🎨 Rendering breakdown with data:', breakdown);
         
         // Calculate current total gold (current + pending - redraws)
         const currentGold = this.goldManager.getPlayerGold();
         const pendingGold = breakdown.total - (breakdown.redrawDeduction || 0);
         const totalGold = currentGold + pendingGold;
-        
-        console.log('💰 Gold calculation:', {
-            currentGold,
-            pendingGold,
-            totalGold,
-            redrawDeduction: breakdown.redrawDeduction || 0
-        });
         
         return `
             <div class="gold-breakdown-container">
@@ -267,7 +238,8 @@ export class CardRewardManager {
                     <h3>Battle Rewards</h3>
                 </div>
                 
-                <div class="gold-breakdown-content">
+                <!-- SCROLLABLE CONTENT: Individual gold contributors -->
+                <div class="gold-breakdown-content-scrollable">
                     <!-- Base Gold -->
                     <div class="gold-line-item">
                         <span class="gold-source">Base Reward</span>
@@ -311,7 +283,7 @@ export class CardRewardManager {
                         </div>
                     ` : ''}
                     
-                    <!-- NEW: Thieving Section -->
+                    <!-- Thieving Section -->
                     ${this.thievingManager.generateBreakdownHTML({
                         thievingGained: breakdown.thievingGained,
                         thievingLost: breakdown.thievingLost,
@@ -326,8 +298,10 @@ export class CardRewardManager {
                             <span class="gold-amount">-${breakdown.redrawDeduction}</span>
                         </div>
                     ` : ''}
-                    
-                    <!-- Battle Rewards Total -->
+                </div>
+                
+                <!-- FIXED TOTALS: Battle Total (non-scrollable) -->
+                <div class="gold-breakdown-totals">
                     <div class="gold-total-line">
                         <span class="gold-total-label">Battle Total</span>
                         <span class="gold-arrow total-arrow">→</span>
@@ -335,7 +309,7 @@ export class CardRewardManager {
                     </div>
                 </div>
                 
-                <!-- Your Total Gold Display -->
+                <!-- Your Total Gold Display (non-scrollable) -->
                 <div class="total-gold-display">
                     <div class="total-gold-header">
                         <span class="total-gold-icon">🏆</span>
@@ -362,7 +336,23 @@ export class CardRewardManager {
         return 'Battle';
     }
 
-    // Enhanced redraw button HTML - FIXED affordability calculation
+    // Create view battlefield button HTML
+    createViewBattlefieldButtonHTML() {
+        const isShowingRewards = this.viewMode === 'rewards';
+        const buttonText = isShowingRewards ? 'View Battlefield' : 'View Rewards';
+        const buttonIcon = isShowingRewards ? '🔍' : '🎁';
+        
+        return `
+            <div class="view-battlefield-button-container">
+                <button class="view-battlefield-button" onclick="window.toggleRewardView()" id="viewToggleButton">
+                    <span class="view-button-icon">${buttonIcon}</span>
+                    <span class="view-button-text">${buttonText}</span>
+                </button>
+            </div>
+        `;
+    }
+
+    // Enhanced redraw button HTML
     createRedrawButtonHTML() {
         const currentGold = this.goldManager.getPlayerGold();
         const pendingGold = this.lastGoldBreakdown ? (this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0)) : 0;
@@ -604,9 +594,10 @@ export class CardRewardManager {
                         <div class="reward-header">
                             <h2>🎉 Battle Rewards</h2>
                             <p>Choose one card to add to your deck (Turn ${currentTurn})</p>
+                            ${this.createViewBattlefieldButtonHTML()}
                         </div>
                         
-                        <div class="reward-main-content">
+                        <div class="reward-main-content toggleable-content">
                             <!-- Gold Breakdown with integrated redraw button -->
                             <div class="gold-and-redraw-section">
                                 ${this.createGoldBreakdownHTML()}
@@ -620,11 +611,13 @@ export class CardRewardManager {
                         </div>
                         
                         <!-- Hand Display Section -->
-                        ${this.createHandDisplaySection()}
+                        <div class="toggleable-content">
+                            ${this.createHandDisplaySection()}
+                        </div>
                     </div>
                     
                     <!-- Card Preview (Right) -->
-                    <div class="reward-right-section">
+                    <div class="reward-right-section toggleable-content">
                         ${this.createCardPreviewSection()}
                     </div>
                 </div>
@@ -670,6 +663,9 @@ export class CardRewardManager {
         
         // Animate in
         overlay.style.animation = 'fadeIn 0.3s ease-out';
+        
+        // Set up global toggle function
+        this.setupGlobalToggleFunction();
     }
 
     // Enhanced display Hero reward UI with enhanced redraw button integration
@@ -694,9 +690,10 @@ export class CardRewardManager {
                             <p>Choose one Hero to join your roster (Turn ${currentTurn})</p>
                             ${currentTurn === 3 ? '<div class="special-reward-indicator turn-3">⚔️ Turn 3 Special Reward</div>' : ''}
                             ${currentTurn === 5 ? '<div class="special-reward-indicator turn-5">🏆 Turn 5 Epic Reward</div>' : ''}
+                            ${this.createViewBattlefieldButtonHTML()}
                         </div>
                         
-                        <div class="reward-main-content">
+                        <div class="reward-main-content toggleable-content">
                             <!-- Gold Breakdown with integrated redraw button -->
                             <div class="gold-and-redraw-section">
                                 ${this.createGoldBreakdownHTML()}
@@ -710,11 +707,13 @@ export class CardRewardManager {
                         </div>
                         
                         <!-- Hand Display Section -->
-                        ${this.createHandDisplaySection()}
+                        <div class="toggleable-content">
+                            ${this.createHandDisplaySection()}
+                        </div>
                     </div>
                     
                     <!-- Card Preview (Right) -->
-                    <div class="reward-right-section">
+                    <div class="reward-right-section toggleable-content">
                         ${this.createCardPreviewSection()}
                     </div>
                 </div>
@@ -760,6 +759,370 @@ export class CardRewardManager {
         
         // Animate in
         overlay.style.animation = 'fadeIn 0.3s ease-out';
+        
+        // Set up global toggle function
+        this.setupGlobalToggleFunction();
+    }
+
+    // Toggle between rewards view and battlefield view
+    async toggleRewardView() {
+        const previousMode = this.viewMode;
+        this.viewMode = this.viewMode === 'rewards' ? 'battlefield' : 'rewards';
+        
+        console.log(`🔄 Toggling view from ${previousMode} to ${this.viewMode}`);
+        
+        // Update button
+        this.updateViewToggleButton();
+        
+        // Toggle visibility of reward elements
+        const toggleableElements = document.querySelectorAll('.toggleable-content');
+        const overlay = document.getElementById('cardRewardOverlay');
+        
+        if (this.viewMode === 'battlefield') {
+            console.log('🔍 Switching to battlefield view...');
+            
+            // Hide reward elements and make overlay transparent
+            toggleableElements.forEach(el => {
+                el.style.display = 'none';
+            });
+            if (overlay) {
+                overlay.classList.add('battlefield-mode');
+            }
+            
+            // ✅ ENHANCED: Try to show battle arena with recovery
+            const battleArena = document.getElementById('battleArena');
+            if (battleArena) {
+                battleArena.style.display = 'block';
+                console.log('🔍 Battle arena found and shown for battlefield view');
+                console.log('🔍 Battle arena innerHTML length:', battleArena.innerHTML.length);
+                console.log('🔍 Battle arena classes:', battleArena.className);
+            } else {
+                console.warn('⚠️ Battle arena not found - attempting recovery...');
+                console.log('🔍 Available elements with battle-related IDs:');
+                ['battleArena', 'gameScreen', 'battleField', 'battle-arena'].forEach(id => {
+                    const element = document.getElementById(id);
+                    console.log(`🔍 ${id}:`, element ? 'EXISTS' : 'NOT FOUND');
+                });
+                
+                // Try to find battle arena by class name
+                const battleArenaByClass = document.querySelector('.battle-arena');
+                if (battleArenaByClass) {
+                    console.log('🔍 Found battle arena by class name');
+                    battleArenaByClass.style.display = 'block';
+                } else {
+                    console.log('🔍 No battle arena found by class name either');
+                    
+                    // ✅ NEW: Attempt to recover by initializing battle screen
+                    const recoverySuccess = await this.attemptBattleScreenRecovery();
+                    
+                    if (recoverySuccess) {
+                        const recoveredArena = document.getElementById('battleArena');
+                        if (recoveredArena) {
+                            recoveredArena.style.display = 'block';
+                            console.log('✅ Battle screen recovery successful!');
+                        } else {
+                            console.error('❌ Battle screen recovery failed - no arena found after recovery');
+                            this.showBattleViewError();
+                        }
+                    } else {
+                        console.error('❌ Could not recover battle screen');
+                        this.showBattleViewError();
+                    }
+                }
+            }
+            
+        } else {
+            console.log('🎁 Switching to rewards view...');
+            
+            // Show reward elements and restore overlay
+            toggleableElements.forEach(el => {
+                el.style.display = '';
+            });
+            if (overlay) {
+                overlay.classList.remove('battlefield-mode');
+            }
+            
+            // Hide the battle arena
+            const battleArena = document.getElementById('battleArena');
+            if (battleArena) {
+                battleArena.style.display = 'none';
+                console.log('🎁 Battle arena hidden for rewards view');
+            } else {
+                console.log('🎁 No battle arena to hide (not found)');
+            }
+        }
+        
+        // Save the view mode state
+        this.saveViewModeState();
+        
+        console.log(`✅ Successfully switched to ${this.viewMode} view`);
+    }
+
+    // Attempt to recover battle screen when missing
+    async attemptBattleScreenRecovery() {
+        console.log('🔧 Attempting to recover missing battle screen...');
+        
+        if (!this.heroSelection) {
+            console.error('❌ No heroSelection available for recovery');
+            return false;
+        }
+        
+        try {
+            // Use the same method we added for ensuring battle screen initialization
+            const recoverySuccess = await this.ensureBattleScreenInitialized(this.heroSelection);
+            
+            if (recoverySuccess) {
+                console.log('✅ Battle screen recovery completed');
+                return true;
+            } else {
+                console.error('❌ Battle screen recovery failed');
+                return false;
+            }
+            
+        } catch (error) {
+            console.error('❌ Error during battle screen recovery:', error);
+            return false;
+        }
+    }
+
+    // Show user-friendly error for battle view
+    showBattleViewError() {
+        // Switch back to rewards view
+        this.viewMode = 'rewards';
+        this.updateViewToggleButton();
+        
+        // Show reward elements again
+        const toggleableElements = document.querySelectorAll('.toggleable-content');
+        const overlay = document.getElementById('cardRewardOverlay');
+        
+        toggleableElements.forEach(el => {
+            el.style.display = '';
+        });
+        if (overlay) {
+            overlay.classList.remove('battlefield-mode');
+        }
+        
+        // Show error message to user
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'battle-view-error-message';
+        errorDiv.innerHTML = `
+            <div class="error-content">
+                <div class="error-icon">⚠️</div>
+                <div class="error-text">
+                    <h4>Battlefield View Unavailable</h4>
+                    <p>The battle view isn't available right now. This can happen after reconnecting to the game.</p>
+                    <p>You can still select your reward cards normally.</p>
+                </div>
+                <button class="error-close-btn" onclick="this.parentElement.parentElement.remove()">Got it</button>
+            </div>
+        `;
+        
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(244, 67, 54, 0.95);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            z-index: 10001;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            max-width: 400px;
+            animation: fadeIn 0.3s ease-out;
+        `;
+        
+        // Add styles for error content
+        const errorStyle = document.createElement('style');
+        errorStyle.textContent = `
+            .error-content {
+                display: flex;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .error-icon {
+                font-size: 24px;
+                flex-shrink: 0;
+            }
+            .error-text h4 {
+                margin: 0 0 10px 0;
+                font-size: 16px;
+            }
+            .error-text p {
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            .error-close-btn {
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                margin-top: 10px;
+                transition: background 0.2s ease;
+            }
+            .error-close-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+        `;
+        
+        document.head.appendChild(errorStyle);
+        document.body.appendChild(errorDiv);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (errorDiv.parentElement) {
+                errorDiv.remove();
+            }
+            if (errorStyle.parentElement) {
+                errorStyle.remove();
+            }
+        }, 10000);
+    }
+    
+    // Update the view toggle button text and icon
+    updateViewToggleButton() {
+        const button = document.getElementById('viewToggleButton');
+        if (!button) return;
+        
+        const isShowingRewards = this.viewMode === 'rewards';
+        const buttonText = isShowingRewards ? 'View Battlefield' : 'View Rewards';
+        const buttonIcon = isShowingRewards ? '🔍' : '🎁';
+        
+        const iconElement = button.querySelector('.view-button-icon');
+        const textElement = button.querySelector('.view-button-text');
+        
+        if (iconElement) iconElement.textContent = buttonIcon;
+        if (textElement) textElement.textContent = buttonText;
+    }
+    
+    // Set up global toggle function for button
+    setupGlobalToggleFunction() {
+        // Store reference to this instance for global access
+        if (typeof window !== 'undefined') {
+            window.toggleRewardView = () => {
+                this.toggleRewardView();
+            };
+        }
+    }
+
+    // Apply battlefield mode without toggling (for restoration)
+    applyBattlefieldMode() {
+        if (this.viewMode !== 'battlefield') {
+            console.log('🔍 Not applying battlefield mode - current mode is:', this.viewMode);
+            return;
+        }
+        
+        console.log('🔍 Applying battlefield mode from saved state...');
+        
+        // Update button
+        this.updateViewToggleButton();
+        
+        // Hide reward elements and make overlay transparent
+        const toggleableElements = document.querySelectorAll('.toggleable-content');
+        const overlay = document.getElementById('cardRewardOverlay');
+        
+        console.log('🔍 Found', toggleableElements.length, 'toggleable elements to hide');
+        
+        toggleableElements.forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        if (overlay) {
+            overlay.classList.add('battlefield-mode');
+            console.log('🔍 Added battlefield-mode class to overlay');
+        } else {
+            console.warn('⚠️ Reward overlay not found when applying battlefield mode');
+        }
+        
+        // Show the battle arena for battlefield mode
+        const battleArena = document.getElementById('battleArena');
+        if (battleArena) {
+            battleArena.style.display = 'block';
+            console.log('✅ Applied battlefield mode - battle arena shown');
+            console.log('🔍 Battle arena innerHTML length:', battleArena.innerHTML.length);
+        } else {
+            console.warn('⚠️ Battle arena not found when applying battlefield mode');
+            console.log('🔍 Searching for battle arena alternatives...');
+            
+            // Search for battle arena by class
+            const battleArenaByClass = document.querySelector('.battle-arena');
+            if (battleArenaByClass) {
+                battleArenaByClass.id = 'battleArena'; // Ensure it has the right ID
+                battleArenaByClass.style.display = 'block';
+                console.log('✅ Found and showed battle arena by class name');
+            } else {
+                console.error('❌ No battle arena found by ID or class name');
+                
+                // List all elements that might be the battle arena
+                const gameScreen = document.getElementById('gameScreen');
+                if (gameScreen) {
+                    console.log('🔍 Children of gameScreen:', 
+                        Array.from(gameScreen.children).map(child => ({
+                            tagName: child.tagName,
+                            id: child.id,
+                            className: child.className,
+                            display: child.style.display
+                        }))
+                    );
+                }
+            }
+        }
+        
+        console.log('✅ Battlefield mode application completed');
+    }
+
+    // Save view mode state to local storage and pending rewards
+    async saveViewModeState() {
+        // Save to local storage for immediate persistence
+        try {
+            localStorage.setItem('rewardViewMode', this.viewMode);
+        } catch (error) {
+            console.warn('Could not save view mode to localStorage:', error);
+        }
+        
+        // Save to Firebase with pending rewards
+        if (this.heroSelection && this.heroSelection.roomManager) {
+            try {
+                const roomRef = this.heroSelection.roomManager.getRoomRef();
+                if (!roomRef) return;
+                
+                const isHost = this.heroSelection.isHost;
+                const rewardKey = isHost ? 'hostPendingRewards' : 'guestPendingRewards';
+                
+                // Update the viewMode in existing pending rewards
+                await roomRef.child('gameState').child(rewardKey).child('viewMode').set(this.viewMode);
+                console.log(`Saved view mode "${this.viewMode}" to Firebase`);
+                
+            } catch (error) {
+                console.warn('Could not save view mode to Firebase:', error);
+            }
+        }
+    }
+    
+    // Restore view mode state
+    restoreViewModeState() {
+        // Try to restore from local storage first
+        try {
+            const savedMode = localStorage.getItem('rewardViewMode');
+            if (savedMode && (savedMode === 'rewards' || savedMode === 'battlefield')) {
+                this.viewMode = savedMode;
+                console.log(`Restored view mode "${this.viewMode}" from localStorage`);
+            }
+        } catch (error) {
+            console.warn('Could not restore view mode from localStorage:', error);
+        }
+        
+        // Apply the restored view mode
+        if (this.viewMode === 'battlefield') {
+            // Delay to ensure DOM is ready
+            setTimeout(() => {
+                this.toggleRewardView();
+            }, 100);
+        }
     }
 
     // Enhanced reward styles with updated redraw button and total gold display
@@ -787,8 +1150,54 @@ export class CardRewardManager {
             /* Prevent body scrolling when reward overlay is active */
             body.reward-overlay-active {
                 overflow: hidden !important;
-                position: fixed;
-                width: 100%;
+            }
+            
+            /* Battlefield mode - make overlay completely transparent and hide reward elements */
+            .card-reward-overlay.battlefield-mode {
+                background: transparent !important;
+                backdrop-filter: none !important;
+                pointer-events: none !important; /* Allow clicking through to battlefield */
+            }
+            
+            .card-reward-overlay.battlefield-mode .reward-container {
+                pointer-events: auto !important; /* Keep button clickable */
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+            
+            /* Hide only the text content in reward header, keep the button container */
+            .card-reward-overlay.battlefield-mode .reward-header h2,
+            .card-reward-overlay.battlefield-mode .reward-header p,
+            .card-reward-overlay.battlefield-mode .special-reward-indicator {
+                display: none !important;
+            }
+            
+            /* Keep the reward header container visible but transparent */
+            .card-reward-overlay.battlefield-mode .reward-header {
+                background: transparent !important;
+                pointer-events: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            /* Hide the main reward content sections */
+            .card-reward-overlay.battlefield-mode .reward-main-content,
+            .card-reward-overlay.battlefield-mode .reward-hand-display-section-normal,
+            .card-reward-overlay.battlefield-mode .reward-right-section {
+                opacity: 0 !important;
+                pointer-events: none !important;
+                position: absolute !important;
+                top: -9999px !important;
+            }
+            
+            /* Ensure the view button container remains visible and clickable */
+            .card-reward-overlay.battlefield-mode .view-battlefield-button-container {
+                pointer-events: auto !important;
+                display: block !important;
+                position: fixed !important;
+                z-index: 10002 !important;
             }
             
             .reward-container.enhanced-with-gold-and-preview {
@@ -1596,6 +2005,71 @@ export class CardRewardManager {
                 color: rgba(255, 255, 255, 0.8);
             }
             
+            /* View Battlefield Button Styles - Centered between hero rows */
+            .view-battlefield-button-container {
+                position: fixed;
+                top: 2%;
+                left: 9.5%;
+                z-index: 10001;  /* Ensure it's above the overlay */
+            }
+            
+            .view-battlefield-button {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 25px;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                min-width: 160px;
+                justify-content: center;
+                backdrop-filter: blur(10px);
+                border: 2px solid rgba(255, 255, 255, 0.2);
+            }
+            
+            .view-battlefield-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+                background: linear-gradient(135deg, #7c8cff 0%, #8b5fbf 100%);
+                border-color: rgba(255, 255, 255, 0.4);
+            }
+            
+            .view-battlefield-button:active {
+                transform: translateY(0);
+            }
+            
+            .view-button-icon {
+                font-size: 16px;
+                transition: transform 0.3s ease;
+            }
+            
+            .view-battlefield-button:hover .view-button-icon {
+                transform: scale(1.1);
+            }
+            
+            .view-button-text {
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                transition: all 0.3s ease;
+            }
+            
+            /* Battlefield mode specific button styling */
+            .card-reward-overlay.battlefield-mode .view-battlefield-button {
+                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+            }
+            
+            .card-reward-overlay.battlefield-mode .view-battlefield-button:hover {
+                background: linear-gradient(135deg, #32cc52 0%, #26d9a8 100%);
+                box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
+            }
+            
             .special-reward-indicator {
                 position: absolute;
                 top: 15px;
@@ -1720,6 +2194,12 @@ export class CardRewardManager {
                 .total-gold-amount {
                     font-size: 28px;
                 }
+                
+                .view-battlefield-button {
+                    padding: 10px 16px;
+                    font-size: 13px;
+                    min-width: 140px;
+                }
             }
             
             @media (max-width: 1400px) {
@@ -1750,6 +2230,12 @@ export class CardRewardManager {
                 
                 .total-gold-amount {
                     font-size: 26px;
+                }
+                
+                .view-battlefield-button {
+                    padding: 8px 14px;
+                    font-size: 12px;
+                    min-width: 130px;
                 }
             }
             
@@ -1789,6 +2275,20 @@ export class CardRewardManager {
                 
                 .total-gold-amount {
                     font-size: 30px;
+                }
+                
+                .view-battlefield-button-container {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 10001;
+                }
+                
+                .view-battlefield-button {
+                    padding: 8px 14px;
+                    font-size: 12px;
+                    min-width: 130px;
                 }
             }
             
@@ -1832,6 +2332,16 @@ export class CardRewardManager {
                 
                 .total-gold-breakdown {
                     font-size: 11px;
+                }
+                
+                .view-battlefield-button {
+                    padding: 10px 16px;
+                    font-size: 13px;
+                    min-width: 150px;
+                }
+                
+                .view-button-text {
+                    font-size: 12px;
                 }
             }
         `;
@@ -2030,50 +2540,101 @@ export class CardRewardManager {
         return rewardHeroes;
     }
 
+    // NEW: Updated generateRewardCards method with duplicate support and new logic
     generateRewardCards(count = 3) {
         const allCards = getAllAbilityCards();
         
-        // Get current deck contents to filter out duplicates
+        // Get current deck contents
         const currentDeck = this.deckManager ? this.deckManager.getDeck() : [];
-        const currentDeckCardNames = new Set(currentDeck.map(card => 
+        const currentDeckCardNames = currentDeck.map(card => 
             typeof card === 'string' ? card : card.name
-        ));
+        );
         
-        console.log('Current deck cards:', Array.from(currentDeckCardNames));
+        console.log('Current deck cards:', currentDeckCardNames);
         
-        // Filter out cards that are already in the deck
-        const availableCards = allCards.filter(card => !currentDeckCardNames.has(card.name));
+        // Separate cards into categories
+        const cardsInDeck = allCards.filter(card => currentDeckCardNames.includes(card.name));
+        const cardsNotInDeck = allCards.filter(card => !currentDeckCardNames.includes(card.name));
         
-        console.log(`Filtered cards: ${allCards.length} total -> ${availableCards.length} available (removed ${allCards.length - availableCards.length} duplicates)`);
+        const abilitiesInDeck = cardsInDeck.filter(card => card.cardType === 'Ability');
+        const nonAbilitiesInDeck = cardsInDeck.filter(card => card.cardType !== 'Ability');
+        const abilitiesNotInDeck = cardsNotInDeck.filter(card => card.cardType === 'Ability');
+        const nonAbilitiesNotInDeck = cardsNotInDeck.filter(card => card.cardType !== 'Ability');
         
-        if (availableCards.length === 0) {
-            console.warn('No available cards for rewards - all cards already in deck!');
-            return this.generateFallbackRewards(allCards, count);
-        }
-        
-        if (availableCards.length < count) {
-            console.warn(`Only ${availableCards.length} available cards, but need ${count} rewards`);
-            count = availableCards.length;
-        }
+        console.log(`Cards in deck: ${cardsInDeck.length}, abilities: ${abilitiesInDeck.length}, non-abilities: ${nonAbilitiesInDeck.length}`);
+        console.log(`Cards not in deck: ${cardsNotInDeck.length}, abilities: ${abilitiesNotInDeck.length}, non-abilities: ${nonAbilitiesNotInDeck.length}`);
         
         const rewardCards = [];
-        const usedIndices = new Set();
         
-        while (rewardCards.length < count && usedIndices.size < availableCards.length) {
-            const randomIndex = Math.floor(Math.random() * availableCards.length);
+        for (let i = 0; i < count; i++) {
+            let selectedCard = null;
             
-            if (!usedIndices.has(randomIndex)) {
-                usedIndices.add(randomIndex);
-                rewardCards.push(availableCards[randomIndex]);
+            // Step 1: 2/3 chance for existing card, 1/3 for new card
+            const useExistingCard = Math.random() < (2/3);
+            
+            if (useExistingCard && cardsInDeck.length > 0) {
+                // Step 2: 1/3 chance for Ability if available
+                const useAbility = Math.random() < (1/3);
+                
+                if (useAbility && abilitiesInDeck.length > 0) {
+                    // Pick random ability from deck
+                    const randomIndex = Math.floor(Math.random() * abilitiesInDeck.length);
+                    selectedCard = abilitiesInDeck[randomIndex];
+                    console.log(`Selected existing ability: ${selectedCard.name}`);
+                } else if (nonAbilitiesInDeck.length > 0) {
+                    // Pick random non-ability from deck
+                    const randomIndex = Math.floor(Math.random() * nonAbilitiesInDeck.length);
+                    selectedCard = nonAbilitiesInDeck[randomIndex];
+                    console.log(`Selected existing non-ability: ${selectedCard.name}`);
+                } else if (cardsInDeck.length > 0) {
+                    // Fallback: pick any card from deck
+                    const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
+                    selectedCard = cardsInDeck[randomIndex];
+                    console.log(`Selected existing card (fallback): ${selectedCard.name}`);
+                }
+            }
+            
+            // If we haven't selected a card yet, or if we need a new card
+            if (!selectedCard) {
+                if (cardsNotInDeck.length > 0) {
+                    // Step 2: 1/3 chance for Ability if available
+                    const useAbility = Math.random() < (1/3);
+                    
+                    if (useAbility && abilitiesNotInDeck.length > 0) {
+                        // Pick random ability not in deck
+                        const randomIndex = Math.floor(Math.random() * abilitiesNotInDeck.length);
+                        selectedCard = abilitiesNotInDeck[randomIndex];
+                        console.log(`Selected new ability: ${selectedCard.name}`);
+                    } else if (nonAbilitiesNotInDeck.length > 0) {
+                        // Pick random non-ability not in deck
+                        const randomIndex = Math.floor(Math.random() * nonAbilitiesNotInDeck.length);
+                        selectedCard = nonAbilitiesNotInDeck[randomIndex];
+                        console.log(`Selected new non-ability: ${selectedCard.name}`);
+                    } else {
+                        // Fallback: pick any card not in deck
+                        const randomIndex = Math.floor(Math.random() * cardsNotInDeck.length);
+                        selectedCard = cardsNotInDeck[randomIndex];
+                        console.log(`Selected new card (fallback): ${selectedCard.name}`);
+                    }
+                } else {
+                    // Ultimate fallback: pick any card
+                    const randomIndex = Math.floor(Math.random() * allCards.length);
+                    selectedCard = allCards[randomIndex];
+                    console.log(`Selected any card (ultimate fallback): ${selectedCard.name}`);
+                }
+            }
+            
+            if (selectedCard) {
+                rewardCards.push(selectedCard);
             }
         }
         
-        console.log('Generated filtered card rewards:', rewardCards.map(c => c.name));
+        console.log('Generated reward cards with new logic:', rewardCards.map(c => c.name));
         return rewardCards;
     }
 
     generateFallbackRewards(allCards, count) {
-        console.log('Using fallback reward generation - player may have full collection');
+        console.log('Using fallback reward generation');
         
         const rewardCards = [];
         const usedIndices = new Set();
@@ -2137,13 +2698,10 @@ export class CardRewardManager {
         `;
     }
 
-    // Handle hero selection
+    // Handle hero selection - REMOVED duplicate restriction, allows duplicates
     async handleHeroSelection(heroName) {
-        console.log('Hero selected:', heroName);
-        
         // Prevent multiple selections
         if (this.selectionMade) {
-            console.log('Selection already made, ignoring');
             return;
         }
         
@@ -2164,18 +2722,16 @@ export class CardRewardManager {
                 throw new Error(`No cards found for hero: ${heroName}`);
             }
             
-            // Add all hero cards to deck
+            // Add all hero cards to deck (USING addCardReward to allow duplicates)
             let addedCardsCount = 0;
             heroCards.forEach(cardName => {
-                const success = this.deckManager.addCard(cardName);
+                const success = this.deckManager.addCardReward(cardName);  // CHANGED: Allow duplicates
                 if (success) {
                     addedCardsCount++;
                 }
             });
             
             if (addedCardsCount > 0) {
-                console.log(`Successfully added ${addedCardsCount} cards from ${heroName} to deck`);
-                
                 this.awardCalculatedGold();
                 
                 // Add 1 random hero card to hand
@@ -2183,11 +2739,9 @@ export class CardRewardManager {
                     const randomIndex = Math.floor(Math.random() * heroCards.length);
                     const randomCard = heroCards[randomIndex];
                     this.handManager.addCardToHand(randomCard);
-                    console.log(`Added random hero card ${randomCard} to hand`);
                     
                     // Draw 1 additional card from deck
                     this.handManager.drawCards(1);
-                    console.log('Drew 1 additional card from deck');
                 }
                 
                 // Add the hero to the leftmost free slot in battle formation
@@ -2223,39 +2777,27 @@ export class CardRewardManager {
                             formation[targetSlot] = heroForFormation;
                             this.heroSelection.formationManager.battleFormation[targetSlot] = heroForFormation;
                             
-                            console.log(`✨ Added hero ${heroName} to formation slot ${targetSlot}!`);
-                            
                             // Get hero info from database for abilities initialization
                             const heroInfo = this.getHeroInfoForAbilities(heroName);
                             
                             if (heroInfo && this.heroSelection.heroAbilitiesManager) {
                                 // Initialize hero abilities
                                 this.heroSelection.heroAbilitiesManager.updateHeroPlacement(targetSlot, heroInfo);
-                                console.log(`Initialized ${heroName} with starting abilities in slot ${targetSlot}`);
                             }
                             
                             // Initialize empty spellbook for the new hero
                             if (this.heroSelection.heroSpellbookManager) {
                                 this.heroSelection.heroSpellbookManager.clearHeroSpellbook(targetSlot);
-                                console.log(`Initialized empty spellbook for ${heroName} in slot ${targetSlot}`);
                             }
                             
                             heroAddedToFormation = true;
-                            
-                        } else {
-                            console.warn(`Could not find hero data for ${heroName} in allHeroes array`);
                         }
-                    } else {
-                        console.warn('⚠️ No free slots available in formation for new hero - all slots occupied');
                     }
-                } else {
-                    console.warn('FormationManager not available, hero not added to formation');
                 }
                 
                 // Update the battle formation UI to show the new hero
                 if (heroAddedToFormation && this.heroSelection.updateBattleFormationUI) {
                     this.heroSelection.updateBattleFormationUI();
-                    console.log('Updated battle formation UI to show new hero');
                 }
                 
                 // Store info about the added hero
@@ -2282,6 +2824,9 @@ export class CardRewardManager {
                 // Clear pending rewards from Firebase
                 await this.clearPendingRewards();
                 
+                // NEW: Clear final battle state
+                await this.clearFinalBattleState();
+                
                 // Save game state with new cards and hero
                 if (this.heroSelection) {
                     await this.heroSelection.saveGameState();
@@ -2290,7 +2835,6 @@ export class CardRewardManager {
                 // Reset actions for the new turn after selecting reward
                 if (window.heroSelection && window.heroSelection.actionManager) {
                     window.heroSelection.actionManager.resetActions();
-                    console.log('✨ Actions reset after hero reward selection');
                     
                     // Update action display immediately
                     window.heroSelection.updateActionDisplay();
@@ -2300,7 +2844,6 @@ export class CardRewardManager {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 // IMPORTANT: Set game phase back to Formation before closing
-                console.log('🛡️ Setting game phase back to Formation after hero reward selection');
                 await this.heroSelection.setGamePhase('Formation');
                 
                 // Close reward overlay and return to formation
@@ -2314,7 +2857,6 @@ export class CardRewardManager {
                 // Send formation update to opponent AFTER adding hero
                 if (heroAddedToFormation && this.heroSelection.sendFormationUpdate) {
                     await this.heroSelection.sendFormationUpdate();
-                    console.log('Sent formation update to opponent with new hero');
                 }
                 
                 // Send sync message to opponent
@@ -2334,8 +2876,6 @@ export class CardRewardManager {
             }
             
         } catch (error) {
-            console.error('Error in handleHeroSelection:', error);
-            
             // Re-enable selection on error
             this.selectionMade = false;
             
@@ -2351,25 +2891,10 @@ export class CardRewardManager {
         }
     }
 
-    // Handle card selection
+    // Handle card selection - REMOVED duplicate restriction, allows duplicates
     async handleCardSelection(cardName) {
-        console.log('Card selected:', cardName);
-        
         // Prevent multiple selections
         if (this.selectionMade) {
-            console.log('Selection already made, ignoring');
-            return;
-        }
-        
-        // Double-check that the card isn't already in deck (safety check)
-        const currentDeck = this.deckManager.getDeck();
-        const currentDeckCardNames = currentDeck.map(card => 
-            typeof card === 'string' ? card : card.name
-        );
-        
-        if (currentDeckCardNames.includes(cardName)) {
-            console.warn(`Card ${cardName} is already in deck, cannot add duplicate`);
-            this.showErrorMessage(`You already have ${this.formatCardName(cardName)} in your deck!`);
             return;
         }
         
@@ -2384,21 +2909,16 @@ export class CardRewardManager {
         });
         
         try {
-            // Add the selected card to deck
-            const success = this.deckManager.addCard(cardName);
+            // Add the selected card to deck (USING addCardReward to allow duplicates)
+            const success = this.deckManager.addCardReward(cardName);  // CHANGED: Allow duplicates
             
             if (success) {
-                console.log(`Successfully added ${cardName} to deck`);
-            
                 this.awardCalculatedGold();
                 
                 // Add the reward card to hand + draw 1 additional card
                 if (this.handManager) {
                     this.handManager.addCardToHand(cardName);
-                    console.log(`Added reward card ${cardName} to hand`);
-                    
                     this.handManager.drawCards(1);
-                    console.log('Drew 1 additional card from deck');
                 }
                 
                 // Store the last added card for UI highlighting
@@ -2425,6 +2945,9 @@ export class CardRewardManager {
                 // Clear pending rewards from Firebase
                 await this.clearPendingRewards();
                 
+                // NEW: Clear final battle state
+                await this.clearFinalBattleState();
+                
                 // Save game state with new card
                 if (this.heroSelection) {
                     await this.heroSelection.saveGameState();
@@ -2433,7 +2956,6 @@ export class CardRewardManager {
                 // Reset actions for the new turn after selecting reward
                 if (window.heroSelection && window.heroSelection.actionManager) {
                     window.heroSelection.actionManager.resetActions();
-                    console.log('✨ Actions reset after card reward selection');
                     
                     // Update action display immediately
                     window.heroSelection.updateActionDisplay();
@@ -2443,7 +2965,6 @@ export class CardRewardManager {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 // IMPORTANT: Set game phase back to Formation before closing
-                console.log('🛡️ Setting game phase back to Formation after reward selection');
                 await this.heroSelection.setGamePhase('Formation');
                 
                 // Close reward overlay and return to formation
@@ -2463,8 +2984,6 @@ export class CardRewardManager {
                 }
                 
             } else {
-                console.error('Failed to add card to deck');
-                
                 // Re-enable selection on failure
                 this.selectionMade = false;
                 
@@ -2482,8 +3001,6 @@ export class CardRewardManager {
             }
             
         } catch (error) {
-            console.error('Error in handleCardSelection:', error);
-            
             // Re-enable selection on error
             this.selectionMade = false;
             
@@ -2570,6 +3087,25 @@ export class CardRewardManager {
         // Clear any active tooltips
         this.cardPreviewManager.hideCardTooltip();
         
+        // Clean up global toggle function
+        if (typeof window !== 'undefined') {
+            window.toggleRewardView = null;
+        }
+        
+        // Clear view mode from localStorage
+        try {
+            localStorage.removeItem('rewardViewMode');
+        } catch (error) {
+            console.warn('Could not clear view mode from localStorage:', error);
+        }
+        
+        // Hide battle arena if it was shown during battlefield view
+        const battleArena = document.getElementById('battleArena');
+        if (battleArena) {
+            battleArena.style.display = 'none';
+            console.log('🎁 Hidden battle arena when closing reward overlay');
+        }
+        
         // Re-enable body scrolling
         document.body.classList.remove('reward-overlay-active');
         
@@ -2581,8 +3117,9 @@ export class CardRewardManager {
             }, 300);
         }
         
-        // Reset selection state
+        // Reset selection state and view mode
         this.selectionMade = false;
+        this.viewMode = 'rewards';
     }
 
     // Save pending rewards to Firebase (updated to handle hero rewards and gold breakdown)
@@ -2608,6 +3145,8 @@ export class CardRewardManager {
                 // Add redraw state
                 redrawCost: this.redrawCost,
                 totalRedraws: this.totalRedraws,
+                // Add view mode state
+                viewMode: this.viewMode,
                 timestamp: Date.now()
             };
             
@@ -2641,6 +3180,16 @@ export class CardRewardManager {
             if (pendingRewards && pendingRewards.rewards && pendingRewards.rewards.length > 0) {
                 console.log('Found pending rewards:', pendingRewards);
                 
+                // ✅ CRITICAL FIX: Initialize battle screen BEFORE restoring rewards
+                console.log('🔥 Ensuring battle screen is initialized for reward restoration...');
+                const battleScreenInitialized = await this.ensureBattleScreenInitialized(heroSelection);
+                if (!battleScreenInitialized) {
+                    console.warn('⚠️ Failed to initialize battle screen for reward restoration');
+                    // Still show rewards but warn user that battlefield view may not work
+                } else {
+                    console.log('✅ Battle screen successfully initialized for reward restoration');
+                }
+                
                 // Restore gold breakdown if available
                 if (pendingRewards.goldBreakdown) {
                     this.lastGoldBreakdown = pendingRewards.goldBreakdown;
@@ -2654,6 +3203,15 @@ export class CardRewardManager {
                     console.log('Restored redraw state:', { redrawCost: this.redrawCost, totalRedraws: this.totalRedraws });
                 }
                 
+                // Restore view mode state
+                if (pendingRewards.viewMode) {
+                    this.viewMode = pendingRewards.viewMode;
+                    console.log('Restored view mode:', this.viewMode);
+                } else {
+                    // Fallback to localStorage
+                    this.restoreViewModeState();
+                }
+                
                 // Check if these are hero rewards or card rewards
                 if (pendingRewards.isHeroReward) {
                     this.displayHeroRewardUI(pendingRewards.rewards, pendingRewards.turn || 1);
@@ -2662,6 +3220,14 @@ export class CardRewardManager {
                     const rewards = pendingRewards.rewards || pendingRewards.cards;
                     this.displayRewardUI(rewards, pendingRewards.turn || 1);
                 }
+                
+                // Restore view mode after UI is displayed
+                if (this.viewMode === 'battlefield' && battleScreenInitialized) {
+                    setTimeout(() => {
+                        this.applyBattlefieldMode();
+                    }, 100);
+                }
+                
                 return true;
             }
             
@@ -2672,10 +3238,208 @@ export class CardRewardManager {
         }
     }
 
+    // Ensure battle screen is initialized for reward reconnection
+    async ensureBattleScreenInitialized(heroSelection) {
+        console.log('🔥 Ensuring battle screen is initialized for reward reconnection...');
+        
+        try {
+            // Check if we have the required data
+            if (!heroSelection.selectedCharacter || !heroSelection.opponentSelectedCharacter) {
+                console.warn('⚠️ Missing character data for battle screen initialization');
+                return false;
+            }
+            
+            const playerFormation = heroSelection.formationManager.getBattleFormation();
+            const opponentFormation = heroSelection.formationManager.getOpponentBattleFormation();
+            
+            if (!playerFormation || !opponentFormation) {
+                console.warn('⚠️ Missing formation data for battle screen initialization');
+                return false;
+            }
+            
+            // Check if battle screen already exists and is properly initialized
+            const existingBattleArena = document.getElementById('battleArena');
+            if (existingBattleArena && existingBattleArena.innerHTML.trim() !== '') {
+                console.log('✅ Battle arena already exists and has content');
+                existingBattleArena.style.display = 'none'; // Ensure it's hidden initially
+                
+                // Wait a bit to ensure DOM is ready
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Try to load final battle state for existing arena
+                const finalBattleState = await this.loadFinalBattleStateForViewing();
+                if (finalBattleState && heroSelection.battleScreen && heroSelection.battleScreen.battleManager) {
+                    await heroSelection.battleScreen.battleManager.restoreFinalBattleState(finalBattleState);
+                }
+                
+                return true;
+            }
+            
+            console.log('🎮 Initializing battle screen for reward reconnection...');
+            
+            // Initialize battle screen if not already done
+            if (!heroSelection.battleScreen) {
+                const { BattleScreen } = await import('./battleScreen.js');
+                heroSelection.battleScreen = new BattleScreen();
+            }
+            
+            // Try normal initialization first
+            let battleInitialized = heroSelection.initBattleScreen();
+            
+            if (battleInitialized && heroSelection.battleScreen) {
+                console.log('🏗️ Creating battle screen HTML...');
+                heroSelection.battleScreen.createBattleScreen();
+                
+                // Wait for DOM to be ready
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                const battleArena = document.getElementById('battleArena');
+                if (battleArena) {
+                    battleArena.style.display = 'none'; // Hide initially
+                    
+                    // After successful initialization, try to load final battle state
+                    const finalBattleState = await this.loadFinalBattleStateForViewing();
+                    if (finalBattleState && heroSelection.battleScreen.battleManager) {
+                        await heroSelection.battleScreen.battleManager.restoreFinalBattleState(finalBattleState);
+                    }
+                    
+                    console.log('✅ Battle screen initialized successfully for reward reconnection');
+                    return true;
+                } else {
+                    console.error('❌ Battle arena not found after initialization');
+                    battleInitialized = false;
+                }
+            }
+            
+            // Fallback: Manual battle screen setup
+            if (!battleInitialized) {
+                console.log('🔧 Attempting manual battle screen setup...');
+                return await this.manualBattleScreenSetup(heroSelection);
+            }
+            
+            return battleInitialized;
+            
+        } catch (error) {
+            console.error('❌ Error ensuring battle screen initialization:', error);
+            return false;
+        }
+    }
+
+    // Load final battle state for viewing
+    async loadFinalBattleStateForViewing() {
+        if (!this.heroSelection || !this.heroSelection.roomManager || !this.heroSelection.roomManager.getRoomRef()) {
+            return null;
+        }
+        
+        try {
+            const snapshot = await this.heroSelection.roomManager.getRoomRef()
+                .child('gameState')
+                .child('finalBattleState')
+                .once('value');
+            return snapshot.val();
+        } catch (error) {
+            console.error('Error loading final battle state:', error);
+            return null;
+        }
+    }
+
+    // Clear final battle state after reward selection
+    async clearFinalBattleState() {
+        if (!this.heroSelection || !this.heroSelection.roomManager || !this.heroSelection.roomManager.getRoomRef()) {
+            return;
+        }
+        
+        try {
+            await this.heroSelection.roomManager.getRoomRef()
+                .child('gameState')
+                .child('finalBattleState')
+                .remove();
+            console.log('🧹 Cleared final battle state after reward selection');
+        } catch (error) {
+            console.error('Error clearing final battle state:', error);
+        }
+    }
+
+    // Manual battle screen setup as fallback
+    async manualBattleScreenSetup(heroSelection) {
+        try {
+            console.log('🔧 Manual battle screen setup starting...');
+            
+            // Get all required data
+            const playerAbilities = {
+                left: heroSelection.heroAbilitiesManager.getHeroAbilities('left'),
+                center: heroSelection.heroAbilitiesManager.getHeroAbilities('center'),
+                right: heroSelection.heroAbilitiesManager.getHeroAbilities('right')
+            };
+            
+            const playerSpellbooks = {
+                left: heroSelection.heroSpellbookManager.getHeroSpellbook('left'),
+                center: heroSelection.heroSpellbookManager.getHeroSpellbook('center'),
+                right: heroSelection.heroSpellbookManager.getHeroSpellbook('right')
+            };
+            
+            const playerCreatures = {
+                left: heroSelection.heroCreatureManager.getHeroCreatures('left'),
+                center: heroSelection.heroCreatureManager.getHeroCreatures('center'),
+                right: heroSelection.heroCreatureManager.getHeroCreatures('right')
+            };
+            
+            // Initialize battle screen manually
+            heroSelection.battleScreen.init(
+                heroSelection.isHost,
+                heroSelection.formationManager.getBattleFormation(),
+                heroSelection.formationManager.getOpponentBattleFormation(),
+                heroSelection.gameDataSender,
+                heroSelection.roomManager,
+                heroSelection.lifeManager,
+                heroSelection.goldManager,
+                heroSelection.turnTracker,
+                heroSelection.roomManager,
+                playerAbilities,
+                heroSelection.opponentAbilitiesData,
+                playerSpellbooks,
+                heroSelection.opponentSpellbooksData,
+                heroSelection.actionManager,
+                playerCreatures,
+                heroSelection.opponentCreaturesData
+            );
+            
+            // Create battle screen HTML manually
+            heroSelection.battleScreen.createBattleScreen();
+            
+            // Verify it was created
+            const battleArena = document.getElementById('battleArena');
+            if (battleArena) {
+                battleArena.style.display = 'none'; // Hide initially
+                console.log('✅ Manual battle screen setup successful');
+                return true;
+            } else {
+                console.error('❌ Manual battle screen setup failed - no arena created');
+                return false;
+            }
+            
+        } catch (error) {
+            console.error('❌ Error in manual battle screen setup:', error);
+            return false;
+        }
+    }
+
     // Clear any active card rewards
     clearAnyActiveCardRewards() {
         // Re-enable body scrolling
         document.body.classList.remove('reward-overlay-active');
+        
+        // Clean up global toggle function
+        if (typeof window !== 'undefined') {
+            window.toggleRewardView = null;
+        }
+        
+        // Clear view mode from localStorage
+        try {
+            localStorage.removeItem('rewardViewMode');
+        } catch (error) {
+            console.warn('Could not clear view mode from localStorage:', error);
+        }
         
         const existingOverlay = document.getElementById('cardRewardOverlay');
         if (existingOverlay) {
@@ -2688,6 +3452,7 @@ export class CardRewardManager {
         // Reset state
         this.selectionMade = false;
         this.lastAddedRewardCard = null;
+        this.viewMode = 'rewards';
     }
 
     // Get last added reward card (for UI highlighting)

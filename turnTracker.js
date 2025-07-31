@@ -6,8 +6,6 @@ export class TurnTracker {
         this.onTurnChangeCallback = null;
         this.roomManager = null;
         this.gameDataSender = null;
-        
-        console.log('TurnTracker initialized - Starting at Turn 1');
     }
 
     // Initialize with dependencies
@@ -15,8 +13,6 @@ export class TurnTracker {
         this.roomManager = roomManager;
         this.gameDataSender = gameDataSender;
         this.onTurnChangeCallback = onTurnChangeCallback;
-        
-        console.log('TurnTracker initialized with dependencies');
     }
 
     // Get current turn
@@ -30,7 +26,6 @@ export class TurnTracker {
         this.currentTurn = Math.max(1, turn);
         
         if (previousTurn !== this.currentTurn) {
-            console.log(`Turn changed: ${previousTurn} → ${this.currentTurn}`);
             this.notifyTurnChange(previousTurn, this.currentTurn);
         }
     }
@@ -39,9 +34,7 @@ export class TurnTracker {
     async incrementTurn() {
         const previousTurn = this.currentTurn;
         this.currentTurn++;
-        
-        console.log(`Turn incremented: ${previousTurn} → ${this.currentTurn}`);
-        
+                
         // Save to Firebase
         await this.saveTurnState();
         
@@ -61,14 +54,12 @@ export class TurnTracker {
                 currentTurn: this.currentTurn,
                 timestamp: Date.now()
             });
-            console.log(`Synced turn ${this.currentTurn} with opponent`);
         }
     }
 
     // Receive turn sync from opponent
     receiveTurnSync(data) {
         if (data.currentTurn && data.currentTurn !== this.currentTurn) {
-            console.log(`Received turn sync: ${data.currentTurn}`);
             this.setCurrentTurn(data.currentTurn);
         }
     }
@@ -76,7 +67,6 @@ export class TurnTracker {
     // Save turn state to Firebase
     async saveTurnState() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
-            console.log('No room reference available for saving turn state');
             return false;
         }
 
@@ -86,8 +76,6 @@ export class TurnTracker {
                 currentTurn: this.currentTurn,
                 turnLastUpdated: Date.now()
             });
-            
-            console.log(`Turn state saved to Firebase: ${this.currentTurn}`);
             return true;
         } catch (error) {
             console.error('Error saving turn state:', error);
@@ -98,7 +86,6 @@ export class TurnTracker {
     // Restore turn state from Firebase
     async restoreTurnState() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
-            console.log('No room reference available for restoring turn state');
             return false;
         }
 
@@ -109,10 +96,8 @@ export class TurnTracker {
             
             if (savedTurn !== null && savedTurn !== undefined) {
                 this.setCurrentTurn(savedTurn);
-                console.log(`Turn state restored from Firebase: ${this.currentTurn}`);
                 return true;
             } else {
-                console.log('No saved turn state found, starting at Turn 1');
                 return false;
             }
         } catch (error) {
@@ -126,7 +111,6 @@ export class TurnTracker {
         const previousTurn = this.currentTurn;
         this.currentTurn = 1;
         
-        console.log(`Turn tracker reset: ${previousTurn} → ${this.currentTurn}`);
         this.notifyTurnChange(previousTurn, this.currentTurn);
     }
 
@@ -153,12 +137,10 @@ export class TurnTracker {
     // Import turn data
     importTurnData(turnData) {
         if (!turnData || turnData.currentTurn === undefined) {
-            console.log('No turn data to import');
             return false;
         }
 
         this.setCurrentTurn(turnData.currentTurn);
-        console.log(`Turn data imported: ${this.currentTurn}`);
         return true;
     }
 
@@ -182,14 +164,6 @@ export class TurnTracker {
                 </div>
             </div>
         `;
-    }
-
-    // Log turn state (for debugging)
-    logTurnState() {
-        console.log('=== TURN STATE ===');
-        console.log('Current Turn:', this.currentTurn);
-        console.log('Turn Stats:', this.getTurnStats());
-        console.log('==================');
     }
 }
 

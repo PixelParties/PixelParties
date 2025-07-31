@@ -16,8 +16,6 @@ export class HeroSpellbookManager {
         this.handManager = null;
         this.formationManager = null;
         this.onStateChange = null; // Callback for when state changes
-        
-        console.log('HeroSpellbookManager initialized');
     }
 
     // Initialize with references to other managers
@@ -25,7 +23,6 @@ export class HeroSpellbookManager {
         this.handManager = handManager;
         this.formationManager = formationManager;
         this.onStateChange = onStateChange;
-        console.log('HeroSpellbookManager initialized with manager references');
     }
 
     // Check if a card is a spell card
@@ -46,10 +43,6 @@ export class HeroSpellbookManager {
         if (this.formationManager) {
             const formation = this.formationManager.getBattleFormation();
             const hasHero = formation && formation[heroPosition] !== null && formation[heroPosition] !== undefined;
-            
-            if (!hasHero) {
-                console.log(`No hero in formation at position: ${heroPosition}`);
-            }
             
             return hasHero;
         }
@@ -73,7 +66,6 @@ export class HeroSpellbookManager {
     // Add a spell to a hero's spellbook
     addSpellToHero(heroPosition, spellCardName) {
         if (!this.hasHeroAtPosition(heroPosition)) {
-            console.log(`Cannot add spell - no hero at position: ${heroPosition}`);
             return false;
         }
 
@@ -95,9 +87,6 @@ export class HeroSpellbookManager {
             ...cardInfo,
             addedAt: Date.now() // Track when the spell was added
         });
-
-        console.log(`Added spell ${spellCardName} to ${heroPosition} hero's spellbook`);
-        console.log(`${heroPosition} hero now has ${this.heroSpellbooks[heroPosition].length} spells`);
         
         // Notify state change
         if (this.onStateChange) {
@@ -122,7 +111,6 @@ export class HeroSpellbookManager {
 
         // Remove and return the spell
         const removedSpell = spellbook.splice(spellIndex, 1)[0];
-        console.log(`Removed spell ${removedSpell.name} from ${heroPosition} hero's spellbook`);
         
         // Notify state change
         if (this.onStateChange) {
@@ -152,7 +140,6 @@ export class HeroSpellbookManager {
         }
 
         this.heroSpellbooks[heroPosition] = [];
-        console.log(`Cleared spellbook for ${heroPosition} hero`);
     }
 
     // Move spellbook when heroes swap positions
@@ -167,8 +154,6 @@ export class HeroSpellbookManager {
         const temp = this.heroSpellbooks[fromPosition];
         this.heroSpellbooks[fromPosition] = this.heroSpellbooks[toPosition];
         this.heroSpellbooks[toPosition] = temp;
-        
-        console.log(`Swapped spellbooks between ${fromPosition} and ${toPosition}`);
     }
 
     // Update hero placement (called when formation changes)
@@ -222,7 +207,6 @@ export class HeroSpellbookManager {
     // Import state for loading
     importSpellbooksState(state) {
         if (!state || !state.heroSpellbooks) {
-            console.log('No spellbook state to import');
             return false;
         }
 
@@ -234,11 +218,7 @@ export class HeroSpellbookManager {
             } else {
                 this.heroSpellbooks[position] = [];
             }
-        }
-
-        console.log('Imported hero spellbooks state');
-        console.log('Total spells across all heroes:', this.getTotalSpellCount());
-        
+        }        
         return true;
     }
 
@@ -253,22 +233,15 @@ export class HeroSpellbookManager {
         this.handManager = null;
         this.formationManager = null;
         this.onStateChange = null;
-        
-        console.log('HeroSpellbookManager reset');
     }
 
     // Debug method to log current state
     logSpellbookState() {
-        console.log('=== HERO SPELLBOOK STATE ===');
         for (const position in this.heroSpellbooks) {
             const spellbook = this.heroSpellbooks[position];
-            console.log(`${position} hero: ${spellbook.length} spells`);
             spellbook.forEach((spell, index) => {
-                console.log(`  [${index}] ${spell.name} (Level ${spell.level || 0})`);
             });
         }
-        console.log(`Total spells: ${this.getTotalSpellCount()}`);
-        console.log('===========================');
     }
 }
 

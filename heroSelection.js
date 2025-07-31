@@ -15,7 +15,7 @@ import { ActionManager } from './actionManager.js';
 import { HeroCreatureManager } from './creatures.js';
 import { GameStateMachine } from './gameStateMachine.js';
 import { globalSpellManager } from './globalSpellManager.js';
-
+import { potionHandler } from './potionHandler.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 
@@ -59,6 +59,7 @@ export class HeroSelection {
         this.heroSpellbookManager = new HeroSpellbookManager();
         this.actionManager = new ActionManager();
         this.heroCreatureManager = new HeroCreatureManager();
+        this.potionHandler = potionHandler; 
 
         // Initialize hero abilities manager with references
         this.heroAbilitiesManager.init(
@@ -68,6 +69,10 @@ export class HeroSelection {
                 // Callback for when ability state changes
                 this.updateBattleFormationUI();
                 this.updateHandDisplay();
+                
+                // NEW: Update potion bonuses when abilities change
+                this.potionHandler.updateAlchemyBonuses(this);
+                
                 await this.saveGameState();
             }
         );
@@ -100,7 +105,8 @@ export class HeroSelection {
         // Expose handManager to window for HTML event handlers
         if (typeof window !== 'undefined') {
             window.handManager = this.handManager;
-            // NEW: Make leadership ability available globally
+            window.potionHandler = this.potionHandler; // Expose potion handler
+            // Make leadership ability available globally
             window.leadershipAbility = leadershipAbility;
         }
         
@@ -262,10 +268,8 @@ export class HeroSelection {
             }
             
             // Check if we're waiting and opponent just became ready
-            const waitingOverlay = document.getElementById('battleFormationWaitingOverlay');
-            if (waitingOverlay && waitingOverlay.style.display === 'flex') {
-                if (hostReady && guestReady && !battleStarted && 
-                    this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
+            if (this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
+                if (hostReady && guestReady && !battleStarted) {
                     
                     // Transition to battle starting
                     this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
@@ -280,13 +284,13 @@ export class HeroSelection {
                         });
                     }
                 }
-                
-                // Only transition if we're in the correct state and battle has started
-                if (battleStarted && 
-                    this.stateMachine.isInState(this.stateMachine.states.TRANSITIONING_TO_BATTLE)) {
-                    // Transition to battle
-                    this.transitionToBattleScreen();
-                }
+            }
+
+            // Check if we should transition to battle screen
+            if (battleStarted && 
+                this.stateMachine.isInState(this.stateMachine.states.TRANSITIONING_TO_BATTLE)) {
+                // Transition to battle
+                this.transitionToBattleScreen();
             }
             
             // Handle case where we load into a game where opponent is already waiting
@@ -323,6 +327,7 @@ export class HeroSelection {
                 guestBattleReady: false,
                 battleStarted: false,
                 battleStartTime: null,
+                battleEndedAt: null,      
                 emergencyCleared: Date.now(),
                 lastBattleCleared: Date.now()
             });
@@ -363,8 +368,11 @@ export class HeroSelection {
     onTurnChange(turnChangeData) {
         // Reset actions at the start of each turn (team building phase)
         this.actionManager.resetActions();
+
+        // Reset potions for the new turn
+        this.potionHandler.resetPotionsForTurn();
         
-        // NEW: Reset Leadership usage and ability attachment tracking for new turn
+        // Reset Leadership usage and ability attachment tracking for new turn
         if (this.heroAbilitiesManager) {
             this.heroAbilitiesManager.resetTurnBasedTracking();
             console.log('✨ Leadership usage and ability tracking reset for new turn');
@@ -615,8 +623,6 @@ export class HeroSelection {
                 guestCharacters: this.isHost ? this.opponentCharacters : this.playerCharacters,
                 // Use TurnTracker for turn data
                 ...this.turnTracker.exportTurnData(),
-                // REMOVED: ...this.globalSpellManager.exportGlobalSpellState(), 
-                // Guard Change state is now saved per player below
                 lastUpdated: Date.now()
             };
 
@@ -639,12 +645,8 @@ export class HeroSelection {
                     gameState.hostGoldData = sanitizeForFirebase(this.goldManager.exportGoldData());
                 }
                 
-                // Save abilities with comprehensive verification
+                // Save abilities
                 const abilitiesState = this.heroAbilitiesManager.exportAbilitiesState();
-                
-                // Verify Fighting abilities before saving
-                this.verifyAbilitiesBeforeSave('HOST', abilitiesState);
-                
                 gameState.hostAbilitiesState = sanitizeForFirebase(abilitiesState);
                 
                 // Save spellbooks
@@ -655,7 +657,7 @@ export class HeroSelection {
                 const creaturesState = this.heroCreatureManager.exportCreaturesState();
                 gameState.hostCreaturesState = sanitizeForFirebase(creaturesState);
 
-                // NEW: Save Guard Change state for HOST only
+                // Save Guard Change state for HOST only
                 const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
                 gameState.hostGlobalSpellState = sanitizeForFirebase(globalSpellState);
 
@@ -684,6 +686,11 @@ export class HeroSelection {
                     gameState.hostMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
 
+                // Save potion state for host
+                if (this.potionHandler) {
+                    gameState.hostPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
+                }
+
             } else if (!this.isHost && this.selectedCharacter) {
                 gameState.guestSelected = this.selectedCharacter;
                 gameState.guestBattleFormation = sanitizeForFirebase(this.formationManager.getBattleFormation());
@@ -702,12 +709,8 @@ export class HeroSelection {
                     gameState.guestGoldData = sanitizeForFirebase(this.goldManager.exportGoldData());
                 }
                 
-                // Save abilities with comprehensive verification
+                // Save abilities
                 const abilitiesState = this.heroAbilitiesManager.exportAbilitiesState();
-                
-                // Verify Fighting abilities before saving
-                this.verifyAbilitiesBeforeSave('GUEST', abilitiesState);
-                
                 gameState.guestAbilitiesState = sanitizeForFirebase(abilitiesState);
                 
                 // Save spellbooks
@@ -718,7 +721,7 @@ export class HeroSelection {
                 const creaturesState = this.heroCreatureManager.exportCreaturesState();
                 gameState.guestCreaturesState = sanitizeForFirebase(creaturesState);
 
-                // NEW: Save Guard Change state for GUEST only
+                // Save Guard Change state for GUEST only
                 const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
                 gameState.guestGlobalSpellState = sanitizeForFirebase(globalSpellState);
 
@@ -746,6 +749,11 @@ export class HeroSelection {
                 if (window.magneticGloveArtifact) {
                     gameState.guestMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
+
+                // Save potion state for guest
+                if (this.potionHandler) {
+                    gameState.guestPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
+                }
             }
 
             // Save opponent's selection regardless of whether we have selected
@@ -759,10 +767,8 @@ export class HeroSelection {
             const sanitizedGameState = sanitizeForFirebase(gameState);
             
             await roomRef.child('gameState').update(sanitizedGameState);
-            console.log('Game state saved successfully');
             return true;
         } catch (error) {
-            console.error('Error saving game state:', error);
             return false;
         }
     }
@@ -802,7 +808,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -826,6 +832,20 @@ export class HeroSelection {
         // Restore gold data
         if (goldData && this.goldManager) {
             const goldRestored = this.goldManager.importGoldData(goldData);
+        }
+
+        // ✅ FIXED: Restore potion data with proper 0-value handling
+        if (potionData && this.potionHandler) {
+            const potionRestored = this.potionHandler.importPotionState(potionData, false);
+            if (potionRestored) {
+                console.log('✅ Potion state restored successfully');
+                // Don't call updateAlchemyBonuses here - it will be called by reconnectionManager if needed
+            }
+        } else {
+            // Initialize potion state and update alchemy bonuses
+            this.potionHandler.reset();
+            this.potionHandler.updateAlchemyBonuses(this);
+            console.log('📝 No potion data found - initialized with current Alchemy bonuses');
         }
         
         // Restore player-specific global spell state (including Guard Change mode)
@@ -1011,6 +1031,10 @@ export class HeroSelection {
         if (heroInfo) {
             // Initialize hero with starting abilities in center position
             this.heroAbilitiesManager.updateHeroPlacement('center', heroInfo);
+            
+            // ✅ FIX: Immediately update potion bonuses after hero placement
+            this.potionHandler.updateAlchemyBonuses(this);
+            console.log('🧪 Updated potion bonuses after character selection');
         }
 
         // Initialize life manager with turn tracker for team building phase
@@ -1068,36 +1092,6 @@ export class HeroSelection {
                 right: this.heroAbilitiesManager.getHeroAbilities('right')
             };
             
-            // Count and verify abilities being sent
-            let totalAbilitiesSent = 0;
-            let totalFightingSent = 0;
-            ['left', 'center', 'right'].forEach(position => {
-                const abilities = abilitiesData[position];
-                if (abilities) {
-                    let positionAbilities = 0;
-                    let positionFighting = 0;
-                    
-                    ['zone1', 'zone2', 'zone3'].forEach(zone => {
-                        if (abilities[zone] && Array.isArray(abilities[zone])) {
-                            positionAbilities += abilities[zone].length;
-                            const fightingCount = abilities[zone].filter(a => a && a.name === 'Fighting').length;
-                            positionFighting += fightingCount;
-                            
-                            if (abilities[zone].length > 0) {
-                                abilities[zone].forEach((ability, idx) => {
-                                    // Count abilities
-                                });
-                            }
-                        }
-                    });
-                    
-                    if (positionAbilities > 0) {
-                        totalAbilitiesSent += positionAbilities;
-                        totalFightingSent += positionFighting;
-                    }
-                }
-            });
-            
             // Gather spellbooks data
             const spellbooksData = {
                 left: this.heroSpellbookManager.getHeroSpellbook('left'),
@@ -1112,72 +1106,24 @@ export class HeroSelection {
                 right: this.heroCreatureManager.getHeroCreatures('right')
             };
             
-            // Count creatures being sent
-            let totalCreaturesSent = 0;
-            ['left', 'center', 'right'].forEach(position => {
-                const creatures = creaturesData[position];
-                if (creatures && Array.isArray(creatures)) {
-                    totalCreaturesSent += creatures.length;
-                    if (creatures.length > 0) {
-                        console.log(`Sending ${creatures.length} creatures for ${position} hero:`, 
-                            creatures.map(c => c.name).join(', '));
-                    }
-                }
-            });
-            
-            console.log(`Sending formation update with ${totalAbilitiesSent} abilities (${totalFightingSent} Fighting), ${totalCreaturesSent} creatures`);
-            
             // Send all data
             this.gameDataSender('formation_update', {
                 playerRole: this.isHost ? 'host' : 'guest',
                 battleFormation: this.formationManager.getBattleFormation(),
                 abilities: abilitiesData,
                 spellbooks: spellbooksData,
-                creatures: creaturesData // Add creatures to the message
+                creatures: creaturesData
             });
         }
     }
 
     // Receive formation update from opponent with abilities and comprehensive debugging
     receiveFormationUpdate(data) {
-        console.log('Received formation update from opponent');
-        
         // Update opponent formation
         this.formationManager.updateOpponentFormation(data);
         
         // Store opponent abilities if included
         if (data.abilities) {
-            let totalOpponentAbilities = 0;
-            let totalOpponentFighting = 0;
-            ['left', 'center', 'right'].forEach(position => {
-                const abilities = data.abilities[position];
-                if (abilities) {
-                    let positionAbilities = 0;
-                    let positionFighting = 0;
-                    
-                    ['zone1', 'zone2', 'zone3'].forEach(zone => {
-                        if (abilities[zone] && Array.isArray(abilities[zone])) {
-                            positionAbilities += abilities[zone].length;
-                            const fightingCount = abilities[zone].filter(a => a && a.name === 'Fighting').length;
-                            positionFighting += fightingCount;
-                            
-                            if (abilities[zone].length > 0) {
-                                abilities[zone].forEach((ability, idx) => {
-                                    // Count abilities
-                                });
-                            }
-                        }
-                    });
-                    
-                    if (positionAbilities > 0) {
-                        totalOpponentAbilities += positionAbilities;
-                        totalOpponentFighting += positionFighting;
-                    }
-                }
-            });
-            
-            console.log(`Received ${totalOpponentAbilities} opponent abilities (${totalOpponentFighting} Fighting)`);
-            
             // Store for later use when battle starts
             this.opponentAbilitiesData = data.abilities;
             
@@ -1189,36 +1135,12 @@ export class HeroSelection {
         
         // Store opponent spellbooks if included
         if (data.spellbooks) {
-            console.log('Received opponent spellbooks data');
-            
             // Store for later use when battle starts
             this.opponentSpellbooksData = data.spellbooks;
-            
-            // Log spellbook counts
-            ['left', 'center', 'right'].forEach(position => {
-                const spellbook = data.spellbooks[position];
-                if (spellbook && Array.isArray(spellbook)) {
-                    console.log(`Opponent ${position} hero has ${spellbook.length} spells`);
-                }
-            });
         }
         
         // Store opponent creatures if included
         if (data.creatures) {
-            let totalOpponentCreatures = 0;
-            ['left', 'center', 'right'].forEach(position => {
-                const creatures = data.creatures[position];
-                if (creatures && Array.isArray(creatures)) {
-                    totalOpponentCreatures += creatures.length;
-                    if (creatures.length > 0) {
-                        console.log(`Opponent ${position} hero has ${creatures.length} creatures:`,
-                            creatures.map(c => c.name).join(', '));
-                    }
-                }
-            });
-            
-            console.log(`Received ${totalOpponentCreatures} opponent creatures total`);
-            
             // Store for later use when battle starts
             this.opponentCreaturesData = data.creatures;
         }
@@ -1554,31 +1476,28 @@ export class HeroSelection {
         const roomRef = this.roomManager.getRoomRef();
         
         try {
-            // Method 1: Direct update
-            await roomRef.child('gameState').update({
-                hostBattleReady: false,
-                guestBattleReady: false,
+            // Check current battle ready states before clearing
+            const currentState = await roomRef.child('gameState').once('value');
+            const gameState = currentState.val();
+            
+            // Only clear our own ready state, not the opponent's
+            const updates = {
                 battleStarted: false,
                 battleStartTime: null,
                 aggressiveCleared: Date.now(),
                 lastBattleCleared: Date.now()
-            });
+            };
             
-            // Method 2: Individual field clearing (in parallel, not sequential)
-            await Promise.all([
-                roomRef.child('gameState/hostBattleReady').set(false),
-                roomRef.child('gameState/guestBattleReady').set(false),
-                roomRef.child('gameState/battleStarted').set(false),
-                roomRef.child('gameState/battleStartTime').remove()
-            ]);
-            
-            // Method 3: Quick verification (removed the 500ms delay!)
-            const verification = await roomRef.child('gameState').once('value');
-            const verifyState = verification.val();
-            
-            if (verifyState && verifyState.battleStarted) {
-                await roomRef.child('gameState/battleStarted').set(false);
+            // Only clear our own ready state
+            if (this.isHost) {
+                updates.hostBattleReady = false;
+                // Don't touch guestBattleReady
+            } else {
+                updates.guestBattleReady = false;
+                // Don't touch hostBattleReady
             }
+            
+            await roomRef.child('gameState').update(updates);
             
         } catch (error) {
             // Error occurred but don't log it
@@ -1677,10 +1596,17 @@ export class HeroSelection {
                 
                 // Only HOST should mark battle as started
                 if (this.isHost) {
+                    // ❗ CRITICAL: Set ALL battle flags atomically to prevent race conditions
                     await roomRef.child('gameState').update({
                         battleStarted: true,
-                        battleStartTime: Date.now()
+                        battleStartTime: Date.now(),
+                        battleEndedAt: null,        // Clear previous battle end timestamp
+                        battleActive: true,         // Mark battle as active
+                        gamePhase: 'Battle',        // Set phase atomically
+                        gamePhaseUpdated: Date.now(),
+                        battlePaused: false         // Ensure not paused
                     });
+                    console.log('🔥 HOST: Battle state set atomically - battleStarted, gamePhase=Battle, battleActive=true');
                     
                     // Send battle start signal via P2P
                     if (this.gameDataSender) {
@@ -1763,7 +1689,7 @@ export class HeroSelection {
     }
     
     // Transition to battle screen (called when both are ready)
-    transitionToBattleScreen() {
+    async transitionToBattleScreen() {
         console.log('🔥 Transitioning to battle screen');
 
         this.globalSpellManager.clearGuardChangeMode(this);
@@ -1771,13 +1697,12 @@ export class HeroSelection {
         // Check if we're in a valid state to transition to battle
         const validStates = [
             this.stateMachine.states.TRANSITIONING_TO_BATTLE,
-            this.stateMachine.states.WAITING_FOR_BATTLE  // Allow from waiting state too
+            this.stateMachine.states.WAITING_FOR_BATTLE
         ];
         
         if (!this.stateMachine.isInAnyState(validStates)) {
             console.warn('Not in correct state to transition to battle. Current state:', this.stateMachine.getState());
             
-            // Try to fix the state if we know battle should be starting
             if (this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
                 console.log('Fixing state: WAITING_FOR_BATTLE -> TRANSITIONING_TO_BATTLE');
                 this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
@@ -1788,8 +1713,9 @@ export class HeroSelection {
             }
         }
         
-        // Set game phase to Battle
-        this.setGamePhase('Battle');
+        // ✅ Game phase is now set atomically by HOST in checkAndHandleBattleTransition()
+        // This eliminates the race condition that caused reconnection issues
+        console.log('✅ Battle state already set atomically - proceeding with battle');
         
         // Hide any waiting overlay
         this.hideBattleWaitingOverlay();
@@ -1834,9 +1760,8 @@ export class HeroSelection {
     }
 
     // Battle screen management with abilities, spellbooks, and creatures
-    initBattleScreen() {
+    initBattleScreen() {        
         if (!this.selectedCharacter || !this.opponentSelectedCharacter) {
-            console.error('Cannot initialize battle screen - missing character selections');
             return false;
         }
         
@@ -1848,6 +1773,7 @@ export class HeroSelection {
         };
         
         // Verify player abilities
+        let totalPlayerAbilities = 0;
         ['left', 'center', 'right'].forEach(position => {
             const abilities = playerAbilities[position];
             if (abilities) {
@@ -1863,10 +1789,12 @@ export class HeroSelection {
                     }
                 });
                 
-                console.log(`Player ${position} hero: ${totalAbilities} abilities (${fightingCount} Fighting)`);
+                if (totalAbilities > 0) {
+                    totalPlayerAbilities += totalAbilities;
+                }
             }
         });
-        
+                
         // Get opponent abilities (from stored data if available)
         let opponentAbilities = null;
         if (this.opponentAbilitiesData) {
@@ -1874,16 +1802,21 @@ export class HeroSelection {
             opponentAbilities = this.alignOpponentAbilities(this.opponentAbilitiesData);
             
             if (opponentAbilities) {
+                let totalOpponentAbilities = 0;
                 ['left', 'center', 'right'].forEach(position => {
                     const abilities = opponentAbilities[position];
                     if (abilities) {
                         let fightingCount = 0;
+                        let totalAbilities = 0;
                         ['zone1', 'zone2', 'zone3'].forEach(zone => {
                             if (abilities[zone] && Array.isArray(abilities[zone])) {
+                                totalAbilities += abilities[zone].length;
                                 fightingCount += abilities[zone].filter(a => a && a.name === 'Fighting').length;
                             }
                         });
-                        console.log(`Opponent ${position} hero has ${fightingCount} Fighting abilities`);
+                        if (totalAbilities > 0) {
+                            totalOpponentAbilities += totalAbilities;
+                        }
                     }
                 });
             }
@@ -1892,7 +1825,7 @@ export class HeroSelection {
         const hasValidPlayerAbilities = Object.values(playerAbilities).some(pos => pos !== null);
         
         if (!hasValidPlayerAbilities) {
-            console.warn('No valid player abilities found, attempting emergency recovery');
+            console.warn('⚠️ No valid player abilities found, attempting emergency recovery');
             
             // EMERGENCY RECOVERY: Try to rebuild abilities from formation
             const formation = this.formationManager.getBattleFormation();
@@ -1904,12 +1837,12 @@ export class HeroSelection {
                     const directAbilities = this.heroAbilitiesManager.heroAbilityZones?.[position];
                     if (directAbilities) {
                         emergencyAbilities[position] = directAbilities;
+                        console.log(`🎮 Emergency recovery: found abilities for ${position}`);
                     }
                 }
             });
             
             if (Object.keys(emergencyAbilities).length > 0) {
-                console.log('Emergency abilities recovery successful');
                 Object.assign(playerAbilities, emergencyAbilities);
             }
         }
@@ -1921,19 +1854,10 @@ export class HeroSelection {
             right: this.heroSpellbookManager.getHeroSpellbook('right')
         };
         
-        // Log player spellbook counts
-        ['left', 'center', 'right'].forEach(position => {
-            const spellbook = playerSpellbooks[position];
-            if (spellbook && spellbook.length > 0) {
-                console.log(`Player ${position} hero has ${spellbook.length} spells`);
-            }
-        });
-        
         // Get opponent spellbooks (from stored data if available)
         let opponentSpellbooks = null;
         if (this.opponentSpellbooksData) {
             opponentSpellbooks = this.opponentSpellbooksData;
-            console.log('Using stored opponent spellbooks data');
         }
         
         // Get creature data for all player heroes
@@ -1943,59 +1867,39 @@ export class HeroSelection {
             right: this.heroCreatureManager.getHeroCreatures('right')
         };
         
-        // Log player creature counts
-        let totalPlayerCreatures = 0;
-        ['left', 'center', 'right'].forEach(position => {
-            const creatures = playerCreatures[position];
-            if (creatures && creatures.length > 0) {
-                totalPlayerCreatures += creatures.length;
-                console.log(`Player ${position} hero has ${creatures.length} creatures:`,
-                    creatures.map(c => c.name).join(', '));
-            }
-        });
-        console.log(`Total player creatures: ${totalPlayerCreatures}`);
-        
         // Get opponent creatures (from stored data if available)
         let opponentCreatures = null;
         if (this.opponentCreaturesData) {
             opponentCreatures = this.opponentCreaturesData;
-            
-            // Log opponent creature counts
-            let totalOpponentCreatures = 0;
-            ['left', 'center', 'right'].forEach(position => {
-                const creatures = opponentCreatures[position];
-                if (creatures && creatures.length > 0) {
-                    totalOpponentCreatures += creatures.length;
-                    console.log(`Opponent ${position} hero has ${creatures.length} creatures`);
-                }
-            });
-            console.log(`Total opponent creatures: ${totalOpponentCreatures}`);
         }
         
-        // Initialize battle screen with all data
-        console.log('Initializing battle screen with formations, abilities, spellbooks, and creatures');
-        
-        // Pass to battleScreen.init()
-        this.battleScreen.init(
-            this.isHost,
-            this.formationManager.getBattleFormation(),
-            this.formationManager.getOpponentBattleFormation(),
-            this.gameDataSender,
-            this.roomManager,
-            this.lifeManager,
-            this.goldManager,
-            this.turnTracker,
-            this.roomManager,
-            playerAbilities,
-            opponentAbilities,
-            playerSpellbooks,
-            opponentSpellbooks,
-            this.actionManager,
-            playerCreatures,      
-            opponentCreatures     
-        );
-        
-        return true;
+        // Initialize battle screen with all data        
+        try {
+            // Pass to battleScreen.init()
+            this.battleScreen.init(
+                this.isHost,
+                this.formationManager.getBattleFormation(),
+                this.formationManager.getOpponentBattleFormation(),
+                this.gameDataSender,
+                this.roomManager,
+                this.lifeManager,
+                this.goldManager,
+                this.turnTracker,
+                this.roomManager,
+                playerAbilities,
+                opponentAbilities,
+                playerSpellbooks,
+                opponentSpellbooks,
+                this.actionManager,
+                playerCreatures,      
+                opponentCreatures     
+            );
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Error during battle screen initialization:', error);
+            return false;
+        }
     }
 
     // Get hero abilities manager
@@ -2408,6 +2312,13 @@ export class HeroSelection {
         }
     }
 
+    // Update potion display
+    updatePotionDisplay() {
+        if (this.potionHandler) {
+            this.potionHandler.updatePotionDisplay();
+        }
+    }
+
     // Show visual feedback for spell drop result
     showSpellDropResult(heroPosition, message, success) {
         const teamSlot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
@@ -2506,6 +2417,11 @@ export class HeroSelection {
         if (this.actionManager) {
             this.actionManager.reset();
         }
+
+        // Reset potion handler
+        if (this.potionHandler) {
+            this.potionHandler.reset();
+        }
         
         // Hide battle waiting overlay
         this.hideBattleWaitingOverlay();
@@ -2588,8 +2504,11 @@ export class HeroSelection {
         // Create gold display
         const goldDisplay = this.goldManager.createGoldDisplay();
         
-        // Create action display
+        // // Create action display
         const actionDisplay = this.actionManager.createActionDisplay();
+        
+        // Create potion display
+        const potionDisplay = window.potionHandler ? window.potionHandler.createPotionDisplay() : '';
 
         return `
             ${lifeDisplay}
@@ -2636,10 +2555,15 @@ export class HeroSelection {
                     </div>
                 </div>
                 
-                <!-- Gold and Action Display - positioned together -->
+                <!-- Gold, Action, and Potion Display - positioned together -->
                 <div class="resource-display-container">
-                    ${goldDisplay}
-                    ${actionDisplay}
+                    <div class="resource-top-row">
+                        ${goldDisplay}
+                        ${potionDisplay}
+                    </div>
+                    <div class="resource-bottom-row">
+                        ${actionDisplay}
+                    </div>
                 </div>
             </div>
         `;

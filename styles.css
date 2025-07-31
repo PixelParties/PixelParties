@@ -3102,7 +3102,7 @@ body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-draggi
    ============================================ */
 .battle-arena {
     position: absolute;
-    top: 20px;
+    top: 0px;
     left: 0;
     right: 0;
     bottom: 0;
@@ -6345,5 +6345,497 @@ body.guard-change-active .hero-creatures:has(.creature-empty-placeholder)::after
     
     .empty-text {
         font-size: 14px;
+    }
+}
+
+/* ============================================
+   UPDATED BATTLE ARENA LAYOUT - REDUCED HEIGHT HERO SLOTS
+   ============================================ */
+
+/* UPDATED: Hero slots made significantly shorter to prevent bottom row cutoff */
+.battle-hero-slot {
+    width: 317px;  /* Keep same width */
+    height: 380px; /* Reduced from 432px - about 35% shorter */
+    position: relative;
+    transition: var(--transition-medium);
+}
+
+/* Update empty hero slot styling for smaller size */
+.battle-hero-slot.empty-hero-slot {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.03) 0%, 
+        rgba(128, 128, 128, 0.05) 100%);
+    border: 3px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.empty-hero-placeholder {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.empty-icon {
+    font-size: 36px; /* Reduced for smaller slots */
+    margin-bottom: 8px;
+    opacity: 0.6;
+}
+
+.empty-text {
+    font-size: 14px; /* Reduced font size */
+    font-weight: 600;
+    font-style: italic;
+}
+
+/* Update hero image container - adjust these values to control how much image shows */
+.hero-image-container {
+    width: 100%;
+    height: 70%; 
+    overflow: hidden;
+    border-radius: 17px 17px 0 0;
+    position: relative;
+}
+
+/* Control which part of the hero image is visible */
+.battle-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%; /* ADJUST THIS: 8% crops top portion, higher % = more top cropping */
+    transition: var(--transition-medium);
+}
+
+.battle-hero-card:hover .battle-hero-image {
+    transform: scale(1.05);
+}
+
+/* Update hero info bar - adjust to match image container changes */
+.hero-info-bar {
+    height: 40%; /* Reduced from 55% to match new image height of 60% */
+    padding: 8px 15px 10px 15px; /* Adjusted padding for smaller slot */
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.8) 0%, 
+        rgba(0, 0, 0, 0.6) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px; /* Reduced gap */
+}
+
+.battle-hero-name {
+    color: white;
+    font-size: 16px; /* Slightly reduced font size */
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.health-bar {
+    height: 18px; /* Slightly reduced height */
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Update attack display for smaller slots */
+.battle-hero-attack {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px; /* Slightly reduced gap */
+    padding: 5px 8px; /* Reduced padding */
+    background: linear-gradient(135deg, 
+        rgba(255, 107, 107, 0.15) 0%, 
+        rgba(238, 90, 36, 0.15) 100%);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: var(--radius-medium);
+    backdrop-filter: blur(5px);
+    transition: var(--transition-medium);
+}
+
+.attack-icon {
+    font-size: 16px; /* Slightly reduced size */
+    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.attack-value {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-size: 16px; /* Slightly reduced font size */
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 5px rgba(255, 107, 107, 0.3);
+}
+
+.attack-bonus {
+    font-size: 14px; /* Slightly reduced font size */
+    font-weight: bold;
+    margin-left: 2px;
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 8px currentColor;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Update battle field container to accommodate shorter hero slots */
+.battle-field-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    min-height: 600px; /* Reduced from 700px since slots are shorter */
+}
+
+/* Update battle field padding for shorter slots */
+.battle-field {
+    flex: 0 0 75%;
+    display: flex;
+    flex-direction: column;
+    padding: 5px 20px 30px 20px;
+    gap: 15px; /* Reduced gap since slots are shorter */
+    position: relative;
+    min-height: 550px; /* Reduced minimum height */
+}
+
+/* Update battle rows for better spacing with shorter slots */
+.battle-row {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 40px; /* Keep same gap between slots */
+    padding: 5px 40px; /* Reduced padding */
+    position: relative;
+}
+
+.opponent-row {
+    justify-content: center;
+    padding-bottom: 5px;
+}
+
+.player-row {
+    justify-content: center;
+    padding-top: 5px;
+}
+
+/* ============================================
+   RESPONSIVE UPDATES FOR SHORTER HERO SLOTS
+   ============================================ */
+
+@media (max-width: 1400px) {
+    .battle-hero-slot {
+        width: 280px;
+        height: 240px; /* Proportionally reduced */
+    }
+    
+    .battle-speed-panel-container {
+        width: 100px;
+        height: 160px;
+        right: 15px;
+    }
+    
+    .battle-row {
+        gap: 30px;
+        padding: 5px 30px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .battle-hero-slot {
+        width: 240px;
+        height: 200px; /* Proportionally reduced */
+    }
+    
+    .battle-speed-panel-container {
+        width: 80px;
+        height: 120px;
+        right: 10px;
+    }
+    
+    .battle-row {
+        gap: 25px;
+        padding: 5px 25px;
+    }
+    
+    .hero-info-bar {
+        padding: 6px 12px 8px 12px;
+        gap: 4px;
+    }
+    
+    .battle-hero-name {
+        font-size: 14px;
+    }
+    
+    .health-bar {
+        height: 16px;
+    }
+    
+    .attack-icon {
+        font-size: 14px;
+    }
+    
+    .attack-value {
+        font-size: 14px;
+        gap: 2px;
+    }
+    
+    .attack-bonus {
+        font-size: 12px;
+        margin-left: 2px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .battle-hero-slot {
+        width: 200px;
+        height: 170px; /* Proportionally reduced */
+    }
+    
+    .battle-speed-panel-container {
+        width: 70px;
+        height: 100px;
+        right: 8px;
+    }
+    
+    .battle-row {
+        gap: 20px;
+        padding: 5px 20px;
+    }
+    
+    .empty-icon {
+        font-size: 28px;
+        margin-bottom: 6px;
+    }
+    
+    .empty-text {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .battle-hero-slot {
+        width: 160px;
+        height: 140px; /* Proportionally reduced */
+    }
+    
+    .battle-speed-panel-container {
+        width: 60px;
+        height: 80px;
+        right: 5px;
+    }
+    
+    .battle-row {
+        gap: 15px;
+        padding: 5px 15px;
+    }
+    
+    .battle-hero-name {
+        font-size: 12px;
+    }
+    
+    .health-bar {
+        height: 14px;
+    }
+    
+    .hero-info-bar {
+        padding: 5px 10px 6px 10px;
+        gap: 3px;
+    }
+    
+    .attack-icon {
+        font-size: 12px;
+    }
+    
+    .attack-value {
+        font-size: 12px;
+    }
+    
+    .attack-bonus {
+        font-size: 10px;
+    }
+    
+    .empty-icon {
+        font-size: 24px;
+        margin-bottom: 4px;
+    }
+    
+    .empty-text {
+        font-size: 10px;
+    }
+}
+
+/* ADD THESE STYLES TO YOUR styles.css FILE */
+
+/* Scrollable content container for individual gold contributors */
+.gold-breakdown-content-scrollable {
+    max-height: 120px; /* Adjust this value as needed - try 150px, 250px, 300px, etc. */
+    
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px; /* Space for scrollbar */
+    margin-bottom: 15px; /* Space before totals */
+    
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    
+    /* Custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 193, 7, 0.6) rgba(255, 193, 7, 0.1);
+}
+
+/* Webkit scrollbar styling for better appearance */
+.gold-breakdown-content-scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar-track {
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 3px;
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar-thumb {
+    background: rgba(255, 193, 7, 0.6);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 193, 7, 0.8);
+}
+
+/* Container for fixed totals (Battle Total) */
+.gold-breakdown-totals {
+    margin-bottom: 20px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+/* Ensure all child elements still have proper styling within scrollable area */
+.gold-breakdown-content-scrollable .gold-line-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+    transition: all 0.3s ease;
+    margin-bottom: 10px;
+}
+
+.gold-breakdown-content-scrollable .gold-line-item:hover {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: rgba(255, 193, 7, 0.4);
+    transform: translateX(3px);
+}
+
+/* Preserve existing styling for specific line item types within scrollable area */
+.gold-breakdown-content-scrollable .gold-line-item.victory-bonus {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.4);
+}
+
+.gold-breakdown-content-scrollable .gold-line-item.participation-bonus {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+.gold-breakdown-content-scrollable .gold-line-item.wealth-bonus {
+    background: rgba(156, 39, 176, 0.1);
+    border-color: rgba(156, 39, 176, 0.4);
+}
+
+.gold-breakdown-content-scrollable .gold-line-item.semi-bonus {
+    background: rgba(64, 224, 208, 0.1);
+    border-color: rgba(64, 224, 208, 0.4);
+}
+
+.gold-breakdown-content-scrollable .gold-line-item.redraw-deduction {
+    background: rgba(255, 107, 107, 0.1);
+    border-color: rgba(255, 107, 107, 0.4);
+}
+
+.gold-breakdown-content-scrollable .gold-line-item.thieving-bonus {
+    background: rgba(255, 215, 0, 0.15);
+    border-color: rgba(255, 215, 0, 0.4);
+}
+
+.gold-breakdown-content-scrollable .gold-line-item.thieving-penalty {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.4);
+}
+
+/* Ensure wealth and thieving details remain properly styled within scrollable area */
+.gold-breakdown-content-scrollable .wealth-details,
+.gold-breakdown-content-scrollable .thieving-details {
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(255, 193, 7, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.gold-breakdown-content-scrollable .wealth-detail-line,
+.gold-breakdown-content-scrollable .thieving-detail-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 6px;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 193, 7, 0.05);
+    border-radius: 4px;
+}
+
+/* Add a subtle fade effect at the bottom of scrollable area when content overflows */
+.gold-breakdown-content-scrollable::after {
+    content: '';
+    position: sticky;
+    bottom: 0;
+    display: block;
+    height: 10px;
+    background: linear-gradient(transparent, rgba(255, 193, 7, 0.1));
+    pointer-events: none;
+    margin-top: -10px;
+}
+
+/* Hide the fade effect when not scrollable */
+.gold-breakdown-content-scrollable:not([data-scrollable])::after {
+    display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+    .gold-breakdown-content-scrollable {
+        max-height: 180px; /* Slightly smaller on medium screens */
+    }
+}
+
+@media (max-width: 1200px) {
+    .gold-breakdown-content-scrollable {
+        max-height: 160px; /* Smaller on small screens */
+    }
+}
+
+@media (max-width: 768px) {
+    .gold-breakdown-content-scrollable {
+        max-height: 140px; /* Even smaller on mobile */
+        padding-right: 3px;
+    }
+    
+    .gold-breakdown-content-scrollable::-webkit-scrollbar {
+        width: 4px;
     }
 }

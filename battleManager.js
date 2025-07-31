@@ -1,9 +1,11 @@
-// battleManager.js - Complete Battle Manager with Hero Class, Abilities, Creatures, and Firebase Persistence
+// battleManager.js - Complete Battle Manager with Hero Class, Abilities, Creatures, Firebase Persistence, and Deterministic Randomness System
 
 import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
 import { Hero } from './hero.js';
 import { BattleSpeedManager } from './battleSpeedManager.js';
+import { BattleRandomness } from './battleRandomness.js'; // NEW: Deterministic Randomness
+import { BattleSpellSystem } from './battleSpellSystem.js';
 
 import { NecromancyManager } from './Abilities/necromancy.js';
 
@@ -40,6 +42,9 @@ export class BattleManager {
         this.pauseStartTime = null;
         this.totalPauseTime = 0;
         
+        // Spell System
+        this.spellSystem = null;
+
         //ABILITY STUFF
         this.necromancyManager = null; 
 
@@ -69,9 +74,234 @@ export class BattleManager {
         this.battleSpeed = 1; // 1x = normal, 2x = fast, 4x = super fast
         this.speedLocked = false; // Prevent speed changes during critical moments
 
+        // NEW: DETERMINISTIC RANDOMNESS SYSTEM
+        this.randomness = null;
+        this.randomnessSeed = null;
+        this.randomnessInitialized = false;
+
         this.tabWasHidden = false;
         this.setupTabVisibilityListener();
     }
+
+    // ============================================
+    // DETERMINISTIC RANDOMNESS SYSTEM
+    // ============================================
+
+    // NEW: Initialize randomness system (called by host only)
+    initializeRandomness(seed = null) {
+        if (!this.isAuthoritative) {
+            console.warn('⚠️ Only host should initialize randomness system');
+            return false;
+        }
+        
+        this.randomness = new BattleRandomness(seed);
+        this.randomnessSeed = this.randomness.originalSeed;
+        this.randomnessInitialized = true;
+        
+        console.log(`🎲 Battle randomness initialized by host with seed: ${this.randomnessSeed.slice(0, 12)}...`);
+        
+        // Send seed to guest immediately
+        this.sendBattleUpdate('randomness_seed', {
+            seed: this.randomnessSeed,
+            timestamp: Date.now()
+        });
+        
+        return true;
+    }
+    
+    // NEW: Initialize randomness from received seed (called by guest)
+    initializeRandomnessFromSeed(seed) {
+        if (this.isAuthoritative) {
+            console.warn('⚠️ Host should not receive randomness seed');
+            return false;
+        }
+        
+        this.randomness = new BattleRandomness(seed);
+        this.randomnessSeed = seed;
+        this.randomnessInitialized = true;
+        
+        console.log(`🎲 Battle randomness initialized by guest with received seed: ${seed.slice(0, 12)}...`);
+        
+        return true;
+    }
+    
+    // NEW: Convenient randomness access methods
+    
+    // Get a random number between 0 and 1
+    getRandom() {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            return Math.random();
+        }
+        return this.randomness.random();
+    }
+    
+    // Get a random integer between min and max (inclusive)
+    getRandomInt(min, max) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        return this.randomness.randomInt(min, max);
+    }
+    
+    // Get a random float between min and max
+    getRandomFloat(min, max) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            return Math.random() * (max - min) + min;
+        }
+        return this.randomness.randomFloat(min, max);
+    }
+    
+    // Get a random boolean with optional probability
+    getRandomBool(probability = 0.5) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            return Math.random() < probability;
+        }
+        return this.randomness.randomBool(probability);
+    }
+    
+    // Choose a random element from an array
+    getRandomChoice(array) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            if (!Array.isArray(array) || array.length === 0) return null;
+            return array[Math.floor(Math.random() * array.length)];
+        }
+        return this.randomness.randomChoice(array);
+    }
+    
+    // Choose multiple random elements from an array (without replacement)
+    getRandomChoices(array, count) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using fallback');
+            if (!Array.isArray(array) || array.length === 0 || count <= 0) return [];
+            const shuffled = [...array].sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, Math.min(count, shuffled.length));
+        }
+        return this.randomness.randomChoices(array, count);
+    }
+    
+    // Shuffle an array deterministically
+    shuffleArray(array) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            const result = [...array];
+            for (let i = result.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        }
+        return this.randomness.shuffle(array);
+    }
+    
+    // Random percentage roll (0-100)
+    getRandomPercent() {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            return Math.random() * 100;
+        }
+        return this.randomness.randomPercent();
+    }
+    
+    // Check if a percentage chance succeeds
+    checkChance(percentage) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            return Math.random() * 100 < percentage;
+        }
+        return this.randomness.chance(percentage);
+    }
+    
+    // Get random damage variance
+    getRandomDamageVariance(baseDamage, variancePercent = 10) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
+            const variance = baseDamage * (variancePercent / 100);
+            return Math.round(Math.random() * (variance * 2) + (baseDamage - variance));
+        }
+        return this.randomness.randomDamageVariance(baseDamage, variancePercent);
+    }
+    
+    // Weighted random choice
+    getWeightedChoice(choices, weights) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using fallback weighted choice');
+            if (!Array.isArray(choices) || !Array.isArray(weights) || 
+                choices.length !== weights.length || choices.length === 0) {
+                return null;
+            }
+            const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+            if (totalWeight <= 0) return null;
+            const randomValue = Math.random() * totalWeight;
+            let currentWeight = 0;
+            for (let i = 0; i < choices.length; i++) {
+                currentWeight += weights[i];
+                if (randomValue <= currentWeight) {
+                    return choices[i];
+                }
+            }
+            return choices[choices.length - 1];
+        }
+        return this.randomness.weightedChoice(choices, weights);
+    }
+    
+    // Generate random normal distribution (mean, standard deviation)
+    getRandomNormal(mean, standardDeviation) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using fallback normal distribution');
+            // Box-Muller approximation
+            const u1 = Math.random();
+            const u2 = Math.random();
+            const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            return z0 * standardDeviation + mean;
+        }
+        return this.randomness.randomNormal(mean, standardDeviation);
+    }
+    
+    // Generate a random ID string
+    getRandomId(length = 8) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized, using fallback ID generation');
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars[Math.floor(Math.random() * chars.length)];
+            }
+            return result;
+        }
+        return this.randomness.randomId(length);
+    }
+    
+    // Get randomness debug info (development only)
+    getRandomnessDebugInfo() {
+        if (!this.randomnessInitialized) {
+            return { status: 'not_initialized' };
+        }
+        
+        return {
+            status: 'active',
+            ...this.randomness.getDebugInfo(),
+            isHost: this.isAuthoritative
+        };
+    }
+    
+    // Test randomness distribution (development only)
+    testRandomnessDistribution(samples = 1000) {
+        if (!this.randomnessInitialized) {
+            console.warn('⚠️ Randomness not initialized');
+            return null;
+        }
+        
+        return this.randomness.testDistribution(samples);
+    }
+
+    // ============================================
+    // CORE BATTLE MANAGER FUNCTIONALITY
+    // ============================================
 
     // Initialize battle with formations, references, and abilities
     init(playerFormation, opponentFormation, gameDataSender, isHost, battleScreen, 
@@ -116,6 +346,14 @@ export class BattleManager {
         
         // Initialize heroes with full HP, abilities, and fresh visual state
         this.initializeHeroes();
+        
+        // Initialize randomness system (host only)
+        if (this.isAuthoritative) {
+            this.initializeRandomness();
+        }
+
+        // Initialize Spell System
+        this.spellSystem = new BattleSpellSystem(this);
     }
 
     setBattleSpeed(speed) {
@@ -627,6 +865,16 @@ export class BattleManager {
         // ADD: Initialize Jiggles manager
         this.jigglesManager = new JigglesCreature(this);
         
+        // NEW: Ensure randomness is initialized before battle starts
+        if (this.isAuthoritative && !this.randomnessInitialized) {
+            this.initializeRandomness();
+        }
+        
+        // Add randomness info to combat log
+        if (this.randomnessInitialized) {
+            this.addCombatLog(`🎲 Battle randomness initialized (seed: ${this.randomnessSeed.slice(0, 8)}...)`, 'info');
+        }
+        
         this.addCombatLog('⚔️ Battle begins with Hero abilities and creatures!', 'success');
         
         // Log any SummoningMagic bonuses applied to creatures
@@ -1018,53 +1266,92 @@ export class BattleManager {
     }
 
     async executeHeroActions(playerHeroActor, opponentHeroActor, position) {
-        const playerCanAttack = playerHeroActor !== null;
-        const opponentCanAttack = opponentHeroActor !== null;
-        
-        const playerTarget = playerCanAttack ? 
-            this.authoritative_findTargetWithCreatures(position, 'player') : null;
-        const opponentTarget = opponentCanAttack ? 
-            this.authoritative_findTargetWithCreatures(position, 'opponent') : null;
-        
-        // ADD THIS: Check if targets are valid before proceeding
-        const playerValidAttack = playerCanAttack && playerTarget;
-        const opponentValidAttack = opponentCanAttack && opponentTarget;
-        
-        // If no valid attacks can be made, skip animation
-        if (!playerValidAttack && !opponentValidAttack) {
-            this.addCombatLog('💨 No valid targets remain for hero attacks!', 'info');
+        // Check if battle ended before executing actions
+        if (this.checkBattleEnd()) {
+            console.log('Battle ended before hero actions, skipping');
             return;
         }
         
-        const playerDamage = playerValidAttack ? 
-            this.calculateDamage(playerHeroActor.data, true) : 0;
-        const opponentDamage = opponentValidAttack ? 
-            this.calculateDamage(opponentHeroActor.data, true) : 0;
+        const playerCanAttack = playerHeroActor !== null;
+        const opponentCanAttack = opponentHeroActor !== null;
         
-        const turnData = this.createTurnDataWithCreatures(
-            position, 
-            playerHeroActor?.data, playerTarget, playerDamage,
-            opponentHeroActor?.data, opponentTarget, opponentDamage
-        );
+        // NEW: Check for spell casting before attacking
+        let playerSpellToCast = null;
+        let opponentSpellToCast = null;
+        let playerWillAttack = playerCanAttack;
+        let opponentWillAttack = opponentCanAttack;
         
-        this.sendBattleUpdate('hero_turn_execution', turnData);
+        if (playerCanAttack && this.spellSystem) {
+            playerSpellToCast = this.spellSystem.checkSpellCasting(playerHeroActor.data);
+            if (playerSpellToCast) {
+                playerWillAttack = false; // Hero spent turn casting spell
+            }
+        }
         
-        const executionPromise = this.executeHeroAttacksWithDamage(
-            playerValidAttack ? { 
-                hero: playerHeroActor.data, 
-                target: playerTarget, 
-                damage: playerDamage 
-            } : null,
-            opponentValidAttack ? { 
-                hero: opponentHeroActor.data, 
-                target: opponentTarget, 
-                damage: opponentDamage 
-            } : null
-        );
+        if (opponentCanAttack && this.spellSystem) {
+            opponentSpellToCast = this.spellSystem.checkSpellCasting(opponentHeroActor.data);
+            if (opponentSpellToCast) {
+                opponentWillAttack = false; // Hero spent turn casting spell
+            }
+        }
         
-        const ackPromise = this.waitForGuestAcknowledgment('turn_complete', this.getAdaptiveTimeout());
+        // Execute spell casting if applicable
+        if (playerSpellToCast && this.spellSystem) {
+            this.spellSystem.executeSpellCasting(playerHeroActor.data, playerSpellToCast);
+        }
         
-        await Promise.all([executionPromise, ackPromise]);
+        if (opponentSpellToCast && this.spellSystem) {
+            this.spellSystem.executeSpellCasting(opponentHeroActor.data, opponentSpellToCast);
+        }
+        
+        // Continue with normal attack logic for heroes that didn't cast spells
+        const playerTarget = playerWillAttack ? 
+            this.authoritative_findTargetWithCreatures(position, 'player') : null;
+        const opponentTarget = opponentWillAttack ? 
+            this.authoritative_findTargetWithCreatures(position, 'opponent') : null;
+        
+        // Check if targets are valid before proceeding
+        const playerValidAttack = playerWillAttack && playerTarget;
+        const opponentValidAttack = opponentWillAttack && opponentTarget;
+        
+        // If no valid attacks can be made and no spells were cast, skip animation
+        if (!playerValidAttack && !opponentValidAttack && !playerSpellToCast && !opponentSpellToCast) {
+            this.addCombatLog('💨 No actions taken this turn!', 'info');
+            return;
+        }
+        
+        // Only proceed with attack animations/damage for heroes that are attacking
+        if (playerValidAttack || opponentValidAttack) {
+            const playerDamage = playerValidAttack ? 
+                this.calculateDamage(playerHeroActor.data, true) : 0;
+            const opponentDamage = opponentValidAttack ? 
+                this.calculateDamage(opponentHeroActor.data, true) : 0;
+            
+            const turnData = this.createTurnDataWithCreatures(
+                position, 
+                playerValidAttack ? playerHeroActor.data : null, playerTarget, playerDamage,
+                opponentValidAttack ? opponentHeroActor.data : null, opponentTarget, opponentDamage
+            );
+            
+            this.sendBattleUpdate('hero_turn_execution', turnData);
+            
+            const executionPromise = this.executeHeroAttacksWithDamage(
+                playerValidAttack ? { 
+                    hero: playerHeroActor.data, 
+                    target: playerTarget, 
+                    damage: playerDamage 
+                } : null,
+                opponentValidAttack ? { 
+                    hero: opponentHeroActor.data, 
+                    target: opponentTarget, 
+                    damage: opponentDamage 
+                } : null
+            );
+            
+            const ackPromise = this.waitForGuestAcknowledgment('turn_complete', this.getAdaptiveTimeout());
+            
+            await Promise.all([executionPromise, ackPromise]);
+        }
     }
 
     // Execute creature actions (shake animations)
@@ -1176,9 +1463,11 @@ export class BattleManager {
                 
             case 'center':
                 // Random target selection, but still check creatures first
-                const randomTargetHero = aliveTargets[Math.floor(Math.random() * aliveTargets.length)];
-                const randomTarget = getTargetForPosition(randomTargetHero.position);
-                if (randomTarget) return randomTarget;
+                const randomTargetHero = this.getRandomChoice(aliveTargets);
+                if (randomTargetHero) {
+                    const randomTarget = getTargetForPosition(randomTargetHero.position);
+                    if (randomTarget) return randomTarget;
+                }
                 break;
                 
             case 'right':
@@ -1281,6 +1570,7 @@ export class BattleManager {
     // Execute hero attacks with damage application
     async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
         if (playerAttack && opponentAttack) {
+            // Both heroes attack - collision animation (meet in middle)
             await this.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
             this.applyAttackDamageToTarget(playerAttack);
@@ -1292,6 +1582,7 @@ export class BattleManager {
             ]);
             
         } else if (playerAttack || opponentAttack) {
+            // Only one hero attacks - full dash animation (to target)
             const attack = playerAttack || opponentAttack;
             const side = playerAttack ? 'player' : 'opponent';
             
@@ -1409,6 +1700,29 @@ export class BattleManager {
                 newHp: Math.max(0, attack.target.hero.currentHp - attack.damage),
                 died: (attack.target.hero.currentHp - attack.damage) <= 0
             });
+            
+            // Check for fireshield recoil damage (only for hero-to-hero attacks)
+            this.checkAndApplyFireshieldRecoil(attack.hero, attack.target.hero);
+        }
+    }
+
+    // Check and apply fireshield recoil damage
+    checkAndApplyFireshieldRecoil(attacker, defender) {
+        if (!this.isAuthoritative || !this.spellSystem) return;
+        
+        // Get fireshield spell implementation
+        const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
+        if (!fireshieldSpell) return;
+        
+        // Check if recoil should trigger
+        if (!fireshieldSpell.shouldTriggerRecoil(attacker, defender, this.currentTurn)) {
+            return;
+        }
+        
+        // Calculate and apply recoil damage
+        const recoilDamage = fireshieldSpell.calculateRecoilDamage(defender);
+        if (recoilDamage > 0) {
+            fireshieldSpell.applyRecoilDamage(attacker, defender, recoilDamage);
         }
     }
 
@@ -1622,7 +1936,7 @@ export class BattleManager {
         });
     }
 
-    // Receive battle data from host (for GUEST)
+    // Receive battle data from host (for GUEST) - UPDATED
     receiveBattleData(message) {        
         // Handle host-specific messages first
         if (this.isAuthoritative) {
@@ -1643,6 +1957,10 @@ export class BattleManager {
                 
             case 'speed_change':
                 this.guest_handleSpeedChange(data);
+                break;
+                
+            case 'randomness_seed':
+                this.guest_handleRandomnessSeed(data);
                 break;
                 
             case 'creature_action':
@@ -1685,12 +2003,63 @@ export class BattleManager {
                 this.guest_handleNecromancyRevival(data);
                 break;
                 
-            // ADD: Handle Jiggles special attack
             case 'jiggles_special_attack':
                 if (this.jigglesManager) {
                     this.jigglesManager.handleGuestSpecialAttack(data);
                 }
                 break;
+                
+            // Handle basic spell casting
+            case 'spell_cast':
+                this.guest_handleSpellCast(data);
+                break;
+                
+            // Handle spell effects (like FlameAvalanche area damage)
+            case 'spell_effect':
+                this.guest_handleSpellEffect(data);
+                break;
+                
+            // Handle fireshield applied
+            case 'fireshield_applied':
+                this.guest_handleFireshieldApplied(data);
+                break;
+        }
+    }
+
+    guest_handleSpellCast(data) {
+        if (this.spellSystem) {
+            this.spellSystem.handleGuestSpellCast(data);
+        }
+    }
+
+    guest_handleSpellEffect(data) {
+        if (this.spellSystem) {
+            this.spellSystem.handleGuestSpellEffect(data);
+        } else {
+            console.warn('Received spell effect but spell system not initialized');
+        }
+    }
+
+    guest_handleFireshieldApplied(data) {
+        // Forward to the fireshield spell implementation if available
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('Fireshield')) {
+            const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
+            fireshieldSpell.handleGuestFireshieldApplied(data);
+        } else {
+            console.warn('Received fireshield applied but fireshield spell not available');
+        }
+    }
+    
+    getSpellStatistics() {
+        return this.spellSystem ? this.spellSystem.getSpellStatistics() : null;
+    }
+
+    // Handle randomness seed from host (for GUEST)
+    guest_handleRandomnessSeed(data) {
+        const { seed } = data;
+        if (seed) {
+            this.initializeRandomnessFromSeed(seed);
+            this.addCombatLog(`🎲 Battle randomness synchronized`, 'info');
         }
     }
 
@@ -1839,9 +2208,10 @@ export class BattleManager {
                     heroes.playerHero, playerAction.targetData, heroes.playerLocalSide
                 ));
             } else {
+                // ✅ FIXED: Use playerAction.targetData.position for player's attack
                 animations.push(this.animateCollisionAttackTowards(
                     heroes.playerHero, 
-                    this.getHeroElement(heroes.opponentLocalSide, opponentAction.targetData.position),
+                    this.getHeroElement(heroes.opponentLocalSide, playerAction.targetData.position),
                     heroes.playerLocalSide
                 ));
             }
@@ -1851,9 +2221,10 @@ export class BattleManager {
                     heroes.opponentHero, opponentAction.targetData, heroes.opponentLocalSide
                 ));
             } else {
+                // ✅ FIXED: Use opponentAction.targetData.position for opponent's attack
                 animations.push(this.animateCollisionAttackTowards(
                     heroes.opponentHero,
-                    this.getHeroElement(heroes.playerLocalSide, playerAction.targetData.position),
+                    this.getHeroElement(heroes.playerLocalSide, opponentAction.targetData.position),
                     heroes.opponentLocalSide
                 ));
             }
@@ -2176,28 +2547,6 @@ export class BattleManager {
         await Promise.all(animations);
     }
 
-    // Animate collision attack towards target
-    async animateCollisionAttackTowards(attacker, targetElement, attackerSide) {
-        const attackerElement = this.getHeroElement(attackerSide, attacker.position);
-        if (!attackerElement || !targetElement) return;
-
-        const attackerCard = attackerElement.querySelector('.battle-hero-card');
-        if (!attackerCard) return;
-
-        const attackerRect = attackerElement.getBoundingClientRect();
-        const targetRect = targetElement.getBoundingClientRect();
-        
-        const deltaX = (targetRect.left - attackerRect.left) * 0.5;
-        const deltaY = (targetRect.top - attackerRect.top) * 0.5;
-        
-        attackerCard.classList.add('attacking');
-        attackerCard.style.transition = 'transform 0.08s ease-out';
-        attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1)`;
-        
-        await this.delay(80);
-        this.createCollisionEffect();
-    }
-
     // Animate full attack to target
     async animateFullAttack(attacker, target) {
         const attackerElement = this.getHeroElement(attacker.side, attacker.position);
@@ -2215,7 +2564,8 @@ export class BattleManager {
         const targetRect = targetElement.getBoundingClientRect();
         
         const deltaX = targetRect.left - attackerRect.left;
-        const deltaY = targetRect.top - targetRect.top;
+        const deltaY = targetRect.top - attackerRect.top;
+
         
         attackerCard.classList.add('attacking');
         attackerCard.style.transition = `transform ${this.getSpeedAdjustedDelay(120)}ms ease-out`;
@@ -2510,6 +2860,9 @@ export class BattleManager {
                 newTurn: newTurn  // 🔥 NEW: Include the new turn number
             };
             
+            // NEW: Save final battle state before cleanup
+            await this.saveFinalBattleState();
+            
             this.sendBattleUpdate('battle_end', battleEndData);
             
             const hostMessage = this.getResultMessage(hostResult);
@@ -2531,6 +2884,141 @@ export class BattleManager {
                 this.onBattleEnd(hostResult);
             }
         }
+    }
+
+    // Save final battle state for viewing during rewards
+    async saveFinalBattleState() {
+        if (!this.persistenceManager || !this.roomManager) return;
+        
+        try {
+            // Export current battle state with all details
+            const finalState = this.exportBattleState();
+            
+            // Add additional metadata
+            finalState.isFinalState = true;
+            finalState.savedAt = Date.now();
+            finalState.battleLog = this.battleLog; // Ensure full battle log is saved
+            
+            // Save it under a different key in Firebase
+            const roomRef = this.roomManager.getRoomRef();
+            if (roomRef) {
+                await roomRef.child('gameState').child('finalBattleState').set(
+                    this.persistenceManager.sanitizeForFirebase(finalState)
+                );
+                console.log('💾 Final battle state saved for reward viewing');
+            }
+        } catch (error) {
+            console.error('Error saving final battle state:', error);
+        }
+    }
+
+    // Restore final battle state for viewing
+    async restoreFinalBattleState(finalState) {
+        try {
+            console.log('🔄 Restoring final battle state for viewing...');
+            
+            // Don't reactivate the battle
+            this.battleActive = false;
+            
+            // Initialize necromancy manager if not already done
+            if (!this.necromancyManager) {
+                const { NecromancyManager } = await import('./Abilities/necromancy.js');
+                this.necromancyManager = new NecromancyManager(this);
+            }
+            
+            // Restore the state using existing restoration logic
+            if (this.persistenceManager) {
+                await this.persistenceManager.restoreBattleState(this, finalState);
+            } else {
+                // Fallback restoration
+                this.restoreBattleState(finalState);
+            }
+            
+            // Make sure battle appears ended
+            this.battleActive = false;
+            this.turnInProgress = false;
+            
+            // Clear any pause overlays
+            this.hideBattlePauseUI();
+            
+            // IMPORTANT: Force update all hero visuals after restoration
+            await this.delay(100); // Small delay to ensure DOM is ready
+            this.updateAllHeroVisuals();
+            
+            // Re-render creatures after restoration
+            this.renderCreaturesAfterInit();
+            
+            // Initialize and update necromancy displays
+            if (this.necromancyManager) {
+                this.necromancyManager.initializeNecromancyStackDisplays();
+                
+                // Update necromancy displays for all heroes
+                ['left', 'center', 'right'].forEach(position => {
+                    ['player', 'opponent'].forEach(side => {
+                        const heroes = side === 'player' ? this.playerHeroes : this.opponentHeroes;
+                        const hero = heroes[position];
+                        if (hero) {
+                            this.necromancyManager.updateNecromancyDisplayForHeroWithCreatures(side, position, hero);
+                        }
+                    });
+                });
+            }
+            
+            // Restore combat log
+            if (finalState.battleLog && this.battleScreen) {
+                // Clear existing log first
+                const logArea = document.getElementById('combatLog');
+                if (logArea) {
+                    logArea.innerHTML = '';
+                }
+                
+                // Add all log entries
+                finalState.battleLog.forEach(entry => {
+                    this.battleScreen.addCombatLogMessage(entry.message, entry.type || 'info');
+                });
+                
+                // Add final message
+                this.battleScreen.addCombatLogMessage('📜 Viewing final battle state', 'info');
+            }
+            
+            console.log('✅ Final battle state restored for viewing');
+            return true;
+        } catch (error) {
+            console.error('Error restoring final battle state:', error);
+            return false;
+        }
+    }
+
+    renderCreaturesAfterInit() {
+        ['left', 'center', 'right'].forEach(position => {
+            ['player', 'opponent'].forEach(side => {
+                const heroInstance = side === 'player' 
+                    ? this.playerHeroes[position]
+                    : this.opponentHeroes[position];
+                
+                if (heroInstance && heroInstance.creatures && heroInstance.creatures.length > 0) {
+                    const heroSlot = document.querySelector(`.${side}-slot.${position}-slot`);
+                    if (heroSlot) {
+                        // Remove existing creatures if any
+                        const existingCreatures = heroSlot.querySelector('.battle-hero-creatures');
+                        if (existingCreatures) {
+                            existingCreatures.remove();
+                        }
+                        
+                        // Add new creatures HTML
+                        const creaturesHTML = this.battleScreen.createCreaturesHTML(heroInstance.creatures, side, position);
+                        heroSlot.insertAdjacentHTML('beforeend', creaturesHTML);
+                        
+                        // Update necromancy displays
+                        if (this.necromancyManager) {
+                            this.necromancyManager.updateNecromancyDisplayForHeroWithCreatures(
+                                side, position, heroInstance
+                            );
+                        }
+                    }
+                }
+            });
+        });
     }
 
     async setGamePhaseToReward() {
@@ -2763,7 +3251,7 @@ export class BattleManager {
         }
     }
 
-    // Export battle state for persistence
+    // Export battle state for persistence - UPDATED WITH RANDOMNESS
     exportBattleState() {
         const exportHeroes = (heroes) => {
             const exported = {};
@@ -2797,7 +3285,10 @@ export class BattleManager {
             abilitiesUsed: this.abilitiesUsed,
             weatherEffects: this.weatherEffects,
             terrainModifiers: this.terrainModifiers,
-            specialRules: this.specialRules
+            specialRules: this.specialRules,
+            
+            // NEW: Export randomness state
+            randomnessState: this.randomnessInitialized ? this.randomness.exportState() : null
         };
 
         if (this.isAuthoritative) {
@@ -2812,7 +3303,7 @@ export class BattleManager {
         return baseState;
     }
 
-    // Restore battle state from persistence data
+    // Restore battle state from persistence data - UPDATED WITH RANDOMNESS
     restoreBattleState(stateData) {
         try {
             this.battleActive = stateData.battleActive || false;
@@ -2851,6 +3342,23 @@ export class BattleManager {
             this.terrainModifiers = stateData.terrainModifiers || [];
             this.specialRules = stateData.specialRules || [];
 
+            // Restore randomness state
+            if (stateData.randomnessState) {
+                if (!this.randomness) {
+                    this.randomness = new BattleRandomness();
+                }
+                const restored = this.randomness.importState(stateData.randomnessState);
+                if (restored) {
+                    this.randomnessSeed = this.randomness.originalSeed;
+                    this.randomnessInitialized = true;
+                    console.log(`🎲 Randomness state restored: ${this.randomness.callCount} calls made`);
+                }
+            }
+
+            if (stateData.spellSystemState && this.spellSystem) {
+                this.spellSystem.importState(stateData.spellSystemState);
+            }
+
             if (this.isAuthoritative && stateData.connectionAware) {
                 this.battlePaused = stateData.connectionAware.battlePaused || false;
                 this.totalPauseTime = stateData.connectionAware.totalPauseTime || 0;
@@ -2871,36 +3379,85 @@ export class BattleManager {
 
     // Update all hero visuals after restoration
     updateAllHeroVisuals() {
+        console.log('🎨 Updating all hero visuals...');
+        
         ['left', 'center', 'right'].forEach(position => {
+            // Update player heroes
             if (this.playerHeroes[position]) {
                 const hero = this.playerHeroes[position];
+                
+                // Update health bar
                 this.updateHeroHealthBar('player', position, hero.currentHp, hero.maxHp);
+                
+                // Update attack display
                 this.updateHeroAttackDisplay('player', position, hero);
+                
+                // Handle defeated state
                 if (!hero.alive) {
-                    this.handleHeroDeath(hero);
+                    this.applyDefeatedVisualState('player', position);
+                } else {
+                    this.resetHeroVisualState('player', position);
                 }
+                
                 // Update creature visuals
-                this.updateCreatureVisuals('player', position, hero.creatures);
-
-                if (this.necromancyManager) {
-                    this.necromancyManager.updateNecromancyDisplayForHeroWithCreatures('player', position, hero);
+                if (hero.creatures && hero.creatures.length > 0) {
+                    this.updateCreatureVisuals('player', position, hero.creatures);
                 }
+                
+                console.log(`Updated player ${hero.name}: ${hero.currentHp}/${hero.maxHp} HP, alive: ${hero.alive}`);
             }
+            
+            // Update opponent heroes
             if (this.opponentHeroes[position]) {
                 const hero = this.opponentHeroes[position];
+                
+                // Update health bar
                 this.updateHeroHealthBar('opponent', position, hero.currentHp, hero.maxHp);
+                
+                // Update attack display
                 this.updateHeroAttackDisplay('opponent', position, hero);
+                
+                // Handle defeated state
                 if (!hero.alive) {
-                    this.handleHeroDeath(hero);
+                    this.applyDefeatedVisualState('opponent', position);
+                } else {
+                    this.resetHeroVisualState('opponent', position);
                 }
+                
                 // Update creature visuals
-                this.updateCreatureVisuals('opponent', position, hero.creatures);
-
-                if (this.necromancyManager) {
-                    this.necromancyManager.updateNecromancyDisplayForHeroWithCreatures('player', position, hero);
+                if (hero.creatures && hero.creatures.length > 0) {
+                    this.updateCreatureVisuals('opponent', position, hero.creatures);
                 }
+                
+                console.log(`Updated opponent ${hero.name}: ${hero.currentHp}/${hero.maxHp} HP, alive: ${hero.alive}`);
             }
         });
+        
+        
+        // Restore fireshield visual effects
+        this.restoreFireshieldVisuals();
+
+        console.log('✅ All hero visuals updated');
+    }
+
+    // Restore fireshield visual effects after reconnection
+    restoreFireshieldVisuals() {
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('Fireshield')) {
+            const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
+            fireshieldSpell.restoreFireshieldVisuals();
+        }
+    }
+
+    applyDefeatedVisualState(side, position) {
+        const heroElement = this.getHeroElement(side, position);
+        if (heroElement) {
+            const card = heroElement.querySelector('.battle-hero-card');
+            if (card) {
+                card.classList.add('defeated');
+                card.style.filter = 'grayscale(100%)';
+                card.style.opacity = '0.5';
+            }
+        }
     }
 
     // Force refresh battle state
@@ -2913,6 +3470,11 @@ export class BattleManager {
         this.battlePaused = false;
         this.pauseStartTime = null;
         this.totalPauseTime = 0;
+        
+        // Reset randomness system
+        if (this.isAuthoritative) {
+            this.initializeRandomness();
+        }
     }
 
     // Utility delay function
@@ -2927,7 +3489,7 @@ export class BattleManager {
         }
     }
 
-    // Reset battle manager
+    // Reset battle manager - UPDATED WITH RANDOMNESS RESET
     reset() {
         this.battleActive = false;
         this.currentTurn = 0;
@@ -2971,10 +3533,26 @@ export class BattleManager {
             this.necromancyManager = null;
         }
 
-        // ADD: Cleanup Jiggles manager
+        // Cleanup Jiggles manager
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
             this.jigglesManager = null;
+        }
+
+        // Cleanup fireshield visual effects
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('Fireshield')) {
+            const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
+            fireshieldSpell.cleanupFireshieldEffects();
+        }
+
+        // Reset randomness system
+        this.randomness = null;
+        this.randomnessSeed = null;
+        this.randomnessInitialized = false;
+
+        if (this.spellSystem) {
+            this.spellSystem.reset();
+            this.spellSystem = null;
         }
 
         this.clearVisualEffects();
@@ -2983,7 +3561,6 @@ export class BattleManager {
             this.persistenceManager.cleanup();
         }
     }
-
 
     // Clear all visual effects
     clearVisualEffects() {

@@ -28,8 +28,6 @@ export class HeroCreatureManager {
             draggedFromIndex: null,
             draggedElement: null
         };
-        
-        console.log('HeroCreatureManager initialized');
     }
 
     // Initialize with references to other managers
@@ -37,7 +35,6 @@ export class HeroCreatureManager {
         this.handManager = handManager;
         this.formationManager = formationManager;
         this.onStateChange = onStateChange;
-        console.log('HeroCreatureManager initialized with manager references');
     }
 
     // Check if a card is a creature spell
@@ -48,24 +45,11 @@ export class HeroCreatureManager {
 
     // Set Guard Change mode (called by GlobalSpellManager)
     setGuardChangeMode(active) {
-        console.log('🔍 HeroCreatureManager.setGuardChangeMode called with active:', active);
-        console.log('🔍 Previous guardChangeMode value:', this.guardChangeMode);
-        
         this.guardChangeMode = active;
-        
-        console.log('🔍 New guardChangeMode value:', this.guardChangeMode);
-        console.log(`🛡️ HeroCreatureManager: Guard Change mode ${active ? 'ACTIVATED' : 'DEACTIVATED'}`);
     }
 
     // Move creature between different heroes (only allowed in Guard Change mode)
-    moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, toHeroPosition, toIndex) {
-        console.log('🔍 moveCreatureBetweenHeroes called');
-        console.log('🔍 fromHeroPosition:', fromHeroPosition);
-        console.log('🔍 fromIndex:', fromIndex);
-        console.log('🔍 toHeroPosition:', toHeroPosition);
-        console.log('🔍 toIndex:', toIndex);
-        console.log('🔍 this.guardChangeMode:', this.guardChangeMode);
-        
+    moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, toHeroPosition, toIndex) {        
         if (!this.guardChangeMode) {
             console.error('❌ Cannot move creatures between heroes - Guard Change mode not active');
             return false;
@@ -78,17 +62,11 @@ export class HeroCreatureManager {
         }
         
         if (!this.hasHeroAtPosition(toHeroPosition)) {
-            console.log('❌ Cannot move creature to empty hero slot');
             return false;
         }
         
         const fromCreatures = this.heroCreatures[fromHeroPosition];
         const toCreatures = this.heroCreatures[toHeroPosition];
-        
-        console.log('🔍 fromCreatures length:', fromCreatures.length);
-        console.log('🔍 toCreatures length:', toCreatures.length);
-        console.log('🔍 fromCreatures:', fromCreatures.map(c => c.name));
-        console.log('🔍 toCreatures:', toCreatures.map(c => c.name));
         
         if (fromIndex < 0 || fromIndex >= fromCreatures.length) {
             console.error(`❌ Invalid source creature index: ${fromIndex}`);
@@ -99,24 +77,15 @@ export class HeroCreatureManager {
             console.error(`❌ Invalid target creature index: ${toIndex}`);
             return false;
         }
-        
-        console.log('🔍 About to move creature:', fromCreatures[fromIndex].name);
-        
+                
         // Move the creature
         const [movedCreature] = fromCreatures.splice(fromIndex, 1);
         toCreatures.splice(toIndex, 0, movedCreature);
-        
-        console.log('✅ Creature moved successfully!');
-        console.log('🔍 fromCreatures after move:', fromCreatures.map(c => c.name));
-        console.log('🔍 toCreatures after move:', toCreatures.map(c => c.name));
-        
-        console.log(`🛡️ Guard Change: Moved creature ${movedCreature.name} from ${fromHeroPosition}[${fromIndex}] to ${toHeroPosition}[${toIndex}]`);
-        
+                
         if (this.onStateChange) {
-            console.log('🔍 Calling onStateChange callback');
             this.onStateChange();
         } else {
-            console.log('⚠️ No onStateChange callback set');
+            console.error('⚠️ No onStateChange callback set');
         }
         
         return true;
@@ -134,10 +103,6 @@ export class HeroCreatureManager {
         if (this.formationManager) {
             const formation = this.formationManager.getBattleFormation();
             const hasHero = formation && formation[heroPosition] !== null && formation[heroPosition] !== undefined;
-            
-            if (!hasHero) {
-                console.log(`No hero in formation at position: ${heroPosition}`);
-            }
             
             return hasHero;
         }
@@ -161,7 +126,6 @@ export class HeroCreatureManager {
     // Add a creature to a hero
     addCreatureToHero(heroPosition, creatureCardName) {
         if (!this.hasHeroAtPosition(heroPosition)) {
-            console.log(`Cannot add creature - no hero at position: ${heroPosition}`);
             return false;
         }
 
@@ -183,9 +147,6 @@ export class HeroCreatureManager {
             ...cardInfo,
             addedAt: Date.now() // Track when the creature was added
         });
-
-        console.log(`Added creature ${creatureCardName} to ${heroPosition} hero`);
-        console.log(`${heroPosition} hero now has ${this.heroCreatures[heroPosition].length} creatures`);
         
         // Notify state change
         if (this.onStateChange) {
@@ -210,7 +171,6 @@ export class HeroCreatureManager {
 
         // Remove and return the creature
         const removedCreature = creatures.splice(creatureIndex, 1)[0];
-        console.log(`Removed creature ${removedCreature.name} from ${heroPosition} hero`);
         
         // Notify state change
         if (this.onStateChange) {
@@ -246,8 +206,6 @@ export class HeroCreatureManager {
         
         // Insert at new position
         creatures.splice(toIndex, 0, draggedCreature);
-
-        console.log(`Reordered creature ${draggedCreature.name} from index ${fromIndex} to ${toIndex} for ${heroPosition} hero`);
         
         // Notify state change
         if (this.onStateChange) {
@@ -305,7 +263,6 @@ export class HeroCreatureManager {
             draggedElement.classList.add('creature-dragging');
         }
 
-        console.log(`Started dragging creature ${this.dragState.draggedCreature.name} from ${heroPosition}[${creatureIndex}]`);
         return true;
     }
 
@@ -335,65 +292,41 @@ export class HeroCreatureManager {
     }
 
     // Handle creature drop operation
-    handleCreatureDrop(targetHeroPosition, dropX, targetContainer) {
-        console.log('🔍 HeroCreatureManager.handleCreatureDrop called');
-        console.log('🔍 targetHeroPosition:', targetHeroPosition);
-        console.log('🔍 this.dragState:', this.dragState);
-        
+    handleCreatureDrop(targetHeroPosition, dropX, targetContainer) {        
         if (!this.dragState.isDragging) {
-            console.log('❌ No creature drag in progress (this.dragState.isDragging is false)');
             return false;
         }
 
         const fromHeroPosition = this.dragState.draggedFromHero;
         const fromIndex = this.dragState.draggedFromIndex;
         
-        console.log('🔍 fromHeroPosition:', fromHeroPosition);
-        console.log('🔍 fromIndex:', fromIndex);
-        console.log('🔍 targetHeroPosition:', targetHeroPosition);
-        
         // Same hero - handle reordering within hero
         if (targetHeroPosition === fromHeroPosition) {
-            console.log(`🔄 Reordering creature within ${targetHeroPosition} hero`);
             
             const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
-            console.log('🔍 targetIndex for reorder:', targetIndex);
             
             const success = this.reorderCreaturesWithinHero(targetHeroPosition, fromIndex, targetIndex);
-            console.log('🔍 reorderCreaturesWithinHero result:', success);
             
             this.endCreatureDrag();
             return success;
         }
-        
-        // Different hero - check if Guard Change mode is active
-        console.log('🔍 this.guardChangeMode:', this.guardChangeMode);
-        
+                
         if (!this.guardChangeMode) {
-            console.log('❌ Cannot move creature to different hero - Guard Change mode not active in manager');
             this.endCreatureDrag();
             return false;
         }
 
-        // Guard Change mode is active - allow cross-hero movement
-        console.log(`🛡️ Guard Change mode: Moving creature from ${fromHeroPosition} to ${targetHeroPosition}`);
-
         // Check if target hero exists
         const hasTargetHero = this.hasHeroAtPosition(targetHeroPosition);
-        console.log('🔍 hasTargetHero (from manager):', hasTargetHero);
         
         if (!hasTargetHero) {
-            console.log(`❌ Cannot move creature to ${targetHeroPosition} - no hero at that position`);
             this.endCreatureDrag();
             return false;
         }
 
         const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
-        console.log('🔍 targetIndex for cross-hero move:', targetIndex);
         
-        console.log('🔍 About to call moveCreatureBetweenHeroes...');
         const success = this.moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, targetHeroPosition, targetIndex);
-        console.log('🔍 moveCreatureBetweenHeroes result:', success);
 
         this.endCreatureDrag();
         return success;
@@ -419,7 +352,6 @@ export class HeroCreatureManager {
         }
 
         this.heroCreatures[heroPosition] = [];
-        console.log(`Cleared creatures for ${heroPosition} hero`);
     }
 
     // Move creatures when heroes swap positions
@@ -435,7 +367,6 @@ export class HeroCreatureManager {
         this.heroCreatures[fromPosition] = this.heroCreatures[toPosition];
         this.heroCreatures[toPosition] = temp;
         
-        console.log(`Swapped creatures between ${fromPosition} and ${toPosition}`);
     }
 
     // Update hero placement (called when formation changes)
@@ -494,7 +425,6 @@ export class HeroCreatureManager {
     // Import state for loading
     importCreaturesState(state) {
         if (!state || !state.heroCreatures) {
-            console.log('No creatures state to import');
             return false;
         }
 
@@ -507,9 +437,6 @@ export class HeroCreatureManager {
                 this.heroCreatures[position] = [];
             }
         }
-
-        console.log('Imported hero creatures state');
-        console.log('Total creatures across all heroes:', this.getTotalCreatureCount());
         
         return true;
     }
@@ -537,22 +464,6 @@ export class HeroCreatureManager {
             draggedFromIndex: null,
             draggedElement: null
         };
-        
-        console.log('HeroCreatureManager reset');
-    }
-
-    // Debug method to log current state
-    logCreatureState() {
-        console.log('=== HERO CREATURE STATE ===');
-        for (const position in this.heroCreatures) {
-            const creatures = this.heroCreatures[position];
-            console.log(`${position} hero: ${creatures.length} creatures`);
-            creatures.forEach((creature, index) => {
-                console.log(`  [${index}] ${creature.name} (Level ${creature.level || 0})`);
-            });
-        }
-        console.log(`Total creatures: ${this.getTotalCreatureCount()}`);
-        console.log('===========================');
     }
 
     // Control creature animations

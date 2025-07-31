@@ -1,8 +1,8 @@
-// handManager.js - Fixed Hand Management with Opera-Compatible Drag & Drop and Centralized Artifact Handling
+// handManager.js - Enhanced Hand Management with Exclusive Artifact Support
 
-// Import the centralized artifact handler
 import { artifactHandler } from './artifactHandler.js';
 import { globalSpellManager } from './globalSpellManager.js';
+import { potionHandler } from './potionHandler.js';
 
 export class HandManager {
     constructor(deckManager) {
@@ -18,14 +18,16 @@ export class HandManager {
             draggedElement: null,
             originalHand: [] // Backup of original hand order
         };
-        
-        console.log('HandManager initialized with Opera-compatible drag & drop support');
     }
 
-    // === DRAG & DROP EVENT HANDLERS - OPERA COMPATIBLE ===
+    // === ENHANCED DRAG & DROP EVENT HANDLERS ===
 
-    // Start dragging a hand card
+    // Start dragging a hand card - now with entire hand disabling approach
     startHandCardDrag(cardIndex, cardName, draggedElement) {
+        // NOTE: Exclusive artifact blocking is now handled at the global function level
+        // (onHandCardDragStart) before this method is even called, so we don't need
+        // to check here anymore since the entire hand gets disabled.
+
         this.dragState = {
             isDragging: true,
             draggedCardIndex: cardIndex,
@@ -51,13 +53,38 @@ export class HandManager {
             }
         }
         
-        // NEW: Check if this is a global spell and add body class
+        // Check if this is a global spell and add body class
         if (window.globalSpellManager && window.heroSelection && 
             window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
             document.body.classList.add('dragging-global-spell');
         }
 
-        console.log(`Started dragging hand card: ${cardName} from index ${cardIndex}`);
+        return true;
+    }
+
+    // Check if the entire hand should be disabled due to exclusive artifact
+    isHandDisabledByExclusive() {
+        return window.artifactHandler ? window.artifactHandler.isExclusiveArtifactActive() : false;
+    }
+
+    // Get info about the active exclusive artifact
+    getActiveExclusiveInfo() {
+        if (!window.artifactHandler || !window.artifactHandler.isExclusiveArtifactActive()) {
+            return null;
+        }
+        
+        return {
+            name: window.artifactHandler.getActiveExclusiveArtifact(),
+            formattedName: this.formatCardName(window.artifactHandler.getActiveExclusiveArtifact())
+        };
+    }
+
+    // Format card name for display
+    formatCardName(cardName) {
+        return cardName
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
+            .trim();
     }
 
     // End drag operation
@@ -79,12 +106,11 @@ export class HandManager {
         // CLEAN UP ALL ABILITY TOOLTIPS when drag ends
         const allTooltips = document.querySelectorAll('.ability-drop-tooltip');
         allTooltips.forEach(tooltip => tooltip.remove());
-        console.log('🔍 Cleaned up all tooltips on drag end');
         
         // Remove body class for ability dragging
         document.body.classList.remove('dragging-ability');
         
-        // NEW: Remove body class for global spell dragging
+        // Remove body class for global spell dragging
         document.body.classList.remove('dragging-global-spell');
 
         this.resetDragState();
@@ -94,14 +120,12 @@ export class HandManager {
     handleInvalidDrop() {
         if (!this.dragState.isDragging) return;
         
-        console.log(`Invalid drop, returning card to original position`);
         this.endHandCardDrag();
     }
 
-    // === HAND ZONE DRAG & DROP HANDLERS ===
+    // === EXISTING HAND ZONE DRAG & DROP HANDLERS (unchanged) ===
 
     onZoneDragEnter(event) {
-        // Only handle if we're dragging a hand card
         if (this.isHandDragging()) {
             event.preventDefault();
             event.stopPropagation();
@@ -114,12 +138,10 @@ export class HandManager {
     }
 
     onZoneDragOver(event) {
-        // Only handle if we're dragging a hand card
         if (this.isHandDragging()) {
             event.preventDefault();
             event.stopPropagation();
             
-            // Set drop effect
             event.dataTransfer.dropEffect = 'move';
             
             return false;
@@ -127,13 +149,11 @@ export class HandManager {
     }
 
     onZoneDragLeave(event) {
-        // Remove visual feedback when leaving the hand zone
         const handZone = event.currentTarget;
         const rect = handZone.getBoundingClientRect();
         const x = event.clientX;
         const y = event.clientY;
         
-        // Only remove feedback if we're actually leaving the zone
         if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
             handZone.classList.remove('hand-zone-drag-over');
         }
@@ -143,31 +163,22 @@ export class HandManager {
         event.preventDefault();
         event.stopPropagation();
         
-        // Only handle if we're dragging a hand card
         if (this.isHandDragging()) {
             const handZone = event.currentTarget;
             
-            // Remove visual feedback immediately
             handZone.classList.remove('hand-zone-drag-over');
             
-            // Get the drop position (cursor X coordinate)
             const dropX = event.clientX;
             
-            // Handle the drop and reorder the hand
             const result = this.handleHandDrop(dropX, handZone);
             if (result.success) {
-                console.log('Hand card successfully reordered');
-                // Notify parent that hand changed and needs saving
                 this.notifyHandChanged();
-            } else {
-                console.log('Hand card drop cancelled or failed');
             }
         }
         
         return false;
     }
 
-    // Calculate insertion position based on cursor position over hand zone
     calculateInsertionPosition(dropX, handZoneElement) {
         const handCards = handZoneElement.querySelectorAll('.hand-card');
         
@@ -175,7 +186,6 @@ export class HandManager {
             return 0;
         }
 
-        // Special case: if only one card and we're dragging it, return position 0
         if (handCards.length === 1 && this.dragState.isDragging) {
             return 0;
         }
@@ -184,7 +194,6 @@ export class HandManager {
         let closestDistance = Infinity;
 
         handCards.forEach((card, index) => {
-            // Skip the currently dragged card
             if (this.dragState.isDragging && index === this.dragState.draggedCardIndex) {
                 return;
             }
@@ -196,7 +205,6 @@ export class HandManager {
             if (distance < closestDistance) {
                 closestDistance = distance;
                 
-                // Determine if we should insert before or after this card
                 if (dropX < cardCenterX) {
                     closestIndex = index;
                 } else {
@@ -205,16 +213,13 @@ export class HandManager {
             }
         });
 
-        // Adjust for removed dragged card if we're dragging from this hand
         if (this.dragState.isDragging && this.dragState.draggedCardIndex < closestIndex) {
             closestIndex--;
         }
 
-        // Clamp to valid range
         return Math.max(0, Math.min(closestIndex, this.hand.length - 1));
     }
 
-    // Reorder hand by moving a card to a new position
     reorderHand(fromIndex, toIndex) {
         if (fromIndex < 0 || fromIndex >= this.hand.length || 
             toIndex < 0 || toIndex >= this.hand.length || 
@@ -222,19 +227,12 @@ export class HandManager {
             return false;
         }
 
-        // Remove card from original position
         const [movedCard] = this.hand.splice(fromIndex, 1);
-        
-        // Insert at new position
         this.hand.splice(toIndex, 0, movedCard);
-
-        console.log(`Reordered hand: moved ${movedCard} from index ${fromIndex} to ${toIndex}`);
-        console.log('New hand order:', this.hand);
         
         return true;
     }
 
-    // Handle drop in hand zone
     handleHandDrop(dropX, handZoneElement) {
         if (!this.dragState.isDragging) {
             return { success: false, needsUIUpdate: false, needsSave: false };
@@ -243,9 +241,6 @@ export class HandManager {
         const targetIndex = this.calculateInsertionPosition(dropX, handZoneElement);
         const originalIndex = this.dragState.draggedCardIndex;
 
-        console.log(`Dropping card from index ${originalIndex} to index ${targetIndex}`);
-
-        // Only reorder if position actually changed
         if (originalIndex !== targetIndex) {
             const success = this.reorderHand(originalIndex, targetIndex);
             if (success) {
@@ -258,7 +253,6 @@ export class HandManager {
         return { success: false, needsUIUpdate: false, needsSave: false };
     }
 
-    // Reset drag state
     resetDragState() {
         this.dragState = {
             isDragging: false,
@@ -269,24 +263,19 @@ export class HandManager {
         };
     }
 
-    // Get current drag state
     getHandDragState() {
         return { ...this.dragState };
     }
 
-    // Check if currently dragging a hand card
     isHandDragging() {
         return this.dragState.isDragging;
     }
 
-    // Notify parent that hand changed and needs saving
     notifyHandChanged() {
-        // Try to notify the hero selection to save the game state
         if (window.heroSelection && typeof window.heroSelection.autoSave === 'function') {
             window.heroSelection.autoSave();
         }
         
-        // Update hand display
         if (window.heroSelection && typeof window.heroSelection.updateHandDisplay === 'function') {
             window.heroSelection.updateHandDisplay();
         }
@@ -294,24 +283,19 @@ export class HandManager {
 
     // === EXISTING HAND MANAGEMENT METHODS (unchanged) ===
 
-    // Get player's hand (returns copy to prevent external modification)
     getHand() {
         return [...this.hand];
     }
 
-    // Get hand size
     getHandSize() {
         return this.hand.length;
     }
 
-    // Clear the hand
     clearHand() {
         this.hand = [];
         this.resetDragState();
-        console.log('Hand cleared');
     }
 
-    // Draw random cards from deck (cards are infinite, so no removal from deck)
     drawCards(count = 1) {
         if (!this.deckManager || this.deckManager.getDeckSize() === 0) {
             console.warn('Cannot draw cards: no deck available or deck is empty');
@@ -322,33 +306,25 @@ export class HandManager {
         const drawnCards = [];
 
         for (let i = 0; i < count; i++) {
-            // Stop if hand is at max capacity
             if (this.hand.length >= this.maxHandSize) {
                 console.warn(`Hand is full (${this.maxHandSize} cards), cannot draw more cards`);
                 break;
             }
 
-            // Draw random card from deck (infinite, so deck doesn't change)
             const randomIndex = Math.floor(Math.random() * deck.length);
             const drawnCard = deck[randomIndex];
             
             this.hand.push(drawnCard);
             drawnCards.push(drawnCard);
-        }
-
-        console.log(`Drew ${drawnCards.length} cards:`, drawnCards);
-        console.log(`Hand now contains ${this.hand.length} cards:`, this.hand);
-        
+        }        
         return drawnCards;
     }
 
-    // Draw initial hand (5 cards)
     drawInitialHand() {
         this.clearHand();
         return this.drawCards(5);
     }
 
-    // Add specific card to hand (for rewards and future functionality)
     addCardToHand(cardName) {
         if (this.hand.length >= this.maxHandSize) {
             console.warn(`Hand is full (${this.maxHandSize} cards), cannot add card`);
@@ -361,16 +337,13 @@ export class HandManager {
         }
 
         this.hand.push(cardName);
-        console.log(`Added ${cardName} to hand. Hand size: ${this.hand.length}`);
         return true;
     }
 
-    // Remove card from hand (for playing cards)
     removeCardFromHand(cardName) {
         const index = this.hand.indexOf(cardName);
         if (index > -1) {
             this.hand.splice(index, 1);
-            console.log(`Removed ${cardName} from hand. Hand size: ${this.hand.length}`);
             return true;
         } else {
             console.warn(`Card ${cardName} not found in hand`);
@@ -378,11 +351,9 @@ export class HandManager {
         }
     }
 
-    // Remove card from hand by index (for playing cards)
     removeCardFromHandByIndex(index) {
         if (index >= 0 && index < this.hand.length) {
             const removedCard = this.hand.splice(index, 1)[0];
-            console.log(`Removed ${removedCard} from hand at index ${index}. Hand size: ${this.hand.length}`);
             return removedCard;
         } else {
             console.warn(`Invalid hand index: ${index}`);
@@ -390,33 +361,28 @@ export class HandManager {
         }
     }
 
-    // Check if hand contains a specific card
     hasCard(cardName) {
         return this.hand.includes(cardName);
     }
 
-    // Get card count for specific card name
     getCardCount(cardName) {
         return this.hand.filter(card => card === cardName).length;
     }
 
-    // Check if hand is full
     isHandFull() {
         return this.hand.length >= this.maxHandSize;
     }
 
-    // Check if hand is empty
     isHandEmpty() {
         return this.hand.length === 0;
     }
 
-    // Set maximum hand size
     setMaxHandSize(size) {
         this.maxHandSize = Math.max(1, size);
-        console.log(`Max hand size set to: ${this.maxHandSize}`);
     }
 
-    // Create hand display HTML with integrated drag & drop support
+    // === ENHANCED HAND DISPLAY WITH EXCLUSIVE ARTIFACT SUPPORT ===
+
     createHandDisplay(formatCardNameFunction, goldManager = null) {
         const handContent = this.createHandContent(formatCardNameFunction);
         const goldDisplay = goldManager ? this.createGoldDisplay(goldManager) : '';
@@ -429,7 +395,7 @@ export class HandManager {
         `;
     }
 
-    // Create hand content (cards) with Opera-compatible event handlers
+    // Enhanced hand content creation with ENTIRE HAND disabling when exclusive artifact is active
     createHandContent(formatCardNameFunction) {
         if (this.hand.length === 0) {
             return `
@@ -442,21 +408,41 @@ export class HandManager {
             `;
         }
 
+        // Check if ANY exclusive artifact is active - this disables the ENTIRE hand
+        const isAnyExclusiveActive = window.artifactHandler ? 
+            window.artifactHandler.isExclusiveArtifactActive() : false;
+        const activeExclusiveArtifact = isAnyExclusiveActive ? 
+            window.artifactHandler.getActiveExclusiveArtifact() : null;
+
         let handHTML = `
-            <div class="hand-container">
+            <div class="hand-container${isAnyExclusiveActive ? ' exclusive-disabled' : ''}">
                 <div class="hand-cards" 
                     data-card-count="${this.hand.length}"
+                    data-exclusive-disabled="${isAnyExclusiveActive}"
                     ondragover="onHandZoneDragOver(event)"
                     ondrop="onHandZoneDrop(event)"
                     ondragleave="onHandZoneDragLeave(event)"
                     ondragenter="onHandZoneDragEnter(event)">
         `;
 
+        // Add exclusive artifact notification bar if any is active
+        if (isAnyExclusiveActive) {
+            const formattedArtifactName = this.formatCardName(activeExclusiveArtifact);
+            handHTML += `
+                <div class="hand-exclusive-overlay">
+                    <div class="hand-exclusive-message">
+                        <span class="hand-exclusive-icon">🔐</span>
+                        <span class="hand-exclusive-text">Hand disabled while ${formattedArtifactName} is active</span>
+                    </div>
+                </div>
+            `;
+        }
+
         this.hand.forEach((cardName, index) => {
             const cardPath = `./Cards/All/${cardName}.png`;
             const cardDisplayName = formatCardNameFunction ? formatCardNameFunction(cardName) : cardName;
             
-            // Get card info to check if it requires an action
+            // Get card info to check various attributes
             const cardInfo = window.heroSelection?.getCardInfo ? 
                 window.heroSelection.getCardInfo(cardName) : null;
             const requiresAction = cardInfo && cardInfo.action;
@@ -468,8 +454,10 @@ export class HandManager {
             // Check if this is a spell card
             const isSpellCard = window.heroSelection?.heroSpellbookManager?.isSpellCard(cardName) || false;
             const isGlobalSpell = window.globalSpellManager?.isGlobalSpell(cardName, window.heroSelection) || false;
-
             
+            // Check if this is a potion card
+            const isPotionCard = window.potionHandler?.isPotionCard(cardName, window.heroSelection) || false;
+
             // Check if this is an artifact and if it's unaffordable
             let isUnaffordable = false;
             let dataCardType = 'other';
@@ -479,6 +467,8 @@ export class HandManager {
                 dataCardType = 'spell';
             } else if (isGlobalSpell) {
                 dataCardType = 'global-spell';
+            } else if (isPotionCard) {
+                dataCardType = 'potion';
             } else if (cardInfo && cardInfo.cardType === 'Artifact') {
                 dataCardType = 'artifact';
                 // Check if player can afford it
@@ -488,8 +478,8 @@ export class HandManager {
                 }
             }
             
-            // Determine if card can be played
-            const canPlay = !requiresAction || hasActions;
+            // If ANY exclusive artifact is active, ALL cards are disabled
+            const canPlay = !isAnyExclusiveActive && (!requiresAction || hasActions) && !isUnaffordable;
             
             const cardData = {
                 imagePath: cardPath,
@@ -505,10 +495,11 @@ export class HandManager {
             if (isAbilityCard) cardClasses += ' ability-card';
             if (isSpellCard) cardClasses += ' spell-card';
             if (!canPlay) cardClasses += ' no-actions-available';
+            if (isAnyExclusiveActive) cardClasses += ' exclusive-hand-disabled';
 
-            // Add clickable class for special cards
+            // Add clickable class for special cards (only if they can be played)
             let clickableClass = '';
-            if (dataCardType === 'artifact' || dataCardType === 'global-spell') {
+            if ((dataCardType === 'artifact' || dataCardType === 'global-spell' || dataCardType === 'potion') && canPlay) {
                 clickableClass = ' clickable';
             }
 
@@ -520,8 +511,9 @@ export class HandManager {
                     data-requires-action="${requiresAction}"
                     data-can-play="${canPlay}"
                     data-unaffordable="${isUnaffordable}"
-                    draggable="${canPlay && !isUnaffordable ? 'true' : 'false'}"
-                    ondragstart="${canPlay && !isUnaffordable ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
+                    data-exclusive-hand-disabled="${isAnyExclusiveActive}"
+                    draggable="${canPlay ? 'true' : 'false'}"
+                    ondragstart="${canPlay ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
                     ondragend="onHandCardDragEnd(event)"
                     onclick="onHandCardClick(event, ${index}, '${cardName}')"
                     onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
@@ -543,7 +535,6 @@ export class HandManager {
         return handHTML;
     }
 
-    // Create gold display HTML
     createGoldDisplay(goldManager) {
         const playerGold = goldManager.getPlayerGold();
         const opponentGold = goldManager.getOpponentGold();
@@ -571,7 +562,6 @@ export class HandManager {
         `;
     }
 
-    // Get hand statistics
     getHandStats() {
         return {
             totalCards: this.hand.length,
@@ -588,7 +578,6 @@ export class HandManager {
         };
     }
 
-    // Calculate overlap level based on hand size
     getOverlapLevel() {
         if (this.hand.length <= 5) return 'none';
         if (this.hand.length === 6) return 'light';
@@ -598,7 +587,6 @@ export class HandManager {
         return 'none';
     }
 
-    // Get overlap description for UI feedback
     getOverlapDescription() {
         const level = this.getOverlapLevel();
         const descriptions = {
@@ -611,17 +599,14 @@ export class HandManager {
         return descriptions[level] || 'Normal spacing';
     }
 
-    // Shuffle hand
     shuffleHand() {
         for (let i = this.hand.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [this.hand[i], this.hand[j]] = [this.hand[j], this.hand[i]];
         }
-        console.log('Hand shuffled');
         return this.getHand();
     }
 
-    // Export hand data (for saving/syncing)
     exportHand() {
         return {
             cards: [...this.hand],
@@ -632,7 +617,6 @@ export class HandManager {
         };
     }
 
-    // Import hand data (for loading/syncing)
     importHand(handData) {
         if (!handData || !Array.isArray(handData.cards)) {
             console.error('Invalid hand data provided');
@@ -643,166 +627,32 @@ export class HandManager {
         if (handData.maxSize) {
             this.maxHandSize = handData.maxSize;
         }
-        this.resetDragState(); // Reset any drag state when importing
-        console.log(`Imported hand with ${this.hand.length} cards:`, this.hand);
-        console.log(`Overlap level: ${this.getOverlapLevel()}`);
+        this.resetDragState();
         return true;
     }
 
-    // Reset hand to initial state
     reset() {
         this.hand = [];
         this.maxHandSize = 10;
         this.resetDragState();
-        console.log('HandManager reset');
-    }
-
-    // Log current hand state (for debugging)
-    logHandState() {
-        console.log('=== ENHANCED HAND STATE ===');
-        console.log('Cards:', this.hand);
-        console.log('Size:', this.hand.length);
-        console.log('Max Size:', this.maxHandSize);
-        console.log('Overlap Level:', this.getOverlapLevel());
-        console.log('Overlap Description:', this.getOverlapDescription());
-        console.log('Drag State:', this.dragState);
-        console.log('Stats:', this.getHandStats());
-        console.log('==========================');
     }
 }
 
-// ===== ARTIFACT GOLD CHECK HELPER FUNCTIONS =====
+// ===== ENHANCED GLOBAL HAND CARD FUNCTIONS WITH EXCLUSIVE SUPPORT =====
 
-// Check if player can afford to play an artifact
-function canPlayerAffordArtifact(cardName) {
-    if (!window.heroSelection) {
-        return { canAfford: false, reason: 'Game not initialized' };
-    }
-    
-    // Get card info
-    const cardInfo = window.heroSelection.getCardInfo(cardName);
-    if (!cardInfo) {
-        return { canAfford: true }; // If no info, allow play
-    }
-    
-    // Check if it's an artifact
-    if (cardInfo.cardType !== 'Artifact') {
-        return { canAfford: true }; // Not an artifact, no gold check needed
-    }
-    
-    // Get artifact cost
-    const artifactCost = cardInfo.cost || 0;
-    if (artifactCost <= 0) {
-        return { canAfford: true }; // No cost or free artifact
-    }
-    
-    // Get player's current gold
-    const playerGold = window.heroSelection.getGoldManager().getPlayerGold();
-    
-    // Check if player can afford it
-    if (playerGold >= artifactCost) {
-        return { canAfford: true };
-    } else {
-        return { 
-            canAfford: false, 
-            reason: `You need ${artifactCost} Gold to play this card!`,
-            cost: artifactCost,
-            currentGold: playerGold,
-            shortBy: artifactCost - playerGold
-        };
-    }
-}
-
-// Show gold error message
-function showGoldError(message, event) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'gold-error-popup';
-    errorDiv.innerHTML = `
-        <div class="gold-error-content">
-            <span class="gold-error-icon">💰</span>
-            <span class="gold-error-text">${message}</span>
-        </div>
-    `;
-    
-    // Position near the cursor or card
-    const x = event ? event.clientX : window.innerWidth / 2;
-    const y = event ? event.clientY : window.innerHeight / 2;
-    
-    errorDiv.style.cssText = `
-        position: fixed;
-        left: ${x}px;
-        top: ${y - 50}px;
-        transform: translateX(-50%);
-        background: rgba(220, 53, 69, 0.95);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: bold;
-        z-index: 10000;
-        pointer-events: none;
-        animation: goldErrorBounce 0.5s ease-out;
-        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-    `;
-    
-    document.body.appendChild(errorDiv);
-    
-    // Remove after animation
-    setTimeout(() => {
-        errorDiv.style.animation = 'goldErrorFade 0.3s ease-out forwards';
-        setTimeout(() => errorDiv.remove(), 300);
-    }, 2000);
-}
-
-// Show action error message
-function showActionError(message, event) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'action-error-popup';
-    errorDiv.innerHTML = `
-        <div class="action-error-content">
-            <span class="action-error-icon">⚡</span>
-            <span class="action-error-text">${message}</span>
-        </div>
-    `;
-    
-    // Position near the cursor
-    const x = event ? event.clientX : window.innerWidth / 2;
-    const y = event ? event.clientY : window.innerHeight / 2;
-    
-    errorDiv.style.cssText = `
-        position: fixed;
-        left: ${x}px;
-        top: ${y - 50}px;
-        transform: translateX(-50%);
-        background: rgba(255, 193, 7, 0.95);
-        color: #212529;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: bold;
-        z-index: 10000;
-        pointer-events: none;
-        animation: actionErrorBounce 0.5s ease-out;
-        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.5);
-        border: 2px solid rgba(255, 255, 255, 0.3);
-    `;
-    
-    document.body.appendChild(errorDiv);
-    
-    // Remove after animation
-    setTimeout(() => {
-        errorDiv.style.animation = 'actionErrorFade 0.3s ease-out forwards';
-        setTimeout(() => errorDiv.remove(), 300);
-    }, 2000);
-}
-
-// ===== GLOBAL HAND CARD DRAG FUNCTIONS =====
-
-// Global hand card drag functions (matching hero drag pattern)
+// Enhanced hand card drag start with ENTIRE HAND disabling
 function onHandCardDragStart(event, cardIndex, cardName) {
     if (window.handManager && window.heroSelection) {
-        // First check if it's an artifact and if player can afford it
+        // Check if entire hand is disabled due to exclusive artifact
+        if (window.artifactHandler && window.artifactHandler.isExclusiveArtifactActive()) {
+            const activeExclusive = window.artifactHandler.getActiveExclusiveArtifact();
+            const formattedName = window.handManager.formatCardName(activeExclusive);
+            event.preventDefault();
+            showHandDisabledError(`Hand is disabled while ${formattedName} is active`, event);
+            return false;
+        }
+
+        // Check if it's an artifact and if player can afford it
         const affordCheck = canPlayerAffordArtifact(cardName);
         if (!affordCheck.canAfford) {
             event.preventDefault();
@@ -810,11 +660,10 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             return false;
         }
         
-        // Get card info
+        // Check if player can play action card
         const cardInfo = window.heroSelection.getCardInfo ? 
             window.heroSelection.getCardInfo(cardName) : null;
         
-        // Check if player can play action card
         if (window.heroSelection.actionManager) {
             const actionCheck = window.heroSelection.actionManager.canPlayActionCard(cardInfo);
             
@@ -853,38 +702,230 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             
             // Browser-specific drag image handling
             if (isOpera) {
-                // Opera needs explicit drag image
                 setupOperaDragImage(event, draggedElement);
             } else if (isFirefox) {
-                // Firefox works better with smaller, properly sized drag images
                 setupFirefoxDragImage(event, draggedElement);
             } else {
-                // Chrome, Safari, and others usually work fine with default
-                // But we can still provide a smaller custom image if needed
                 setupDefaultDragImage(event, draggedElement);
             }
-            
-            console.log(`Drag started for ${cardName} from index ${cardIndex} (Browser: ${getBrowserName()})`);
         } catch (error) {
             console.error('Error setting up drag:', error);
-            // Don't prevent default on error - let browser handle it
         }
         
         // DELAY visual modifications to not interfere with ghost image generation
         setTimeout(() => {
-            window.handManager.startHandCardDrag(cardIndex, cardName, draggedElement);
+            const success = window.handManager.startHandCardDrag(cardIndex, cardName, draggedElement);
+            if (!success) {
+                // Drag was blocked, clean up dataTransfer
+                event.preventDefault();
+                return false;
+            }
         }, 0);
     }
 }
 
-// Opera-specific drag image setup
+// Enhanced hand card click with ENTIRE HAND disabling
+async function onHandCardClick(event, cardIndex, cardName) {
+    event.stopPropagation();
+
+    // Check if entire hand is disabled due to exclusive artifact
+    if (window.artifactHandler && window.artifactHandler.isExclusiveArtifactActive()) {
+        const activeExclusive = window.artifactHandler.getActiveExclusiveArtifact();
+        const formattedName = window.handManager ? 
+            window.handManager.formatCardName(activeExclusive) : activeExclusive;
+        showHandDisabledError(`Hand is disabled while ${formattedName} is active`, event);
+        return;
+    }
+
+    // Check if it's a potion
+    if (window.potionHandler && window.potionHandler.isPotionCard(cardName, window.heroSelection)) {
+        const result = await window.potionHandler.handlePotionClick(cardIndex, cardName, window.heroSelection);
+        return;
+    }
+        
+    // Check if it's an artifact and if player can afford it
+    const affordCheck = canPlayerAffordArtifact(cardName);
+    if (!affordCheck.canAfford) {
+        showGoldError(affordCheck.reason, event);
+        return;
+    }
+
+    // Check if it's a global spell
+    if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
+        const result = await window.globalSpellManager.handleGlobalSpellActivation(cardIndex, cardName, window.heroSelection);
+        return;
+    }
+    
+    // Use artifact handler for all artifacts
+    if (window.artifactHandler) {
+        const handled = await window.artifactHandler.handleArtifactClick(cardIndex, cardName, window.heroSelection);
+        if (handled) {
+            return; // Artifact was successfully handled
+        }
+    }
+}
+
+// === UTILITY FUNCTIONS (unchanged) ===
+
+function canPlayerAffordArtifact(cardName) {
+    if (!window.heroSelection) {
+        return { canAfford: false, reason: 'Game not initialized' };
+    }
+    
+    const cardInfo = window.heroSelection.getCardInfo(cardName);
+    if (!cardInfo) {
+        return { canAfford: true };
+    }
+    
+    if (cardInfo.cardType !== 'Artifact') {
+        return { canAfford: true };
+    }
+    
+    const artifactCost = cardInfo.cost || 0;
+    if (artifactCost <= 0) {
+        return { canAfford: true };
+    }
+    
+    const playerGold = window.heroSelection.getGoldManager().getPlayerGold();
+    
+    if (playerGold >= artifactCost) {
+        return { canAfford: true };
+    } else {
+        return { 
+            canAfford: false, 
+            reason: `You need ${artifactCost} Gold to play this card!`,
+            cost: artifactCost,
+            currentGold: playerGold,
+            shortBy: artifactCost - playerGold
+        };
+    }
+}
+
+function showGoldError(message, event) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'gold-error-popup';
+    errorDiv.innerHTML = `
+        <div class="gold-error-content">
+            <span class="gold-error-icon">💰</span>
+            <span class="gold-error-text">${message}</span>
+        </div>
+    `;
+    
+    const x = event ? event.clientX : window.innerWidth / 2;
+    const y = event ? event.clientY : window.innerHeight / 2;
+    
+    errorDiv.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y - 50}px;
+        transform: translateX(-50%);
+        background: rgba(220, 53, 69, 0.95);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 10000;
+        pointer-events: none;
+        animation: goldErrorBounce 0.5s ease-out;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => {
+        errorDiv.style.animation = 'goldErrorFade 0.3s ease-out forwards';
+        setTimeout(() => errorDiv.remove(), 300);
+    }, 2000);
+}
+
+function showActionError(message, event) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'action-error-popup';
+    errorDiv.innerHTML = `
+        <div class="action-error-content">
+            <span class="action-error-icon">⚡</span>
+            <span class="action-error-text">${message}</span>
+        </div>
+    `;
+    
+    const x = event ? event.clientX : window.innerWidth / 2;
+    const y = event ? event.clientY : window.innerHeight / 2;
+    
+    errorDiv.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y - 50}px;
+        transform: translateX(-50%);
+        background: rgba(255, 193, 7, 0.95);
+        color: #212529;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 10000;
+        pointer-events: none;
+        animation: actionErrorBounce 0.5s ease-out;
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => {
+        errorDiv.style.animation = 'actionErrorFade 0.3s ease-out forwards';
+        setTimeout(() => errorDiv.remove(), 300);
+    }, 2000);
+}
+
+// NEW: Show hand disabled error message
+function showHandDisabledError(message, event) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'hand-disabled-error-popup';
+    errorDiv.innerHTML = `
+        <div class="hand-disabled-error-content">
+            <span class="hand-disabled-error-icon">🔐</span>
+            <span class="hand-disabled-error-text">${message}</span>
+        </div>
+    `;
+    
+    const x = event ? event.clientX : window.innerWidth / 2;
+    const y = event ? event.clientY : window.innerHeight / 2;
+    
+    errorDiv.style.cssText = `
+        position: fixed;
+        left: ${x}px;
+        top: ${y - 50}px;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #6f42c1 0%, #495057 100%);
+        color: white;
+        padding: 14px 22px;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: bold;
+        z-index: 10000;
+        pointer-events: none;
+        animation: handDisabledErrorBounce 0.6s ease-out;
+        box-shadow: 0 6px 20px rgba(111, 66, 193, 0.6);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    setTimeout(() => {
+        errorDiv.style.animation = 'handDisabledErrorFade 0.4s ease-out forwards';
+        setTimeout(() => errorDiv.remove(), 400);
+    }, 2500);
+}
+
+// === REMAINING FUNCTIONS (unchanged) ===
+
 function setupOperaDragImage(event, draggedElement) {
     const cardImage = draggedElement.querySelector('.hand-card-image');
     if (cardImage && cardImage.complete) {
-        // Use the card image as drag image with proper sizing
         event.dataTransfer.setDragImage(cardImage, cardImage.offsetWidth / 2, cardImage.offsetHeight / 2);
     } else {
-        // Fallback: create a custom drag image
         const canvas = createCustomDragImage(draggedElement);
         if (canvas) {
             event.dataTransfer.setDragImage(canvas, canvas.width / 2, canvas.height / 2);
@@ -892,58 +933,36 @@ function setupOperaDragImage(event, draggedElement) {
     }
 }
 
-// Firefox-specific drag image setup
 function setupFirefoxDragImage(event, draggedElement) {
-    // Firefox handles drag images differently - create a smaller, optimized version
     const canvas = createOptimizedDragImage(draggedElement);
     if (canvas) {
-        // Use smaller offsets for Firefox
         event.dataTransfer.setDragImage(canvas, canvas.width / 2, canvas.height / 2);
     }
-    // If canvas creation fails, let Firefox use its default
 }
 
-// Default drag image setup for Chrome, Safari, etc.
 function setupDefaultDragImage(event, draggedElement) {
-    // Most browsers work fine with default behavior
-    // Only set custom drag image if there are issues
     const cardImage = draggedElement.querySelector('.hand-card-image');
     if (cardImage && cardImage.complete) {
-        // Use actual rendered dimensions, not natural dimensions
         const rect = cardImage.getBoundingClientRect();
         event.dataTransfer.setDragImage(cardImage, rect.width / 2, rect.height / 2);
     }
 }
 
-// Get browser name for logging
-function getBrowserName() {
-    if ((!!window.opr && !!opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0) return 'Opera';
-    if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) return 'Firefox';
-    if (navigator.userAgent.toLowerCase().indexOf('chrome') > -1) return 'Chrome';
-    if (navigator.userAgent.toLowerCase().indexOf('safari') > -1) return 'Safari';
-    return 'Unknown';
-}
-
-// Create custom drag image for better Opera compatibility
 function createCustomDragImage(cardElement) {
     try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Use fixed size based on actual card dimensions in CSS
-        canvas.width = 150;  // Match hand-card-image width from CSS
-        canvas.height = 210; // Match hand-card-image height from CSS
+        canvas.width = 150;
+        canvas.height = 210;
         
-        // Draw card background
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Draw border
         ctx.strokeStyle = 'rgba(102, 126, 234, 0.8)';
         ctx.lineWidth = 3;
         ctx.strokeRect(0, 0, canvas.width, canvas.height);
         
-        // Try to draw the card image if available
         const cardImage = cardElement.querySelector('.hand-card-image');
         if (cardImage && cardImage.complete && cardImage.naturalWidth > 0) {
             try {
@@ -953,7 +972,6 @@ function createCustomDragImage(cardElement) {
             }
         }
         
-        // Draw card name
         const cardName = cardElement.querySelector('.hand-card-name');
         if (cardName) {
             ctx.fillStyle = '#333';
@@ -969,46 +987,38 @@ function createCustomDragImage(cardElement) {
     }
 }
 
-// Create optimized drag image specifically for Firefox
 function createOptimizedDragImage(cardElement) {
     try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Use smaller, fixed dimensions for Firefox to prevent scaling issues
-        canvas.width = 120;   // Smaller than default
-        canvas.height = 168;  // Maintain aspect ratio
+        canvas.width = 120;
+        canvas.height = 168;
         
-        // Set higher DPI for crisp rendering
         const dpr = window.devicePixelRatio || 1;
         canvas.width *= dpr;
         canvas.height *= dpr;
         ctx.scale(dpr, dpr);
         
-        // Reset dimensions for CSS
         canvas.style.width = '120px';
         canvas.style.height = '168px';
         
-        // Draw card background with gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, 168);
         gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
         gradient.addColorStop(1, 'rgba(248, 249, 250, 0.95)');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 120, 168);
         
-        // Draw border
         ctx.strokeStyle = 'rgba(102, 126, 234, 0.6)';
         ctx.lineWidth = 2;
         ctx.strokeRect(1, 1, 118, 166);
         
-        // Try to draw the card image
         const cardImage = cardElement.querySelector('.hand-card-image');
         if (cardImage && cardImage.complete && cardImage.naturalWidth > 0) {
             try {
                 ctx.drawImage(cardImage, 3, 3, 114, 134);
             } catch (imgError) {
                 console.warn('Could not draw card image to canvas:', imgError);
-                // Draw placeholder
                 ctx.fillStyle = 'rgba(102, 126, 234, 0.2)';
                 ctx.fillRect(3, 3, 114, 134);
                 ctx.fillStyle = '#666';
@@ -1018,14 +1028,12 @@ function createOptimizedDragImage(cardElement) {
             }
         }
         
-        // Draw card name with better typography
         const cardName = cardElement.querySelector('.hand-card-name');
         if (cardName) {
             ctx.fillStyle = '#333';
             ctx.font = 'bold 10px Arial';
             ctx.textAlign = 'center';
             
-            // Truncate long names
             let text = cardName.textContent;
             if (text.length > 12) {
                 text = text.substring(0, 12) + '...';
@@ -1043,32 +1051,32 @@ function createOptimizedDragImage(cardElement) {
 
 function onHandCardDragEnd(event) {
     if (window.handManager) {
-        // Check if any card was dragged outside the hand
         const dragState = window.handManager.getHandDragState();
         if (dragState.isDragging) {
-            // Check if the drop occurred outside the hand container
             const handContainer = document.querySelector('.hand-cards');
             if (handContainer) {
                 const rect = handContainer.getBoundingClientRect();
                 const x = event.clientX;
                 const y = event.clientY;
                 
-                // If dropped outside the hand container (ANYWHERE outside)
                 if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-                    // First check if it's a global spell
-                    if (window.globalSpellManager && window.heroSelection && 
+                    // Check if it's a potion being dragged out of hand
+                    if (window.potionHandler && window.potionHandler.isPotionCard(dragState.draggedCardName, window.heroSelection)) {
+                        window.potionHandler.handlePotionDrag(
+                            dragState.draggedCardIndex,
+                            dragState.draggedCardName,
+                            window.heroSelection
+                        );
+                    }
+                    else if (window.globalSpellManager && window.heroSelection &&
                         window.globalSpellManager.isGlobalSpell(dragState.draggedCardName, window.heroSelection)) {
-                        
-                        console.log(`🌍 Global spell ${dragState.draggedCardName} dropped outside hand - activating`);
-                        
-                        // Activate the global spell
+                                                
                         window.globalSpellManager.handleGlobalSpellActivation(
                             dragState.draggedCardIndex,
                             dragState.draggedCardName,
                             window.heroSelection
                         );
                     }
-                    // Then check for artifacts (existing code)
                     else if (window.artifactHandler) {
                         window.artifactHandler.handleArtifactDrag(
                             dragState.draggedCardIndex, 
@@ -1081,7 +1089,6 @@ function onHandCardDragEnd(event) {
         }
         
         window.handManager.endHandCardDrag();
-        console.log('Hand card drag ended');
     }
 }
 
@@ -1109,41 +1116,7 @@ function onHandZoneDrop(event) {
     }
 }
 
-// Global hand card click handler - Updated to use ArtifactHandler
-async function onHandCardClick(event, cardIndex, cardName) {
-    // Prevent click from bubbling to parent elements
-    event.stopPropagation();
-    
-    console.log(`Hand card clicked: ${cardName} at index ${cardIndex}`);
-    
-    // First check if it's an artifact and if player can afford it
-    const affordCheck = canPlayerAffordArtifact(cardName);
-    if (!affordCheck.canAfford) {
-        showGoldError(affordCheck.reason, event);
-        return;
-    }
-
-    // Check if it's a global spell
-    if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
-        console.log(`🌍 Global spell clicked: ${cardName}`);
-        const result = await window.globalSpellManager.handleGlobalSpellActivation(cardIndex, cardName, window.heroSelection);
-        return;
-    }
-    
-    // Use artifact handler for all artifacts
-    if (window.artifactHandler) {
-        const handled = await window.artifactHandler.handleArtifactClick(cardIndex, cardName, window.heroSelection);
-        if (handled) {
-            return; // Artifact was successfully handled
-        }
-    }
-    
-    // Fallback for non-artifacts or if artifact handler failed
-    console.log(`No click handler for card: ${cardName}`);
-}
-
-// ===== STYLES =====
-
+// Enhanced styles including exclusive restriction indicators
 const actionIndicatorStyle = document.createElement('style');
 actionIndicatorStyle.textContent = `
     .hand-card {
@@ -1184,7 +1157,7 @@ actionIndicatorStyle.textContent = `
     }
     
     .hand-card.no-actions-available:hover::before {
-        content: "No Actions!";
+        content: "Can't use that";
         position: absolute;
         top: 50%;
         left: 50%;
@@ -1213,7 +1186,6 @@ actionIndicatorStyle.textContent = `
     }
 `;
 
-// Add CSS for gold error popup
 if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles')) {
     const style = document.createElement('style');
     style.id = 'goldErrorStyles';
@@ -1270,6 +1242,33 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
             }
         }
         
+        /* NEW: Hand disabled error animations */
+        @keyframes handDisabledErrorBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(25px) scale(0.7);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-8px) scale(1.08);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes handDisabledErrorFade {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-15px) scale(0.9);
+            }
+        }
+        
         .gold-error-popup {
             display: flex;
             align-items: center;
@@ -1311,7 +1310,34 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
         
-        /* Visual indicator for unaffordable artifacts in hand */
+        /* NEW: Hand disabled error styling */
+        .hand-disabled-error-popup {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .hand-disabled-error-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .hand-disabled-error-icon {
+            font-size: 22px;
+            filter: drop-shadow(0 0 4px rgba(111, 66, 193, 0.8));
+            animation: handDisabledIconPulse 2s ease-in-out infinite;
+        }
+        
+        .hand-disabled-error-text {
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.6);
+        }
+        
+        @keyframes handDisabledIconPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        
         .hand-card[data-card-type="artifact"][data-unaffordable="true"] {
             position: relative;
             opacity: 0.7;
@@ -1331,29 +1357,114 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
             0%, 100% { transform: scale(1); opacity: 0.8; }
             50% { transform: scale(1.1); opacity: 1; }
         }
+        
+        /* NEW: Entire hand disabled styling */
+        .hand-container.exclusive-disabled {
+            position: relative;
+            opacity: 0.4;
+            filter: grayscale(60%) blur(1px);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        
+        .hand-container.exclusive-disabled::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, 
+                rgba(111, 66, 193, 0.15) 0%, 
+                rgba(73, 80, 87, 0.15) 100%);
+            border-radius: 12px;
+            z-index: 10;
+            animation: exclusiveHandOverlay 3s ease-in-out infinite;
+        }
+        
+        @keyframes exclusiveHandOverlay {
+            0%, 100% { 
+                background: linear-gradient(135deg, 
+                    rgba(111, 66, 193, 0.15) 0%, 
+                    rgba(73, 80, 87, 0.15) 100%);
+            }
+            50% { 
+                background: linear-gradient(135deg, 
+                    rgba(111, 66, 193, 0.25) 0%, 
+                    rgba(73, 80, 87, 0.25) 100%);
+            }
+        }
+        
+        .hand-exclusive-overlay {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            right: 0;
+            z-index: 15;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .hand-exclusive-message {
+            background: linear-gradient(135deg, #6f42c1 0%, #495057 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            animation: exclusiveMessageFloat 2s ease-in-out infinite;
+        }
+        
+        @keyframes exclusiveMessageFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        
+        .hand-exclusive-icon {
+            font-size: 16px;
+            animation: exclusiveIconSpin 3s linear infinite;
+        }
+        
+        @keyframes exclusiveIconSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .hand-card.exclusive-hand-disabled {
+            cursor: not-allowed !important;
+            opacity: 0.3 !important;
+            filter: grayscale(70%) !important;
+        }
+        
+        .hand-card.exclusive-hand-disabled:hover {
+            transform: none !important;
+            box-shadow: none !important;
+        }
     `;
     document.head.appendChild(style);
 }
 
-// Load artifact handler for state restoration and centralized artifact management
 if (typeof window !== 'undefined') {
-    // Import and initialize artifact handler
     import('./artifactHandler.js').then(module => {
         window.artifactHandler = module.artifactHandler;
-        console.log('✅ Artifact handler loaded');
-        
-        // Pre-load all artifacts
         window.artifactHandler.preloadAllArtifacts();
     }).catch(error => {
-        console.log('Could not load artifact handler:', error);
+        console.error('Could not load artifact handler:', error);
+    });
+
+    import('./potionHandler.js').then(module => {
+        window.potionHandler = module.potionHandler;
+    }).catch(error => {
+        console.error('Could not load potion handler:', error);
     });
     
-    // Global error handlers
     window.showActionError = showActionError;
-}
-
-// Attach global functions to window for cross-module access
-if (typeof window !== 'undefined') {
+    window.showHandDisabledError = showHandDisabledError; // NEW: Export hand disabled error function
     window.onHandCardDragStart = onHandCardDragStart;
     window.onHandCardDragEnd = onHandCardDragEnd;
     window.onHandZoneDragEnter = onHandZoneDragEnter;
@@ -1363,6 +1474,4 @@ if (typeof window !== 'undefined') {
     window.onHandCardClick = onHandCardClick;
     window.canPlayerAffordArtifact = canPlayerAffordArtifact;
     window.showGoldError = showGoldError;
-    
-    console.log('Opera-compatible hand card drag functions attached to window');
 }

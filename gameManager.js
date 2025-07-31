@@ -20,12 +20,10 @@ export class GameManager {
     // Register message handlers for game events
     registerMessageHandlers() {
         this.webRTCManager.registerMessageHandler('game_started', (data) => {
-            console.log('Game started confirmation received via P2P:', data.message);
             this.uiManager.showConnectionDetails(`🎮 ${data.message}<br>✅ Battle begins now!<br>⚔️ Fight for victory!`);
         });
 
         this.webRTCManager.registerMessageHandler('game_surrender', (data) => {
-            console.log('Surrender notification received via P2P:', data.message);
             this.uiManager.showConnectionDetails(`🏳️ ${data.message}<br>✅ Returned to lobby<br>🎮 Ready for next battle!`);
         });
 
@@ -37,7 +35,6 @@ export class GameManager {
         });
 
         this.webRTCManager.registerMessageHandler('character_selected', (data) => {
-            console.log('Received character selection via P2P:', data.data);
             if (this.heroSelection) {
                 this.heroSelection.receiveOpponentSelection(data.data);
                 window.updateHeroSelectionUI();
@@ -46,7 +43,6 @@ export class GameManager {
         
         // Turn synchronization handler
         this.webRTCManager.registerMessageHandler('turn_sync', (data) => {
-            console.log('Received turn sync via P2P:', data.data);
             if (this.turnTracker) {
                 this.turnTracker.receiveTurnSync(data.data);
             }
@@ -54,7 +50,6 @@ export class GameManager {
 
         // Handler for formation updates
         this.webRTCManager.registerMessageHandler('formation_update', (data) => {
-            console.log('Received formation update via P2P:', data.data);
             if (this.heroSelection) {
                 this.heroSelection.receiveFormationUpdate(data.data);
                 // Update UI if in team building phase
@@ -65,7 +60,6 @@ export class GameManager {
         });
 
         this.webRTCManager.registerMessageHandler('life_update', (data) => {
-            console.log('Received life update via P2P:', data);
             if (this.heroSelection && this.heroSelection.getLifeManager()) {
                 const lifeManager = this.heroSelection.getLifeManager();
                 // Update opponent's view of the lives (reversed perspective)
@@ -80,7 +74,6 @@ export class GameManager {
         });
         
         this.webRTCManager.registerMessageHandler('battle_ready', (data) => {
-            console.log('Received battle ready via P2P:', data);
             if (this.heroSelection) {
                 this.heroSelection.receiveBattleReady(data);
             }
@@ -88,14 +81,12 @@ export class GameManager {
 
         // Battle flow handlers
         this.webRTCManager.registerMessageHandler('battle_start', (data) => {
-            console.log('Received battle start via P2P:', data);
             if (this.heroSelection && this.heroSelection.getBattleScreen()) {
                 this.heroSelection.getBattleScreen().receiveBattleStart(data);
             }
         });
 
         this.webRTCManager.registerMessageHandler('battle_data', (data) => {
-            console.log('Received battle data via P2P:', data);
             if (this.heroSelection && this.heroSelection.getBattleScreen()) {
                 this.heroSelection.getBattleScreen().receiveBattleData(data);
             }
@@ -103,7 +94,6 @@ export class GameManager {
 
         // Handler for battle transition start
         this.webRTCManager.registerMessageHandler('battle_transition_start', (data) => {
-            console.log('Received battle transition start via P2P:', data);
             if (this.heroSelection) {
                 // Only transition if we're in a valid state
                 const validStates = [
@@ -123,16 +113,12 @@ export class GameManager {
                     }
                     
                     this.heroSelection.transitionToBattleScreen();
-                } else {
-                    console.warn('Received battle_transition_start but not in valid state:', 
-                                this.heroSelection.stateMachine.getState());
                 }
             }
         });
 
         // Battle acknowledgment handler for synchronized battles
         this.webRTCManager.registerMessageHandler('battle_ack', (data) => {
-            console.log('Received battle acknowledgment via P2P:', data);
             if (this.heroSelection && this.heroSelection.getBattleScreen() && this.heroSelection.getBattleScreen().battleManager) {
                 this.heroSelection.getBattleScreen().battleManager.receiveBattleAcknowledgment(data);
             }
@@ -164,7 +150,6 @@ export class GameManager {
             const messageId = `${message.type}_${message.timestamp}_${message.from}`;
             
             if (this.processedMessages.has(messageId)) {
-                console.log('Skipping duplicate message:', messageId);
                 return;
             }
             
@@ -177,8 +162,6 @@ export class GameManager {
                 // Keep the last 25
                 entries.slice(-25).forEach(id => this.processedMessages.add(id));
             }
-
-            console.log('Processing game data via Firebase:', message.type, message.data);
 
             // Handle the message based on type
             if (message.type === 'character_selection' && this.heroSelection) {
@@ -218,7 +201,6 @@ export class GameManager {
                 this.turnTracker.receiveTurnSync(message.data);
             } else if (message.type === 'battle_transition_start' && this.heroSelection) {
                 // Handle battle transition start via Firebase fallback
-                console.log('Received battle transition start via Firebase');
                 this.heroSelection.transitionToBattleScreen();
             }
             // Clean up old game data messages (keep only last 10)
@@ -233,8 +215,6 @@ export class GameManager {
                 });
             }, 1000);
         });
-
-        console.log('Firebase game data listener set up with duplicate prevention, formation sync, battle flow, and battle acknowledgment support');
     }
 
     // Remove Firebase game data listener
@@ -243,7 +223,6 @@ export class GameManager {
             this.roomManager.getRoomRef().child('game_data').off('child_added', this.firebaseGameDataListener);
             this.firebaseGameDataListener = null;
             this.processedMessages = new Set(); // Clear processed messages
-            console.log('Firebase game data listener removed');
         }
     }
 
@@ -259,11 +238,8 @@ export class GameManager {
         const guestOnline = room.guestOnline;
         
         if (hostReady && guestReady && hostOnline && guestOnline && !room.gameStarted && !room.gameInProgress) {
-            console.log('All players are ready! Starting game...');
-            
             // Prevent multiple game starts
             if (this.gameState !== 'lobby') {
-                console.log('Game already starting/in progress, ignoring ready check');
                 return false;
             }
             
@@ -286,7 +262,6 @@ export class GameManager {
                     // Transition to game screen - this is a NEW game, not a reconnection
                     this.showGameScreen(false); // false = new game
                 }).catch(error => {
-                    console.error('Error marking game as started:', error);
                     // Still try to start the game
                     this.showGameScreen(false); // false = new game
                 });
@@ -303,7 +278,6 @@ export class GameManager {
         // Prevent multiple calls during transition
         const currentState = this.gameState;
         if (currentState === 'starting' || currentState === 'selection') {
-            console.log('Game screen already being shown or shown, skipping...');
             return;
         }
         
@@ -313,7 +287,6 @@ export class GameManager {
                                 this.heroSelection.stateMachine.states.RECONNECTING
                             );
         
-        console.log(`GameManager: Showing game screen... (${isReconnection ? 'reconnection' : 'new game'})`);
         this.gameState = 'selection';
         
         // Clear all tooltips before transition
@@ -336,7 +309,6 @@ export class GameManager {
         
         // For reconnections, let the reconnection manager handle the flow
         if (isReconnection) {
-            console.log('🔄 Reconnection detected - reconnection manager will handle state restoration');
             // The reconnectionManager.handleReconnection() will be called during heroSelection.restoreGameState()
         } else {
             // Force UI update for new games
@@ -346,8 +318,6 @@ export class GameManager {
                 }
             }, 50);
         }
-        
-        console.log('Game screen displayed');
     }
 
     // NEW: Show loading overlay to prevent flashing during transition
@@ -433,8 +403,6 @@ export class GameManager {
         `;
         
         document.head.appendChild(style);
-        
-        console.log('Game loading overlay shown');
     }
 
     // NEW: Hide loading overlay
@@ -450,14 +418,11 @@ export class GameManager {
                     style.remove();
                 }
             }, 300);
-            console.log('Game loading overlay hidden');
         }
     }
 
     // Enhanced initialize hero selection with proper new game vs reconnection logic
     async initializeHeroSelection() {
-        console.log('Initializing hero selection...');
-        
         // Determine if this is a reconnection based on existing hero selection state
         const isReconnection = this.heroSelection && 
                             (this.heroSelection.stateMachine.isInState(
@@ -468,7 +433,6 @@ export class GameManager {
         
         // Clean up any existing instance if this is a new game
         if (!isReconnection && this.heroSelection) {
-            console.log('Cleaning up existing hero selection for new game...');
             this.heroSelection.reset();
             this.heroSelection = null;
             window.heroSelection = null;
@@ -479,7 +443,6 @@ export class GameManager {
         
         // Create hero selection instance (or reuse existing one for reconnection)
         if (!this.heroSelection) {
-            console.log('Creating hero selection instance...');
             this.heroSelection = new HeroSelection();
             window.heroSelection = this.heroSelection; // For global access
         
@@ -500,8 +463,6 @@ export class GameManager {
         
         // Set up life change callback to sync with opponent
         this.heroSelection.initLifeChangeCallback((lifeChangeData) => {
-            console.log('Life changed:', lifeChangeData);
-            
             // Get current life state
             const lifeManager = this.heroSelection.getLifeManager();
             const lifeUpdate = {
@@ -516,7 +477,6 @@ export class GameManager {
             // Check for game over
             if (lifeManager.isGameOver()) {
                 const winner = lifeManager.getWinner();
-                console.log('Game Over! Winner:', winner);
                 this.handleGameOver(winner);
             }
         });
@@ -526,38 +486,29 @@ export class GameManager {
             const playerCharacters = this.heroSelection.getPlayerCharacters();
             
             if (playerCharacters.length > 0) {
-                console.log('Characters already loaded from restored state');
-                
                 // For reconnections, the restore process now handles showing the correct screen
                 // (Formation, Battle, or Reward) based on the gamePhase
                 if (isReconnection) {
-                    console.log('🔄 Reconnection: State restoration will handle screen determination');
                     // The heroSelection.restoreGameState() method will determine the correct screen
                 } else {
                     // For non-reconnections with existing data, check for pending rewards
                     if (this.heroSelection.getCurrentPhase() === 'team_building') {
                         setTimeout(async () => {
                             const hasRewards = await this.heroSelection.checkAndRestorePendingCardRewards();
-                            if (hasRewards) {
-                                console.log('Restored pending card rewards');
-                            }
                         }, 50);
                     }
                 }
             } else {
                 // No existing characters - start fresh selection (only for new games)
                 if (!isReconnection) {
-                    console.log('Starting fresh character selection for new game');
                     await this.heroSelection.startSelection();
                     // UI update is handled inside startSelection() method
                 } else {
-                    console.log('Reconnection but no characters found - this should not happen');
                     // This case shouldn't occur, but handle gracefully
                     await this.heroSelection.startSelection();
                 }
             }
         } else {
-            console.error('Failed to load hero selection');
             // Fallback to basic game screen
             const heroContainer = document.querySelector('.hero-selection-screen');
             if (heroContainer) {
@@ -573,7 +524,6 @@ export class GameManager {
 
     // Handle hero selection completion - FIXED to preserve existing hand
     onHeroSelectionComplete(selectionData) {
-        console.log('Hero selection complete!', selectionData);
         this.gameState = 'battle';
         
         // Check if player already has a hand (from restored state)
@@ -581,15 +531,11 @@ export class GameManager {
         
         if (currentHandSize === 0) {
             // Only draw initial hand if player doesn't already have cards
-            console.log('No existing hand found, drawing initial hand of 5 cards...');
             if (this.heroSelection) {
                 const drawnCards = this.heroSelection.drawInitialHand();
-                console.log('Drew initial hand of 5 cards:', drawnCards);
             }
         } else {
             // Player already has a hand (restored from save state)
-            console.log(`Player already has ${currentHandSize} cards in hand, skipping initial draw`);
-            console.log('Existing hand:', this.heroSelection.getHand());
         }
         
         // Update the battle formation UI to show the hand
@@ -611,8 +557,6 @@ export class GameManager {
     // Handle surrender
     async handleSurrender() {
         try {
-            console.log('Player surrendered - returning both players to lobby');
-            
             // Reset game state
             await this.roomManager.handleSurrender();
             
@@ -631,15 +575,12 @@ export class GameManager {
             this.uiManager.showStatus('🏳️ Game ended - returned to lobby', 'connected');
             
         } catch (error) {
-            console.error('Error handling surrender:', error);
             this.uiManager.showStatus('❌ Error ending game', 'error');
         }
     }
 
     // Handle game over (when someone reaches 0 lives)
     handleGameOver(winner) {
-        console.log('Game Over! Winner:', winner);
-        
         let message = '';
         if (winner === 'player') {
             message = '🎉 Victory! You have defeated your opponent!';
@@ -670,7 +611,6 @@ export class GameManager {
 
     // Return to lobby
     returnToLobby() {
-        console.log('GameManager: Returning to lobby...');
         this.gameState = 'lobby';
         this.isReconnecting = false;
         
@@ -689,7 +629,6 @@ export class GameManager {
         if (this.heroSelection) {
             const battleScreen = this.heroSelection.getBattleScreen();
             if (battleScreen) {
-                console.log('Resetting battle screen...');
                 battleScreen.reset();
             }
         }
@@ -702,18 +641,13 @@ export class GameManager {
         
         // Reset hero selection completely
         if (this.heroSelection) {
-            console.log('Resetting hero selection...');
             this.heroSelection.reset();
             this.heroSelection = null;
             window.heroSelection = null;
         }
-        
-        console.log('Returned to lobby - all game components cleaned up');
     }
 
     clearAllTooltipsGlobally() {
-        console.log('GameManager: Performing global tooltip cleanup...');
-        
         // Use hero selection's comprehensive cleanup if available
         if (this.heroSelection && typeof this.heroSelection.clearAllTooltips === 'function') {
             this.heroSelection.clearAllTooltips();
@@ -745,8 +679,6 @@ export class GameManager {
                 try { window.hideBattleCardPreview(); } catch(e) {}
             }
         }
-        
-        console.log('Global tooltip cleanup completed');
     }
 
     // Handle room update for game state
@@ -770,7 +702,6 @@ export class GameManager {
         
         if (room.gameInProgress && this.gameState === 'lobby' && !isInGameFlow) {
             // Game started, transition to game screen (reconnection)
-            console.log(`🔄 Reconnection detected with gamePhase: ${gamePhase}`);
             
             // Set hero selection to reconnecting state if not already
             if (this.heroSelection && !isReconnection) {
@@ -783,7 +714,6 @@ export class GameManager {
             this.showGameScreen(); // ReconnectionManager will handle the rest
         } else if (!room.gameInProgress && this.gameState !== 'lobby') {
             // Game ended (surrender), return to lobby
-            console.log('Game ended, returning to lobby');
             this.returnToLobby();
             
             if (room.lastSurrender) {
@@ -793,7 +723,6 @@ export class GameManager {
             }
         } else if (isInGameFlow) {
             // We're in normal game flow - don't trigger reconnection logic
-            console.log(`🎮 Normal game flow detected - gamePhase: ${gamePhase}, state: ${this.heroSelection?.stateMachine.getState()}`);
         }
     }
 
@@ -820,10 +749,8 @@ export class GameManager {
                 gamePhaseUpdated: Date.now(),
                 gameManagerReset: Date.now()
             }).catch(error => {
-                console.log('Could not reset game phase during game manager reset:', error.message);
+                // Silently handle error - could not reset game phase during game manager reset
             });
         }
-        
-        console.log('Game manager reset completed with game phase cleanup');
     }
 }

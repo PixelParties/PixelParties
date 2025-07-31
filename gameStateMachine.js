@@ -62,7 +62,9 @@ export class GameStateMachine {
             [this.states.VIEWING_REWARDS]: [
                 this.states.TEAM_BUILDING,
                 this.states.RECONNECTING,
-                this.states.ERROR
+                this.states.ERROR,
+                // ↓ ADD THESE - Allow staying in VIEWING_REWARDS and transitioning back from RECONNECTING
+                this.states.VIEWING_REWARDS  // Allow staying in this state
             ],
             [this.states.RECONNECTING]: [
                 // Can go to any state after reconnecting
@@ -103,7 +105,6 @@ export class GameStateMachine {
     transitionTo(newState, context = {}) {
         // Check if already in the target state
         if (this.currentState === newState) {
-            console.log(`🎮 Already in state: ${newState}, updating context only`);
             // Just update the context without changing state
             this.stateContext = { ...this.stateContext, ...context };
             return true;
@@ -111,8 +112,6 @@ export class GameStateMachine {
         
         // Check if this is a valid transition
         if (!this.canTransitionTo(newState)) {
-            console.error(`Invalid state transition: ${this.currentState} -> ${newState}`);
-            console.trace(); // Show stack trace to find where this was called
             return false;
         }
 
@@ -122,8 +121,6 @@ export class GameStateMachine {
         // Update state
         this.currentState = newState;
         this.stateContext = context;
-        
-        console.log(`🎮 State transition: ${this.previousState} -> ${this.currentState}`, context);
         
         // Notify listeners
         this.notifyStateChange(this.previousState, this.currentState, context);
@@ -202,6 +199,5 @@ export class GameStateMachine {
         this.currentState = this.states.INITIALIZING;
         this.previousState = null;
         this.stateContext = {};
-        console.log('🔄 State machine reset to INITIALIZING');
     }
 }

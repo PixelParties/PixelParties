@@ -51,9 +51,7 @@ class ProjectPixelParties {
         try {
             this.app = firebase.initializeApp(firebaseConfig);
             this.database = firebase.database();
-            console.log('Firebase initialized successfully');
         } catch (error) {
-            console.log("Firebase demo mode - using mock functionality");
             this.setupMockDemo();
         }
     }
@@ -369,7 +367,6 @@ class ProjectPixelParties {
     async handleRoomUpdate(snapshot) {
         const room = snapshot.val();
         if (!room) {
-            console.log('Room was deleted by other player');
             this.uiManager.showStatus('❌ Room was closed by other player', 'error');
             this.roomManager.cleanup();
             this.webRTCManager.cleanup();
@@ -381,7 +378,6 @@ class ProjectPixelParties {
         
         // Check for role promotion
         if (!this.roomManager.getIsHost() && room.host === this.playerId) {
-            console.log('Promoted to host role!');
             this.roomManager.setIsHost(true);
             
             const roomId = this.roomManager.getRoomRef().key;
@@ -415,9 +411,7 @@ class ProjectPixelParties {
                 const guestName = room.guestName || 'Challenger';
                 this.uiManager.showStatus(`🎉 ${guestName} joined the party! Establishing connection...`, 'connected');
                 this.uiManager.showConnectionDetails(`${guestName} connected! Setting up battle arena...`);
-            } else if (!room.guest) {
-                console.log('Guest left the room');
-                
+            } else if (!room.guest) {                
                 if (room.gameInProgress) {
                     await this.roomManager.getRoomRef().update({
                         gameStarted: false,
@@ -448,7 +442,6 @@ class ProjectPixelParties {
         
         const peerConnection = this.webRTCManager.peerConnection;
         if (!peerConnection) {
-            console.log('No peer connection available');
             return;
         }
         
@@ -456,23 +449,17 @@ class ProjectPixelParties {
             const isHost = this.roomManager.getIsHost();
             const connectionState = peerConnection.connectionState;
             const signalingState = peerConnection.signalingState;
-            
-            console.log(`WebRTC states - Connection: ${connectionState}, Signaling: ${signalingState}`);
-            
+                        
             if (isHost && room.offer && signalingState === 'stable') {
                 // Host has already created offer, skip
-                console.log('Host: Offer already created, skipping');
             } else if (isHost && !room.offer && signalingState === 'stable') {
                 // Host needs to create offer
-                console.log('Host: Creating offer...');
                 await this.webRTCManager.createOffer();
             } else if (!isHost && room.offer && !peerConnection.remoteDescription) {
                 // Guest needs to create answer
-                console.log('Guest: Creating answer...');
                 await this.webRTCManager.createAnswer(room.offer);
             } else if (isHost && room.answer && signalingState === 'have-local-offer') {
                 // Host needs to set remote answer
-                console.log('Host: Setting remote answer...');
                 await this.webRTCManager.setRemoteAnswer(room.answer);
             }
             
@@ -499,12 +486,9 @@ class ProjectPixelParties {
         const savedData = this.storageManager.getSavedGameData();
         
         if (!savedData || !savedData.roomId) {
-            console.log('No saved room data for auto-reconnect');
             return;
         }
-        
-        console.log('Attempting auto-reconnect to room:', savedData.roomId);
-        
+                
         try {
             this.uiManager.showStatus('🔍 Checking for previous room...', 'waiting', true);
             this.uiManager.showLeaveButton();
@@ -514,7 +498,6 @@ class ProjectPixelParties {
             const room = snapshot.val();
             
             if (!room) {
-                console.log('Previous room no longer exists');
                 this.storageManager.clearGameData();
                 this.uiManager.showStatus('❌ Previous room no longer exists', 'error');
                 setTimeout(() => {
@@ -526,13 +509,10 @@ class ProjectPixelParties {
             
             const wasHost = savedData.isHost;
             const savedPassword = savedData.password;
-            
-            console.log('Room found, reconnecting as:', wasHost ? 'host' : 'guest');
-            
+                        
             // Validate password if needed
             if (!wasHost && room.password && room.password.trim() !== '') {
                 if (!savedPassword || savedPassword !== room.password) {
-                    console.log('Password required for auto-reconnect, but not saved or changed');
                     this.storageManager.clearGameData();
                     this.uiManager.showStatus('❌ Cannot auto-reconnect: room password changed', 'error');
                     setTimeout(() => {
@@ -580,7 +560,6 @@ class ProjectPixelParties {
             
             // Check if game is in progress and restore game state
             if (room.gameInProgress || room.gameStarted) {
-                console.log('Game is in progress - attempting to restore game state...');
                 this.uiManager.showStatus('🎮 Rejoining battle in progress...', 'waiting', true);
                 
                 // Transition to game screen and restore state - THIS IS A RECONNECTION
@@ -597,9 +576,7 @@ class ProjectPixelParties {
                     this.uiManager.showStatus('🔄 Reconnected. Waiting for other player...', 'waiting', true);
                 }
             }
-            
-            console.log('Reconnection successful');
-            
+                        
         } catch (error) {
             console.error('Auto-reconnect error:', error);
             this.storageManager.clearGameData();
@@ -657,7 +634,6 @@ class ProjectPixelParties {
 // Initialize the application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new ProjectPixelParties();
-    console.log('Project Pixel Parties initialized');
 });
 
 window.emergencyTooltipCleanup = function() {

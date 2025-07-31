@@ -1,6 +1,7 @@
-// battlePersistenceManager.js - Enhanced Battle State Persistence Manager with Necromancy Module Support
+// battlePersistenceManager.js - Enhanced Battle State Persistence Manager with Randomness Support
 
-import { NecromancyUtils } from './Abilities/necromancy.js'; // NEW IMPORT
+import { NecromancyUtils } from './Abilities/necromancy.js';
+import { BattleRandomness } from './battleRandomness.js'; // NEW IMPORT
 
 export class BattlePersistenceManager {
     constructor(roomManager, isHost) {
@@ -12,13 +13,11 @@ export class BattlePersistenceManager {
         this.baseSaveThrottleDelay = 100; // Base minimum time between saves (ms)
         this.lastSaveTime = 0;
         
-        // Battle state version for future expansion - UPDATED for necromancy support
-        this.BATTLE_STATE_VERSION = '1.1.0'; 
-        
-        console.log('BattlePersistenceManager initialized for', isHost ? 'HOST' : 'GUEST', 'with necromancy persistence support');
+        // Battle state version for future expansion - UPDATED for randomness support
+        this.BATTLE_STATE_VERSION = '1.2.0'; // Incremented for randomness support
     }
 
-    // Save complete battle state to Firebase (enhanced with connection state)
+    // Save complete battle state to Firebase (enhanced with randomness)
     async saveBattleState(battleManager) {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
             console.warn('No room reference available for battle state save');
@@ -40,7 +39,7 @@ export class BattlePersistenceManager {
             const battleState = this.exportBattleState(battleManager);
             const stateHash = this.generateStateHash(battleState);
             
-            // Skip save if state hasn't changed
+            // Skip save if state hasn't changed (including randomness state)
             if (stateHash === this.lastSavedStateHash) {
                 return false;
             }
@@ -65,7 +64,10 @@ export class BattlePersistenceManager {
             this.lastSavedStateHash = stateHash;
             
             const pauseInfo = battleState.connectionState?.battlePaused ? ' (PAUSED)' : '';
-            console.log(`✅ Battle state with creatures saved by ${this.isHost ? 'HOST' : 'GUEST'} (Turn ${battleState.currentTurn})${pauseInfo}`);
+            const randomnessInfo = battleState.randomnessState ? 
+                ` (RNG: ${battleState.randomnessState.callCount} calls)` : '';
+            
+            console.log(`💾 Battle state saved${pauseInfo}${randomnessInfo}`);
             
             // Mark battle as active in gameState for reconnection detection
             await roomRef.child('gameState').update({
@@ -86,7 +88,7 @@ export class BattlePersistenceManager {
         }
     }
 
-    // Export complete battle state (enhanced with connection awareness)
+    // Export complete battle state (enhanced with randomness)
     exportBattleState(battleManager) {
         const baseState = {
             // Core battle parameters
@@ -108,6 +110,9 @@ export class BattlePersistenceManager {
             // Authority and sync info
             authoritativeHost: this.isHost && battleManager.isAuthoritative,
             
+            // NEW: Randomness state
+            randomnessState: this.exportRandomnessState(battleManager),
+            
             // Extensible sections for future features
             battleEffects: {
                 globalEffects: battleManager.globalEffects || [],
@@ -128,7 +133,7 @@ export class BattlePersistenceManager {
             }
         };
 
-        // NEW: Add connection-aware state (only for host)
+        // Add connection-aware state (only for host)
         if (this.isHost && battleManager.isAuthoritative) {
             baseState.connectionState = {
                 opponentConnected: battleManager.opponentConnected,
@@ -141,8 +146,51 @@ export class BattlePersistenceManager {
 
         return baseState;
     }
+    
+    // NEW: Export randomness state
+    exportRandomnessState(battleManager) {
+        if (!battleManager.randomnessInitialized || !battleManager.randomness) {
+            return null;
+        }
+        
+        return {
+            ...battleManager.randomness.exportState(),
+            initialized: true,
+            exportedAt: Date.now(),
+            exportedBy: this.isHost ? 'host' : 'guest'
+        };
+    }
+    
+    // NEW: Import randomness state
+    importRandomnessState(battleManager, randomnessState) {
+        if (!randomnessState || !randomnessState.initialized) {
+            console.log('🎲 No randomness state to import');
+            return false;
+        }
+        
+        try {
+            // Create randomness instance if it doesn't exist
+            if (!battleManager.randomness) {
+                battleManager.randomness = new BattleRandomness();
+            }
+            
+            // Import the state
+            const imported = battleManager.randomness.importState(randomnessState);
+            if (imported) {
+                battleManager.randomnessSeed = battleManager.randomness.originalSeed;
+                battleManager.randomnessInitialized = true;
+                
+                console.log(`🎲 Randomness state imported: seed ${battleManager.randomnessSeed.slice(0, 8)}..., ${randomnessState.callCount} calls made`);
+                return true;
+            }
+        } catch (error) {
+            console.error('❌ Error importing randomness state:', error);
+        }
+        
+        return false;
+    }
 
-    // Restore battle manager from saved state (enhanced with creatures)
+    // Restore battle manager from saved state (enhanced with randomness)
     async restoreBattleState(battleManager, savedState) {
         if (!savedState) {
             console.error('No saved state provided for restoration');
@@ -150,8 +198,6 @@ export class BattlePersistenceManager {
         }
 
         try {
-            console.log('🔄 Restoring battle state with creatures from Firebase...');
-
             // Restore core battle parameters
             battleManager.battleActive = savedState.battleActive;
             battleManager.currentTurn = savedState.currentTurn;
@@ -159,6 +205,11 @@ export class BattlePersistenceManager {
             
             // Restore battle log
             battleManager.battleLog = savedState.battleLog || [];
+
+            // NEW: Restore randomness state FIRST (before other restorations that might use randomness)
+            if (savedState.randomnessState) {
+                this.importRandomnessState(battleManager, savedState.randomnessState);
+            }
 
             // Restore hero states INCLUDING CREATURES
             this.restoreHeroStates(battleManager, savedState);
@@ -172,12 +223,11 @@ export class BattlePersistenceManager {
             // Restore extensible state (for future features)
             this.restoreExtensibleState(battleManager, savedState);
 
-            // NEW: Restore connection-aware state (only for host)
+            // Restore connection-aware state (only for host)
             if (this.isHost && savedState.connectionState) {
                 this.restoreConnectionState(battleManager, savedState.connectionState);
             }
 
-            console.log('✅ Battle state restoration with creatures completed');
             return true;
 
         } catch (error) {
@@ -186,7 +236,7 @@ export class BattlePersistenceManager {
         }
     }
 
-    // NEW: Restore connection-aware state
+    // Restore connection-aware state
     restoreConnectionState(battleManager, connectionState) {
         if (!battleManager.isAuthoritative) return;
 
@@ -197,20 +247,13 @@ export class BattlePersistenceManager {
         // Don't restore pauseStartTime - let it be set fresh if needed
         battleManager.pauseStartTime = null;
 
-        console.log('🔄 Connection state restored:', {
-            opponentConnected: battleManager.opponentConnected,
-            battlePaused: battleManager.battlePaused,
-            totalPauseTime: battleManager.totalPauseTime
-        });
-
         // If battle was paused when saved, show pause UI
         if (battleManager.battlePaused) {
-            console.log('⏸️ Battle was paused when saved - showing pause UI');
             battleManager.showBattlePauseUI('Battle was paused (restored from save)');
         }
     }
 
-    // Enhanced state hash generation to include creatures and connection state
+    // Enhanced state hash generation to include randomness state
     generateStateHash(state) {
         const stateForHash = {
             turn: state.currentTurn,
@@ -219,8 +262,13 @@ export class BattlePersistenceManager {
             battleActive: state.battleActive,
             // Include pause state in hash so pauses trigger saves
             battlePaused: state.connectionState?.battlePaused || false,
-            // NEW: Include necromancy stacks in hash using module utility
-            necromancyData: NecromancyUtils.extractNecromancyData(state)
+            // Include necromancy data in hash
+            necromancyData: NecromancyUtils.extractNecromancyData(state),
+            // NEW: Include randomness state in hash so randomness changes trigger saves
+            randomnessData: state.randomnessState ? {
+                callCount: state.randomnessState.callCount,
+                currentState: state.randomnessState.currentState
+            } : null
         };
         
         const stateString = JSON.stringify(stateForHash);
@@ -235,7 +283,7 @@ export class BattlePersistenceManager {
         return hash.toString();
     }
 
-    // Enhanced validation to check creatures and connection state
+    // Enhanced validation to check randomness state
     validateBattleState(savedState) {
         if (!savedState || typeof savedState !== 'object') return false;
         
@@ -248,6 +296,15 @@ export class BattlePersistenceManager {
             const connState = savedState.connectionState;
             if (typeof connState.battlePaused !== 'boolean') return false;
             if (connState.totalPauseTime && typeof connState.totalPauseTime !== 'number') return false;
+        }
+        
+        // NEW: Validate randomness state if present
+        if (savedState.randomnessState) {
+            const randomState = savedState.randomnessState;
+            if (typeof randomState.initialized !== 'boolean') return false;
+            if (typeof randomState.callCount !== 'number') return false;
+            if (typeof randomState.seed !== 'string') return false;
+            if (typeof randomState.currentState !== 'number') return false;
         }
         
         return true;
@@ -272,8 +329,8 @@ export class BattlePersistenceManager {
                     lastBattleStateUpdate: null
                 })
             ]);
-
-            console.log('🧹 Battle state with creatures cleared from Firebase');
+            
+            console.log('🧹 Battle state cleared (including randomness)');
             return true;
 
         } catch (error) {
@@ -343,7 +400,7 @@ export class BattlePersistenceManager {
                     // CREATURES STATE
                     creatures: this.exportCreatureStates(hero.creatures),
                     
-                    // NEW: Necromancy stacks persistence using module utility
+                    // Necromancy stacks persistence using module utility
                     ...NecromancyUtils.extractNecromancyDataFromHero(hero),
                     
                     // Extensible hero state
@@ -362,7 +419,7 @@ export class BattlePersistenceManager {
         return heroStates;
     }
 
-    // NEW: Export creature states with full combat information
+    // Export creature states with full combat information
     exportCreatureStates(creatures) {
         if (!creatures || !Array.isArray(creatures)) {
             return [];
@@ -435,7 +492,7 @@ export class BattlePersistenceManager {
             const battleState = snapshot.val();
 
             if (!battleState) {
-                console.log('No battle state found in Firebase');
+                console.log('🎲 No battle state found in Firebase');
                 return null;
             }
 
@@ -446,8 +503,10 @@ export class BattlePersistenceManager {
             }
 
             const pauseInfo = battleState.connectionState?.battlePaused ? ' (PAUSED)' : '';
-            console.log(`📥 Battle state with creatures loaded from Firebase (Turn ${battleState.currentTurn})${pauseInfo}`);
-            console.log(`Last updated by: ${battleState.lastUpdatedBy} at ${new Date(battleState.lastUpdatedAt)}`);
+            const randomnessInfo = battleState.randomnessState ? 
+                ` (RNG: ${battleState.randomnessState.callCount} calls)` : '';
+            
+            console.log(`📥 Battle state loaded${pauseInfo}${randomnessInfo}`);
 
             return battleState;
 
@@ -476,7 +535,7 @@ export class BattlePersistenceManager {
                 hero.alive = savedHero.alive;
                 hero.absoluteSide = savedHero.absoluteSide;
                 
-                // NEW: Restore necromancy stacks using the saved data
+                // Restore necromancy stacks using the saved data
                 hero.necromancyStacks = savedHero.necromancyStacks || 0;
                 hero.maxNecromancyStacks = savedHero.maxNecromancyStacks || 0;
                 
@@ -492,8 +551,6 @@ export class BattlePersistenceManager {
                 if (savedHero.creatures) {
                     this.restoreCreatureStates(hero, savedHero.creatures);
                 }
-                
-                console.log(`Restored ${hero.name} with ${hero.necromancyStacks}/${hero.maxNecromancyStacks} necromancy stacks`);
             }
         });
 
@@ -511,7 +568,7 @@ export class BattlePersistenceManager {
                 hero.alive = savedHero.alive;
                 hero.absoluteSide = savedHero.absoluteSide;
                 
-                // NEW: Restore necromancy stacks using the saved data
+                // Restore necromancy stacks using the saved data
                 hero.necromancyStacks = savedHero.necromancyStacks || 0;
                 hero.maxNecromancyStacks = savedHero.maxNecromancyStacks || 0;
                 
@@ -527,15 +584,11 @@ export class BattlePersistenceManager {
                 if (savedHero.creatures) {
                     this.restoreCreatureStates(hero, savedHero.creatures);
                 }
-                
-                console.log(`Restored opponent ${hero.name} with ${hero.necromancyStacks}/${hero.maxNecromancyStacks} necromancy stacks`);
             }
         });
-
-        console.log('🦸 Hero states with creatures and necromancy stacks restored from Firebase');
     }
 
-    // NEW: Restore creature states with full combat information
+    // Restore creature states with full combat information
     restoreCreatureStates(hero, savedCreatures) {
         if (!savedCreatures || !Array.isArray(savedCreatures)) {
             hero.creatures = [];
@@ -568,8 +621,6 @@ export class BattlePersistenceManager {
                 lastDamaged: savedCreature.lastDamaged || null
             };
         });
-
-        console.log(`🐾 Restored ${hero.creatures.length} creatures for ${hero.name}, alive: ${hero.creatures.filter(c => c.alive).length}`);
     }
 
     // Restore formation data
@@ -600,8 +651,6 @@ export class BattlePersistenceManager {
                 customArrangement: opponentFormation.customArrangement
             };
         }
-
-        console.log('🏺 Formations restored from Firebase');
     }
 
     // Update battle visuals after restoration INCLUDING NECROMANCY DISPLAYS
@@ -622,7 +671,7 @@ export class BattlePersistenceManager {
                 // UPDATE CREATURE VISUALS
                 battleManager.updateCreatureVisuals('player', position, hero.creatures);
                 
-                // NEW: Update necromancy stack display using the battle manager's module
+                // Update necromancy stack display using the battle manager's module
                 if (battleManager.necromancyManager) {
                     battleManager.necromancyManager.updateNecromancyStackDisplay('player', position, hero.necromancyStacks);
                 }
@@ -642,7 +691,7 @@ export class BattlePersistenceManager {
                 // UPDATE CREATURE VISUALS
                 battleManager.updateCreatureVisuals('opponent', position, hero.creatures);
                 
-                // NEW: Update necromancy stack display using the battle manager's module
+                // Update necromancy stack display using the battle manager's module
                 if (battleManager.necromancyManager) {
                     battleManager.necromancyManager.updateNecromancyStackDisplay('opponent', position, hero.necromancyStacks);
                 }
@@ -657,8 +706,6 @@ export class BattlePersistenceManager {
                 }
             });
         }
-
-        console.log('🎨 Battle visuals with creature states and necromancy displays updated after restoration');
     }
 
     // Restore extensible state for future features
@@ -682,8 +729,6 @@ export class BattlePersistenceManager {
             battleManager.terrainModifiers = savedState.advancedState.terrainModifiers || [];
             battleManager.specialRules = savedState.advancedState.specialRules || [];
         }
-
-        console.log('🔮 Extensible state restored for future features');
     }
 
     // Utility: Check if battle state exists in Firebase
@@ -695,7 +740,15 @@ export class BattlePersistenceManager {
         try {
             const battleStateRef = this.roomManager.getRoomRef().child('battleState');
             const snapshot = await battleStateRef.once('value');
-            return snapshot.exists();
+            const exists = snapshot.exists();
+            
+            if (exists) {
+                const state = snapshot.val();
+                const hasRandomness = !!(state.randomnessState);
+                console.log(`🎲 Battle state exists${hasRandomness ? ' with randomness' : ''}`);
+            }
+            
+            return exists;
         } catch (error) {
             console.error('Error checking battle state existence:', error);
             return false;
@@ -706,10 +759,11 @@ export class BattlePersistenceManager {
     validateStateVersion(version) {
         if (!version) return false;
         
-        const [major] = version.split('.');
-        const [currentMajor] = this.BATTLE_STATE_VERSION.split('.');
+        const [major, minor] = version.split('.');
+        const [currentMajor, currentMinor] = this.BATTLE_STATE_VERSION.split('.');
         
-        return major === currentMajor;
+        // Major version must match, minor version can be backwards compatible
+        return major === currentMajor && parseInt(minor) <= parseInt(currentMinor);
     }
 
     // Utility: Sanitize data for Firebase (remove undefined values)
@@ -735,7 +789,6 @@ export class BattlePersistenceManager {
         this.saveQueue = [];
         this.isSaving = false;
         this.lastSavedStateHash = null;
-        console.log('BattlePersistenceManager cleanup completed');
     }
 
     getSpeedAdjustedDelay(ms, battleManager = null) {

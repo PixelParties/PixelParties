@@ -130,7 +130,10 @@ export class BattlePersistenceManager {
                 weatherEffects: battleManager.weatherEffects || null,
                 terrainModifiers: battleManager.terrainModifiers || [],
                 specialRules: battleManager.specialRules || []
-            }
+            },
+                
+            statusEffectsState: battleManager.statusEffectsManager ? 
+                battleManager.statusEffectsManager.exportStatusEffectsState() : null
         };
 
         // Add connection-aware state (only for host)
@@ -206,7 +209,7 @@ export class BattlePersistenceManager {
             // Restore battle log
             battleManager.battleLog = savedState.battleLog || [];
 
-            // NEW: Restore randomness state FIRST (before other restorations that might use randomness)
+            // Restore randomness state FIRST (before other restorations that might use randomness)
             if (savedState.randomnessState) {
                 this.importRandomnessState(battleManager, savedState.randomnessState);
             }
@@ -226,6 +229,10 @@ export class BattlePersistenceManager {
             // Restore connection-aware state (only for host)
             if (this.isHost && savedState.connectionState) {
                 this.restoreConnectionState(battleManager, savedState.connectionState);
+            }
+            
+            if (savedState.statusEffectsState && battleManager.statusEffectsManager) {
+                battleManager.statusEffectsManager.importStatusEffectsState(savedState.statusEffectsState);
             }
 
             return true;

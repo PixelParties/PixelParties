@@ -1,0 +1,302 @@
+/* ============================================
+   7. BUTTONS
+   ============================================ */
+.btn {
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: var(--radius-medium);
+    cursor: pointer;
+    transition: var(--transition-medium);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    overflow: hidden;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: var(--shadow-light);
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Button variants */
+.btn-primary {
+    background: var(--primary-gradient);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #7c8df0 0%, #8655b8 100%);
+}
+
+.btn-secondary {
+    background: var(--secondary-gradient);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
+    background: linear-gradient(135deg, #f3a3fc 0%, #f7677c 100%);
+}
+
+.btn-danger {
+    background: var(--danger-gradient);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-danger:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    background: linear-gradient(135deg, #ff7b7b 0%, #fe6a34 100%);
+}
+
+.btn-back {
+    padding: 8px 16px;
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: var(--radius-small);
+    color: #667eea;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-medium);
+    font-size: 0.9rem;
+}
+
+.btn-back:hover {
+    background: rgba(102, 126, 234, 0.2);
+    transform: translateX(-2px);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+/* Ready button states */
+.ready-button {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border: none;
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: var(--transition-medium);
+    min-width: 80px;
+}
+
+.ready-button.not-ready {
+    background: var(--success-gradient);
+    color: white;
+    border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.ready-button.not-ready:hover {
+    background: linear-gradient(135deg, #34ce57, #2dd4aa);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.ready-button.ready {
+    background: var(--warning-gradient);
+    color: #000;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.ready-button.ready:hover {
+    background: linear-gradient(135deg, #ffcd39, #ff851d);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+.ready-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Specialized buttons */
+.surrender-button {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: var(--radius-medium);
+    cursor: pointer;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: var(--danger-gradient);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    transition: var(--transition-medium);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    z-index: var(--z-modal);
+}
+
+.surrender-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    background: linear-gradient(135deg, #ff7b7b 0%, #fe6a34 100%);
+}
+
+.surrender-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* HIDE SURRENDER BUTTON DURING BATTLE */
+.battle-arena {
+    display: none;
+}
+
+.battle-arena ~ .surrender-button,
+#battleArena:not([style*="display: none"]) ~ .surrender-button,
+body:has(#battleArena:not([style*="display: none"])) .surrender-button {
+    display: none !important;
+}
+
+/* Alternative approach using CSS class */
+body.battle-active .surrender-button {
+    display: none !important;
+}
+
+.to-battle-button {
+    background: linear-gradient(135deg, #ff6b6b 0%, #c44569 100%);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: var(--transition-medium);
+    box-shadow: 0 4px 15px rgba(196, 69, 105, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.to-battle-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(196, 69, 105, 0.4);
+    background: linear-gradient(135deg, #ff7d7d 0%, #d6567b 100%);
+}
+
+.to-battle-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(196, 69, 105, 0.3);
+}
+
+.to-battle-button:disabled,
+.to-battle-button:disabled:hover {
+    background: linear-gradient(135deg, #999 0%, #777 100%);
+    cursor: not-allowed;
+    opacity: 0.7;
+    box-shadow: none;
+    transform: none;
+}
+
+/* Modal buttons */
+.btn-modal,
+.btn-surrender-confirm {
+    flex: 1;
+    padding: 12px 20px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: var(--transition-medium);
+}
+
+.btn-modal.primary,
+.btn-surrender-confirm.no {
+    background: var(--primary-gradient);
+    color: white;
+}
+
+.btn-modal.primary:hover,
+.btn-surrender-confirm.no:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-surrender-confirm.no:hover {
+    background: linear-gradient(135deg, #34ce57 0%, #2dd4aa 100%);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+}
+
+.btn-modal.secondary {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+    border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+.btn-modal.secondary:hover {
+    background: rgba(108, 117, 125, 0.2);
+    transform: translateY(-1px);
+}
+
+.btn-surrender-confirm.yes {
+    background: var(--danger-gradient);
+    color: white;
+}
+
+.btn-surrender-confirm.yes:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+}
+
+/* Battle formation button from reward screen */
+.battle-formation-waiting-overlay .btn {
+    margin-top: 30px;
+    min-width: 150px;
+}
+
+/* Log control buttons */
+.log-control-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 3px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 0.2s ease;
+}
+
+.log-control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+}

@@ -1,0 +1,333 @@
+/* ============================================
+   Project Pixel Parties - Animations
+   ============================================ */
+
+@keyframes shimmer {
+    0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(30deg); }
+    50% { transform: translateX(100%) translateY(100%) rotate(30deg); }
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes float {
+    0% { transform: translateY(0px) rotate(0deg); }
+    100% { transform: translateY(-10px) rotate(5deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 8px rgba(40, 167, 69, 0.6); }
+    100% { box-shadow: 0 0 12px rgba(40, 167, 69, 0.8); }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+}
+
+@keyframes modalSlideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes tooltipFadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes tooltipFadeInFixed {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes tooltipFadeInSmooth {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes tooltipSlideIn {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-5px) scale(0.9); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+@keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    25%, 75% { transform: scale(1.1); }
+    50% { transform: scale(1); }
+}
+
+@keyframes trophyShine {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.5); }
+}
+
+@keyframes trophyGain {
+    0% { transform: scale(0) rotate(0deg); opacity: 0; }
+    50% { transform: scale(1.5) rotate(180deg); opacity: 1; }
+    100% { transform: scale(1) rotate(360deg); opacity: 1; }
+}
+
+@keyframes damageShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+@keyframes heroAttack {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(50px); }
+}
+
+@keyframes heroDamage {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+@keyframes heroDefeat {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0.3; transform: scale(0.9); filter: grayscale(100%); }
+}
+
+@keyframes goldIconFloat {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    33% { transform: translateY(-3px) rotate(2deg); }
+    66% { transform: translateY(3px) rotate(-2deg); }
+}
+
+@keyframes goldChangeSlide {
+    0% { opacity: 0; transform: translateY(-50%) translateX(-10px) scale(0.8); }
+    15% { opacity: 1; transform: translateY(-50%) translateX(0px) scale(1.1); }
+    85% { opacity: 1; transform: translateY(-50%) translateX(0px) scale(1); }
+    100% { opacity: 0; transform: translateY(-50%) translateX(10px) scale(0.9); }
+}
+
+@keyframes rewardCardAppear {
+    0% { opacity: 0; transform: scale(0.8) translateY(-20px); filter: brightness(0.5); }
+    50% { opacity: 1; transform: scale(1.1) translateY(-5px); filter: brightness(1.5); }
+    100% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+}
+
+@keyframes pulseSuccess {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes insertionPulse {
+    0%, 100% { opacity: 0.6; transform: scaleY(1); }
+    50% { opacity: 1; transform: scaleY(1.1); }
+}
+
+@keyframes heroRewardPulse {
+    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes heroAddedGlow {
+    0% { box-shadow: 0 0 0 rgba(40, 167, 69, 0.8); transform: scale(1); }
+    50% { box-shadow: 0 0 30px rgba(40, 167, 69, 0.8); transform: scale(1.05); }
+    100% { box-shadow: 0 15px 35px rgba(40, 167, 69, 0.5); transform: scale(1); }
+}
+
+@keyframes heroCardNotification {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.8); }
+    20% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1.1); }
+    80% { opacity: 1; transform: translateX(-50%) translateY(-5px) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(0.9); }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { 
+        box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        background: rgba(102, 126, 234, 0.15);
+    }
+    50% { 
+        box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+        background: rgba(102, 126, 234, 0.25);
+    }
+}
+
+@keyframes abilityDropPulse {
+    0%, 100% { 
+        box-shadow: 
+            0 0 30px rgba(76, 175, 80, 0.6),
+            inset 0 0 20px rgba(76, 175, 80, 0.3);
+    }
+    50% { 
+        box-shadow: 
+            0 0 40px rgba(76, 175, 80, 0.8),
+            inset 0 0 30px rgba(76, 175, 80, 0.5);
+    }
+}
+
+@keyframes invalidDropPulse {
+    0%, 100% { 
+        box-shadow: 
+            0 0 20px rgba(220, 53, 69, 0.4),
+            inset 0 0 15px rgba(220, 53, 69, 0.2);
+    }
+    50% { 
+        box-shadow: 
+            0 0 30px rgba(220, 53, 69, 0.6),
+            inset 0 0 20px rgba(220, 53, 69, 0.3);
+    }
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+}
+
+@keyframes slideIntoPlace {
+    from { opacity: 0.7; transform: scale(0.95) translateY(-5px); }
+    to { opacity: 0.95; transform: scale(0.98) translateY(0); }
+}
+
+@keyframes insertionGlow {
+    0%, 100% { opacity: 0.7; transform: scaleY(1); }
+    50% { opacity: 1; transform: scaleY(1.1); }
+}
+
+@keyframes attackValueChange {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); filter: brightness(1.5); }
+    100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes actionPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes actionNumberChange {
+    0% { transform: scale(1) rotate(0deg); color: #ffd700; }
+    50% { transform: scale(1.5) rotate(10deg); color: #ff4444; }
+    100% { transform: scale(1) rotate(0deg); color: #ffd700; }
+}
+
+@keyframes orbGlow {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), inset 0 0 5px rgba(255, 255, 255, 0.4);
+    }
+    50% { 
+        transform: scale(1.1);
+        box-shadow: 0 0 25px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.6);
+    }
+}
+
+@keyframes actionErrorPulse {
+    0% { transform: scale(0.8) translateY(10px); opacity: 0; }
+    50% { transform: scale(1.1) translateY(-5px); }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes actionErrorFadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.9); }
+}
+
+@keyframes noActionsPulse {
+    from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+    to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes noActionShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+@keyframes abilityClickPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+
+@keyframes guardChangeGlow {
+    0% {
+        box-shadow: 
+            0 2px 8px rgba(76, 175, 80, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    100% {
+        box-shadow: 
+            0 4px 16px rgba(76, 175, 80, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes creatureBob {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+@keyframes creatureReorderSuccess {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}

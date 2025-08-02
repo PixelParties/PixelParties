@@ -1,0 +1,307 @@
+/* ============================================
+   15. CARD SYSTEMS
+   ============================================ */
+.card-preview-content {
+    width: 100%;
+    max-width: 500px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(248, 249, 250, 0.1));
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-large);
+    padding: 30px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.card-preview-header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.card-preview-header h3 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: var(--shadow-glow);
+}
+
+/* Deck grid styles */
+.deck-grid-wrapper {
+    width: 100%;
+    max-height: 500px;
+    position: relative;
+}
+
+.deck-grid-wrapper.scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px;
+}
+
+.deck-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.deck-grid-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+}
+
+/* Legacy card grid styles */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    aspect-ratio: 1;
+}
+
+.card-grid-4x3 {
+    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-rows: repeat(3, 1fr) !important;
+    gap: 10px;
+}
+
+.card-grid-4x4 {
+    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-rows: repeat(4, 1fr) !important;
+    gap: 8px;
+}
+
+.card-grid-5x4 {
+    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-rows: repeat(4, 1fr) !important;
+    gap: 6px;
+}
+
+/* Card slot styles */
+.card-slot {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 10px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-medium);
+    position: relative;
+    overflow: hidden;
+    min-height: 120px;
+}
+
+.card-slot:hover,
+.card-grid-4x3 .card-slot:hover,
+.card-grid-4x4 .card-slot:hover,
+.card-grid-5x4 .card-slot:hover {
+    transform: scale(1.05);
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    z-index: 10;
+}
+
+.card-grid-4x3 .card-slot:hover,
+.card-grid-4x4 .card-slot:hover,
+.card-grid-5x4 .card-slot:hover {
+    transform: scale(1.1);
+    z-index: 15;
+}
+
+.card-grid-4x4 .card-slot,
+.card-grid-5x4 .card-slot {
+    min-height: 100px;
+    padding: 6px;
+}
+
+.character-card-slot {
+    border-color: #28a745;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(32, 201, 151, 0.15));
+    box-shadow: 0 5px 20px rgba(40, 167, 69, 0.3);
+}
+
+.character-card-slot:hover {
+    border-color: #28a745;
+    box-shadow: 0 10px 30px rgba(40, 167, 69, 0.5);
+}
+
+.reward-card-slot {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.15));
+    border: 2px solid rgba(255, 193, 7, 0.4);
+    box-shadow: 0 5px 20px rgba(255, 193, 7, 0.3);
+    position: relative;
+}
+
+.reward-card-slot:hover {
+    border-color: rgba(255, 193, 7, 0.7);
+    box-shadow: 0 8px 30px rgba(255, 193, 7, 0.5);
+    transform: scale(1.08);
+}
+
+.reward-card-slot.newly-added {
+    animation: rewardCardAppear 0.8s ease-out;
+}
+
+.reward-card-slot.newly-added::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    background: linear-gradient(45deg, #ffc107, #ff8c00, #ffc107);
+    background-size: 200% 200%;
+    border-radius: var(--radius-medium);
+    opacity: 0.6;
+    z-index: -1;
+    animation: gradientShift 2s ease-in-out infinite;
+}
+
+/* Card image styles */
+.preview-card {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: var(--transition-medium);
+    object-position: center top;
+    cursor: pointer;
+}
+
+.preview-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    border-radius: var(--radius-small);
+    z-index: 100;
+    position: relative;
+}
+
+.card-grid-4x4 .preview-card,
+.card-grid-5x4 .preview-card {
+    height: 70px;
+    margin-bottom: 4px;
+}
+
+.character-preview-card,
+.reward-card-preview {
+    border: 2px solid #28a745;
+    box-shadow: 0 3px 12px rgba(40, 167, 69, 0.4);
+}
+
+.character-preview-card:hover,
+.reward-card-preview:hover {
+    box-shadow: 0 5px 20px rgba(40, 167, 69, 0.5);
+}
+
+.reward-card-preview {
+    border: 1px solid rgba(255, 193, 7, 0.6);
+    box-shadow: 0 3px 12px rgba(255, 193, 7, 0.4);
+}
+
+.reward-card-preview:hover {
+    box-shadow: 0 5px 20px rgba(255, 193, 7, 0.6);
+    border-color: rgba(255, 193, 7, 0.8);
+}
+
+.card-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #333;
+    text-align: center;
+    line-height: 1.1;
+    margin-top: auto;
+}
+
+.card-grid-4x4 .card-name,
+.card-grid-5x4 .card-name {
+    font-size: 0.6rem;
+    line-height: 1.0;
+}
+
+.character-card-slot .card-name {
+    color: #28a745;
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+
+.empty-slot {
+    background: rgba(200, 200, 200, 0.2);
+    border-style: dashed;
+    border-color: rgba(150, 150, 150, 0.4);
+}
+
+.empty-card {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-style: italic;
+}
+
+.card-preview-placeholder {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1.2rem;
+    font-weight: 600;
+    padding: 60px 20px;
+}
+
+.card-preview-placeholder .preview-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.reward-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--warning-gradient);
+    color: white;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 6px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 2px 6px rgba(255, 193, 7, 0.5);
+    z-index: 5;
+}
+
+.deck-overflow-notice {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-style: italic;
+    margin: 5px 0 0 0;
+}
+
+.deck-hero-update {
+    position: relative;
+    overflow: visible;
+}
+
+.deck-hero-update::after {
+    content: "🦸 New Hero Cards Added!";
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--success-gradient);
+    color: white;
+    padding: 8px 16px;
+    border-radius: var(--radius-large);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+    animation: heroCardNotification 3s ease-out forwards;
+    z-index: 100;
+    white-space: nowrap;
+}

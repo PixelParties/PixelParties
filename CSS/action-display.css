@@ -1,0 +1,248 @@
+/* ============================================
+   20. ACTION DISPLAY SYSTEM
+   ============================================ */
+.team-building-actions {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.team-building-actions .action-display-container {
+    position: relative;
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+.action-display {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(20, 20, 40, 0.9));
+    border: 2px solid rgba(102, 126, 234, 0.5);
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    min-width: 180px;
+}
+
+.action-display.player-actions {
+    border-color: rgba(76, 175, 80, 0.6);
+    background: linear-gradient(135deg, rgba(0, 20, 0, 0.9), rgba(20, 40, 20, 0.9));
+}
+
+.action-display.opponent-actions {
+    border-color: rgba(244, 67, 54, 0.6);
+    background: linear-gradient(135deg, rgba(20, 0, 0, 0.9), rgba(40, 20, 20, 0.9));
+}
+
+.action-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.action-icon {
+    font-size: 20px;
+    animation: actionPulse 2s ease-in-out infinite;
+}
+
+.action-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.action-counter {
+    font-size: 28px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.current-actions {
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+.current-actions.action-changed {
+    animation: actionNumberChange 0.5s ease-out;
+}
+
+.max-actions {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 20px;
+}
+
+.action-orbs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.action-orb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+.action-orb.filled {
+    background: radial-gradient(circle at 30% 30%, #ffd700, #ff8c00);
+    box-shadow: 
+        0 0 15px rgba(255, 215, 0, 0.6),
+        inset 0 0 5px rgba(255, 255, 255, 0.4);
+    animation: orbGlow 2s ease-in-out infinite;
+}
+
+.action-orb.empty {
+    background: rgba(0, 0, 0, 0.3);
+    opacity: 0.5;
+}
+
+.action-error-tooltip {
+    text-align: center;
+    animation: actionErrorPulse 0.5s ease-out;
+}
+
+.action-changed {
+    animation: actionPulse 0.5s ease-out;
+}
+
+/* Resource display container for Gold and Actions */
+.resource-display-container {
+    position: absolute;
+    bottom: 20px;          
+    right: 22%;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    width: auto;
+    max-width: 1000px;
+    pointer-events: none;
+}
+
+/* Make child elements interactive while keeping container non-interactive */
+.resource-display-container > * {
+    pointer-events: auto;
+}
+
+/* Ensure gold and action displays have constrained widths and are left-aligned */
+.resource-display-container .gold-display-enhanced,
+.resource-display-container .action-display-container {
+    width: auto;
+    max-width: 280px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+/* Target action displays within the resource container to be compact */
+.resource-display-container .action-display-container {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(16, 16, 32, 0.95));
+    border: 2px solid #ffd700;
+    border-radius: 12px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    min-width: 160px;
+}
+
+.resource-display-container .action-display {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.resource-display-container .action-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.resource-display-container .action-icon {
+    font-size: 18px;
+}
+
+.resource-display-container .action-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffd700;
+    white-space: nowrap;
+}
+
+.resource-display-container .action-counter {
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.resource-display-container .current-actions {
+    color: #ffd700;
+    font-size: 20px;
+}
+
+/* Hide the max actions display in resource container */
+.resource-display-container .max-actions {
+    display: none;
+}
+
+.resource-display-container .action-orbs {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.resource-display-container .action-orb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #ffd700;
+    transition: all 0.3s ease;
+}
+
+.resource-display-container .action-orb.filled {
+    background: radial-gradient(circle at 30% 30%, #ffed4e, #ffd700);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+}
+
+.resource-display-container .action-orb.empty {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 215, 0, 0.3);
+}
+
+/* Ensure gold display has proper constraints and left-alignment */
+.resource-display-container .gold-display-enhanced {
+    position: static !important;
+    transform: none !important;
+    margin: 0;
+    width: auto;
+    max-width: 200px;
+    align-self: flex-start;
+}
+
+.resource-display-container .gold-amount-large {
+    padding: 0.5rem 1rem;
+    gap: 8px;
+    width: auto;
+    max-width: 180px;
+    box-sizing: border-box;
+    justify-content: flex-start;
+}

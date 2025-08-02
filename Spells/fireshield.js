@@ -112,13 +112,6 @@ export class FireshieldSpell {
             return false;
         }
         
-        // Check timing: recoil only applies to attacks that happen AFTER fireshield was cast
-        // If fireshield was cast this turn, attacks this turn don't trigger recoil yet
-        if (fireshieldEffect.lastCastTurn >= currentTurn) {
-            console.log(`🛡️ Fireshield was cast this turn (${fireshieldEffect.lastCastTurn}), no recoil yet`);
-            return false;
-        }
-        
         return true;
     }
 

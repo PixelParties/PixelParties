@@ -50,6 +50,12 @@ export class BattleSpellSystem {
             return null;
         }
         
+        if (this.battleManager.statusEffectsManager && 
+            !this.battleManager.statusEffectsManager.canCastSpells(hero)) {
+            console.log(`🔇 ${hero.name} is silenced and cannot cast spells!`);
+            return null;
+        }
+        
         // Get all spells this hero has (including duplicates)
         const allSpells = hero.getAllSpells();
         if (!allSpells || allSpells.length === 0) {
@@ -205,8 +211,6 @@ export class BattleSpellSystem {
         
         // TODO: Add actual spell effects here in the future
         this.executeSpellEffects(hero, spell);
-        
-        console.log(`🪄 ${hero.name} successfully cast ${spell.name} (effects not yet implemented)`);
     }
 
     // Placeholder for future spell effects implementation

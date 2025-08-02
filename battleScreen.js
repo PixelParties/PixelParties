@@ -1,6 +1,7 @@
-// battleScreen.js - Battle Screen Module with Hero Abilities Support, Necromancy Integration, and Speed Control
+// battleScreen.js - Battle Screen Module with BattleLog Integration
 
 import BattleManager from './battleManager.js';
+import { BattleLog } from './battleLog.js'; // NEW: Import BattleLog
 import { getCardInfo } from './cardDatabase.js';
 
 export class BattleScreen {
@@ -15,6 +16,9 @@ export class BattleScreen {
         this.turnTracker = null;
         this.playerAbilities = null;
         this.opponentAbilities = null;
+        
+        // NEW: Initialize BattleLog instance
+        this.battleLog = new BattleLog('combatLog', 100);
         
         // Initialize battle manager with synchronization support
         this.battleManager = new BattleManager();
@@ -115,7 +119,7 @@ export class BattleScreen {
 
     // Start the battle directly with speed-aware delays
     startBattle() {
-        // Add initial log message
+        // NEW: Use BattleLog instead of old method
         this.addCombatLogMessage('⚔️ Battle begins with Hero abilities!', 'success');
         
         // Only the host should initiate the battle
@@ -281,6 +285,9 @@ export class BattleScreen {
         // Clear all tooltips before transition
         this.clearTooltipsBeforeTransition();
         
+        // Show surrender button when returning to formation
+        this.showSurrenderButton();
+        
         // Use the new returnToFormationScreenAfterBattle method with state cleanup
         if (window.heroSelection && typeof window.heroSelection.returnToFormationScreenAfterBattle === 'function') {
             window.heroSelection.returnToFormationScreenAfterBattle();
@@ -303,6 +310,9 @@ export class BattleScreen {
         if (heroSelectionScreen) {
             heroSelectionScreen.style.display = 'flex';
         }
+        
+        // ADDED: Show surrender button when returning to formation
+        this.showSurrenderButton();
         
         // Update UI to show team building
         if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
@@ -358,6 +368,22 @@ export class BattleScreen {
         
         battleArena.innerHTML = battleHTML;
         battleArena.style.display = 'block';
+        
+        // NEW: Initialize BattleLog after DOM is ready
+        setTimeout(() => {
+            const logInitialized = this.battleLog.init();
+            if (logInitialized) {
+                console.log('✅ BattleLog initialized successfully');
+                
+                // Add initial welcome messages
+                this.battleLog.addMessage('🎯 Battle ready with abilities!', 'success');
+                this.battleLog.addMessage('⚔️ Heroes are empowered!', 'info');
+                this.battleLog.addMessage('🛡️ Abilities will affect combat!', 'info');
+                this.battleLog.addMessage('🔄 Real-time synchronization active', 'system');
+            } else {
+                console.warn('⚠️ BattleLog failed to initialize, falling back to basic logging');
+            }
+        }, 100);
         
         // Add life display at the top
         this.updateBattleLifeDisplay();
@@ -421,18 +447,18 @@ export class BattleScreen {
                         </div>
                     </div>
                     
-                    <!-- Combat Log Area -->
+                    <!-- Combat Log Area - UPDATED for BattleLog integration -->
                     <div class="combat-log-section">
                         <div class="log-header">
                             <h3>📜 Combat Log</h3>
+                            <div class="log-controls">
+                                <button id="logScrollTop" class="log-control-btn" title="Scroll to top">⬆️</button>
+                                <button id="logToggleAutoScroll" class="log-control-btn" title="Toggle auto-scroll">📌</button>
+                                <button id="logClear" class="log-control-btn" title="Clear log">🗑️</button>
+                            </div>
                         </div>
                         <div class="combat-log-area" id="combatLog">
-                            <div class="log-placeholder">
-                                <p>🎯 Battle ready with abilities!</p>
-                                <p>⚔️ Heroes are empowered!</p>
-                                <p>🛡️ Abilities will affect combat!</p>
-                                <p style="font-size: 0.8rem; color: #aaa;">🔄 Real-time synchronization active</p>
-                            </div>
+                            <!-- BattleLog will populate this area -->
                         </div>
                     </div>
                     
@@ -470,7 +496,42 @@ export class BattleScreen {
         
         // Initialize speed manager UI
         const success = this.battleManager.speedManager.initializeUI(battleCenter);
+        
+        // NEW: Initialize log control buttons
+        this.initializeLogControls();
+        
         return success;
+    }
+
+    // NEW: Initialize log control buttons
+    initializeLogControls() {
+        // Set up log control buttons
+        setTimeout(() => {
+            const scrollTopBtn = document.getElementById('logScrollTop');
+            const toggleAutoScrollBtn = document.getElementById('logToggleAutoScroll');
+            const clearLogBtn = document.getElementById('logClear');
+            
+            if (scrollTopBtn) {
+                scrollTopBtn.addEventListener('click', () => {
+                    this.battleLog.scrollToTop();
+                });
+            }
+            
+            if (toggleAutoScrollBtn) {
+                toggleAutoScrollBtn.addEventListener('click', () => {
+                    const autoScroll = this.battleLog.toggleAutoScroll();
+                    toggleAutoScrollBtn.title = autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll';
+                    toggleAutoScrollBtn.style.opacity = autoScroll ? '1' : '0.5';
+                });
+            }
+            
+            if (clearLogBtn) {
+                clearLogBtn.addEventListener('click', () => {
+                    this.battleLog.clear();
+                    this.battleLog.addMessage('📝 Combat log cleared', 'system');
+                });
+            }
+        }, 150);
     }
 
     // Create individual battle hero slot with enhanced styling and ability indicators
@@ -806,7 +867,7 @@ export class BattleScreen {
         // Display the abilities debug info
         const debugOutput = ``;
         
-        // Also show in combat log
+        // NEW: Also log to BattleLog instead of old method
         this.addCombatLogMessage(`${hero.name} - ${debugOutput}`, 'info');
         
         // Create a floating tooltip to show abilities
@@ -1205,33 +1266,52 @@ export class BattleScreen {
         `;
     }
 
-    // Add message to combat log
+    // NEW: Updated to use BattleLog instead of manual DOM manipulation
     addCombatLogMessage(message, type = 'info') {
-        const logArea = document.getElementById('combatLog');
-        if (!logArea) return;
-        
-        // Remove placeholder if it exists
-        const placeholder = logArea.querySelector('.log-placeholder');
-        if (placeholder) {
-            placeholder.remove();
+        if (this.battleLog && this.battleLog.isInitialized) {
+            // Use the new BattleLog system
+            this.battleLog.addMessage(message, type);
+        } else {
+            // Fallback to old method if BattleLog isn't ready yet
+            const logArea = document.getElementById('combatLog');
+            if (!logArea) return;
+            
+            // Remove placeholder if it exists
+            const placeholder = logArea.querySelector('.log-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+            
+            // Create new message element
+            const messageElement = document.createElement('div');
+            messageElement.className = `log-message log-${type}`;
+            messageElement.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+            
+            // Add to log
+            logArea.appendChild(messageElement);
+            
+            // Auto scroll to bottom
+            logArea.scrollTop = logArea.scrollHeight;
+            
+            // Keep only last 50 messages
+            const messages = logArea.querySelectorAll('.log-message');
+            if (messages.length > 50) {
+                messages[0].remove();
+            }
         }
-        
-        // Create new message element
-        const messageElement = document.createElement('div');
-        messageElement.className = `log-message log-${type}`;
-        messageElement.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${message}`;
-        
-        // Add to log
-        logArea.appendChild(messageElement);
-        
-        // Auto scroll to bottom
-        logArea.scrollTop = logArea.scrollHeight;
-        
-        // Keep only last 50 messages
-        const messages = logArea.querySelectorAll('.log-message');
-        if (messages.length > 50) {
-            messages[0].remove();
+    }
+
+    // NEW: Method to get battle log state for persistence
+    getBattleLogState() {
+        return this.battleLog ? this.battleLog.exportState() : null;
+    }
+
+    // NEW: Method to restore battle log state from persistence
+    restoreBattleLogState(logState) {
+        if (this.battleLog && logState) {
+            return this.battleLog.importState(logState);
         }
+        return false;
     }
 
     // Update life display for battle screen
@@ -1244,10 +1324,58 @@ export class BattleScreen {
         }
     }
 
+    // Show surrender button (called when returning to formation screen)
+    showSurrenderButton() {
+        console.log('🛡️ Showing surrender button after battle');
+        
+        // Remove battle-active class that might hide the surrender button
+        document.body.classList.remove('battle-active');
+        
+        // Find and show the surrender button
+        const surrenderButton = document.querySelector('.surrender-button');
+        if (surrenderButton) {
+            surrenderButton.style.display = '';
+            surrenderButton.style.visibility = 'visible';
+            surrenderButton.disabled = false;
+            console.log('✅ Surrender button shown and enabled');
+        } else {
+            console.warn('⚠️ Surrender button not found in DOM');
+        }
+        
+        // Also try common surrender button selectors as fallbacks
+        const surrenderButtonAlt = document.querySelector('#surrenderButton, .surrender-btn, [data-action="surrender"]');
+        if (surrenderButtonAlt && !surrenderButton) {
+            surrenderButtonAlt.style.display = '';
+            surrenderButtonAlt.style.visibility = 'visible';
+            surrenderButtonAlt.disabled = false;
+            console.log('✅ Alternative surrender button shown');
+        }
+    }
+
+    // Add static method as well for global access
+    static showSurrenderButton() {
+        console.log('🛡️ Static method: Showing surrender button');
+        
+        document.body.classList.remove('battle-active');
+        
+        const surrenderButton = document.querySelector('.surrender-button');
+        if (surrenderButton) {
+            surrenderButton.style.display = '';
+            surrenderButton.style.visibility = 'visible';
+            surrenderButton.disabled = false;
+            console.log('✅ Static: Surrender button shown');
+        }
+    }
+
     // Reset battle screen
     reset() {
         // Clear all tooltips first
         this.clearTooltipsBeforeTransition();
+        
+        // NEW: Clear the BattleLog
+        if (this.battleLog) {
+            this.battleLog.clear();
+        }
         
         // Reset battle manager with synchronization state
         if (this.battleManager) {
@@ -1277,7 +1405,7 @@ export class BattleScreen {
     }
 }
 
-// Add consolidated styles for battle screen including all creature-related styles
+// Add consolidated styles for battle screen including log control styles
 if (!document.getElementById('battleScreenStyles')) {
     const style = document.createElement('style');
     style.id = 'battleScreenStyles';
@@ -1285,6 +1413,46 @@ if (!document.getElementById('battleScreenStyles')) {
         /* ============================================
         BATTLE SCREEN & CREATURE STYLES - UPDATED
         ============================================ */
+
+        /* NEW: Log control buttons styling */
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0 5px;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .log-control-btn {
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.4);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 28px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .log-control-btn:hover {
+            background: rgba(102, 126, 234, 0.4);
+            border-color: rgba(102, 126, 234, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .log-control-btn:active {
+            transform: translateY(0);
+        }
 
         /* Ability indicators */
         .ability-indicator {

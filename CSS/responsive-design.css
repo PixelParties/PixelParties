@@ -1,0 +1,944 @@
+/* ============================================
+   23. RESPONSIVE DESIGN
+   ============================================ */
+@media (max-width: 1400px) {
+    .reward-container.enhanced-with-gold-and-preview {
+        padding: 30px !important;
+        max-height: 96vh !important;
+    }
+    
+    #cardRewardOverlay .reward-hand-content-normal .hand-cards {
+        min-height: 180px !important;
+    }
+    
+    .formation-spellbook-tooltip {
+        min-width: 280px;
+        max-width: 320px;
+    }
+    
+    .card-preview-column,
+    .team-building-right {
+        width: 500px;
+    }
+    
+    .character-selection-grid {
+        max-width: 600px;
+        gap: 20px;
+    }
+    
+    .character-card {
+        min-height: 240px;
+    }
+    
+    .character-image-container {
+        height: 160px;
+    }
+    
+    .character-card.with-ability-zones {
+        min-height: 300px;
+    }
+    
+    .character-card.with-ability-zones .character-image-container {
+        height: 200px;
+    }
+    
+    .character-card .ability-zone {
+        width: 55px;
+        height: 77px;
+    }
+    
+    .large-card-tooltip {
+        max-width: 280px;
+        padding: 15px;
+    }
+    
+    .large-card-image {
+        max-width: 250px;
+    }
+    
+    .card-tooltip-name {
+        font-size: 1rem;
+    }
+    
+    .battle-hero-slot {
+        width: 280px;
+        height: 240px;
+    }
+    
+    .card-grid-5x4 {
+        grid-template-columns: repeat(4, 1fr) !important;
+        grid-template-rows: repeat(5, 1fr) !important;
+    }
+    
+    .card-grid-4x4 .card-slot,
+    .card-grid-5x4 .card-slot {
+        min-height: 90px;
+        padding: 4px;
+    }
+    
+    .card-grid-4x4 .preview-card,
+    .card-grid-5x4 .preview-card {
+        height: 70px;
+    }
+    
+    .battle-hero-attack {
+        padding: 3px 6px;
+        gap: 6px;
+    }
+    
+    .attack-icon {
+        font-size: 14px;
+    }
+    
+    .attack-value {
+        font-size: 14px;
+    }
+    
+    .attack-bonus {
+        font-size: 12px;
+    }
+    
+    .ability-drop-tooltip {
+        font-size: 12px;
+        padding: 6px 12px;
+        top: -30px;
+    }
+    
+    .team-building-actions .action-display-container {
+        gap: 20px;
+    }
+    
+    .action-display {
+        min-width: 150px;
+        padding: 12px 15px;
+    }
+    
+    .action-counter {
+        font-size: 24px;
+    }
+    
+    .action-orb {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .resource-display-container {
+        right: 20px;
+        max-width: 250px;
+    }
+    
+    .deck-tooltip-anchor {
+        top: -380px;
+        width: 300px;
+        height: 380px;
+    }
+    
+    .deck-tooltip-content .large-card-image {
+        max-width: 240px;
+        max-height: 300px;
+    }
+    
+    .reward-content-wrapper {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .reward-right-section {
+        flex: none;
+        width: 100%;
+        max-height: 400px;
+        order: -1;
+    }
+    
+    .reward-card-preview-section {
+        max-height: 100%;
+    }
+    
+    .formation-spellbook-tooltip {
+        min-width: 260px;
+        max-width: 300px;
+        padding: 16px;
+    }
+    
+    .formation-spellbook-tooltip .spell-entry {
+        padding: 6px 10px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 100px;
+        height: 160px;
+        right: 15px;
+    }
+    
+    .battle-row {
+        gap: 30px;
+        padding: 8px 30px;
+    }
+    
+    .gold-breakdown-content-scrollable {
+        max-height: 180px;
+    }
+    
+    .battle-interface-panel {
+        min-width: 280px;
+        max-width: 350px;
+    }
+    
+    .card-preview-section {
+        min-height: 350px;
+    }
+    
+    .preview-card-image {
+        max-width: 300px;
+        max-height: 80%;
+    }
+    
+    .combat-log-section {
+        max-height: 220px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .character-selection-grid {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 500px;
+        gap: 15px;
+    }
+    
+    .game-title {
+        font-size: 2.5rem;
+    }
+    
+    .selection-header h2 {
+        font-size: 2.2rem;
+    }
+    
+    .large-card-tooltip {
+        max-width: 240px;
+        padding: 12px;
+    }
+    
+    .large-card-image {
+        max-width: 200px;
+    }
+    
+    .card-tooltip-name {
+        font-size: 0.9rem;
+    }
+    
+    .battle-hero-slot {
+        width: 240px;
+        height: 200px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 80px;
+        height: 120px;
+        right: 10px;
+    }
+    
+    .battle-row {
+        gap: 25px;
+        padding: 5px 25px;
+    }
+    
+    .hero-info-bar {
+        padding: 6px 12px 8px 12px;
+        gap: 4px;
+    }
+    
+    .battle-hero-name {
+        font-size: 14px;
+    }
+    
+    .health-bar {
+        height: 16px;
+    }
+    
+    .attack-icon {
+        font-size: 14px;
+    }
+    
+    .attack-value {
+        font-size: 14px;
+        gap: 2px;
+    }
+    
+    .attack-bonus {
+        font-size: 12px;
+        margin-left: 2px;
+    }
+    
+    .gold-breakdown-content-scrollable {
+        max-height: 160px;
+    }
+    
+    .battle-interface-panel {
+        min-width: 250px;
+        max-width: 300px;
+        padding: 15px;
+    }
+    
+    .card-preview-section {
+        min-height: 300px;
+        padding: 12px;
+    }
+    
+    .combat-log-section {
+        max-height: 200px;
+        padding: 12px;
+    }
+    
+    .preview-card-image {
+        max-width: 250px;
+        max-height: 80%;
+    }
+    
+    .preview-card-info h4 {
+        font-size: 16px;
+    }
+    
+    .card-type {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 1024px) {
+    .hand-display-area-inline .hand-card-image {
+        width: 120px;
+        height: 168px;
+    }
+    
+    .hand-display-area-inline .hand-cards {
+        gap: 12px;
+    }
+    
+    .team-building-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card {
+        margin-right: -15px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="7"] .hand-card {
+        margin-right: -30px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="8"] .hand-card {
+        margin-right: -45px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="9"] .hand-card {
+        margin-right: -55px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card {
+        margin-right: -65px;
+    }
+    
+    .battle-hero-slot {
+        width: 200px;
+        height: 170px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 70px;
+        height: 100px;
+        right: 8px;
+    }
+    
+    .battle-row {
+        gap: 20px;
+        padding: 5px 20px;
+    }
+    
+    .empty-icon {
+        font-size: 28px;
+        margin-bottom: 6px;
+    }
+    
+    .empty-text {
+        font-size: 12px;
+    }
+    
+    .battle-field-container {
+        flex-direction: column;
+        height: 100vh;
+    }
+    
+    .battle-field {
+        flex: 1;
+        min-height: 60vh;
+    }
+    
+    .battle-interface-panel {
+        flex: 0 0 40vh;
+        max-width: none;
+        border-left: none;
+        border-top: 2px solid rgba(102, 126, 234, 0.3);
+        flex-direction: row;
+        gap: 10px;
+    }
+    
+    .card-preview-section {
+        flex: 1;
+        min-height: auto;
+    }
+    
+    .combat-log-section {
+        flex: 1;
+        max-height: none;
+        min-height: auto;
+    }
+    
+    .preview-card-image {
+        max-width: 200px;
+        max-height: 75%;
+    }
+}
+
+@media (max-width: 1000px) {
+    .hero-selection-container,
+    .team-building-container {
+        flex-direction: column;
+    }
+    
+    .card-preview-column,
+    .team-building-right {
+        width: 100%;
+        border-left: none;
+        border-top: 2px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .character-selection-grid {
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 500px;
+        gap: 15px;
+    }
+}
+
+@media (max-width: 768px) {
+    .life-display-container {
+        padding: 10px 15px;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+    
+    .life-display-container .battle-title {
+        font-size: 20px;
+        width: 100%;
+        text-align: center;
+        order: -1;
+        margin: 0 0 10px 0;
+    }
+    
+    .player-hearts, 
+    .opponent-trophies {
+        flex: 0 0 auto;
+    }
+    
+    .heart, 
+    .trophy {
+        font-size: 20px;
+    }
+    
+    .hearts-container, 
+    .trophies-container {
+        justify-content: center;
+    }
+    
+    .turn-container {
+        padding: 8px 16px;
+        gap: 6px;
+    }
+    
+    .turn-icon {
+        font-size: 16px;
+    }
+    
+    .turn-text {
+        font-size: 14px;
+        letter-spacing: 0.5px;
+    }
+    
+    .hand-display-area-inline .hand-card-image {
+        width: 100px;
+        height: 140px;
+    }
+    
+    .hand-display-area-inline .hand-cards {
+        gap: 10px;
+        min-height: 180px;
+    }
+    
+    .hand-display-area-inline {
+        margin-top: 20px;
+        padding: 10px;
+    }
+    
+    .hand-zone-drag-over::before {
+        content: "👆 Drop to reorder";
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+    
+    .battle-hero-slot {
+        width: 160px;
+        height: 140px;
+    }
+    
+    .battle-hero-name {
+        font-size: 12px;
+    }
+    
+    .health-bar {
+        height: 15px;
+    }
+    
+    .gold-display-enhanced {
+        bottom: 500px;
+        right: 500%;
+    }
+    
+    .gold-amount-large {
+        padding: 6px 12px;
+        gap: 6px;
+    }
+    
+    .gold-icon-large {
+        font-size: 24px;
+    }
+    
+    .gold-amount-large .player-gold-number {
+        font-size: 20px;
+    }
+    
+    .gold-change-indicator {
+        font-size: 20px;
+    }
+    
+    .card-grid-4x3,
+    .card-grid-4x4,
+    .card-grid-5x4 {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px;
+    }
+    
+    .card-grid-4x4,
+    .card-grid-5x4 {
+        grid-template-rows: repeat(auto, 1fr) !important;
+    }
+    
+    .deck-overflow-notice {
+        font-size: 0.8rem;
+    }
+    
+    .reward-indicator {
+        font-size: 8px;
+        padding: 1px 3px;
+    }
+    
+    .card-reward-container {
+        padding: 30px 20px;
+        margin: 20px;
+        width: calc(100% - 40px);
+    }
+    
+    .card-reward-header h2 {
+        font-size: 2rem;
+    }
+    
+    .card-reward-header p {
+        font-size: 1rem;
+    }
+    
+    .card-reward-selection,
+    .hero-reward-selection {
+        gap: 20px;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .reward-card {
+        width: 200px;
+        min-height: 300px;
+        padding: 15px;
+    }
+    
+    .reward-card-image,
+    .hero-card-image {
+        width: 160px;
+        height: 220px;
+    }
+    
+    .special-reward-indicator {
+        position: static;
+        margin-bottom: 20px;
+        align-self: center;
+    }
+    
+    .character-card.with-ability-zones {
+        min-height: 260px;
+    }
+    
+    .character-card.with-ability-zones .character-image-container {
+        height: 170px;
+    }
+    
+    .character-card .hero-ability-zones {
+        gap: 3px;
+        padding: 6px 4px;
+    }
+    
+    .character-card .ability-zone {
+        width: 50px;
+        height: 70px;
+    }
+    
+    .character-card .zone-placeholder {
+        font-size: 0.6rem;
+    }
+    
+    .ability-zone .ability-stack-count {
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        min-width: 18px;
+    }
+    
+    .battle-hero-attack {
+        padding: 2px 5px;
+        gap: 4px;
+    }
+    
+    .attack-icon {
+        font-size: 12px;
+    }
+    
+    .attack-value {
+        font-size: 12px;
+    }
+    
+    .attack-bonus {
+        font-size: 10px;
+    }
+    
+    .hero-info-bar {
+        gap: 4px;
+        padding: 6px 10px 8px 10px;
+    }
+    
+    .ability-drop-tooltip {
+        font-size: 11px;
+        padding: 5px 10px;
+        top: -28px;
+    }
+    
+    .turn-limit-message {
+        font-size: 12px;
+        padding: 8px 16px;
+        top: -40px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card {
+        margin-right: -10px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="7"] .hand-card {
+        margin-right: -20px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="8"] .hand-card {
+        margin-right: -30px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="9"] .hand-card {
+        margin-right: -40px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card {
+        margin-right: -50px;
+    }
+    
+    .hand-display-area-inline .hand-card-name {
+        max-width: 90px;
+        font-size: 0.6rem;
+    }
+    
+    .team-building-actions .action-display-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .action-display {
+        min-width: 200px;
+    }
+    
+    .resource-display-container {
+        bottom: 15px;
+        right: 15px;
+        max-width: 200px;
+    }
+    
+    .resource-display-container .gold-amount-large {
+        max-width: 150px;
+    }
+    
+    .resource-display-container .action-display-container {
+        min-width: 140px;
+    }
+    
+    .deck-tooltip-anchor {
+        top: -320px;
+        width: 250px;
+        height: 320px;
+    }
+    
+    .deck-tooltip-content .large-card-image {
+        max-width: 200px;
+        max-height: 250px;
+    }
+    
+    .reward-container.enhanced-with-gold-and-preview {
+        padding: 20px 15px !important;
+        max-height: 98vh !important;
+    }
+    
+    .reward-header {
+        margin-bottom: 15px !important;
+    }
+    
+    #cardRewardOverlay .reward-hand-content-normal .hand-cards {
+        min-height: 160px !important;
+    }
+    
+    .gold-breakdown-content-scrollable {
+        max-height: 140px;
+        padding-right: 3px;
+    }
+    
+    .gold-breakdown-content-scrollable::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .battle-speed-panel-container {
+        width: 60px;
+        height: 80px;
+        right: 5px;
+    }
+    
+    .battle-hero-name {
+        font-size: 14px;
+    }
+    
+    .health-bar {
+        height: 14px;
+    }
+    
+    .hero-info-bar {
+        padding: 5px 10px 6px 10px;
+        gap: 3px;
+    }
+    
+    .attack-icon {
+        font-size: 12px;
+    }
+    
+    .attack-value {
+        font-size: 12px;
+    }
+    
+    .attack-bonus {
+        font-size: 10px;
+    }
+    
+    .empty-icon {
+        font-size: 24px;
+        margin-bottom: 4px;
+    }
+    
+    .empty-text {
+        font-size: 10px;
+    }
+    
+    .battle-interface-panel {
+        padding: 10px;
+        gap: 8px;
+    }
+    
+    .card-preview-section,
+    .combat-log-section {
+        padding: 8px;
+    }
+    
+    .preview-card-image {
+        max-width: 150px;
+        max-height: 70%;
+    }
+    
+    .preview-card-info h4 {
+        font-size: 14px;
+    }
+    
+    .card-type {
+        font-size: 11px;
+    }
+    
+    .combat-log-area {
+        font-size: 10px;
+        padding: 6px;
+    }
+    
+    .log-header h3 {
+        font-size: 14px;
+    }
+    
+    /* Responsive creature sizing */
+    .creature-sprite-container {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .hero-creatures {
+        gap: 3px;
+        padding: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .turn-container {
+        padding: 6px 12px;
+        gap: 4px;
+    }
+    
+    .turn-icon {
+        font-size: 14px;
+    }
+    
+    .turn-text {
+        font-size: 12px;
+        letter-spacing: 0px;
+    }
+    
+    .gold-display-enhanced {
+        bottom: 15px;
+        right: 15px;
+    }
+    
+    .gold-amount-large {
+        padding: 4px 10px;
+        gap: 4px;
+    }
+    
+    .gold-icon-large {
+        font-size: 20px;
+    }
+    
+    .gold-amount-large .player-gold-number {
+        font-size: 16px;
+    }
+    
+    .gold-change-indicator {
+        font-size: 16px;
+    }
+    
+    .hand-zone-drag-over::before {
+        top: -30px;
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+    
+    .card-reward-container {
+        padding: 20px 15px;
+        margin: 10px;
+        width: calc(100% - 20px);
+    }
+    
+    .card-reward-header h2 {
+        font-size: 1.8rem;
+    }
+    
+    .reward-card {
+        width: 180px;
+        min-height: 280px;
+        padding: 12px;
+    }
+    
+    .reward-card-image,
+    .hero-card-image {
+        width: 140px;
+        height: 200px;
+    }
+    
+    .reward-card-name {
+        font-size: 0.9rem;
+    }
+    
+    .success-content {
+        padding: 20px 25px;
+        font-size: 1.2rem;
+    }
+    
+    .hand-display-area-inline .hand-card-image {
+        width: 80px;
+        height: 112px;
+    }
+    
+    .character-card.with-ability-zones {
+        min-height: 220px;
+    }
+    
+    .character-card.with-ability-zones .character-image-container {
+        height: 140px;
+    }
+    
+    .character-card .ability-zone {
+        width: 36px;
+        height: 50px;
+    }
+    
+    .character-card .zone-placeholder {
+        font-size: 0.55rem;
+    }
+    
+    .ability-zone .ability-stack-count {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+        min-width: 16px;
+        bottom: 1px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card {
+        margin-right: -5px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="7"] .hand-card {
+        margin-right: -15px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="8"] .hand-card {
+        margin-right: -25px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="9"] .hand-card {
+        margin-right: -35px;
+    }
+    
+    .hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card {
+        margin-right: -40px;
+    }
+    
+    .resource-display-container {
+        max-width: 180px;
+    }
+    
+    .resource-display-container .gold-amount-large {
+        max-width: 130px;
+    }
+    
+    .resource-display-container .action-display-container {
+        min-width: 120px;
+    }
+}

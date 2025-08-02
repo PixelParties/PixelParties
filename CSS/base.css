@@ -1,0 +1,116 @@
+/* ============================================
+   3. BASE STYLES & TYPOGRAPHY
+   ============================================ */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
+    background-attachment: fixed;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(255, 107, 107, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Body states for drag and drop */
+body.dragging-ability .ability-zone:not(.filled) {
+    background: rgba(102, 126, 234, 0.15);
+    border-style: solid;
+    animation: pulseGlow 2s ease-in-out infinite;
+    transform: scale(1.1);
+    border-color: rgba(102, 126, 234, 0.6);
+    box-shadow: 0 0 8px rgba(102, 126, 234, 0.3);
+}
+
+body.dragging-ability .character-card.with-ability-zones {
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
+}
+
+body.dragging-ability .team-slot {
+    border-width: 3px;
+    border-color: rgba(76, 175, 80, 0.4);
+    box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+}
+
+body.dragging-ability .team-slot.filled {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(56, 142, 60, 0.1));
+}
+
+body.dragging-spell .team-slot {
+    border-width: 3px;
+    border-color: rgba(102, 126, 234, 0.4);
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+}
+
+body.dragging-spell .team-slot.filled {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+}
+
+body.reward-overlay-active {
+    overflow: hidden !important;
+    position: fixed;
+    width: 100%;
+}
+
+body.dragging-ability .hand-card[data-card-type="ability"]:not(.hand-card-dragging) {
+    opacity: 0.6;
+}
+
+body.dragging-global-spell,
+body.dragging-global-spell * {
+    cursor: copy !important;
+}
+
+body.guard-change-active .hero-creatures:empty::after,
+body.guard-change-active .hero-creatures:has(.creature-empty-placeholder)::after {
+    content: "Drop creatures here";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+/* Typography */
+h1 {
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 2.8rem;
+    font-weight: 900;
+    background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #667eea);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 4s ease-in-out infinite;
+    text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+    letter-spacing: -1px;
+    position: relative;
+}
+
+h1::after {
+    content: '🎮✨';
+    position: absolute;
+    top: -10px;
+    right: -40px;
+    font-size: 1.5rem;
+    animation: float 2s ease-in-out infinite alternate;
+}

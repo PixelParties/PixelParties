@@ -1,0 +1,437 @@
+/* ============================================
+   16. HAND DISPLAY
+   ============================================ */
+.hand-display-area {
+    display: none;
+}
+
+.hand-display-area-inline {
+    position: relative;
+    margin-top: 30px;
+    background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.7) 100%);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-medium);
+    padding: 12px;
+    width: 100%;
+    box-shadow: var(--shadow-medium);
+}
+
+.hand-display-area-inline .hand-container {
+    max-width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    transition: var(--transition-medium);
+}
+
+.hand-display-area-inline .hand-container.empty {
+    padding: 15px;
+    text-align: center;
+    color: rgba(255,255,255,0.6);
+}
+
+.hand-zone-drag-over .hand-container {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-radius: var(--radius-medium);
+    padding: 5px;
+    box-shadow: inset 0 0 20px rgba(102, 126, 234, 0.2);
+}
+
+.hand-display-area-inline .hand-header {
+    margin-bottom: 15px;
+}
+
+.hand-display-area-inline .hand-title {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.hand-display-area-inline .hand-title::before {
+    content: "🃏";
+    font-size: 1.2rem;
+}
+
+.hand-zone-drag-over .hand-title::after {
+    content: " ↔️ Reordering...";
+    color: rgba(102, 126, 234, 0.8);
+    font-weight: bold;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.hand-display-area-inline .hand-cards {
+    display: flex;
+    gap: 0px;
+    justify-content: center;
+    align-items: flex-end;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    padding: 5px 0;
+    position: relative;
+    overflow: visible;
+    transition: var(--transition-medium);
+    min-height: 220px;
+}
+
+.hand-cards.preview-reordering {
+    transition: var(--transition-fast);
+}
+
+.hand-cards.preview-reordering .hand-card {
+    transition: var(--transition-fast);
+    will-change: transform, opacity;
+}
+
+.hand-cards.hand-zone-drag-over {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border: 2px dashed rgba(102, 126, 234, 0.5);
+    border-radius: var(--radius-medium);
+    box-shadow: 
+        var(--shadow-glow),
+        inset 0 0 20px rgba(102, 126, 234, 0.1);
+    transform: scale(1.02);
+}
+
+.hand-zone-drag-over::before {
+    content: "💫 Drop to reorder cards";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+    color: white;
+    padding: 8px 16px;
+    border-radius: var(--radius-large);
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    z-index: 1001;
+    white-space: nowrap;
+    animation: tooltipFadeIn 0.3s ease-out;
+    pointer-events: none;
+}
+
+/* Dynamic spacing based on number of cards */
+.hand-display-area-inline .hand-cards[data-card-count="1"] .hand-card,
+.hand-display-area-inline .hand-cards[data-card-count="2"] .hand-card,
+.hand-display-area-inline .hand-cards[data-card-count="3"] .hand-card,
+.hand-display-area-inline .hand-cards[data-card-count="4"] .hand-card,
+.hand-display-area-inline .hand-cards[data-card-count="5"] .hand-card {
+    margin-right: 15px;
+}
+
+.hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card {
+    margin-right: -20px;
+}
+
+.hand-display-area-inline .hand-cards[data-card-count="7"] .hand-card {
+    margin-right: -40px;
+}
+
+.hand-display-area-inline .hand-cards[data-card-count="8"] .hand-card {
+    margin-right: -55px;
+}
+
+.hand-display-area-inline .hand-cards[data-card-count="9"] .hand-card {
+    margin-right: -65px;
+}
+
+.hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card {
+    margin-right: -75px;
+}
+
+.hand-display-area-inline .hand-card:last-child {
+    margin-right: 0 !important;
+}
+
+/* Enhanced hand card styles */
+.hand-display-area-inline .hand-card {
+    position: relative;
+    cursor: grab;
+    transition: var(--transition-medium);
+    flex-shrink: 0;
+    margin-right: 0;
+    user-select: none;
+    opacity: 1;
+    transform: none;
+}
+
+.hand-card:active {
+    cursor: grabbing;
+}
+
+.hand-display-area-inline .hand-card:hover:not(.preview-card) {
+    transform: translateY(-12px) scale(1.08);
+    z-index: 20;
+    filter: brightness(1.1);
+}
+
+.hand-display-area-inline .hand-card:hover .hand-card-name {
+    opacity: 1;
+    z-index: 21;
+}
+
+.hand-card.preview-card {
+    animation: slideIntoPlace 0.2s ease-out;
+    opacity: 0.95;
+    transform: scale(0.98);
+    filter: brightness(1.05);
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    border-radius: var(--radius-small);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.hand-card.preview-card:hover {
+    transform: translateY(-8px) scale(1.02) !important;
+    filter: brightness(1.1);
+}
+
+.hand-card-drag-over {
+    transform: translateY(-8px) scale(1.05);
+    filter: brightness(1.1);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    border: 2px solid rgba(102, 126, 234, 0.5);
+    border-radius: var(--radius-small);
+    z-index: 10;
+}
+
+.hand-display-area-inline .hand-card-image {
+    width: 150px;
+    height: 210px;
+    border-radius: var(--radius-small);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+    border: 2px solid rgba(255,255,255,0.3);
+    transition: var(--transition-medium);
+    object-fit: cover;
+    background: linear-gradient(135deg, #3a3a3a, #2a2a2a);
+    pointer-events: none;
+    user-select: none;
+}
+
+.hand-display-area-inline .hand-card-image:hover,
+.hand-display-area-inline .hand-card-image.hand-card-hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.7);
+    border-color: rgba(255,255,255,0.6);
+    filter: brightness(1.2);
+}
+
+.hand-display-area-inline .hand-card-name {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+    text-align: center;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: var(--transition-medium);
+    background: rgba(0,0,0,0.8);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.2);
+    z-index: 15;
+    pointer-events: none;
+    user-select: none;
+}
+
+.hand-display-area-inline .hand-card:hover .hand-card-name {
+    opacity: 1;
+}
+
+.hand-card.preview-card .hand-card-name {
+    opacity: 0.8;
+    background: rgba(102, 126, 234, 0.8);
+    border-color: rgba(102, 126, 234, 0.6);
+    text-shadow: 
+        1px 1px 2px rgba(0,0,0,0.9),
+        0 0 4px rgba(102, 126, 234, 0.6);
+}
+
+/* Enhanced insertion preview indicators */
+.hand-card.preview-card::before,
+.hand-card.preview-card::after {
+    content: '';
+    position: absolute;
+    width: 3px;
+    top: 5%;
+    height: 90%;
+    background: linear-gradient(180deg, 
+        rgba(102, 126, 234, 0.0) 0%, 
+        rgba(102, 126, 234, 0.8) 20%, 
+        rgba(102, 126, 234, 1.0) 50%,
+        rgba(102, 126, 234, 0.8) 80%, 
+        rgba(102, 126, 234, 0.0) 100%);
+    border-radius: 2px;
+    opacity: 0.7;
+    z-index: 15;
+    box-shadow: 0 0 6px rgba(102, 126, 234, 0.8);
+    pointer-events: none;
+    animation: insertionGlow 1.5s ease-in-out infinite;
+}
+
+.hand-card.preview-card:first-child::before {
+    left: -8px;
+    opacity: 1;
+    width: 4px;
+    background: linear-gradient(180deg, 
+        rgba(76, 175, 80, 0.0) 0%, 
+        rgba(76, 175, 80, 0.9) 20%, 
+        rgba(76, 175, 80, 1.0) 50%,
+        rgba(76, 175, 80, 0.9) 80%, 
+        rgba(76, 175, 80, 0.0) 100%);
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+}
+
+.hand-card.preview-card:last-child::after {
+    right: -8px;
+    opacity: 1;
+    width: 4px;
+    background: linear-gradient(180deg, 
+        rgba(76, 175, 80, 0.0) 0%, 
+        rgba(76, 175, 80, 0.9) 20%, 
+        rgba(76, 175, 80, 1.0) 50%,
+        rgba(76, 175, 80, 0.9) 80%, 
+        rgba(76, 175, 80, 0.0) 100%);
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.8);
+}
+
+.hand-display-area-inline .hand-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px;
+}
+
+.hand-display-area-inline .hand-icon {
+    font-size: 2rem;
+    opacity: 0.5;
+}
+
+/* Ability card states */
+.hand-card[data-card-type="ability"] {
+    position: relative;
+}
+
+.hand-card[data-card-type="ability"]::after {
+    content: "↓";
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    opacity: 0;
+    transition: var(--transition-fast);
+}
+
+.hand-card[data-card-type="ability"]:hover::after {
+    opacity: 1;
+}
+
+.hand-card.ability-card.partial-disabled {
+    position: relative;
+}
+
+.hand-card.ability-card.partial-disabled::after {
+    content: '⚠';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    color: #ffc107;
+    font-size: 18px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.hand-card[data-requires-action="true"] {
+    position: relative;
+}
+
+.hand-card[data-requires-action="true"] .action-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 18px;
+    color: #ffd700;
+    text-shadow: 
+        0 0 5px rgba(255, 215, 0, 0.8),
+        0 0 10px rgba(255, 140, 0, 0.6);
+    z-index: 10;
+    animation: actionPulse 2s ease-in-out infinite;
+}
+
+.hand-card.no-actions-available {
+    opacity: 0.6;
+    filter: grayscale(30%);
+    cursor: not-allowed;
+}
+
+.hand-card.no-actions-available::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, 
+        rgba(244, 67, 54, 0.1) 0%, 
+        rgba(244, 67, 54, 0.2) 100%);
+    pointer-events: none;
+    border-radius: 8px;
+}
+
+.hand-card.no-actions-available:hover::before {
+    content: "No Actions!";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(244, 67, 54, 0.95);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 100;
+    white-space: nowrap;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    animation: noActionsPulse 0.3s ease-out;
+}
+
+/* Hand display enhanced specifics for reward overlay */
+#cardRewardOverlay .reward-hand-display-section-normal {
+    margin: 15px 0 10px 0 !important;
+    padding: 12px 16px !important;
+}
+
+#cardRewardOverlay .reward-hand-content-normal .hand-container {
+    padding: 10px !important;
+}
+
+#cardRewardOverlay .reward-hand-content-normal .hand-cards {
+    min-height: 200px !important;
+    padding: 5px 0 !important;
+}

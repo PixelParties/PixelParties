@@ -1,4 +1,4 @@
-// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management and Creature Drag & Drop
+// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, and Nicolas Effect
 
 export class HeroSelectionUI {
     constructor() {
@@ -170,11 +170,28 @@ export class HeroSelectionUI {
         }
     }
 
+    // Check if Nicolas effect is currently usable
+    isNicolasEffectUsable(character) {
+        if (character.name !== 'Nicolas') return false;
+        
+        // Check if we have access to the managers
+        if (!window.heroSelection || !window.heroSelection.nicolasEffectManager || !window.heroSelection.goldManager) {
+            return false;
+        }
+        
+        const canUse = window.heroSelection.nicolasEffectManager.canUseNicolasEffect(window.heroSelection.goldManager);
+        return canUse.canUse;
+    }
+
     // Create character card HTML
     createCharacterCardHTML(character, isSelectable = true, isSelected = false, showTooltip = false, isDraggable = false, slotPosition = null, includeAbilityZones = false, heroAbilitiesManager = null) {
         const selectableClass = isSelectable ? 'character-selectable' : '';
         const selectedClass = isSelected ? 'character-selected' : '';
         const draggableClass = isDraggable ? 'character-draggable' : '';
+        
+        // Check if this is Nicolas and if the effect is usable
+        const isNicolasUsable = character.name === 'Nicolas' && isDraggable && this.isNicolasEffectUsable(character);
+        const nicolasUsableClass = isNicolasUsable ? 'nicolas-effect-usable' : '';
         
         let tooltipEvents = '';
         if (showTooltip) {
@@ -201,6 +218,12 @@ export class HeroSelectionUI {
         if (isSelectable && !showTooltip && !isDraggable) {
             hoverEvents = `onmouseenter="window.showCharacterPreview(${character.id})"`;
         }
+
+        // Nicolas click handler for formation heroes
+        let nicolasClickEvents = '';
+        if (isDraggable && slotPosition && character.name === 'Nicolas') {
+            nicolasClickEvents = `onclick="window.handleNicolasClick(event, '${slotPosition}', '${character.name}')"`;
+        }
         
         // Only show character name if NOT in team building (no ability zones)
         const showCharacterName = !includeAbilityZones;
@@ -213,14 +236,16 @@ export class HeroSelectionUI {
             <div class="character-card ${selectableClass} ${selectedClass} ${draggableClass} ${includeAbilityZones ? 'with-ability-zones' : ''}" 
                 data-character-id="${character.id}"
                 data-slot-position="${slotPosition || ''}"
+                data-character-name="${character.name}"
                 ${isSelectable && !isDraggable ? `onclick="window.selectCharacterCard(${character.id})"` : ''}
                 ${hoverEvents}>
-                <div class="character-image-container">
+                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass}">
                     <img src="${character.image}" 
                         alt="${character.name}" 
-                        class="character-image"
+                        class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''}"
                         ${tooltipEvents}
                         ${dragEvents}
+                        ${nicolasClickEvents}
                         onerror="this.src='./Cards/Characters/placeholder.png'">
                 </div>
                 ${showCharacterName ? `<div class="character-name">${character.name}</div>` : ''}
@@ -458,10 +483,10 @@ export class HeroSelectionUI {
                 <div class="team-building-left">
                     <div class="team-header">
                         <h2>🛡️ Your Battle Formation</h2>
-                        <p class="drag-hint">💡 Drag and drop heroes to rearrange your formation!</p>
-                        <p class="drag-hint">🎯 Drag ability cards to any hero slot to attach them!</p>
-                        <p class="drag-hint">📜 Drag spell cards to heroes to add them to their spellbook!</p>
-                        <p class="drag-hint">🐾 Drag creatures to reorder them within the same hero!</p>
+                        <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
+                        <p class="drag-hint">🎯 Drag Abilities to a Hero slot to attach them!</p>
+                        <p class="drag-hint">📜 Drag Spell to Heroes to add them to their Spellbook!</p>
+                        <p class="drag-hint">🐾 Drag and drop Creatures to reorder them within the same Hero!</p>
                     </div>
                     
                     <div class="team-slots-container">
@@ -1214,6 +1239,22 @@ async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount)
     }
 }
 
+// Nicolas click handler
+function handleNicolasClick(event, heroPosition, heroName) {
+    // Prevent drag from starting if this is a click
+    event.stopPropagation();
+    
+    // Only handle if this is actually Nicolas and we have the effect manager
+    if (heroName !== 'Nicolas' || !window.heroSelection?.nicolasEffectManager) {
+        return;
+    }
+    
+    console.log(`🧪 Nicolas clicked at position ${heroPosition}`);
+    
+    // Show Nicolas dialog
+    window.heroSelection.nicolasEffectManager.showNicolasDialog(window.heroSelection, heroPosition);
+}
+
 // Attach to window
 if (typeof window !== 'undefined') {
     window.onTeamSlotDragOver = onTeamSlotDragOver;
@@ -1222,8 +1263,9 @@ if (typeof window !== 'undefined') {
     window.onTeamSlotDrop = onTeamSlotDrop;
     window.cleanupAllAbilityTooltips = cleanupAllAbilityTooltips;
     window.onAbilityClick = onAbilityClick;
+    window.handleNicolasClick = handleNicolasClick;
     
-    // NEW: Creature drag and drop functions
+    // Creature drag and drop functions
     window.onCreatureDragStart = onCreatureDragStart;
     window.onCreatureDragEnd = onCreatureDragEnd;
     window.onCreatureContainerDragOver = onCreatureContainerDragOver;
@@ -1272,6 +1314,51 @@ if (typeof document !== 'undefined' && !document.getElementById('clickableAbilit
             display: block;
             width: 100%;
             height: 100%;
+        }
+
+        /* Nicolas Hero Click Styles - Updated for Green Border */
+        .nicolas-clickable {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .nicolas-hero-image {
+            transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+        }
+
+        .nicolas-hero-image:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+
+        /* Nicolas Effect Usable Border - Green border when effect is available */
+        .character-image-container.nicolas-effect-usable {
+            position: relative;
+            border: 3px solid #28a745;
+            border-radius: 8px;
+            animation: nicolasUsablePulse 2s ease-in-out infinite;
+            box-shadow: 0 0 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .character-image-container.nicolas-effect-usable .nicolas-hero-image:hover {
+            box-shadow: 0 0 20px rgba(40, 167, 69, 0.6);
+        }
+
+        @keyframes nicolasUsablePulse {
+            0%, 100% { 
+                border-color: #28a745;
+                box-shadow: 0 0 15px rgba(40, 167, 69, 0.4);
+            }
+            50% { 
+                border-color: #20c997;
+                box-shadow: 0 0 20px rgba(32, 201, 151, 0.6);
+            }
+        }
+
+        /* Make sure the border doesn't interfere with the image */
+        .character-image-container.nicolas-effect-usable .character-image {
+            border-radius: 5px; /* Slightly smaller radius to fit within container */
         }
 
         /* Creature Drag and Drop Styles */

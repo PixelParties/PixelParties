@@ -85,11 +85,6 @@ export class BattleSpeedManager {
             </button>
         `).join('');
 
-        const persistentIndicator = `
-            <div class="speed-persistent-indicator" title="Battle speed is saved between battles">
-                💾 Persistent
-            </div>
-        `;
 
         return `
             <div class="battle-speed-controls" id="battleSpeedControls">
@@ -98,7 +93,7 @@ export class BattleSpeedManager {
                     ${buttonsHTML}
                 </div>
                 <div class="speed-control-status" id="speedStatus">${this.getCurrentSpeedInfo().name} Speed</div>
-                ${persistentIndicator}
+                
             </div>
         `;
     }

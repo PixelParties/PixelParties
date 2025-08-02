@@ -145,7 +145,9 @@ export class HeroCreatureManager {
         // Add the full card info to the creatures list
         this.heroCreatures[heroPosition].push({
             ...cardInfo,
-            addedAt: Date.now() // Track when the creature was added
+            addedAt: Date.now(),
+            statusEffects: [],
+            type: 'creature'  
         });
         
         // Notify state change

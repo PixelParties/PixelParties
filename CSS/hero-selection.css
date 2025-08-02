@@ -1,0 +1,706 @@
+/* ============================================
+   14. HERO SELECTION & TEAM BUILDING
+   ============================================ */
+.hero-selection-screen {
+    flex: 1;
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    display: flex;
+    flex-direction: row;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+
+.hero-selection-container,
+.team-building-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    gap: 30px;
+    align-items: flex-start;
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.team-building-container {
+    padding-bottom: 20px;
+}
+
+.character-selection-column,
+.team-building-left {
+    flex: 1;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(248, 249, 250, 0.05));
+    backdrop-filter: blur(10px);
+    min-width: 0;
+}
+
+.team-building-left {
+    align-items: center;
+}
+
+.team-building-left * {
+    user-select: none;
+}
+
+.card-preview-column,
+.team-building-right {
+    width: 600px;
+    padding: 40px;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.1));
+    backdrop-filter: blur(15px);
+    border-left: 2px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    position: relative !important;
+    min-width: 300px;
+    min-height: 400px;
+}
+
+.team-building-right {
+    justify-content: flex-start;
+    padding-top: 100px;
+}
+
+/* Force layout recalculation after battle */
+.hero-selection-screen[data-post-battle="true"] .team-building-right {
+    transform: translateZ(0);
+}
+
+.selection-header,
+.team-header {
+    margin-bottom: 40px;
+    text-align: center;
+}
+
+.team-header {
+    margin-bottom: 25px;
+    margin-top: 15px;
+}
+
+.selection-header h2,
+.team-header h2 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    margin-bottom: 15px;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: var(--shadow-glow);
+}
+
+.team-header h2 {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+    background: linear-gradient(45deg, #28a745, #20c997, #17a2b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.selection-header p,
+.team-header p,
+.drag-hint {
+    font-size: 1.3rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    margin: 10px 0;
+}
+
+.team-header p,
+.drag-hint {
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.drag-hint {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.8);
+}
+
+.hover-hint {
+    font-size: 1.1rem;
+    color: #667eea;
+    font-weight: 600;
+    margin-top: 10px;
+    opacity: 0.9;
+}
+
+.character-selection-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    margin-bottom: 40px;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Character cards */
+.character-card {
+    background: rgba(255, 255, 255, 0.95);
+    border: 3px solid rgba(102, 126, 234, 0.2);
+    border-radius: var(--radius-large);
+    padding: 20px;
+    transition: var(--transition-medium);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+}
+
+.character-card:hover {
+    transform: translateY(-10px) scale(1.05);
+    border-color: rgba(102, 126, 234, 0.6);
+    box-shadow: 0 20px 40px rgba(102, 126, 234, 0.4);
+    z-index: 10;
+}
+
+.character-card.character-selected {
+    border-color: #28a745;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
+    box-shadow: 0 15px 35px rgba(40, 167, 69, 0.4);
+}
+
+.character-card.dragging {
+    opacity: 0.5 !important;
+    transform: scale(0.9) !important;
+    z-index: 100 !important;
+}
+
+.character-draggable {
+    cursor: grab;
+}
+
+.character-draggable:active {
+    cursor: grabbing;
+}
+
+.character-draggable:hover {
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+.character-image-container {
+    width: 100%;
+    height: 200px;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.character-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-medium);
+    transition: var(--transition-medium);
+}
+
+.character-card:hover .character-image {
+    transform: scale(1.1);
+}
+
+.character-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #333;
+    text-align: center;
+    margin-top: auto;
+}
+
+/* Character cards with ability zones */
+.character-card.with-ability-zones {
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+}
+
+.character-card.with-ability-zones .character-image-container {
+    height: 240px;
+    flex-shrink: 0;
+}
+
+.character-card .hero-ability-zones {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    padding: 8px 6px;
+    flex: 1;
+    align-items: center;
+}
+
+.character-card .ability-zone {
+    width: 60px;
+    height: 84px;
+    border: 2px dashed rgba(102, 126, 234, 0.4);
+    border-radius: var(--radius-small);
+    background: rgba(248, 249, 250, 0.08);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: var(--transition-fast);
+    cursor: pointer;
+    overflow: hidden;
+    flex: 1;
+    max-width: 60px;
+}
+
+.character-card .ability-zone:hover {
+    border-color: rgba(102, 126, 234, 0.3);
+    background: rgba(248, 249, 250, 0.08);
+    box-shadow: none;
+    transform: none;
+}
+
+.character-card .ability-zone.filled {
+    border-style: solid;
+    border-color: rgba(102, 126, 234, 0.2);
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0;
+}
+
+.character-card .ability-zone.filled:hover {
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+.character-card .zone-placeholder {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-align: center;
+    user-select: none;
+    opacity: 0.6;
+}
+
+.ability-zone .ability-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+    position: relative;
+    z-index: 1;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.ability-zone:hover .ability-card-image {
+    transform: scale(1.05);
+    filter: brightness(1.15);
+}
+
+.ability-zone .ability-stack-count {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-gradient);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+    box-shadow: 
+        0 2px 6px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    backdrop-filter: blur(4px);
+}
+
+.character-card.turn-limit-reached {
+    animation: shake 0.5s ease-in-out;
+    position: relative;
+}
+
+.character-card[data-ability-received="true"] {
+    position: relative;
+}
+
+.character-card[data-ability-received="true"]::before {
+    content: '✓';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Ability zone states */
+.ability-zone.filled {
+    position: relative;
+    z-index: 10;
+}
+
+.ability-zone.filled .ability-card-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.ability-zone.ability-clicked {
+    animation: abilityClickPulse 0.3s ease-out;
+}
+
+/* Clickable ability styles */
+.ability-card-image.clickable-ability {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.ability-card-image.clickable-ability:hover {
+    transform: scale(1.1);
+    filter: brightness(1.2);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+}
+
+.ability-card-image.clickable-ability:active {
+    transform: scale(0.95);
+}
+
+/* Team Building Slots */
+.team-slots-container {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 0;
+}
+
+.team-slot {
+    width: 200px;
+    min-height: 340px;
+    border: 3px dashed rgba(102, 126, 234, 0.3);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: rgba(248, 249, 250, 0.1);
+    transition: var(--transition-medium);
+}
+
+.team-slot.filled {
+    border: 3px solid #28a745;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
+    box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+}
+
+.team-slot.drag-over {
+    border-color: #667eea !important;
+    border-style: solid !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2)) !important;
+    box-shadow: var(--shadow-glow) !important;
+    transform: none !important;
+    transition: none !important;
+    pointer-events: auto !important;
+}
+
+.team-slot:not(.drag-over):hover {
+    transform: scale(1.02);
+    transition: var(--transition-fast);
+}
+
+.team-slot.drag-over,
+.team-slot.drag-over * {
+    cursor: copy !important;
+}
+
+.team-slot:not(.filled).drag-over::after {
+    content: "Drop here";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #667eea;
+    font-weight: bold;
+    font-size: 16px;
+    z-index: 10;
+    text-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+}
+
+.team-slot.filled.drag-over::after {
+    content: "Swap positions";
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 20;
+}
+
+.team-slot.invalid-drop {
+    border-color: #ff6b6b !important;
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(238, 90, 36, 0.1)) !important;
+    box-shadow: 0 0 15px rgba(255, 107, 107, 0.4) !important;
+}
+
+.team-slot.hero-added {
+    animation: heroAddedGlow 1s ease-out;
+    border-color: #28a745 !important;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(32, 201, 151, 0.2)) !important;
+    box-shadow: 0 15px 35px rgba(40, 167, 69, 0.5) !important;
+}
+
+/* Ability drop zone styles */
+.team-slot.filled.ability-drop-ready {
+    border-color: #4caf50 !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(56, 142, 60, 0.2)) !important;
+    box-shadow: 
+        0 0 30px rgba(76, 175, 80, 0.6),
+        inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
+    transform: scale(1.03);
+    animation: abilityDropPulse 1.5s ease-in-out infinite;
+}
+
+.team-slot.empty.ability-drop-ready {
+    border-color: rgba(102, 126, 234, 0.3) !important;
+    border-width: 3px !important;
+    background: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.team-slot.ability-drop-invalid {
+    border-color: #dc3545 !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(200, 35, 51, 0.1)) !important;
+    box-shadow: 
+        0 0 20px rgba(220, 53, 69, 0.4),
+        inset 0 0 15px rgba(220, 53, 69, 0.2) !important;
+}
+
+.team-slot.empty.ability-drop-invalid {
+    border-color: rgba(220, 53, 69, 0.5) !important;
+    border-width: 3px !important;
+    border-style: dashed !important;
+    background: rgba(220, 53, 69, 0.05) !important;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.3) !important;
+    transform: none !important;
+}
+
+.team-slot.filled.ability-drop-invalid {
+    animation: invalidDropPulse 1.5s ease-in-out infinite;
+}
+
+.team-slot.turn-limit-reached {
+    animation: shake 0.5s ease-in-out;
+}
+
+.team-slot.turn-limit-reached .character-card {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.5) !important;
+}
+
+.team-slot.spell-drop-ready {
+    border-color: #667eea !important;
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.6) !important;
+}
+
+.team-slot.spell-drop-invalid {
+    border-color: #f44336 !important;
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.6) !important;
+}
+
+.team-slot.global-spell-hover {
+    background: rgba(54, 162, 235, 0.1);
+    border-color: rgba(54, 162, 235, 0.5);
+    cursor: not-allowed;
+}
+
+.team-slot.global-spell-hover::after {
+    content: "🌍 Global spell - drop anywhere outside hand to activate!";
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(54, 162, 235, 0.95);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.slot-placeholder {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 20px;
+}
+
+.team-status {
+    text-align: center;
+    padding: 30px;
+}
+
+.ready-indicator {
+    padding: 20px 30px;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(32, 201, 151, 0.15));
+    border: 2px solid rgba(40, 167, 69, 0.3);
+    border-radius: 15px;
+    display: inline-block;
+}
+
+.ready-indicator .status-text {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #28a745;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.ready-indicator p {
+    margin: 0;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.loading-heroes {
+    text-align: center;
+    padding: 60px 20px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.loading-heroes h2 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.selection-status {
+    text-align: center;
+    padding: 20px;
+}
+
+.waiting-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    font-size: 1.2rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+}
+
+.selection-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e9ecef;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+/* Guard change indicator */
+.team-header-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+}
+
+.guard-change-indicator {
+    position: relative;
+    background: linear-gradient(135deg, 
+        rgba(76, 175, 80, 0.15) 0%, 
+        rgba(129, 199, 132, 0.15) 100%);
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #2E7D32;
+    box-shadow: 
+        0 2px 8px rgba(76, 175, 80, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    animation: guardChangeGlow 2s ease-in-out infinite alternate;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.guard-change-indicator::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid #4CAF50;
+}
+
+/* Ability hint */
+.ability-hint {
+    color: #6c757d;
+    font-size: 14px;
+    font-style: italic;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.ability-hint::before {
+    content: '⚡';
+    font-style: normal;
+    color: #ffc107;
+}

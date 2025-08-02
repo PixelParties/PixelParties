@@ -208,7 +208,8 @@ export class ReconnectionManager {
                     gameState.hostLifeData, 
                     gameState.hostGoldData,
                     gameState.hostGlobalSpellState,
-                    gameState.hostPotionState
+                    gameState.hostPotionState,
+                    gameState.hostNicolasState  
                 );
                 
             } else if (!this.isHost && gameState.guestSelected) {
@@ -230,7 +231,8 @@ export class ReconnectionManager {
                     gameState.guestLifeData, 
                     gameState.guestGoldData,
                     gameState.guestGlobalSpellState,
-                    gameState.guestPotionState
+                    gameState.guestPotionState,
+                    gameState.guestNicolasState  
                 );
             }
 
@@ -361,6 +363,29 @@ export class ReconnectionManager {
                 this.heroSelection.potionHandler.reset();
                 this.heroSelection.potionHandler.updateAlchemyBonuses(this.heroSelection);
                 console.log('📝 No potion data found during reconnection - initialized with current Alchemy bonuses');
+            }
+        }
+
+        // Restore Nicolas effect state
+        if (this.isHost && gameState.hostNicolasState) {
+            if (this.heroSelection.nicolasEffectManager) {
+                const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.hostNicolasState);
+                if (nicolasRestored) {
+                    console.log('✅ Host Nicolas effect state restored during reconnection');
+                }
+            }
+        } else if (!this.isHost && gameState.guestNicolasState) {
+            if (this.heroSelection.nicolasEffectManager) {
+                const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.guestNicolasState);
+                if (nicolasRestored) {
+                    console.log('✅ Guest Nicolas effect state restored during reconnection');
+                }
+            }
+        } else {
+            // Initialize Nicolas state if no saved data
+            if (this.heroSelection.nicolasEffectManager) {
+                this.heroSelection.nicolasEffectManager.reset();
+                console.log('📝 No Nicolas data found during reconnection - initialized fresh state');
             }
         }
     }

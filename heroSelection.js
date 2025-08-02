@@ -19,6 +19,9 @@ import { potionHandler } from './potionHandler.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 
+import { NicolasEffectManager } from './Heroes/nicolas.js';
+
+
 export class HeroSelection {
     constructor() {
         this.allCharacters = [];
@@ -60,6 +63,9 @@ export class HeroSelection {
         this.actionManager = new ActionManager();
         this.heroCreatureManager = new HeroCreatureManager();
         this.potionHandler = potionHandler; 
+
+
+        this.nicolasEffectManager = new NicolasEffectManager();
 
         // Initialize hero abilities manager with references
         this.heroAbilitiesManager.init(
@@ -369,13 +375,18 @@ export class HeroSelection {
         // Reset actions at the start of each turn (team building phase)
         this.actionManager.resetActions();
 
-        // Reset potions for the new turn
-        this.potionHandler.resetPotionsForTurn();
+        // ===== UPDATED: Reset potions for the new turn (preserves active effects) =====
+        this.potionHandler.resetPotionsForTurn(); // This method already exists and works correctly
         
         // Reset Leadership usage and ability attachment tracking for new turn
         if (this.heroAbilitiesManager) {
             this.heroAbilitiesManager.resetTurnBasedTracking();
             console.log('✨ Leadership usage and ability tracking reset for new turn');
+        }
+        
+        // Reset Nicolas effect usage for new turn
+        if (this.nicolasEffectManager) {
+            this.nicolasEffectManager.resetForNewTurn();
         }
         
         // Update UI to reflect new turn
@@ -686,9 +697,15 @@ export class HeroSelection {
                     gameState.hostMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
 
-                // Save potion state for host
+                // ===== MODIFIED: Save potion state for host (now includes active effects) =====
                 if (this.potionHandler) {
                     gameState.hostPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
+                    console.log(`💾 Host saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
+                }
+
+                // Save Nicolas effect state for host
+                if (this.nicolasEffectManager) {
+                    gameState.hostNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
 
             } else if (!this.isHost && this.selectedCharacter) {
@@ -750,9 +767,15 @@ export class HeroSelection {
                     gameState.guestMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
 
-                // Save potion state for guest
+                // ===== MODIFIED: Save potion state for guest (now includes active effects) =====
                 if (this.potionHandler) {
                     gameState.guestPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
+                    console.log(`💾 Guest saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
+                }
+
+                // Save Nicolas effect state for guest
+                if (this.nicolasEffectManager) {
+                    gameState.guestNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
             }
 
@@ -808,7 +831,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -834,7 +857,6 @@ export class HeroSelection {
             const goldRestored = this.goldManager.importGoldData(goldData);
         }
 
-        // ✅ FIXED: Restore potion data with proper 0-value handling
         if (potionData && this.potionHandler) {
             const potionRestored = this.potionHandler.importPotionState(potionData, false);
             if (potionRestored) {
@@ -842,10 +864,24 @@ export class HeroSelection {
                 // Don't call updateAlchemyBonuses here - it will be called by reconnectionManager if needed
             }
         } else {
-            // Initialize potion state and update alchemy bonuses
-            this.potionHandler.reset();
+            // ===== Initialize potion state for new game =====
+            this.potionHandler.resetForNewGame(); // Use new method that clears any lingering effects
             this.potionHandler.updateAlchemyBonuses(this);
-            console.log('📝 No potion data found - initialized with current Alchemy bonuses');
+            console.log('📝 No potion data found - initialized fresh for new game');
+        }
+
+        // Restore Nicolas effect state
+        if (nicolasData && this.nicolasEffectManager) {
+            const nicolasRestored = this.nicolasEffectManager.importNicolasState(nicolasData);
+            if (nicolasRestored) {
+                console.log('✅ Nicolas effect state restored successfully');
+            }
+        } else {
+            // Initialize Nicolas state if no saved data
+            if (this.nicolasEffectManager) {
+                this.nicolasEffectManager.reset();
+                console.log('📝 No Nicolas data found - initialized fresh state');
+            }
         }
         
         // Restore player-specific global spell state (including Guard Change mode)
@@ -941,6 +977,10 @@ export class HeroSelection {
         this.handManager.reset();
         this.lifeManager.reset();
         this.goldManager.reset();
+
+        if (this.potionHandler) {
+            this.potionHandler.resetForNewGame();
+        }
         
         // Reset turn tracker for new game ONLY if it's truly turn 1
         if (currentTurn === 1) {
@@ -1391,6 +1431,17 @@ export class HeroSelection {
             // STEP 1: Set game phase to Formation immediately
             await this.setGamePhase('Formation');
             
+            // ===== NEW: CLEAR POTION EFFECTS WHEN RETURNING TO FORMATION =====
+            if (this.potionHandler) {
+                try {
+                    console.log('🧪 Clearing potion effects when returning to formation...');
+                    this.potionHandler.clearPotionEffects();
+                    console.log('✅ Potion effects cleared during formation return');
+                } catch (error) {
+                    console.error('❌ Error clearing potion effects during formation return:', error);
+                }
+            }
+            
             // STEP 2: IMMEDIATE UI UPDATES (no waiting for Firebase)
             this.clearAllTooltips();
             
@@ -1439,6 +1490,12 @@ export class HeroSelection {
             if (this.actionManager) {
                 this.actionManager.resetActions();
                 console.log('✨ Actions reset for new turn after battle');
+            }
+
+            // Reset Nicolas effect usage when returning to formation
+            if (this.nicolasEffectManager) {
+                this.nicolasEffectManager.resetForNewTurn();
+                console.log('✨ Nicolas effect usage reset when returning to formation');
             }
             
             // STEP 3: Transition to team building state BEFORE updating UI
@@ -2412,15 +2469,20 @@ export class HeroSelection {
         this.heroCreatureManager.reset();
         this.globalSpellManager.reset();
 
-
         // Reset action manager
         if (this.actionManager) {
             this.actionManager.reset();
         }
 
-        // Reset potion handler
+        // ===== RESET POTION HANDLER FOR NEW GAME =====
         if (this.potionHandler) {
-            this.potionHandler.reset();
+            this.potionHandler.resetForNewGame(); 
+            console.log('🧪 PotionHandler completely reset for new game');
+        }
+
+        // Reset Nicolas effect manager
+        if (this.nicolasEffectManager) {
+            this.nicolasEffectManager.reset();
         }
         
         // Hide battle waiting overlay

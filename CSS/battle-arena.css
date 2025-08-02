@@ -1,0 +1,608 @@
+/* ============================================
+   18. BATTLE ARENA
+   ============================================ */
+.battle-arena {
+    position: absolute;
+    top: 0px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    overflow: hidden;
+}
+
+.battle-field-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    min-height: 600px;
+}
+
+.battle-field {
+    flex: 0 0 75%;
+    display: flex;
+    flex-direction: column;
+    padding: 5px 20px 30px 20px;
+    gap: 15px;
+    position: relative;
+    min-height: 550px;
+    overflow: visible;
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.battle-row {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+    padding: 5px 40px;
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.opponent-row {
+    justify-content: center;
+    padding-bottom: 5px;
+    margin-bottom: 40px;
+}
+
+.player-row {
+    justify-content: center;
+    padding-top: 5px;
+    margin-top: 40px;
+}
+
+.battle-center {
+    display: none;
+}
+
+.battle-effects-area {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0.05) 0%, 
+        rgba(102, 126, 234, 0.1) 50%, 
+        rgba(255, 255, 255, 0.05) 100%);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    backdrop-filter: blur(10px);
+}
+
+.battlefield-decoration {
+    font-size: 18px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 2px;
+}
+
+/* Battle hero slot styles */
+.battle-hero-slot {
+    width: 317px;
+    height: 380px;
+    position: relative;
+    transition: var(--transition-medium);
+}
+
+.battle-hero-slot.empty-hero-slot {
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.03) 0%, 
+        rgba(128, 128, 128, 0.05) 100%);
+    border: 3px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.empty-hero-placeholder {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.empty-icon {
+    font-size: 36px;
+    margin-bottom: 8px;
+    opacity: 0.6;
+}
+
+.empty-text {
+    font-size: 14px;
+    font-weight: 600;
+    font-style: italic;
+}
+
+.battle-hero-card {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, 
+        rgba(45, 45, 68, 0.95) 0%, 
+        rgba(31, 31, 51, 0.95) 100%);
+    border: 3px solid rgba(102, 126, 234, 0.6);
+    border-radius: var(--radius-large);
+    overflow: hidden;
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.4),
+        var(--shadow-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    position: relative;
+    transition: var(--transition-medium);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+}
+
+.battle-hero-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 
+        0 15px 40px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(102, 126, 234, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    border-color: rgba(102, 126, 234, 0.8);
+    z-index: 10;
+}
+
+.player-slot .battle-hero-card {
+    border-color: rgba(40, 167, 69, 0.6);
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(40, 167, 69, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.player-slot .battle-hero-card:hover {
+    border-color: rgba(40, 167, 69, 0.8);
+    box-shadow: 
+        0 15px 40px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(40, 167, 69, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.opponent-slot .battle-hero-card {
+    border-color: rgba(255, 107, 107, 0.6);
+    box-shadow: 
+        0 10px 30px rgba(0, 0, 0, 0.4),
+        0 0 20px rgba(255, 107, 107, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.opponent-slot .battle-hero-card:hover {
+    border-color: rgba(255, 107, 107, 0.8);
+    box-shadow: 
+        0 15px 40px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(255, 107, 107, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.hero-image-container {
+    width: 100%;
+    height: 70%;
+    overflow: hidden;
+    border-radius: 17px 17px 0 0;
+    position: relative;
+}
+
+.battle-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+    transition: var(--transition-medium);
+}
+
+.battle-hero-card:hover .battle-hero-image {
+    transform: scale(1.05);
+}
+
+.hero-info-bar {
+    height: 40%;
+    padding: 8px 15px 10px 15px;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.8) 0%, 
+        rgba(0, 0, 0, 0.6) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.battle-hero-name {
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    text-align: center;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.battle-hero-health {
+    width: 100%;
+}
+
+.health-bar {
+    height: 18px;
+    background: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.health-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50 0%, #66bb6a 100%);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+    border-radius: 9px;
+}
+
+/* Attack display styles */
+.battle-hero-attack {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 5px 8px;
+    background: linear-gradient(135deg, 
+        rgba(255, 107, 107, 0.15) 0%, 
+        rgba(238, 90, 36, 0.15) 100%);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: var(--radius-medium);
+    backdrop-filter: blur(5px);
+    transition: var(--transition-medium);
+}
+
+.battle-hero-attack:hover {
+    background: linear-gradient(135deg, 
+        rgba(255, 107, 107, 0.25) 0%, 
+        rgba(238, 90, 36, 0.25) 100%);
+    border-color: rgba(255, 107, 107, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(255, 107, 107, 0.3);
+}
+
+.attack-icon {
+    font-size: 16px;
+    filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.8));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.attack-value {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 5px rgba(255, 107, 107, 0.3);
+}
+
+.attack-base {
+    color: #ffffff;
+}
+
+.attack-bonus {
+    font-size: 14px;
+    font-weight: bold;
+    margin-left: 2px;
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 8px currentColor;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.attack-bonus[style*="color: rgb(76, 175, 80)"] {
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 8px rgba(76, 175, 80, 0.8);
+}
+
+.attack-bonus[style*="color: rgb(244, 67, 54)"] {
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 8px rgba(244, 67, 54, 0.8);
+}
+
+.player-slot .battle-hero-attack {
+    background: linear-gradient(135deg, 
+        rgba(40, 167, 69, 0.15) 0%, 
+        rgba(32, 201, 151, 0.15) 100%);
+    border-color: rgba(40, 167, 69, 0.3);
+}
+
+.player-slot .battle-hero-attack:hover {
+    background: linear-gradient(135deg, 
+        rgba(40, 167, 69, 0.25) 0%, 
+        rgba(32, 201, 151, 0.25) 100%);
+    border-color: rgba(40, 167, 69, 0.5);
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
+}
+
+.player-slot .attack-value {
+    text-shadow: 
+        1px 1px 2px rgba(0, 0, 0, 0.8),
+        0 0 5px rgba(40, 167, 69, 0.3);
+}
+
+.attack-value.value-changed {
+    animation: attackValueChange 0.5s ease-out;
+}
+
+.battle-hero-attack.attack-buffed {
+    background: linear-gradient(135deg, 
+        rgba(255, 193, 7, 0.2) 0%, 
+        rgba(255, 152, 0, 0.2) 100%);
+    border-color: rgba(255, 193, 7, 0.5);
+    box-shadow: 
+        0 0 15px rgba(255, 193, 7, 0.5),
+        inset 0 0 10px rgba(255, 193, 7, 0.2);
+}
+
+.battle-hero-attack.attack-debuffed {
+    background: linear-gradient(135deg, 
+        rgba(102, 126, 234, 0.2) 0%, 
+        rgba(118, 75, 162, 0.2) 100%);
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 
+        0 0 15px rgba(102, 126, 234, 0.5),
+        inset 0 0 10px rgba(102, 126, 234, 0.2);
+}
+
+/* Battle Speed Panel */
+.battle-speed-panel-container {
+    position: absolute;
+    right: 5%; 
+    top: 42%;
+    width: 120px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    box-shadow: none;
+}
+
+/* Battle Interface Panel */
+.battle-interface-panel {
+    flex: 0 0 25%;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.4) 0%, 
+        rgba(26, 26, 46, 0.6) 100%);
+    backdrop-filter: blur(15px);
+    border-left: 2px solid rgba(102, 126, 234, 0.3);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 15px;
+    overflow: hidden;
+    min-width: 300px;
+    max-width: 400px;
+    box-sizing: border-box;
+}
+
+.card-preview-section {
+    flex: 0 0 65%;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.05) 0%, 
+        rgba(102, 126, 234, 0.1) 100%);
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    box-sizing: border-box;
+    min-height: 400px;
+}
+
+.preview-header {
+    margin-bottom: 15px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 10px;
+}
+
+.preview-header h3 {
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.card-preview-area {
+    height: calc(100% - 60px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.2) 0%, 
+        rgba(0, 0, 0, 0.1) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.preview-placeholder {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 40px 20px;
+}
+
+.preview-icon {
+    font-size: 64px;
+    margin-bottom: 15px;
+    opacity: 0.7;
+}
+
+.preview-placeholder p {
+    font-size: 16px;
+    margin: 0;
+    font-style: italic;
+}
+
+.preview-card-display {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.preview-card-image {
+    width: 100%;
+    max-width: 350px;
+    height: auto;
+    max-height: 85%;
+    object-fit: contain;
+    border-radius: 15px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    border: 3px solid rgba(102, 126, 234, 0.6);
+    margin-bottom: 10px;
+    transition: var(--transition-fast);
+}
+
+.preview-card-image:hover {
+    transform: scale(1.02);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    border-color: rgba(102, 126, 234, 0.8);
+}
+
+.preview-card-info {
+    text-align: center;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-height: 15%;
+}
+
+.preview-card-info h4 {
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0 0 5px 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.card-type {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    margin: 0;
+    font-style: italic;
+}
+
+.combat-log-section {
+    flex: 0 0 35%;
+    min-height: 150px;
+    max-height: 500px;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.3) 0%, 
+        rgba(26, 26, 46, 0.4) 100%);
+    border: 2px solid rgba(40, 167, 69, 0.3);
+    border-radius: 15px;
+    padding: 15px;
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.log-header {
+    margin-bottom: 10px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 8px;
+}
+
+.log-header h3 {
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.combat-log-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
+    background: linear-gradient(135deg, 
+        rgba(0, 0, 0, 0.4) 0%, 
+        rgba(0, 0, 0, 0.2) 100%);
+    border-radius: var(--radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.3;
+    max-height: 100%;
+    box-sizing: border-box;
+}
+
+.log-placeholder {
+    color: rgba(255, 255, 255, 0.6);
+    text-align: center;
+    padding: 20px 10px;
+}
+
+.log-placeholder p {
+    margin: 5px 0;
+    font-style: italic;
+}
+
+.log-message {
+    margin: 2px 0;
+    padding: 2px 4px;
+    border-radius: 3px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.log-time {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 9px;
+}
+
+.log-info {
+    background: rgba(102, 126, 234, 0.1);
+    border-left: 2px solid rgba(102, 126, 234, 0.5);
+}
+
+.log-success {
+    background: rgba(40, 167, 69, 0.1);
+    border-left: 2px solid rgba(40, 167, 69, 0.5);
+}
+
+.log-warning {
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 2px solid rgba(255, 193, 7, 0.5);
+}
+
+.log-error {
+    background: rgba(255, 107, 107, 0.1);
+    border-left: 2px solid rgba(255, 107, 107, 0.5);
+}
+
+.log-controls {
+    display: flex;
+    gap: 3px;
+}

@@ -1,11 +1,18 @@
-// battleManager.js - Complete Battle Manager with Hero Class, Abilities, Creatures, Firebase Persistence, and Deterministic Randomness System
+// battleManager.js - Complete Battle Manager with BattleLog Integration
 
 import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
 import { Hero } from './hero.js';
 import { BattleSpeedManager } from './battleSpeedManager.js';
-import { BattleRandomness } from './battleRandomness.js'; // NEW: Deterministic Randomness
+import { BattleRandomness } from './battleRandomness.js';
 import { BattleSpellSystem } from './battleSpellSystem.js';
+import StatusEffectsManager from './statusEffects.js';
+
+
+import { BattleRandomnessManager } from './battleRandomnessManager.js';
+import { BattleAnimationManager } from './battleAnimationManager.js';
+
+
 
 import { NecromancyManager } from './Abilities/necromancy.js';
 
@@ -18,7 +25,7 @@ export class BattleManager {
         this.currentTurn = 0;
         this.playerHeroes = {}; 
         this.opponentHeroes = {};  
-        this.battleLog = [];
+        this.battleLog = []; // UPDATED: Keep for compatibility, but delegate to BattleScreen's BattleLog
         this.gameDataSender = null;
         this.isHost = false;
         this.battleScreen = null;
@@ -74,229 +81,90 @@ export class BattleManager {
         this.battleSpeed = 1; // 1x = normal, 2x = fast, 4x = super fast
         this.speedLocked = false; // Prevent speed changes during critical moments
 
-        // NEW: DETERMINISTIC RANDOMNESS SYSTEM
-        this.randomness = null;
-        this.randomnessSeed = null;
-        this.randomnessInitialized = false;
+        // DETERMINISTIC RANDOMNESS SYSTEM
+        this.randomnessManager = new BattleRandomnessManager(this);
 
         this.tabWasHidden = false;
         this.setupTabVisibilityListener();
+        
+        this.statusEffectsManager = null;
+        this.animationManager = null;
     }
 
+
     // ============================================
-    // DETERMINISTIC RANDOMNESS SYSTEM
+    // DETERMINISTIC RANDOMNESS SYSTEM - DELEGATED
     // ============================================
 
-    // NEW: Initialize randomness system (called by host only)
+    // Initialize randomness system (called by host only)
     initializeRandomness(seed = null) {
-        if (!this.isAuthoritative) {
-            console.warn('⚠️ Only host should initialize randomness system');
-            return false;
-        }
-        
-        this.randomness = new BattleRandomness(seed);
-        this.randomnessSeed = this.randomness.originalSeed;
-        this.randomnessInitialized = true;
-        
-        console.log(`🎲 Battle randomness initialized by host with seed: ${this.randomnessSeed.slice(0, 12)}...`);
-        
-        // Send seed to guest immediately
-        this.sendBattleUpdate('randomness_seed', {
-            seed: this.randomnessSeed,
-            timestamp: Date.now()
-        });
-        
-        return true;
+        return this.randomnessManager.initialize(seed);
     }
-    
-    // NEW: Initialize randomness from received seed (called by guest)
+
+    // Initialize randomness from received seed (called by guest)
     initializeRandomnessFromSeed(seed) {
-        if (this.isAuthoritative) {
-            console.warn('⚠️ Host should not receive randomness seed');
-            return false;
-        }
-        
-        this.randomness = new BattleRandomness(seed);
-        this.randomnessSeed = seed;
-        this.randomnessInitialized = true;
-        
-        console.log(`🎲 Battle randomness initialized by guest with received seed: ${seed.slice(0, 12)}...`);
-        
-        return true;
+        return this.randomnessManager.initializeFromSeed(seed);
     }
-    
-    // NEW: Convenient randomness access methods
-    
-    // Get a random number between 0 and 1
+
+    // Convenient randomness access methods - DELEGATED
     getRandom() {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            return Math.random();
-        }
-        return this.randomness.random();
+        return this.randomnessManager.getRandom();
     }
-    
-    // Get a random integer between min and max (inclusive)
+
     getRandomInt(min, max) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            return Math.floor(Math.random() * (max - min + 1)) + min;
-        }
-        return this.randomness.randomInt(min, max);
+        return this.randomnessManager.getRandomInt(min, max);
     }
-    
-    // Get a random float between min and max
+
     getRandomFloat(min, max) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            return Math.random() * (max - min) + min;
-        }
-        return this.randomness.randomFloat(min, max);
+        return this.randomnessManager.getRandomFloat(min, max);
     }
-    
-    // Get a random boolean with optional probability
+
     getRandomBool(probability = 0.5) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            return Math.random() < probability;
-        }
-        return this.randomness.randomBool(probability);
+        return this.randomnessManager.getRandomBool(probability);
     }
-    
-    // Choose a random element from an array
+
     getRandomChoice(array) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            if (!Array.isArray(array) || array.length === 0) return null;
-            return array[Math.floor(Math.random() * array.length)];
-        }
-        return this.randomness.randomChoice(array);
+        return this.randomnessManager.getRandomChoice(array);
     }
-    
-    // Choose multiple random elements from an array (without replacement)
+
     getRandomChoices(array, count) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using fallback');
-            if (!Array.isArray(array) || array.length === 0 || count <= 0) return [];
-            const shuffled = [...array].sort(() => Math.random() - 0.5);
-            return shuffled.slice(0, Math.min(count, shuffled.length));
-        }
-        return this.randomness.randomChoices(array, count);
+        return this.randomnessManager.getRandomChoices(array, count);
     }
-    
-    // Shuffle an array deterministically
+
     shuffleArray(array) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            const result = [...array];
-            for (let i = result.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [result[i], result[j]] = [result[j], result[i]];
-            }
-            return result;
-        }
-        return this.randomness.shuffle(array);
+        return this.randomnessManager.shuffleArray(array);
     }
-    
-    // Random percentage roll (0-100)
+
     getRandomPercent() {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            return Math.random() * 100;
-        }
-        return this.randomness.randomPercent();
+        return this.randomnessManager.getRandomPercent();
     }
-    
-    // Check if a percentage chance succeeds
+
     checkChance(percentage) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            return Math.random() * 100 < percentage;
-        }
-        return this.randomness.chance(percentage);
+        return this.randomnessManager.checkChance(percentage);
     }
-    
-    // Get random damage variance
+
     getRandomDamageVariance(baseDamage, variancePercent = 10) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using Math.random() as fallback');
-            const variance = baseDamage * (variancePercent / 100);
-            return Math.round(Math.random() * (variance * 2) + (baseDamage - variance));
-        }
-        return this.randomness.randomDamageVariance(baseDamage, variancePercent);
+        return this.randomnessManager.getRandomDamageVariance(baseDamage, variancePercent);
     }
-    
-    // Weighted random choice
+
     getWeightedChoice(choices, weights) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using fallback weighted choice');
-            if (!Array.isArray(choices) || !Array.isArray(weights) || 
-                choices.length !== weights.length || choices.length === 0) {
-                return null;
-            }
-            const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
-            if (totalWeight <= 0) return null;
-            const randomValue = Math.random() * totalWeight;
-            let currentWeight = 0;
-            for (let i = 0; i < choices.length; i++) {
-                currentWeight += weights[i];
-                if (randomValue <= currentWeight) {
-                    return choices[i];
-                }
-            }
-            return choices[choices.length - 1];
-        }
-        return this.randomness.weightedChoice(choices, weights);
+        return this.randomnessManager.getWeightedChoice(choices, weights);
     }
-    
-    // Generate random normal distribution (mean, standard deviation)
+
     getRandomNormal(mean, standardDeviation) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using fallback normal distribution');
-            // Box-Muller approximation
-            const u1 = Math.random();
-            const u2 = Math.random();
-            const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-            return z0 * standardDeviation + mean;
-        }
-        return this.randomness.randomNormal(mean, standardDeviation);
+        return this.randomnessManager.getRandomNormal(mean, standardDeviation);
     }
-    
-    // Generate a random ID string
+
     getRandomId(length = 8) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized, using fallback ID generation');
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += chars[Math.floor(Math.random() * chars.length)];
-            }
-            return result;
-        }
-        return this.randomness.randomId(length);
+        return this.randomnessManager.getRandomId(length);
     }
-    
-    // Get randomness debug info (development only)
+
     getRandomnessDebugInfo() {
-        if (!this.randomnessInitialized) {
-            return { status: 'not_initialized' };
-        }
-        
-        return {
-            status: 'active',
-            ...this.randomness.getDebugInfo(),
-            isHost: this.isAuthoritative
-        };
+        return this.randomnessManager.getRandomnessDebugInfo();
     }
-    
-    // Test randomness distribution (development only)
+
     testRandomnessDistribution(samples = 1000) {
-        if (!this.randomnessInitialized) {
-            console.warn('⚠️ Randomness not initialized');
-            return null;
-        }
-        
-        return this.randomness.testDistribution(samples);
+        return this.randomnessManager.testRandomnessDistribution(samples);
     }
 
     // ============================================
@@ -349,11 +217,16 @@ export class BattleManager {
         
         // Initialize randomness system (host only)
         if (this.isAuthoritative) {
-            this.initializeRandomness();
+            this.randomnessManager.initialize();
         }
 
         // Initialize Spell System
         this.spellSystem = new BattleSpellSystem(this);
+        
+        // Initialize Extracted Managers
+        this.statusEffectsManager = new StatusEffectsManager(this);
+        this.statusEffectsManager.ensureStatusEffectsCSS();
+        this.animationManager = new BattleAnimationManager(this);
     }
 
     setBattleSpeed(speed) {
@@ -675,7 +548,8 @@ export class BattleManager {
                             currentHp: finalHp,
                             maxHp: finalHp,
                             atk: creatureInfo?.atk || 0,
-                            alive: true
+                            alive: true,
+                            type: 'creature'  
                         };
                     });
                     hero.setCreatures(creaturesWithHealth);
@@ -836,7 +710,7 @@ export class BattleManager {
 
         this.battleActive = true;
         this.currentTurn = 0;
-        this.battleLog = [];
+        this.battleLog = []; // UPDATED: Clear legacy array, delegate to BattleScreen
         this.turnInProgress = false;
         this.pendingAcks = {};
         this.ackTimeouts = {};
@@ -862,23 +736,46 @@ export class BattleManager {
         this.necromancyManager.initializeNecromancyStacks();
         this.necromancyManager.initializeNecromancyStackDisplays();
         
-        // ADD: Initialize Jiggles manager
+        // Initialize Jiggles manager
         this.jigglesManager = new JigglesCreature(this);
         
-        // NEW: Ensure randomness is initialized before battle starts
+        // Ensure randomness is initialized before battle starts
         if (this.isAuthoritative && !this.randomnessInitialized) {
             this.initializeRandomness();
         }
         
         // Add randomness info to combat log
-        if (this.randomnessInitialized) {
-            this.addCombatLog(`🎲 Battle randomness initialized (seed: ${this.randomnessSeed.slice(0, 8)}...)`, 'info');
+        if (this.randomnessManager.isInitialized) {
+            this.addCombatLog(`🎲 Battle randomness initialized (seed: ${this.randomnessManager.seed.slice(0, 8)}...)`, 'info');
         }
         
         this.addCombatLog('⚔️ Battle begins with Hero abilities and creatures!', 'success');
         
         // Log any SummoningMagic bonuses applied to creatures
         this.logSummoningMagicBonuses();
+        
+        if (this.isAuthoritative) {
+            try {
+                console.log('🧪 Applying potion effects from both players at battle start...');
+                
+                // Get both players' potion states from Firebase
+                const potionStates = await this.getBothPlayersPotionStates();
+                
+                // Let the potion handler deal with applying effects from both states
+                if (window.potionHandler && potionStates) {
+                    await window.potionHandler.applyBothPlayersPotionEffectsAtBattleStart(
+                        potionStates.host, 
+                        potionStates.guest, 
+                        this
+                    );
+                }
+                
+                console.log('✅ All potion effects applied successfully');
+            } catch (error) {
+                console.error('❌ Error applying potion effects at battle start:', error);
+                this.addCombatLog('⚠️ Some potion effects failed to apply', 'warning');
+            }
+        }
         
         await this.saveBattleStateToPersistence();
         
@@ -889,6 +786,28 @@ export class BattleManager {
                 await this.delay(50);
                 this.authoritative_battleLoop();
             }
+        }
+    }
+
+    async getBothPlayersPotionStates() {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return null;
+        }
+        
+        try {
+            const roomRef = this.roomManager.getRoomRef();
+            const snapshot = await roomRef.child('gameState').once('value');
+            const gameState = snapshot.val();
+            
+            if (!gameState) return null;
+            
+            return {
+                host: gameState.hostPotionState || null,
+                guest: gameState.guestPotionState || null
+            };
+        } catch (error) {
+            console.error('Error getting potion states from Firebase:', error);
+            return null;
         }
     }
 
@@ -1186,6 +1105,42 @@ export class BattleManager {
             return;
         }
         
+        // ============================================
+        // STATUS EFFECTS: Check action restrictions
+        // ============================================
+        
+        // Check if player actor can take action (not stunned/frozen)
+        if (playerActor && this.statusEffectsManager && !this.statusEffectsManager.canTakeAction(playerActor.data)) {
+            const stunned = this.statusEffectsManager.hasStatusEffect(playerActor.data, 'stunned');
+            const frozen = this.statusEffectsManager.hasStatusEffect(playerActor.data, 'frozen');
+            
+            if (stunned) {
+                this.statusEffectsManager.processTurnSkip(playerActor.data, 'stunned');
+            } else if (frozen) {
+                this.statusEffectsManager.processTurnSkip(playerActor.data, 'frozen');
+            }
+            
+            playerActor = null; // Skip this actor's turn
+        }
+        
+        // Check if opponent actor can take action (not stunned/frozen)
+        if (opponentActor && this.statusEffectsManager && !this.statusEffectsManager.canTakeAction(opponentActor.data)) {
+            const stunned = this.statusEffectsManager.hasStatusEffect(opponentActor.data, 'stunned');
+            const frozen = this.statusEffectsManager.hasStatusEffect(opponentActor.data, 'frozen');
+            
+            if (stunned) {
+                this.statusEffectsManager.processTurnSkip(opponentActor.data, 'stunned');
+            } else if (frozen) {
+                this.statusEffectsManager.processTurnSkip(opponentActor.data, 'frozen');
+            }
+            
+            opponentActor = null; // Skip this actor's turn
+        }
+        
+        // ============================================
+        // EXISTING ACTOR ACTION LOGIC
+        // ============================================
+        
         const actions = [];
         let hasJigglesAttacks = false;
         let hasHeroActions = false;
@@ -1197,7 +1152,7 @@ export class BattleManager {
                 actions.push(this.jigglesManager.executeSpecialAttack(playerActor, position));
                 hasJigglesAttacks = true;
             } else {
-                actions.push(this.shakeCreature('player', position, playerActor.index));
+                actions.push(this.animationManager.shakeCreature('player', position, playerActor.index));
                 this.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
             }
         }
@@ -1208,7 +1163,7 @@ export class BattleManager {
                 actions.push(this.jigglesManager.executeSpecialAttack(opponentActor, position));
                 hasJigglesAttacks = true;
             } else {
-                actions.push(this.shakeCreature('opponent', position, opponentActor.index));
+                actions.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
                 this.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
             }
         }
@@ -1262,6 +1217,47 @@ export class BattleManager {
         // If we only have regular creature actions, execute them
         else if (actions.length > 0) {
             await Promise.all(actions);
+        }
+        
+        // ============================================
+        // STATUS EFFECTS: Post-turn processing
+        // ============================================
+        
+        // Process status effects after actor actions complete
+        // This handles poison damage, burn damage, silenced duration, etc.
+        if (this.statusEffectsManager) {
+            const statusEffectPromises = [];
+            
+            // Process status effects for actors that took actions this turn
+            if (playerActor && playerActor.data && playerActor.data.alive) {
+                statusEffectPromises.push(
+                    this.statusEffectsManager.processStatusEffectsAfterTurn(playerActor.data)
+                );
+            }
+            
+            if (opponentActor && opponentActor.data && opponentActor.data.alive) {
+                statusEffectPromises.push(
+                    this.statusEffectsManager.processStatusEffectsAfterTurn(opponentActor.data)
+                );
+            }
+            
+            // Wait for all status effect processing to complete
+            if (statusEffectPromises.length > 0) {
+                await Promise.all(statusEffectPromises);
+                
+                // Small delay after status effects for visual clarity
+                await this.delay(200);
+            }
+        }
+        
+        // ============================================
+        // FINAL BATTLE STATE CHECK
+        // ============================================
+        
+        // Final check if battle ended due to status effect damage
+        if (this.checkBattleEnd()) {
+            console.log('Battle ended due to status effect damage');
+            return;
         }
     }
 
@@ -1360,36 +1356,17 @@ export class BattleManager {
         
         if (playerCreature) {
             const playerIndex = this.playerHeroes[position].creatures.indexOf(playerCreature);
-            shakePromises.push(this.shakeCreature('player', position, playerIndex));
+            shakePromises.push(this.animationManager.shakeCreature('player', position, playerIndex));
             this.addCombatLog(`🌟 ${playerCreature.name} activates!`, 'success');
         }
         
         if (opponentCreature) {
             const opponentIndex = this.opponentHeroes[position].creatures.indexOf(opponentCreature);
-            shakePromises.push(this.shakeCreature('opponent', position, opponentIndex));
+            shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentIndex));
             this.addCombatLog(`🌟 ${opponentCreature.name} activates!`, 'error');
         }
         
         await Promise.all(shakePromises);
-    }
-
-    // Shake creature animation
-    async shakeCreature(side, position, creatureIndex) {
-        const creatureElement = document.querySelector(
-            `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
-        );
-        
-        if (!creatureElement) return;
-        
-        creatureElement.classList.add('creature-shaking');
-        
-        // Add glow effect during shake
-        creatureElement.style.filter = 'brightness(1.5) drop-shadow(0 0 10px rgba(255, 255, 100, 0.8))';
-        
-        await this.delay(400); // Now uses speed-adjusted delay
-        
-        creatureElement.classList.remove('creature-shaking');
-        creatureElement.style.filter = '';
     }
 
     // Find target with creatures (heroes now target last creature)
@@ -1571,14 +1548,14 @@ export class BattleManager {
     async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
         if (playerAttack && opponentAttack) {
             // Both heroes attack - collision animation (meet in middle)
-            await this.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
+            await this.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
             this.applyAttackDamageToTarget(playerAttack);
             this.applyAttackDamageToTarget(opponentAttack);
             
             await Promise.all([
-                this.animateReturn(playerAttack.hero, 'player'),
-                this.animateReturn(opponentAttack.hero, 'opponent')
+                this.animationManager.animateReturn(playerAttack.hero, 'player'),
+                this.animationManager.animateReturn(opponentAttack.hero, 'opponent')
             ]);
             
         } else if (playerAttack || opponentAttack) {
@@ -1586,96 +1563,10 @@ export class BattleManager {
             const attack = playerAttack || opponentAttack;
             const side = playerAttack ? 'player' : 'opponent';
             
-            await this.animateHeroAttack(attack.hero, attack.target);
+            await this.animationManager.animateHeroAttack(attack.hero, attack.target);
             this.applyAttackDamageToTarget(attack);
-            await this.animateReturn(attack.hero, side);
+            await this.animationManager.animateReturn(attack.hero, side);
         }
-    }
-
-    // Animate simultaneous hero attacks
-    async animateCollisionAttackTowards(attacker, targetElement, attackerSide) {
-        const attackerElement = this.getHeroElement(attackerSide, attacker.position);
-        if (!attackerElement || !targetElement) return;
-
-        const attackerCard = attackerElement.querySelector('.battle-hero-card');
-        if (!attackerCard) return;
-
-        const attackerRect = attackerElement.getBoundingClientRect();
-        const targetRect = targetElement.getBoundingClientRect();
-        
-        const deltaX = (targetRect.left - attackerRect.left) * 0.5;
-        const deltaY = (targetRect.top - attackerRect.top) * 0.5;
-        
-        attackerCard.classList.add('attacking');
-        attackerCard.style.transition = `transform ${this.getSpeedAdjustedDelay(80)}ms ease-out`;
-        attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1)`;
-        
-        await this.delay(80);
-        this.createCollisionEffect();
-    }
-
-    // Animate simultaneous hero attacks
-    async animateSimultaneousHeroAttacks(playerAttack, opponentAttack) {
-        const animations = [];
-        
-        // Player attack animation
-        if (playerAttack.target.type === 'creature') {
-            animations.push(this.animateHeroToCreatureAttack(playerAttack.hero, playerAttack.target, 'player'));
-        } else {
-            animations.push(this.animateCollisionAttackTowards(playerAttack.hero, 
-                this.getHeroElement(playerAttack.target.side, playerAttack.target.position), 'player'));
-        }
-        
-        // Opponent attack animation
-        if (opponentAttack.target.type === 'creature') {
-            animations.push(this.animateHeroToCreatureAttack(opponentAttack.hero, opponentAttack.target, 'opponent'));
-        } else {
-            animations.push(this.animateCollisionAttackTowards(opponentAttack.hero, 
-                this.getHeroElement(opponentAttack.target.side, opponentAttack.target.position), 'opponent'));
-        }
-        
-        await Promise.all(animations);
-    }
-
-    // Animate hero attack (single)
-    async animateHeroAttack(hero, target) {
-        // Safety check for null target
-        if (!target) {
-            console.warn('animateHeroAttack called with null target, skipping animation');
-            return;
-        }
-        
-        if (target.type === 'creature') {
-            await this.animateHeroToCreatureAttack(hero, target, hero.side);
-        } else {
-            await this.animateFullAttack(hero, target.hero);
-        }
-    }
-
-    // Animate hero attacking a creature
-    async animateHeroToCreatureAttack(hero, creatureTarget, heroSide) {
-        const heroElement = this.getHeroElement(heroSide, hero.position);
-        const creatureElement = document.querySelector(
-            `.${creatureTarget.side}-slot.${creatureTarget.position}-slot .creature-icon[data-creature-index="${creatureTarget.creatureIndex}"]`
-        );
-        
-        if (!heroElement || !creatureElement) return;
-        
-        const heroCard = heroElement.querySelector('.battle-hero-card');
-        if (!heroCard) return;
-        
-        const heroRect = heroElement.getBoundingClientRect();
-        const creatureRect = creatureElement.getBoundingClientRect();
-        
-        const deltaX = creatureRect.left + creatureRect.width/2 - (heroRect.left + heroRect.width/2);
-        const deltaY = creatureRect.top + creatureRect.height/2 - (heroRect.top + heroRect.height/2);
-            
-        heroCard.classList.add('attacking');
-        heroCard.style.transition = `transform ${this.getSpeedAdjustedDelay(120)}ms ease-out`;
-        heroCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
-        
-        await this.delay(120);
-        this.createImpactEffect(creatureElement);
     }
 
     // Apply damage to target (hero or creature)
@@ -1748,7 +1639,8 @@ export class BattleManager {
         
         // Update creature health display
         this.updateCreatureHealthBar(side, position, creatureIndex, creature.currentHp, creature.maxHp);
-        this.createDamageNumberOnCreature(side, position, creatureIndex, damage);
+        const damageSource = arguments[1]?.source || 'attack';
+        this.animationManager.createDamageNumberOnCreature(side, position, creatureIndex, damage, creature.maxHp, damageSource);
         
         if (!creature.alive && oldHp > 0) {
             this.handleCreatureDeath(hero, creature, creatureIndex, side, position);
@@ -1798,37 +1690,13 @@ export class BattleManager {
         }
     }
 
-    // Create damage number on creature
-    createDamageNumberOnCreature(side, position, creatureIndex, damage) {
-        const creatureElement = document.querySelector(
-            `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
-        );
-        
-        if (!creatureElement) return;
-        
-        const damageNumber = document.createElement('div');
-        damageNumber.className = 'damage-number';
-        damageNumber.textContent = `-${damage}`;
-        damageNumber.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            font-weight: bold;
-            color: #ff3333;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-            z-index: 200;
-            pointer-events: none;
-            animation: floatUp ${this.getSpeedAdjustedDelay(500)}ms ease-out forwards;
-        `;
-        
-        creatureElement.appendChild(damageNumber);
-        setTimeout(() => damageNumber.remove(), this.getSpeedAdjustedDelay(500));
-    }
-
     // Handle creature death
     handleCreatureDeath(hero, creature, creatureIndex, side, position) {
+        // Clear all status effects from the creature when it dies
+        if (this.statusEffectsManager) {
+            this.statusEffectsManager.clearAllStatusEffects(creature);
+        }
+
         // Attempt necromancy revival
         if (this.necromancyManager && this.isAuthoritative) {
             const revived = this.necromancyManager.attemptNecromancyRevival(
@@ -1839,7 +1707,7 @@ export class BattleManager {
                 // Creature was revived, skip the death handling
                 return;
             }
-}
+        }
 
         this.addCombatLog(`☠️ ${creature.name} has been defeated!`, 'error');
         
@@ -1914,7 +1782,8 @@ export class BattleManager {
         );
 
         this.updateHeroHealthBar(target.side, target.position, result.newHp, target.maxHp);
-        this.createDamageNumber(target.side, target.position, damage);
+        const damageSource = arguments[1]?.source || 'attack';
+        this.animationManager.createDamageNumber(target.side, target.position, damage, target.maxHp, damageSource);
         
         if (result.died && result.oldHp > 0) {
             this.handleHeroDeath(target);
@@ -1999,30 +1868,46 @@ export class BattleManager {
                 this.guest_handleHeroTurnExecution(data);
                 break;
                 
+            case 'status_effect_change':
+                this.guest_handleStatusEffectChange(data);
+                break;
+
+
+
+                
             case 'necromancy_revival':
                 this.guest_handleNecromancyRevival(data);
                 break;
+
+
+
                 
             case 'jiggles_special_attack':
                 if (this.jigglesManager) {
                     this.jigglesManager.handleGuestSpecialAttack(data);
                 }
                 break;
+
+
+
                 
-            // Handle basic spell casting
             case 'spell_cast':
                 this.guest_handleSpellCast(data);
                 break;
                 
-            // Handle spell effects (like FlameAvalanche area damage)
             case 'spell_effect':
                 this.guest_handleSpellEffect(data);
                 break;
                 
-            // Handle fireshield applied
             case 'fireshield_applied':
                 this.guest_handleFireshieldApplied(data);
                 break;
+        }
+    }
+
+    guest_handleStatusEffectChange(data) {
+        if (this.statusEffectsManager) {
+            this.statusEffectsManager.handleGuestStatusEffectUpdate(data);
         }
     }
 
@@ -2058,7 +1943,7 @@ export class BattleManager {
     guest_handleRandomnessSeed(data) {
         const { seed } = data;
         if (seed) {
-            this.initializeRandomnessFromSeed(seed);
+            this.randomnessManager.initializeFromSeed(seed);
             this.addCombatLog(`🎲 Battle randomness synchronized`, 'info');
         }
     }
@@ -2087,12 +1972,12 @@ export class BattleManager {
         const shakePromises = [];
         
         if (playerCreature) {
-            shakePromises.push(this.shakeCreature('player', position, playerCreature.index));
+            shakePromises.push(this.animationManager.shakeCreature('player', position, playerCreature.index));
             this.addCombatLog(`🌟 ${playerCreature.name} activates!`, 'success');
         }
         
         if (opponentCreature) {
-            shakePromises.push(this.shakeCreature('opponent', position, opponentCreature.index));
+            shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentCreature.index));
             this.addCombatLog(`🌟 ${opponentCreature.name} activates!`, 'error');
         }
         
@@ -2133,12 +2018,12 @@ export class BattleManager {
         const shakePromises = [];
         
         if (playerActor && playerActor.type === 'creature') {
-            shakePromises.push(this.shakeCreature('player', position, playerActor.index));
+            shakePromises.push(this.animationManager.shakeCreature('player', position, playerActor.index));
             this.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
         }
         
         if (opponentActor && opponentActor.type === 'creature') {
-            shakePromises.push(this.shakeCreature('opponent', position, opponentActor.index));
+            shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
             this.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
         }
         
@@ -2204,12 +2089,11 @@ export class BattleManager {
             const animations = [];
             
             if (playerTargetsCreature) {
-                animations.push(this.guest_animateHeroToCreatureAttack(
+                animations.push(this.animationManager.guest_animateHeroToCreatureAttack(
                     heroes.playerHero, playerAction.targetData, heroes.playerLocalSide
                 ));
             } else {
-                // ✅ FIXED: Use playerAction.targetData.position for player's attack
-                animations.push(this.animateCollisionAttackTowards(
+                animations.push(this.animationManager.animateCollisionAttackTowards(
                     heroes.playerHero, 
                     this.getHeroElement(heroes.opponentLocalSide, playerAction.targetData.position),
                     heroes.playerLocalSide
@@ -2217,12 +2101,11 @@ export class BattleManager {
             }
             
             if (opponentTargetsCreature) {
-                animations.push(this.guest_animateHeroToCreatureAttack(
+                animations.push(this.animationManager.guest_animateHeroToCreatureAttack(
                     heroes.opponentHero, opponentAction.targetData, heroes.opponentLocalSide
                 ));
             } else {
-                // ✅ FIXED: Use opponentAction.targetData.position for opponent's attack
-                animations.push(this.animateCollisionAttackTowards(
+                animations.push(this.animationManager.animateCollisionAttackTowards(
                     heroes.opponentHero,
                     this.getHeroElement(heroes.playerLocalSide, opponentAction.targetData.position),
                     heroes.opponentLocalSide
@@ -2232,39 +2115,10 @@ export class BattleManager {
             await Promise.all(animations);
             
             await Promise.all([
-                this.animateReturn(heroes.playerHero, heroes.playerLocalSide),
-                this.animateReturn(heroes.opponentHero, heroes.opponentLocalSide)
+                this.animationManager.animateReturn(heroes.playerHero, heroes.playerLocalSide),
+                this.animationManager.animateReturn(heroes.opponentHero, heroes.opponentLocalSide)
             ]);
         }
-    }
-
-    // GUEST: Animate hero to creature attack
-    async guest_animateHeroToCreatureAttack(hero, targetData, heroSide) {
-        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
-        const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
-        
-        const heroElement = this.getHeroElement(heroSide, hero.position);
-        const creatureElement = document.querySelector(
-            `.${targetLocalSide}-slot.${targetData.position}-slot .creature-icon[data-creature-index="${targetData.creatureIndex}"]`
-        );
-        
-        if (!heroElement || !creatureElement) return;
-        
-        const heroCard = heroElement.querySelector('.battle-hero-card');
-        if (!heroCard) return;
-        
-        const heroRect = heroElement.getBoundingClientRect();
-        const creatureRect = creatureElement.getBoundingClientRect();
-        
-        const deltaX = creatureRect.left + creatureRect.width/2 - (heroRect.left + heroRect.width/2);
-        const deltaY = creatureRect.top + creatureRect.height/2 - (heroRect.top + heroRect.height/2);
-        
-        heroCard.classList.add('attacking');
-        heroCard.style.transition = 'transform 0.12s ease-out';
-        heroCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
-        
-        await this.delay(120);
-        this.createImpactEffect(creatureElement);
     }
 
     // Get guest heroes for actions
@@ -2305,7 +2159,7 @@ export class BattleManager {
                     `⚔️ ${action.attackerData.name} attacks ${action.targetData.creatureName}!`,
                     attackerLocalSide === 'player' ? 'success' : 'error'
                 );
-                await this.guest_animateHeroToCreatureAttack(localAttacker, action.targetData, attackerLocalSide);
+                await this.animationManager.guest_animateHeroToCreatureAttack(localAttacker, action.targetData, attackerLocalSide);
             } else {
                 const targetLocalSide = (action.targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
                 const localTarget = targetLocalSide === 'player'
@@ -2322,7 +2176,7 @@ export class BattleManager {
                 }
             }
             
-            await this.animateReturn(localAttacker, attackerLocalSide);
+            await this.animationManager.animateReturn(localAttacker, attackerLocalSide);
         }
     }
 
@@ -2347,7 +2201,7 @@ export class BattleManager {
             );
 
             this.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
-            this.createDamageNumber(targetLocalSide, targetPosition, damage);
+            this.animationManager.createDamageNumber(side, position, damage, maxHp, 'attack');
             
             if (died && oldHp > 0) {
                 this.handleHeroDeath(localTarget);
@@ -2377,7 +2231,7 @@ export class BattleManager {
             );
 
             this.updateCreatureHealthBar(heroLocalSide, heroPosition, creatureIndex, newHp, maxHp);
-            this.createDamageNumberOnCreature(heroLocalSide, heroPosition, creatureIndex, damage);
+            this.animationManager.createDamageNumberOnCreature(side, position, creatureIndex, damage, creature.maxHp, 'attack');
             
             if (died && oldHp > 0) {
                 this.handleCreatureDeath(localHero, creature, creatureIndex, heroLocalSide, heroPosition);
@@ -2439,6 +2293,17 @@ export class BattleManager {
             
             if (opponentWealthBonus > 0) {
                 this.goldManager.addOpponentGold(opponentWealthBonus);
+            }
+        }
+        
+        // ===== NEW: CLEAR POTION EFFECTS AFTER BATTLE (GUEST) =====
+        if (window.potionHandler) {
+            try {
+                console.log('🧪 Guest clearing potion effects after battle...');
+                window.potionHandler.clearPotionEffects();
+                console.log('✅ Guest potion effects cleared successfully');
+            } catch (error) {
+                console.error('❌ Guest error clearing potion effects after battle:', error);
             }
         }
         
@@ -2527,109 +2392,13 @@ export class BattleManager {
         }
     }
 
-    // ANIMATION METHODS
-
-    // Animate collision attacks
-    async animateSimultaneousAttacks(playerHero, opponentHero) {
-        const playerElement = this.getHeroElement('player', playerHero.position);
-        const opponentElement = this.getHeroElement('opponent', opponentHero.position);
-        
-        if (!playerElement || !opponentElement) {
-            console.error('Could not find hero elements for collision animation');
-            return;
-        }
-
-        const animations = [
-            this.animateCollisionAttackTowards(playerHero, opponentElement, 'player'),
-            this.animateCollisionAttackTowards(opponentHero, playerElement, 'opponent')
-        ];
-        
-        await Promise.all(animations);
-    }
-
-    // Animate full attack to target
-    async animateFullAttack(attacker, target) {
-        const attackerElement = this.getHeroElement(attacker.side, attacker.position);
-        const targetElement = this.getHeroElement(target.side, target.position);
-        
-        if (!attackerElement || !targetElement) {
-            console.error(`Could not find elements for attack: ${attacker.name} -> ${target.name}`);
-            return;
-        }
-
-        const attackerCard = attackerElement.querySelector('.battle-hero-card');
-        if (!attackerCard) return;
-
-        const attackerRect = attackerElement.getBoundingClientRect();
-        const targetRect = targetElement.getBoundingClientRect();
-        
-        const deltaX = targetRect.left - attackerRect.left;
-        const deltaY = targetRect.top - attackerRect.top;
-
-        
-        attackerCard.classList.add('attacking');
-        attackerCard.style.transition = `transform ${this.getSpeedAdjustedDelay(120)}ms ease-out`;
-        attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
-        
-        await this.delay(120);
-        this.createImpactEffect(targetElement);
-    }
-
-    // Animate return to position
-    async animateReturn(hero, side) {
-        const heroElement = this.getHeroElement(side, hero.position);
-        if (!heroElement) return;
-
-        const card = heroElement.querySelector('.battle-hero-card');
-        if (!card) return;
-
-        card.style.transition = `transform ${this.getSpeedAdjustedDelay(80)}ms ease-in-out`;
-        card.style.transform = 'translate(0, 0) scale(1)';
-        card.classList.remove('attacking');
-        
-        await this.delay(80);
-    }
-
-    // Create collision effect in battlefield center
-    createCollisionEffect() {
-        const battleCenter = document.querySelector('.battle-effects-area');
-        if (!battleCenter) return;
-
-        const effect = document.createElement('div');
-        effect.className = 'collision-effect';
-        effect.innerHTML = '💥';
-        effect.style.cssText = `
-            position: absolute;
-            font-size: 48px;
-            animation: collisionPulse ${this.getSpeedAdjustedDelay(200)}ms ease-out;
-            z-index: 100;
-        `;
-        
-        battleCenter.appendChild(effect);
-        setTimeout(() => effect.remove(), this.getSpeedAdjustedDelay(200));
-    }
-
-    // Create impact effect on target
-    createImpactEffect(targetElement) {
-        const effect = document.createElement('div');
-        effect.className = 'impact-effect';
-        effect.innerHTML = '💥';
-        effect.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 36px;
-            animation: impactPulse ${this.getSpeedAdjustedDelay(150)}ms ease-out;
-            z-index: 100;
-        `;
-        
-        targetElement.appendChild(effect);
-        setTimeout(() => effect.remove(), this.getSpeedAdjustedDelay(150));
-    }
-
     // Handle hero death
     handleHeroDeath(hero) {
+        // Clear all status effects from the hero when it dies
+        if (this.statusEffectsManager) {
+            this.statusEffectsManager.clearAllStatusEffects(hero);
+        }
+
         this.addCombatLog(`☠️ ${hero.name} has been defeated!`, 'error');
         
         const heroElement = this.getHeroElement(hero.side, hero.position);
@@ -2641,32 +2410,6 @@ export class BattleManager {
                 card.style.opacity = '0.5';
             }
         }
-    }
-
-    // Create floating damage number
-    createDamageNumber(side, position, damage) {
-        const heroElement = this.getHeroElement(side, position);
-        if (!heroElement) return;
-
-        const damageNumber = document.createElement('div');
-        damageNumber.className = 'damage-number';
-        damageNumber.textContent = `-${damage}`;
-        damageNumber.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 45px;
-            font-weight: bold;
-            color: #ff3333;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-            z-index: 200;
-            pointer-events: none;
-            animation: floatUp ${this.getSpeedAdjustedDelay(500)}ms ease-out forwards;
-        `;
-        
-        heroElement.appendChild(damageNumber);
-        setTimeout(() => damageNumber.remove(), this.getSpeedAdjustedDelay(500));
     }
 
     // Update hero health bar with HP text
@@ -2850,6 +2593,17 @@ export class BattleManager {
                 }
             }
             
+            // ===== NEW: CLEAR POTION EFFECTS AFTER BATTLE =====
+            if (window.potionHandler) {
+                try {
+                    console.log('🧪 Clearing potion effects after battle...');
+                    window.potionHandler.clearPotionEffects();
+                    console.log('✅ Potion effects cleared successfully');
+                } catch (error) {
+                    console.error('❌ Error clearing potion effects after battle:', error);
+                }
+            }
+            
             const battleEndData = {
                 hostResult,
                 guestResult,
@@ -2964,21 +2718,14 @@ export class BattleManager {
                 });
             }
             
-            // Restore combat log
-            if (finalState.battleLog && this.battleScreen) {
-                // Clear existing log first
-                const logArea = document.getElementById('combatLog');
-                if (logArea) {
-                    logArea.innerHTML = '';
-                }
-                
-                // Add all log entries
-                finalState.battleLog.forEach(entry => {
-                    this.battleScreen.addCombatLogMessage(entry.message, entry.type || 'info');
+            // NEW: Restore combat log through BattleScreen
+            if (finalState.battleLog && this.battleScreen && this.battleScreen.restoreBattleLogState) {
+                this.battleScreen.restoreBattleLogState({
+                    messages: finalState.battleLog
                 });
                 
                 // Add final message
-                this.battleScreen.addCombatLogMessage('📜 Viewing final battle state', 'info');
+                this.addCombatLog('📜 Viewing final battle state', 'info');
             }
             
             console.log('✅ Final battle state restored for viewing');
@@ -3205,13 +2952,19 @@ export class BattleManager {
         resultOverlay.remove();
     }
 
-    // Add message to combat log
+    // UPDATED: Add message to combat log through BattleScreen
     addCombatLog(message, type = 'info') {
-        this.battleLog.push({ message, type, timestamp: Date.now() });
-        
-        if (this.battleScreen && this.battleScreen.addCombatLogMessage) {
+        // NEW: Delegate to BattleScreen's BattleLog system
+        if (this.battleScreen && typeof this.battleScreen.addCombatLogMessage === 'function') {
             this.battleScreen.addCombatLogMessage(message, type);
         }
+        
+        // LEGACY: Keep for compatibility - maintain the array for persistence
+        this.battleLog.push({ 
+            message, 
+            type, 
+            timestamp: Date.now() 
+        });
     }
 
     // Send battle update to guest
@@ -3251,7 +3004,7 @@ export class BattleManager {
         }
     }
 
-    // Export battle state for persistence - UPDATED WITH RANDOMNESS
+    // Export battle state for persistence - UPDATED WITH BATTLELOG
     exportBattleState() {
         const exportHeroes = (heroes) => {
             const exported = {};
@@ -3287,8 +3040,12 @@ export class BattleManager {
             terrainModifiers: this.terrainModifiers,
             specialRules: this.specialRules,
             
-            // NEW: Export randomness state
-            randomnessState: this.randomnessInitialized ? this.randomness.exportState() : null
+            // Export randomness state
+            randomnessState: this.randomnessManager.exportState(),
+            
+            // Export BattleLog state if available
+            battleLogState: this.battleScreen && this.battleScreen.getBattleLogState ? 
+                            this.battleScreen.getBattleLogState() : null
         };
 
         if (this.isAuthoritative) {
@@ -3303,7 +3060,7 @@ export class BattleManager {
         return baseState;
     }
 
-    // Restore battle state from persistence data - UPDATED WITH RANDOMNESS
+    // Restore battle state from persistence data - UPDATED WITH BATTLELOG
     restoreBattleState(stateData) {
         try {
             this.battleActive = stateData.battleActive || false;
@@ -3344,15 +3101,13 @@ export class BattleManager {
 
             // Restore randomness state
             if (stateData.randomnessState) {
-                if (!this.randomness) {
-                    this.randomness = new BattleRandomness();
-                }
-                const restored = this.randomness.importState(stateData.randomnessState);
-                if (restored) {
-                    this.randomnessSeed = this.randomness.originalSeed;
-                    this.randomnessInitialized = true;
-                    console.log(`🎲 Randomness state restored: ${this.randomness.callCount} calls made`);
-                }
+                this.randomnessManager.importState(stateData.randomnessState);
+            }
+
+            // NEW: Restore BattleLog state
+            if (stateData.battleLogState && this.battleScreen && this.battleScreen.restoreBattleLogState) {
+                this.battleScreen.restoreBattleLogState(stateData.battleLogState);
+                console.log('📜 BattleLog state restored');
             }
 
             if (stateData.spellSystemState && this.spellSystem) {
@@ -3489,11 +3244,11 @@ export class BattleManager {
         }
     }
 
-    // Reset battle manager - UPDATED WITH RANDOMNESS RESET
+    // Reset battle manager - UPDATED WITH BATTLELOG RESET
     reset() {
         this.battleActive = false;
         this.currentTurn = 0;
-        this.battleLog = [];
+        this.battleLog = []; // UPDATED: Clear legacy array
         this.turnInProgress = false;
         
         this.battlePaused = false;
@@ -3528,6 +3283,10 @@ export class BattleManager {
         this.playerCreatures = null;
         this.opponentCreatures = null;
 
+        
+        this.randomnessManager.reset();
+
+
         if (this.necromancyManager) {
             this.necromancyManager.cleanup();
             this.necromancyManager = null;
@@ -3555,26 +3314,24 @@ export class BattleManager {
             this.spellSystem = null;
         }
 
-        this.clearVisualEffects();
+        if (this.animationManager) {
+            this.animationManager.cleanup();
+            this.animationManager = null;
+        }
         
         if (this.persistenceManager) {
             this.persistenceManager.cleanup();
         }
-    }
-
-    // Clear all visual effects
-    clearVisualEffects() {
-        const battleCenter = document.querySelector('.battle-effects-area');
-        if (battleCenter) {
-            const effects = battleCenter.querySelectorAll('.collision-effect, .impact-effect');
-            effects.forEach(effect => effect.remove());
+        
+        if (this.statusEffectsManager) {
+            this.statusEffectsManager.cleanup();
+            this.statusEffectsManager = null;
         }
         
-        const damageNumbers = document.querySelectorAll('.damage-number');
-        damageNumbers.forEach(number => number.remove());
-        
-        const resultOverlays = document.querySelectorAll('.battle-result-overlay');
-        resultOverlays.forEach(overlay => overlay.remove());
+        // NEW: Reset BattleLog through BattleScreen
+        if (this.battleScreen && this.battleScreen.battleLog) {
+            this.battleScreen.battleLog.clear();
+        }
     }
 
     handleGuestReconnectionReady() {
@@ -3604,119 +3361,5 @@ export class BattleManager {
     }
 }
 
-// Add required CSS animations and creature styles
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes collisionPulse {
-        0% { transform: scale(0) rotate(0deg); opacity: 1; }
-        100% { transform: scale(2) rotate(180deg); opacity: 0; }
-    }
-    
-    @keyframes impactPulse {
-        0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
-        100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-    
-    @keyframes fadeOut {
-        from { opacity: 1; }
-        to { opacity: 0; }
-    }
-    
-    @keyframes floatUp {
-        0% {
-            transform: translate(-50%, -50%);
-            opacity: 1;
-        }
-        100% {
-            transform: translate(-50%, -150%);
-            opacity: 0;
-        }
-    }
-    
-    @keyframes creatureShake {
-        0%, 100% { transform: translateX(0); }
-        10% { transform: translateX(-2px) rotate(-5deg); }
-        20% { transform: translateX(2px) rotate(5deg); }
-        30% { transform: translateX(-2px) rotate(-5deg); }
-        40% { transform: translateX(2px) rotate(5deg); }
-        50% { transform: translateX(-2px) rotate(-5deg); }
-        60% { transform: translateX(2px) rotate(5deg); }
-        70% { transform: translateX(-1px) rotate(-2deg); }
-        80% { transform: translateX(1px) rotate(2deg); }
-        90% { transform: translateX(-1px) rotate(-2deg); }
-    }
-    
-    .creature-shaking {
-        animation: creatureShake 0.4s ease-in-out;
-        z-index: 100;
-    }
-    
-    .creature-health-bar {
-        position: absolute;
-        bottom: -5px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 30px;
-        height: 4px;
-        background: rgba(0, 0, 0, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 2px;
-        overflow: hidden;
-    }
-    
-    .creature-health-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #4caf50 0%, #66bb6a 100%);
-        transition: width 0.3s ease;
-    }
-    
-    .creature-hp-text {
-        position: absolute;
-        bottom: -15px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 9px;
-        font-weight: bold;
-        color: white;
-        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-        white-space: nowrap;
-    }
-    
-    .creature-icon.defeated {
-        opacity: 0.6;
-    }
-    
-    .creature-icon.defeated .creature-sprite {
-        filter: grayscale(100%);
-        opacity: 0.5;
-    }
-    
-    .battle-hero-card.attacking {
-        z-index: 50 !important;
-    }
-    
-    .battle-hero-card.defeated {
-        animation: heroDefeat 0.5s ease-out forwards;
-    }
-    
-    .health-bar {
-        position: relative;
-    }
-    
-    .battle-result-overlay .battle-result-message {
-        font-size: 48px;
-        font-weight: bold;
-        color: white;
-        text-align: center;
-        padding: 40px;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-    }
-`;
-document.head.appendChild(style);
 
 export default BattleManager;

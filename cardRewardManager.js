@@ -3106,6 +3106,9 @@ export class CardRewardManager {
             console.log('🎁 Hidden battle arena when closing reward overlay');
         }
         
+        // Show surrender button when returning to formation
+        this.showSurrenderButtonOnReturn();
+        
         // Re-enable body scrolling
         document.body.classList.remove('reward-overlay-active');
         
@@ -3121,6 +3124,35 @@ export class CardRewardManager {
         this.selectionMade = false;
         this.viewMode = 'rewards';
     }
+
+    // Show surrender button when returning from reward screen
+    showSurrenderButtonOnReturn() {
+        // Method 1: Use battle screen static method if available
+        if (typeof window !== 'undefined' && window.BattleScreen && window.BattleScreen.showSurrenderButton) {
+            window.BattleScreen.showSurrenderButton();
+            console.log('🛡️ Showed surrender button via BattleScreen static method');
+            return;
+        }
+        
+        // Method 2: Use heroSelection's battle screen instance
+        if (this.heroSelection && this.heroSelection.battleScreen && 
+            typeof this.heroSelection.battleScreen.showSurrenderButton === 'function') {
+            this.heroSelection.battleScreen.showSurrenderButton();
+            console.log('🛡️ Showed surrender button via heroSelection battle screen');
+            return;
+        }
+        
+        // Method 3: Direct DOM manipulation as fallback
+        document.body.classList.remove('battle-active');
+        const surrenderButton = document.querySelector('.surrender-button');
+        if (surrenderButton) {
+            surrenderButton.style.display = '';
+            console.log('🛡️ Showed surrender button via direct DOM manipulation');
+        } else {
+            console.warn('⚠️ Surrender button not found when trying to show it');
+        }
+    }
+
 
     // Save pending rewards to Firebase (updated to handle hero rewards and gold breakdown)
     async savePendingRewards(rewards, isHeroReward = false) {

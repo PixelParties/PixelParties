@@ -266,8 +266,11 @@ export class PotionHandler {
             case 'BottledFlame':
                 return await this.handleBottledFlameEffects(effects, playerRole, battleManager);
             
-             case 'BottledLightning':
+            case 'BottledLightning':
                 return await this.handleBottledLightningEffects(effects, playerRole, battleManager);
+
+            case 'PoisonVial':
+                return await this.handlePoisonVialEffects(effects, playerRole, battleManager);
     
             case 'ElixirOfStrength':
                 // TODO: Implement when ElixirOfStrength battle effects are added
@@ -345,6 +348,45 @@ export class PotionHandler {
         } catch (error) {
             console.error(`Error delegating BottledLightning effects for ${playerRole}:`, error);
             return 0;
+        }
+    }
+
+    // Handle PoisonVial effects by delegating to the PoisonVial module
+    async handlePoisonVialEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the PoisonVial module
+            const { PoisonVialPotion } = await import('./Potions/poisonVial.js');
+            const poisonVialPotion = new PoisonVialPotion();
+            
+            // Delegate everything to the PoisonVial module
+            const effectsProcessed = await poisonVialPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ PoisonVial delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating PoisonVial effects for ${playerRole}:`, error);
+            
+            // Fallback: try basic poison application using status effects manager
+            const enemyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.opponentHeroes) : 
+                Object.values(battleManager.playerHeroes);
+                
+            const effectCount = effects.length;
+            let fallbackTargets = 0;
+            
+            for (const hero of enemyHeroes) {
+                if (hero && hero.alive && battleManager.statusEffectsManager) {
+                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'poisoned', effectCount);
+                    fallbackTargets++;
+                }
+            }
+                        
+            return effectCount;
         }
     }
 

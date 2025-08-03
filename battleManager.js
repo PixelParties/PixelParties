@@ -1106,6 +1106,15 @@ export class BattleManager {
         }
         
         // ============================================
+        // REMEMBER ORIGINAL ACTORS FOR STATUS EFFECTS
+        // ============================================
+        
+        // Remember original actors before filtering for stun/freeze
+        // This ensures that stunned/frozen actors still get status effect processing
+        const originalPlayerActor = playerActor;
+        const originalOpponentActor = opponentActor;
+        
+        // ============================================
         // STATUS EFFECTS: Check action restrictions
         // ============================================
         
@@ -1220,24 +1229,28 @@ export class BattleManager {
         }
         
         // ============================================
-        // STATUS EFFECTS: Post-turn processing
+        // STATUS EFFECTS: Post-turn processing (FIXED)
         // ============================================
         
         // Process status effects after actor actions complete
         // This handles poison damage, burn damage, silenced duration, etc.
+        // FIXED: Process for ALL original actors, not just those that acted
+        // This ensures that stunned/frozen actors still take poison and burn damage
         if (this.statusEffectsManager) {
             const statusEffectPromises = [];
             
-            // Process status effects for actors that took actions this turn
-            if (playerActor && playerActor.data && playerActor.data.alive) {
+            // Process status effects for ALL original actors (including stunned/frozen)
+            // This is the key fix - we use originalPlayerActor and originalOpponentActor
+            // instead of the potentially null playerActor and opponentActor
+            if (originalPlayerActor && originalPlayerActor.data && originalPlayerActor.data.alive) {
                 statusEffectPromises.push(
-                    this.statusEffectsManager.processStatusEffectsAfterTurn(playerActor.data)
+                    this.statusEffectsManager.processStatusEffectsAfterTurn(originalPlayerActor.data)
                 );
             }
             
-            if (opponentActor && opponentActor.data && opponentActor.data.alive) {
+            if (originalOpponentActor && originalOpponentActor.data && originalOpponentActor.data.alive) {
                 statusEffectPromises.push(
-                    this.statusEffectsManager.processStatusEffectsAfterTurn(opponentActor.data)
+                    this.statusEffectsManager.processStatusEffectsAfterTurn(originalOpponentActor.data)
                 );
             }
             
@@ -1545,8 +1558,26 @@ export class BattleManager {
     }
 
     // Execute hero attacks with damage application
-    async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
+     async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
         if (playerAttack && opponentAttack) {
+            // Both heroes attack - log host's attack first, then guest's attack
+            let hostAttack, guestAttack;
+            
+            if (playerAttack.hero.absoluteSide === 'host') {
+                hostAttack = playerAttack;
+                guestAttack = opponentAttack;
+            } else {
+                hostAttack = opponentAttack;
+                guestAttack = playerAttack;
+            }
+            
+            // Log attacks with host first
+            if (this.battleScreen && this.battleScreen.battleLog) {
+                this.battleScreen.battleLog.logAttackMessage(hostAttack);
+                this.battleScreen.battleLog.logAttackMessage(guestAttack);
+            }
+
+            
             // Both heroes attack - collision animation (meet in middle)
             await this.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
@@ -1562,6 +1593,11 @@ export class BattleManager {
             // Only one hero attacks - full dash animation (to target)
             const attack = playerAttack || opponentAttack;
             const side = playerAttack ? 'player' : 'opponent';
+            
+            // Log the single attack
+            if (this.battleScreen && this.battleScreen.battleLog) {
+                this.battleScreen.battleLog.logAttackMessage(attack);
+            }
             
             await this.animationManager.animateHeroAttack(attack.hero, attack.target);
             this.applyAttackDamageToTarget(attack);
@@ -2201,7 +2237,7 @@ export class BattleManager {
             );
 
             this.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
-            this.animationManager.createDamageNumber(side, position, damage, maxHp, 'attack');
+            this.animationManager.createDamageNumber(targetLocalSide, targetPosition, damage, maxHp, 'attack');
             
             if (died && oldHp > 0) {
                 this.handleHeroDeath(localTarget);
@@ -2231,7 +2267,7 @@ export class BattleManager {
             );
 
             this.updateCreatureHealthBar(heroLocalSide, heroPosition, creatureIndex, newHp, maxHp);
-            this.animationManager.createDamageNumberOnCreature(side, position, creatureIndex, damage, creature.maxHp, 'attack');
+            this.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, creatureIndex, damage, creature.maxHp, 'attack');
             
             if (died && oldHp > 0) {
                 this.handleCreatureDeath(localHero, creature, creatureIndex, heroLocalSide, heroPosition);
@@ -2952,7 +2988,7 @@ export class BattleManager {
         resultOverlay.remove();
     }
 
-    // UPDATED: Add message to combat log through BattleScreen
+    // Add message to combat log through BattleScreen
     addCombatLog(message, type = 'info') {
         // NEW: Delegate to BattleScreen's BattleLog system
         if (this.battleScreen && typeof this.battleScreen.addCombatLogMessage === 'function') {

@@ -11,7 +11,7 @@ export class BattleLog {
         
         // Message type configurations
         this.messageTypes = {
-            'info': { color: '#ffffff', icon: 'ℹ️' },
+            /*'info': { color: '#ffffff', icon: 'ℹ️' },
             'success': { color: '#4caf50', icon: '✅' },
             'error': { color: '#f44336', icon: '❌' },
             'warning': { color: '#ff9800', icon: '⚠️' },
@@ -20,7 +20,18 @@ export class BattleLog {
             'spell': { color: '#673ab7', icon: '🔮' },
             'damage': { color: '#e91e63', icon: '💥' },
             'heal': { color: '#4caf50', icon: '💚' },
-            'system': { color: '#607d8b', icon: '🔧' }
+            'system': { color: '#607d8b', icon: '🔧' }*/
+
+            'info': { color: '#ffffff', icon: '' },
+            'success': { color: '#4caf50', icon: '' },
+            'error': { color: '#f44336', icon: '' },
+            'warning': { color: '#ff9800', icon: '' },
+            'combat': { color: '#9c27b0', icon: '' },
+            'ability': { color: '#2196f3', icon: '' },
+            'spell': { color: '#673ab7', icon: '' },
+            'damage': { color: '#e91e63', icon: '' },
+            'heal': { color: '#4caf50', icon: '' },
+            'system': { color: '#607d8b', icon: '' }
         };
     }
 
@@ -63,6 +74,34 @@ export class BattleLog {
             const isNearBottom = scrollTop + clientHeight >= scrollHeight - 10;
             this.autoScroll = isNearBottom;
         });
+    }
+
+    // Log individual attack message
+    logAttackMessage(attack) {
+        if (!attack || !attack.hero || !attack.target || !attack.damage) return;
+        
+        const attackerName = attack.hero.name;
+        let targetName;
+        
+        // Determine target name based on target type
+        if (attack.target.type === 'creature') {
+            targetName = attack.target.creature.name;
+        } else if (attack.target.type === 'hero') {
+            targetName = attack.target.hero.name;
+        } else {
+            targetName = 'Unknown Target';
+        }
+        
+        // Determine log type based on attacker's side relative to current player
+        // Use the hero's side property ('player' or 'opponent')
+        const isPlayerAttacker = attack.hero.side === 'player';
+        const logType = isPlayerAttacker ? 'success' : 'error';
+        
+        // Create attack message
+        const message = `⚔️ ${attackerName} attacks ${targetName} for ${attack.damage} damage!`;
+        
+        // Use the existing addMessage method to add to the log
+        this.addMessage(message, logType);
     }
 
     // Add message to the battle log

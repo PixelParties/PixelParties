@@ -1,5 +1,3 @@
-// statusEffects.js - Centralized Status Effects System for Heroes and Creatures
-
 export class StatusEffectsManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
@@ -66,6 +64,65 @@ export class StatusEffectsManager {
     }
 
     // ============================================
+    // MEDEA POISON INTERACTION
+    // ============================================
+
+    /**
+     * Count the number of "Medea" heroes on the enemy team relative to the target
+     * @param {Object} target - The target taking poison damage
+     * @returns {number} - Number of enemy Medea heroes
+     */
+    countEnemyMedeaHeroes(target) {
+        // Determine which side is the enemy team
+        const targetSide = target.side;
+        const enemySide = targetSide === 'player' ? 'opponent' : 'player';
+        
+        // Get the enemy heroes collection
+        const enemyHeroes = enemySide === 'player' 
+            ? this.battleManager.playerHeroes 
+            : this.battleManager.opponentHeroes;
+        
+        // Count alive Medea heroes on enemy team
+        let medeaCount = 0;
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = enemyHeroes[position];
+            if (hero && hero.alive && hero.name === 'Medea') {
+                medeaCount++;
+            }
+        });
+        
+        return medeaCount;
+    }
+
+    /**
+     * Apply Medea poison damage multiplier
+     * @param {number} baseDamage - Base poison damage
+     * @param {Object} target - Target taking damage
+     * @returns {Object} - {damage, medeaCount, multiplier}
+     */
+    applyMedeaPoisonMultiplier(baseDamage, target) {
+        const medeaCount = this.countEnemyMedeaHeroes(target);
+        
+        if (medeaCount === 0) {
+            return {
+                damage: baseDamage,
+                medeaCount: 0,
+                multiplier: 1
+            };
+        }
+        
+        // Double the damage for each enemy Medea
+        const multiplier = Math.pow(2, medeaCount);
+        const finalDamage = baseDamage * multiplier;
+        
+        return {
+            damage: finalDamage,
+            medeaCount: medeaCount,
+            multiplier: multiplier
+        };
+    }
+
+    // ============================================
     // CORE STATUS EFFECT MANAGEMENT
     // ============================================
 
@@ -73,6 +130,13 @@ export class StatusEffectsManager {
     applyStatusEffect(target, effectName, stacks = 1) {
         if (!this.isValidTarget(target, effectName)) {
             console.warn(`Cannot apply ${effectName} to ${target.name}: invalid target type`);
+            return false;
+        }
+
+        // ✅ FIX: Don't apply status effects to dead targets
+        const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
+        if (!isTargetAlive) {
+            console.log(`⚰️ Ignoring status effect application to dead target: ${target.name}`);
             return false;
         }
 
@@ -203,43 +267,89 @@ export class StatusEffectsManager {
     }
 
     // ============================================
-    // DAMAGE PROCESSING
+    // DAMAGE PROCESSING (ENHANCED WITH MEDEA)
     // ============================================
 
-    // Process poison damage
+    // Process poison damage - ENHANCED with Medea interaction
     async processPoisonDamage(target) {
         const poisonStacks = this.getStatusEffectStacks(target, 'poisoned');
         if (poisonStacks === 0) return;
 
-        const damage = 10 * poisonStacks;
+        const baseDamage = 10 * poisonStacks;
+        
+        // NEW: Apply Medea poison multiplier
+        const medeaResult = this.applyMedeaPoisonMultiplier(baseDamage, target);
+        const finalDamage = medeaResult.damage;
         
         // Apply damage
         if (target.type === 'hero' || !target.type) {
             // Hero damage with poison source
             this.battleManager.authoritative_applyDamage({
                 target: target,
-                damage: damage,
-                newHp: Math.max(0, target.currentHp - damage),
-                died: (target.currentHp - damage) <= 0
+                damage: finalDamage,
+                newHp: Math.max(0, target.currentHp - finalDamage),
+                died: (target.currentHp - finalDamage) <= 0
             }, { source: 'poison' }); // Pass poison source
         } else {
             // Creature damage with poison source
-            this.applyCreatureDamage(target, damage, 'poison');
+            this.applyCreatureDamage(target, finalDamage, 'poison');
         }
 
         // Create enhanced poison damage visual
-        this.createStatusDamageVisuals(target, damage, 'poison');
+        this.createStatusDamageVisuals(target, finalDamage, 'poison');
 
         // Create additional poison visual effect  
         this.createStatusVisualEffect(target, 'poisoned', 'damage');
 
-        // Log the damage
-        this.battleManager.addCombatLog(
-            `☠️ ${target.name} takes ${damage} poison damage!`,
-            target.side === 'player' ? 'error' : 'success'
-        );
+        // NEW: Enhanced logging with Medea interaction
+        if (medeaResult.medeaCount > 0) {
+            this.battleManager.addCombatLog(
+                `🐍 ${target.name} takes ${finalDamage} poison damage (${baseDamage} × ${medeaResult.multiplier} from ${medeaResult.medeaCount} enemy Medea)!`,
+                target.side === 'player' ? 'error' : 'success'
+            );
+            
+            // Additional Medea-specific visual effect
+            this.createMedeaPoisonEffect(target, medeaResult.medeaCount);
+        } else {
+            this.battleManager.addCombatLog(
+                `☠️ ${target.name} takes ${finalDamage} poison damage!`,
+                target.side === 'player' ? 'error' : 'success'
+            );
+        }
 
         await this.battleManager.delay(300);
+    }
+
+    // NEW: Create special visual effect for Medea-enhanced poison
+    createMedeaPoisonEffect(target, medeaCount) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+
+        const medeaEffect = document.createElement('div');
+        medeaEffect.className = 'medea-poison-enhancement';
+        medeaEffect.innerHTML = '🐍'.repeat(medeaCount);
+        
+        medeaEffect.style.cssText = `
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            z-index: 350;
+            pointer-events: none;
+            animation: medeaPoisonPulse ${this.battleManager.getSpeedAdjustedDelay(1000)}ms ease-out forwards;
+            text-shadow: 
+                0 0 10px rgba(128, 0, 128, 0.9),
+                0 0 20px rgba(128, 0, 128, 0.6);
+        `;
+        
+        targetElement.appendChild(medeaEffect);
+        
+        setTimeout(() => {
+            if (medeaEffect && medeaEffect.parentNode) {
+                medeaEffect.remove();
+            }
+        }, this.battleManager.getSpeedAdjustedDelay(1000));
     }
 
     // Process burn damage
@@ -379,11 +489,18 @@ export class StatusEffectsManager {
     }
 
     // ============================================
-    // VISUAL EFFECTS
+    // VISUAL EFFECTS (ENHANCED WITH MEDEA)
     // ============================================
 
     // Create visual effect for status application/damage
     createStatusVisualEffect(target, effectName, actionType) {
+        // ✅ FIX: Don't create visual effects for dead targets
+        const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
+        if (!isTargetAlive) {
+            console.log(`⚰️ Skipping visual effect creation for dead target: ${target.name}`);
+            return;
+        }
+
         const targetElement = this.getTargetElement(target);
         if (!targetElement) return;
 
@@ -441,8 +558,15 @@ export class StatusEffectsManager {
         }, this.battleManager.getSpeedAdjustedDelay(800));
     }
 
-    // Create persistent status indicator
+    // Create persistent status indicator - ✅ FIXED
     createPersistentStatusIndicator(targetElement, target, effectName) {
+        // ✅ FIX: Don't create indicators for dead targets
+        const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
+        if (!isTargetAlive) {
+            console.log(`⚰️ Skipping status indicator creation for dead target: ${target.name}`);
+            return;
+        }
+
         // Remove existing indicator if any
         const existingIndicator = targetElement.querySelector(`.status-indicator-${effectName}`);
         if (existingIndicator) {
@@ -560,6 +684,85 @@ export class StatusEffectsManager {
     }
 
     // ============================================
+    // CSS AND CLEANUP (ENHANCED WITH MEDEA)
+    // ============================================
+
+    // Ensure CSS exists for status effects
+    ensureStatusEffectsCSS() {
+        if (document.getElementById('statusEffectsCSS')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'statusEffectsCSS';
+        style.textContent = `
+            @keyframes statusApplicationPulse {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
+                }
+                30% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(120deg); 
+                }
+                70% { 
+                    opacity: 0.8; 
+                    transform: translate(-50%, -50%) scale(1.1) rotate(240deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.8) rotate(360deg); 
+                }
+            }
+            
+            @keyframes statusDamageFloat {
+                0% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%) scale(0.8);
+                }
+                50% {
+                    opacity: 0.9;
+                    transform: translate(-50%, -70%) scale(1.2);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translate(-50%, -90%) scale(1);
+                }
+            }
+            
+            @keyframes medeaPoisonPulse {
+                0% {
+                    opacity: 0;
+                    transform: translateX(-50%) scale(0.5);
+                }
+                30% {
+                    opacity: 1;
+                    transform: translateX(-50%) scale(1.2);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translateX(-50%) scale(1) translateY(-10px);
+                }
+            }
+            
+            .status-indicator {
+                transition: all 0.3s ease;
+                will-change: transform, opacity;
+            }
+            
+            .status-indicator:hover {
+                transform: translateX(-50%) scale(1.2);
+            }
+            
+            .status-application-effect,
+            .status-damage-effect,
+            .medea-poison-enhancement {
+                will-change: transform, opacity;
+            }
+        `;
+        
+        document.head.appendChild(style);
+    }
+
+    // ============================================
     // UTILITY METHODS
     // ============================================
 
@@ -660,7 +863,7 @@ export class StatusEffectsManager {
     // Log status effect application
     logStatusEffectApplication(target, effectName, appliedStacks, totalStacks) {
         const definition = this.statusEffectDefinitions[effectName];
-        const logType = target.side === 'player' ? 'error' : 'success';
+        const logType = target.side === 'error';
         
         this.battleManager.addCombatLog(
             `🎭 ${target.name} gains ${definition.displayName} x${appliedStacks}! (Total: ${totalStacks})`,
@@ -721,13 +924,20 @@ export class StatusEffectsManager {
         }
     }
 
-    // Handle guest status effect update
+    // Handle guest status effect update - ✅ FIXED
     handleGuestStatusEffectUpdate(data) {
         const { targetInfo, effectName, stacks, action } = data;
         
         // Find the target
         const target = this.findTargetFromSyncInfo(targetInfo);
         if (!target) return;
+
+        // ✅ FIX: Don't apply status effects to dead targets
+        const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
+        if (!isTargetAlive) {
+            console.log(`⚰️ Ignoring status effect update for dead target: ${target.name}`);
+            return;
+        }
 
         if (action === 'applied') {
             // Set the exact stacks (don't add, as this is a sync)
@@ -768,10 +978,10 @@ export class StatusEffectsManager {
     }
 
     // ============================================
-    // BATTLE MANAGEMENT
+    // BATTLE MANAGEMENT (ENHANCED WITH FIXES)
     // ============================================
 
-    // Clear all status effects from target (battle end)
+    // Clear all status effects from target (battle end) - ✅ ENHANCED
     clearAllStatusEffects(target) {
         if (!target.statusEffects) return;
         
@@ -780,10 +990,37 @@ export class StatusEffectsManager {
         if (targetElement) {
             const indicators = targetElement.querySelectorAll('.status-indicator');
             indicators.forEach(indicator => indicator.remove());
+            
+            // ✅ FIX: Also remove any floating status effects
+            const floatingEffects = targetElement.querySelectorAll(
+                '.status-application-effect, .status-damage-effect, .medea-poison-enhancement'
+            );
+            floatingEffects.forEach(effect => effect.remove());
         }
         
+        // Clear the status effects array
         target.statusEffects = [];
-        console.log(`🧹 Cleared all status effects from ${target.name}`);
+        console.log(`🧹 Cleared all status effects from ${target.name} (alive: ${target.alive})`);
+    }
+
+    // ✅ NEW: Add a safety cleanup method to be called after death
+    cleanupDeadTargetVisuals(target) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+        
+        // Remove all status-related visual elements
+        const statusElements = targetElement.querySelectorAll(`
+            .status-indicator,
+            .status-application-effect,
+            .status-damage-effect,
+            .medea-poison-enhancement
+        `);
+        
+        statusElements.forEach(element => {
+            element.remove();
+        });
+        
+        console.log(`🧹 Cleaned up all status visuals for dead target: ${target.name}`);
     }
 
     // Clear all status effects from all targets (battle end)
@@ -810,69 +1047,6 @@ export class StatusEffectsManager {
         });
     }
 
-    // ============================================
-    // CSS AND CLEANUP
-    // ============================================
-
-    // Ensure CSS exists for status effects
-    ensureStatusEffectsCSS() {
-        if (document.getElementById('statusEffectsCSS')) return;
-        
-        const style = document.createElement('style');
-        style.id = 'statusEffectsCSS';
-        style.textContent = `
-            @keyframes statusApplicationPulse {
-                0% { 
-                    opacity: 0; 
-                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
-                }
-                30% { 
-                    opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.3) rotate(120deg); 
-                }
-                70% { 
-                    opacity: 0.8; 
-                    transform: translate(-50%, -50%) scale(1.1) rotate(240deg); 
-                }
-                100% { 
-                    opacity: 0; 
-                    transform: translate(-50%, -50%) scale(0.8) rotate(360deg); 
-                }
-            }
-            
-            @keyframes statusDamageFloat {
-                0% {
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(0.8);
-                }
-                50% {
-                    opacity: 0.9;
-                    transform: translate(-50%, -70%) scale(1.2);
-                }
-                100% {
-                    opacity: 0;
-                    transform: translate(-50%, -90%) scale(1);
-                }
-            }
-            
-            .status-indicator {
-                transition: all 0.3s ease;
-                will-change: transform, opacity;
-            }
-            
-            .status-indicator:hover {
-                transform: translateX(-50%) scale(1.2);
-            }
-            
-            .status-application-effect,
-            .status-damage-effect {
-                will-change: transform, opacity;
-            }
-        `;
-        
-        document.head.appendChild(style);
-    }
-
     // Cleanup (called when battle ends)
     cleanup() {
         this.clearAllBattleStatusEffects();
@@ -885,7 +1059,7 @@ export class StatusEffectsManager {
     }
 
     // ============================================
-    // EXPORT/IMPORT FOR PERSISTENCE
+    // EXPORT/IMPORT FOR PERSISTENCE (ENHANCED)
     // ============================================
 
     // Export status effects state (for persistence)
@@ -908,7 +1082,7 @@ export class StatusEffectsManager {
         return true;
     }
 
-    // Restore visual effects for all existing status effects
+    // Restore visual effects for all existing status effects - ✅ FIXED
     restoreAllStatusVisualEffects() {
         console.log('🎭 Restoring status effect visual indicators...');
         
@@ -918,25 +1092,27 @@ export class StatusEffectsManager {
                 const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
                 const hero = heroes[position];
                 
-                if (hero && hero.statusEffects) {
+                // ✅ FIX: Only restore indicators for alive heroes
+                if (hero && hero.alive && hero.statusEffects) {
                     hero.statusEffects.forEach(effect => {
                         this.createPersistentStatusIndicator(
                             this.getTargetElement(hero), hero, effect.name
                         );
                     });
-                    
-                    // Restore for creatures
-                    if (hero.creatures) {
-                        hero.creatures.forEach(creature => {
-                            if (creature.statusEffects) {
-                                creature.statusEffects.forEach(effect => {
-                                    this.createPersistentStatusIndicator(
-                                        this.getTargetElement(creature), creature, effect.name
-                                    );
-                                });
-                            }
-                        });
-                    }
+                }
+                
+                // Restore for creatures
+                if (hero && hero.creatures) {
+                    hero.creatures.forEach(creature => {
+                        // ✅ FIX: Only restore indicators for alive creatures
+                        if (creature.alive && creature.statusEffects) {
+                            creature.statusEffects.forEach(effect => {
+                                this.createPersistentStatusIndicator(
+                                    this.getTargetElement(creature), creature, effect.name
+                                );
+                            });
+                        }
+                    });
                 }
             });
         });

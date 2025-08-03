@@ -3,6 +3,10 @@
 import FlameAvalancheSpell from './Spells/flameAvalanche.js';
 import FireballSpell from './Spells/fireball.js';
 import FireshieldSpell from './Spells/fireshield.js';
+import VenomInfusionSpell from './Spells/venomInfusion.js';
+import PoisonedWellSpell from './Spells/poisonedWell.js';
+import ToxicFumesSpell from './Spells/toxicFumes.js';
+import PoisonPollenSpell from './Spells/poisonPollen.js';
 
 
 export class BattleSpellSystem {
@@ -13,7 +17,7 @@ export class BattleSpellSystem {
         this.spellsCastThisBattle = 0;
         this.spellCastHistory = [];
         
-        // NEW: Spell implementations registry
+        // Spell implementations registry
         this.spellImplementations = new Map();
         this.initializeSpellImplementations();
         
@@ -32,6 +36,22 @@ export class BattleSpellSystem {
         // Register Fireshield
         const fireshield = new FireshieldSpell(this.battleManager);
         this.spellImplementations.set('Fireshield', fireshield);
+
+        // Register VenomInfusion
+        const venomInfusion = new VenomInfusionSpell(this.battleManager);
+        this.spellImplementations.set('VenomInfusion', venomInfusion);
+
+        // Register PoisonedWell
+        const poisonedWell = new PoisonedWellSpell(this.battleManager);
+        this.spellImplementations.set('PoisonedWell', poisonedWell);
+
+        // Register ToxicFumes
+        const toxicFumes = new ToxicFumesSpell(this.battleManager);
+        this.spellImplementations.set('ToxicFumes', toxicFumes);
+
+        // Register PoisonPollen
+        const poisonPollen = new PoisonPollenSpell(this.battleManager);
+        this.spellImplementations.set('PoisonPollen', poisonPollen);
         
         // Future spells can be added here:
         // const otherSpell = new OtherSpell(this.battleManager);  

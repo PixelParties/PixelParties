@@ -1,10 +1,11 @@
 // roomManager.js - Room Management Module
 
 export class RoomManager {
-    constructor(database, playerId, storageManager) {
+    constructor(database, playerId, storageManager, gameConfig) {
         this.database = database;
         this.playerId = playerId;
         this.storageManager = storageManager;
+        this.gameConfig = gameConfig;
         this.roomRef = null;
         this.roomsListRef = null;
         this.activityInterval = null;
@@ -140,7 +141,7 @@ export class RoomManager {
                 });
             }
             
-            // Update activity timestamp periodically
+            // Update activity timestamp periodically - USE CONFIG VALUE
             this.activityInterval = setInterval(() => {
                 if (this.roomRef) {
                     const updateData = {
@@ -159,7 +160,7 @@ export class RoomManager {
                 } else {
                     clearInterval(this.activityInterval);
                 }
-            }, 30000); // Every 30 seconds
+            }, this.gameConfig.activityInterval); // USE CONFIG VALUE INSTEAD OF 30000
         });
     }
 
@@ -356,9 +357,10 @@ export class RoomManager {
                 const roomAge = room.created ? (now - room.created) : now;
                 const lastActivity = room.lastActivity ? (now - room.lastActivity) : now;
                 
-                const veryOld = roomAge > 600000; // 10 minutes
+                // USE CONFIG VALUES INSTEAD OF HARDCODED ONES
+                const veryOld = roomAge > this.gameConfig.roomTimeout; // 100 minutes from config
                 const bothOffline = !room.hostOnline && !room.guestOnline;
-                const noRecentActivity = lastActivity > 300000; // 5 minutes
+                const noRecentActivity = lastActivity > this.gameConfig.activityTimeout; // 50 minutes from config
                 
                 if (veryOld || (bothOffline && noRecentActivity)) {
                     roomsToDelete.push(roomId);
@@ -367,7 +369,7 @@ export class RoomManager {
             
             for (const roomId of roomsToDelete) {
                 await this.database.ref('rooms/' + roomId).remove();
-                console.log(`Cleaned up abandoned room: ${roomId}`);
+                console.log(`Cleaned up abandoned room: ${roomId} (age: ${Math.floor(roomAge/60000)}min, activity: ${Math.floor(lastActivity/60000)}min ago)`);
             }
             
         } catch (error) {

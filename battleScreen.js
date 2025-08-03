@@ -118,10 +118,7 @@ export class BattleScreen {
     }
 
     // Start the battle directly with speed-aware delays
-    startBattle() {
-        // NEW: Use BattleLog instead of old method
-        this.addCombatLogMessage('⚔️ Battle begins with Hero abilities!', 'success');
-        
+    startBattle() {        
         // Only the host should initiate the battle
         if (this.isHost) {
             // Set game phase to Battle when battle starts
@@ -863,13 +860,7 @@ export class BattleScreen {
 
         // Get creature count
         const creatureCount = hero.creatures ? hero.creatures.length : 0;
-        
-        // Display the abilities debug info
-        const debugOutput = ``;
-        
-        // NEW: Also log to BattleLog instead of old method
-        this.addCombatLogMessage(`${hero.name} - ${debugOutput}`, 'info');
-        
+                
         // Create a floating tooltip to show abilities
         const existingTooltip = document.querySelector('.hero-abilities-debug');
         if (existingTooltip) {

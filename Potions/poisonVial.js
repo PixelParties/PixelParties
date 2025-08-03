@@ -1,73 +1,73 @@
-// Potions/bottledFlame.js - Enhanced BottledFlame Potion Implementation with Multi-Player Battle Integration
+// Potions/poisonVial.js - PoisonVial Potion Implementation with Multi-Player Battle Integration
 
-export class BottledFlamePotion {
+export class PoisonVialPotion {
     constructor() {
-        this.name = 'BottledFlame';
-        this.displayName = 'Bottled Flame';
-        this.description = 'Burns all enemies at the start of battle';
-        this.effectType = 'burn';
+        this.name = 'PoisonVial';
+        this.displayName = 'Poison Vial';
+        this.description = 'Poisons all enemies at the start of battle';
+        this.effectType = 'poison';
         this.targetType = 'all_enemies';
-        this.burnStacks = 1; // Base burn stacks per use
+        this.poisonStacks = 1; // Base poison stacks per use
         
-        console.log('BottledFlame potion initialized with multi-player support');
+        console.log('PoisonVial potion initialized with multi-player support');
     }
 
     // ===== MAIN EFFECT METHODS =====
 
-    // Apply the burning effect to a single target
-    async applyBurnEffect(target, battleManager, stacks = 1) {
+    // Apply the poison effect to a single target
+    async applyPoisonEffect(target, battleManager, stacks = 1) {
         if (!target || !battleManager) {
-            console.error('Invalid target or battle manager for BottledFlame effect');
+            console.error('Invalid target or battle manager for PoisonVial effect');
             return false;
         }
 
         try {
             // Validate target is alive before applying effect
             if (!this.isTargetValid(target)) {
-                console.log(`Skipping BottledFlame effect on invalid/dead target: ${target.name || 'Unknown'}`);
+                console.log(`Skipping PoisonVial effect on invalid/dead target: ${target.name || 'Unknown'}`);
                 return false;
             }
 
-            // Apply burn status effect using the status effects manager
+            // Apply poison status effect using the status effects manager
             if (battleManager.statusEffectsManager) {
-                battleManager.statusEffectsManager.applyStatusEffect(target, 'burned', stacks);
-                console.log(`Applied ${stacks} burn stack(s) to ${target.name}`);
+                battleManager.statusEffectsManager.applyStatusEffect(target, 'poisoned', stacks);
+                console.log(`Applied ${stacks} poison stack(s) to ${target.name}`);
             } else {
-                console.warn('No status effects manager available - burn effect not applied');
+                console.warn('No status effects manager available - poison effect not applied');
                 return false;
             }
 
             // Show visual effect
-            await this.showBurstingFlameEffect(target, battleManager);
+            await this.showPoisonCloudEffect(target, battleManager);
             
             return true;
         } catch (error) {
-            console.error('Error applying BottledFlame burn effect:', error);
+            console.error('Error applying PoisonVial poison effect:', error);
             return false;
         }
     }
 
-    // Apply BottledFlame effects to multiple targets (main entry point for potion handler)
-    async applyBurnEffectsToTargets(targets, battleManager, playerRole, effectCount = 1) {
+    // Apply PoisonVial effects to multiple targets (main entry point for potion handler)
+    async applyPoisonEffectsToTargets(targets, battleManager, playerRole, effectCount = 1) {
         if (!targets || targets.length === 0) {
-            console.log(`No targets provided for BottledFlame effects from ${playerRole}`);
+            console.log(`No targets provided for PoisonVial effects from ${playerRole}`);
             return 0;
         }
 
         if (!battleManager) {
-            console.error('No battle manager provided for BottledFlame effects');
+            console.error('No battle manager provided for PoisonVial effects');
             return 0;
         }
 
-        console.log(`🔥 Applying BottledFlame effects: ${effectCount} stacks to ${targets.length} targets from ${playerRole}`);
+        console.log(`☠️ Applying PoisonVial effects: ${effectCount} stacks to ${targets.length} targets from ${playerRole}`);
 
         let targetsAffected = 0;
         const effectPromises = [];
 
-        // Apply burn effects to all targets simultaneously
+        // Apply poison effects to all targets simultaneously
         for (const target of targets) {
             if (this.isTargetValid(target)) {
-                const effectPromise = this.applyBurnEffect(target, battleManager, effectCount)
+                const effectPromise = this.applyPoisonEffect(target, battleManager, effectCount)
                     .then(success => {
                         if (success) {
                             targetsAffected++;
@@ -75,7 +75,7 @@ export class BottledFlamePotion {
                         return success;
                     })
                     .catch(error => {
-                        console.error(`Error applying BottledFlame to ${target.name}:`, error);
+                        console.error(`Error applying PoisonVial to ${target.name}:`, error);
                         return false;
                     });
                 
@@ -89,13 +89,13 @@ export class BottledFlamePotion {
         // Add appropriate combat log message
         this.addBattleLogMessage(battleManager, playerRole, effectCount, targetsAffected);
 
-        console.log(`✅ BottledFlame effects completed: ${targetsAffected}/${targets.length} targets affected by ${effectCount} stacks from ${playerRole}`);
+        console.log(`✅ PoisonVial effects completed: ${targetsAffected}/${targets.length} targets affected by ${effectCount} stacks from ${playerRole}`);
         return targetsAffected;
     }
 
     // ===== TARGET VALIDATION AND COLLECTION =====
 
-    // Check if a target is valid for BottledFlame effects
+    // Check if a target is valid for PoisonVial effects
     isTargetValid(target) {
         if (!target) return false;
         
@@ -140,7 +140,7 @@ export class BottledFlamePotion {
             }
         });
 
-        console.log(`Collected ${allTargets.length} valid enemy targets for ${playerRole} BottledFlame effects`);
+        console.log(`Collected ${allTargets.length} valid enemy targets for ${playerRole} PoisonVial effects`);
         
         console.log('Target breakdown:', allTargets.map(t => `${t.name} (${t.type || 'hero'})`));
         return allTargets;
@@ -148,8 +148,8 @@ export class BottledFlamePotion {
 
     // ===== VISUAL EFFECTS =====
 
-    // Show the signature bursting flame effect
-    async showBurstingFlameEffect(target, battleManager) {
+    // Show the signature poison cloud effect
+    async showPoisonCloudEffect(target, battleManager) {
         try {
             // Get the target element (hero or creature)
             const targetElement = this.getTargetElement(target, battleManager);
@@ -158,109 +158,109 @@ export class BottledFlamePotion {
                 return;
             }
 
-            // Create and show the bursting flame effect
-            await this.createBurstingFlameAnimation(targetElement);
+            // Create and show the poison cloud effect
+            await this.createPoisonCloudAnimation(targetElement);
             
         } catch (error) {
-            console.error('Error showing bursting flame effect:', error);
+            console.error('Error showing poison cloud effect:', error);
         }
     }
 
-    // Create the bursting flame animation
-    async createBurstingFlameAnimation(targetElement) {
-        // Create the main flame burst effect
-        const flameBurst = this.createFlameBurstElement();
+    // Create the poison cloud animation
+    async createPoisonCloudAnimation(targetElement) {
+        // Create the main poison cloud effect
+        const poisonCloud = this.createPoisonCloudElement();
         
         // Position it on the target
-        this.positionEffectOnTarget(flameBurst, targetElement);
+        this.positionEffectOnTarget(poisonCloud, targetElement);
         
         // Add to DOM and animate
-        document.body.appendChild(flameBurst);
+        document.body.appendChild(poisonCloud);
         
-        // Create multiple flame particles for enhanced effect
+        // Create multiple poison particles for enhanced effect
         const particles = [];
-        const particleCount = 6 + Math.floor(Math.random() * 4); // 6-9 particles
+        const particleCount = 8 + Math.floor(Math.random() * 4); // 8-11 particles
         
         for (let i = 0; i < particleCount; i++) {
-            const particle = this.createFlameParticle(i);
+            const particle = this.createPoisonParticle(i);
             this.positionEffectOnTarget(particle, targetElement);
             document.body.appendChild(particle);
             particles.push(particle);
         }
         
-        // Create screen flash effect (reduced intensity for multiple targets)
-        this.createScreenFlash();
+        // Create subtle screen tint effect
+        this.createPoisonScreenTint();
         
         // Wait for animation to complete
-        await this.waitForAnimation(600);
+        await this.waitForAnimation(800);
         
         // Clean up elements
-        flameBurst.remove();
+        poisonCloud.remove();
         particles.forEach(particle => particle.remove());
     }
 
-    // Create the main flame burst element
-    createFlameBurstElement() {
-        const flameBurst = document.createElement('div');
-        flameBurst.className = 'bottled-flame-burst';
-        flameBurst.innerHTML = '🔥';
+    // Create the main poison cloud element
+    createPoisonCloudElement() {
+        const poisonCloud = document.createElement('div');
+        poisonCloud.className = 'poison-vial-cloud';
+        poisonCloud.innerHTML = '☁️';
         
-        flameBurst.style.cssText = `
+        poisonCloud.style.cssText = `
             position: absolute;
-            font-size: 60px;
+            font-size: 70px;
             z-index: 1000;
             pointer-events: none;
-            animation: bottledFlameBurst 0.6s ease-out forwards;
+            animation: poisonVialCloud 0.8s ease-out forwards;
             text-shadow: 
-                0 0 20px #ff4444,
-                0 0 40px #ff6600,
-                0 0 60px #ffaa00;
-            filter: drop-shadow(0 0 15px rgba(255, 68, 68, 0.8));
+                0 0 25px #9b59b6,
+                0 0 50px #8e44ad,
+                0 0 75px #6a1b9a;
+            filter: drop-shadow(0 0 20px rgba(155, 89, 182, 0.9));
         `;
         
-        return flameBurst;
+        return poisonCloud;
     }
 
-    // Create a flame particle for the burst effect
-    createFlameParticle(index) {
+    // Create a poison particle for the cloud effect
+    createPoisonParticle(index) {
         const particle = document.createElement('div');
-        particle.className = `bottled-flame-particle bottled-flame-particle-${index}`;
+        particle.className = `poison-vial-particle poison-vial-particle-${index}`;
         
         // Randomize particle appearance
-        const flames = ['🔥', '💥', '✨', '🌟', '⭐'];
-        const randomFlame = flames[Math.floor(Math.random() * flames.length)];
-        particle.innerHTML = randomFlame;
+        const poisonSymbols = ['☠️', '💜', '🟣', '🔮', '💀', '☁️'];
+        const randomSymbol = poisonSymbols[Math.floor(Math.random() * poisonSymbols.length)];
+        particle.innerHTML = randomSymbol;
         
-        // Calculate random direction and distance
-        const angle = (index * (360 / 8)) + (Math.random() * 30 - 15); // Spread particles around
-        const distance = 40 + Math.random() * 50; // Random distance
-        const duration = 0.3 + Math.random() * 0.4; // Random duration
+        // Calculate random direction and distance (more clustered than flames)
+        const angle = (index * (360 / 12)) + (Math.random() * 20 - 10); // Tighter spread
+        const distance = 25 + Math.random() * 35; // Shorter distance for cloud effect
+        const duration = 0.5 + Math.random() * 0.6; // Longer duration for lingering effect
         
         particle.style.cssText = `
             position: absolute;
-            font-size: ${15 + Math.random() * 25}px;
+            font-size: ${12 + Math.random() * 20}px;
             z-index: 999;
             pointer-events: none;
-            animation: bottledFlameParticle${index} ${duration}s ease-out forwards;
+            animation: poisonVialParticle${index} ${duration}s ease-out forwards;
             text-shadow: 
-                0 0 10px #ff4444,
-                0 0 20px #ff6600;
-            filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.6));
+                0 0 15px #9b59b6,
+                0 0 30px #8e44ad;
+            filter: drop-shadow(0 0 10px rgba(155, 89, 182, 0.7));
         `;
         
         // Create custom animation for this particle
-        this.createParticleAnimation(index, angle, distance, duration);
+        this.createPoisonParticleAnimation(index, angle, distance, duration);
         
         return particle;
     }
 
-    // Create custom animation for flame particles
-    createParticleAnimation(index, angle, distance, duration) {
+    // Create custom animation for poison particles
+    createPoisonParticleAnimation(index, angle, distance, duration) {
         const angleRad = (angle * Math.PI) / 180;
         const endX = Math.cos(angleRad) * distance;
         const endY = Math.sin(angleRad) * distance;
         
-        const animationName = `bottledFlameParticle${index}`;
+        const animationName = `poisonVialParticle${index}`;
         
         // Check if animation already exists
         if (this.animationExists(animationName)) {
@@ -270,15 +270,19 @@ export class BottledFlamePotion {
         const keyframes = `
             @keyframes ${animationName} {
                 0% {
-                    transform: translate(-50%, -50%) scale(0.2) rotate(0deg);
-                    opacity: 1;
-                }
-                50% {
-                    transform: translate(calc(-50% + ${endX * 0.7}px), calc(-50% + ${endY * 0.7}px)) scale(1.2) rotate(180deg);
+                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
                     opacity: 0.8;
                 }
+                30% {
+                    transform: translate(calc(-50% + ${endX * 0.5}px), calc(-50% + ${endY * 0.5}px)) scale(1.1) rotate(90deg);
+                    opacity: 1;
+                }
+                70% {
+                    transform: translate(calc(-50% + ${endX * 0.8}px), calc(-50% + ${endY * 0.8}px)) scale(0.9) rotate(180deg);
+                    opacity: 0.6;
+                }
                 100% {
-                    transform: translate(calc(-50% + ${endX}px), calc(-50% + ${endY}px)) scale(0.3) rotate(360deg);
+                    transform: translate(calc(-50% + ${endX}px), calc(-50% + ${endY}px)) scale(0.2) rotate(270deg);
                     opacity: 0;
                 }
             }
@@ -287,29 +291,29 @@ export class BottledFlamePotion {
         this.addAnimationToDocument(animationName, keyframes);
     }
 
-    // Create screen flash effect (reduced intensity for multi-target scenarios)
-    createScreenFlash() {
-        const flash = document.createElement('div');
-        flash.className = 'bottled-flame-screen-flash';
+    // Create subtle poison screen tint effect
+    createPoisonScreenTint() {
+        const tint = document.createElement('div');
+        tint.className = 'poison-vial-screen-tint';
         
-        flash.style.cssText = `
+        tint.style.cssText = `
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
             background: radial-gradient(circle, 
-                rgba(255, 100, 0, 0.15) 0%, 
-                rgba(255, 68, 68, 0.1) 30%, 
-                transparent 70%);
+                rgba(155, 89, 182, 0.08) 0%, 
+                rgba(142, 68, 173, 0.05) 40%, 
+                transparent 80%);
             z-index: 998;
             pointer-events: none;
-            animation: bottledFlameScreenFlash 0.25s ease-out forwards;
+            animation: poisonVialScreenTint 0.4s ease-out forwards;
         `;
         
-        document.body.appendChild(flash);
+        document.body.appendChild(tint);
         
-        setTimeout(() => flash.remove(), 250);
+        setTimeout(() => tint.remove(), 400);
     }
 
     // ===== UTILITY METHODS =====
@@ -375,9 +379,9 @@ export class BottledFlamePotion {
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
-        // Add some randomness for multiple effects
-        const offsetX = (Math.random() - 0.5) * 20;
-        const offsetY = (Math.random() - 0.5) * 20;
+        // Add some randomness for multiple effects (less than flames for cloud effect)
+        const offsetX = (Math.random() - 0.5) * 15;
+        const offsetY = (Math.random() - 0.5) * 15;
         
         effectElement.style.left = `${centerX + offsetX}px`;
         effectElement.style.top = `${centerY + offsetY}px`;
@@ -387,7 +391,7 @@ export class BottledFlamePotion {
     // Add battle log message with proper player context
     addBattleLogMessage(battleManager, playerRole, effectCount, targetsAffected) {
         if (!battleManager || !battleManager.addCombatLog) {
-            console.warn('No battle manager or combat log available for BottledFlame message');
+            console.warn('No battle manager or combat log available for PoisonVial message');
             return;
         }
 
@@ -397,12 +401,12 @@ export class BottledFlamePotion {
         let message;
         if (effectCount === 1) {
             if (targetsAffected === 1) {
-                message = `🔥 ${playerName}'s BottledFlame ignites! 1 enemy burned!`;
+                message = `☠️ ${playerName}'s PoisonVial spreads! 1 enemy poisoned!`;
             } else {
-                message = `🔥 ${playerName}'s BottledFlame ignites! ${targetsAffected} enemies burned!`;
+                message = `☠️ ${playerName}'s PoisonVial spreads! ${targetsAffected} enemies poisoned!`;
             }
         } else {
-            message = `🔥 ${playerName}'s ${effectCount} BottledFlames ignite! ${targetsAffected} enemies suffer intense burns!`;
+            message = `☠️ ${playerName}'s ${effectCount} PoisonVials spread! ${targetsAffected} enemies suffer toxic poison!`;
         }
         
         battleManager.addCombatLog(message, logType);
@@ -429,10 +433,10 @@ export class BottledFlamePotion {
 
     // Add animation to document
     addAnimationToDocument(animationName, keyframes) {
-        let styleSheet = document.getElementById('bottledFlameAnimations');
+        let styleSheet = document.getElementById('poisonVialAnimations');
         if (!styleSheet) {
             styleSheet = document.createElement('style');
-            styleSheet.id = 'bottledFlameAnimations';
+            styleSheet.id = 'poisonVialAnimations';
             document.head.appendChild(styleSheet);
         }
         
@@ -454,25 +458,25 @@ export class BottledFlamePotion {
     // Main integration method called by potion handler
     async handlePotionEffectsForPlayer(effects, playerRole, battleManager) {
         if (!effects || effects.length === 0) {
-            console.log('No BottledFlame effects to apply');
+            console.log('No PoisonVial effects to apply');
             return 0;
         }
 
         if (!battleManager) {
-            console.error('No battle manager provided for BottledFlame effects');
+            console.error('No battle manager provided for PoisonVial effects');
             return 0;
         }
 
-        console.log(`🔥 BottledFlame handling ${effects.length} effect(s) for ${playerRole}`);
+        console.log(`☠️ PoisonVial handling ${effects.length} effect(s) for ${playerRole}`);
 
         try {
             // Collect all enemy targets
             const targets = this.collectEnemyTargets(battleManager, playerRole);
             
             if (targets.length === 0) {
-                console.log(`No valid targets found for ${playerRole} BottledFlame effects`);
+                console.log(`No valid targets found for ${playerRole} PoisonVial effects`);
                 battleManager.addCombatLog(
-                    `🔥 ${playerRole === 'host' ? 'Host' : 'Guest'}'s BottledFlame fizzles - no targets!`, 
+                    `☠️ ${playerRole === 'host' ? 'Host' : 'Guest'}'s PoisonVial dissipates - no targets!`, 
                     playerRole === 'host' ? 'success' : 'error'
                 );
                 return 0;
@@ -480,7 +484,7 @@ export class BottledFlamePotion {
 
             // Apply effects to all targets
             const effectCount = effects.length;
-            const targetsAffected = await this.applyBurnEffectsToTargets(
+            const targetsAffected = await this.applyPoisonEffectsToTargets(
                 targets, 
                 battleManager, 
                 playerRole, 
@@ -490,16 +494,16 @@ export class BottledFlamePotion {
             return effectCount; // Return number of potion effects processed
             
         } catch (error) {
-            console.error(`Error handling BottledFlame effects for ${playerRole}:`, error);
+            console.error(`Error handling PoisonVial effects for ${playerRole}:`, error);
             
-            // Fallback: try basic burn application
-            this.applyFallbackBurnEffects(battleManager, playerRole, effects.length);
+            // Fallback: try basic poison application
+            this.applyFallbackPoisonEffects(battleManager, playerRole, effects.length);
             return effects.length;
         }
     }
 
-    // Fallback burn effect application (without visuals)
-    applyFallbackBurnEffects(battleManager, playerRole, effectCount) {
+    // Fallback poison effect application (without visuals)
+    applyFallbackPoisonEffects(battleManager, playerRole, effectCount) {
         try {
             const enemyHeroes = playerRole === 'host' ? 
                 Object.values(battleManager.opponentHeroes) : 
@@ -509,89 +513,93 @@ export class BottledFlamePotion {
             
             for (const hero of enemyHeroes) {
                 if (hero && hero.alive && battleManager.statusEffectsManager) {
-                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'burned', effectCount);
+                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'poisoned', effectCount);
                     fallbackTargets++;
                 }
             }
             
             const playerName = playerRole === 'host' ? 'Host' : 'Guest';
             battleManager.addCombatLog(
-                `🔥 ${playerName}'s BottledFlame effects applied (${effectCount} stacks to ${fallbackTargets} heroes)`, 
+                `☠️ ${playerName}'s PoisonVial effects applied (${effectCount} stacks to ${fallbackTargets} heroes)`, 
                 playerRole === 'host' ? 'success' : 'error'
             );
             
-            console.log(`Fallback BottledFlame: Applied ${effectCount} stacks to ${fallbackTargets} heroes`);
+            console.log(`Fallback PoisonVial: Applied ${effectCount} stacks to ${fallbackTargets} heroes`);
             
         } catch (error) {
-            console.error('Error in fallback BottledFlame application:', error);
+            console.error('Error in fallback PoisonVial application:', error);
         }
     }
 
     // ===== STATIC METHODS =====
 
-    // Static method to check if a potion is BottledFlame
-    static isBottledFlame(potionName) {
-        return potionName === 'BottledFlame';
+    // Static method to check if a potion is PoisonVial
+    static isPoisonVial(potionName) {
+        return potionName === 'PoisonVial';
     }
 
     // Static method to get potion info
     static getPotionInfo() {
         return {
-            name: 'BottledFlame',
-            displayName: 'Bottled Flame',
-            description: 'Burns all enemies at the start of battle',
+            name: 'PoisonVial',
+            displayName: 'Poison Vial',
+            description: 'Poisons all enemies at the start of battle',
             cardType: 'Potion',
             cost: 0,
-            effect: 'Applies burn status to all enemy heroes and creatures at battle start',
-            burnStacks: 1,
+            effect: 'Applies poison status to all enemy heroes and creatures at battle start',
+            poisonStacks: 1,
             targetType: 'all_enemies'
         };
     }
 
     // Static method to create a new instance
     static create() {
-        return new BottledFlamePotion();
+        return new PoisonVialPotion();
     }
 
     // Static method for quick effect application (utility)
     static async applyToAllEnemies(battleManager, playerRole, stackCount = 1) {
-        const potion = new BottledFlamePotion();
+        const potion = new PoisonVialPotion();
         const targets = potion.collectEnemyTargets(battleManager, playerRole);
-        return await potion.applyBurnEffectsToTargets(targets, battleManager, playerRole, stackCount);
+        return await potion.applyPoisonEffectsToTargets(targets, battleManager, playerRole, stackCount);
     }
 }
 
-// Add enhanced CSS animations for BottledFlame effects
-if (typeof document !== 'undefined' && !document.getElementById('bottledFlameStyles')) {
+// Add enhanced CSS animations for PoisonVial effects
+if (typeof document !== 'undefined' && !document.getElementById('poisonVialStyles')) {
     const style = document.createElement('style');
-    style.id = 'bottledFlameStyles';
+    style.id = 'poisonVialStyles';
     style.textContent = `
-        /* Main flame burst animation */
-        @keyframes bottledFlameBurst {
+        /* Main poison cloud animation */
+        @keyframes poisonVialCloud {
             0% {
-                transform: translate(-50%, -50%) scale(0.1) rotate(0deg);
+                transform: translate(-50%, -50%) scale(0.2) rotate(0deg);
                 opacity: 0;
             }
-            20% {
+            25% {
+                transform: translate(-50%, -50%) scale(1.2) rotate(45deg);
+                opacity: 0.9;
+            }
+            50% {
                 transform: translate(-50%, -50%) scale(1.5) rotate(90deg);
                 opacity: 1;
             }
-            60% {
-                transform: translate(-50%, -50%) scale(2.2) rotate(270deg);
-                opacity: 0.8;
+            75% {
+                transform: translate(-50%, -50%) scale(1.3) rotate(135deg);
+                opacity: 0.7;
             }
             100% {
-                transform: translate(-50%, -50%) scale(0.8) rotate(360deg);
+                transform: translate(-50%, -50%) scale(0.6) rotate(180deg);
                 opacity: 0;
             }
         }
         
-        /* Screen flash animation - reduced intensity */
-        @keyframes bottledFlameScreenFlash {
+        /* Screen tint animation - subtle purple effect */
+        @keyframes poisonVialScreenTint {
             0% {
                 opacity: 0;
             }
-            50% {
+            40% {
                 opacity: 1;
             }
             100% {
@@ -599,103 +607,107 @@ if (typeof document !== 'undefined' && !document.getElementById('bottledFlameSty
             }
         }
         
-        /* Base styles for flame effects */
-        .bottled-flame-burst {
+        /* Base styles for poison effects */
+        .poison-vial-cloud {
             will-change: transform, opacity;
         }
         
-        .bottled-flame-particle {
+        .poison-vial-particle {
             will-change: transform, opacity;
         }
         
-        .bottled-flame-screen-flash {
+        .poison-vial-screen-tint {
             will-change: opacity;
         }
         
-        /* Enhanced flame effects for different elements */
-        .bottled-flame-burst:before {
+        /* Enhanced poison cloud effects */
+        .poison-vial-cloud:before {
             content: '';
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             background: radial-gradient(circle, 
-                rgba(255, 100, 0, 0.5) 0%, 
-                rgba(255, 68, 68, 0.3) 30%, 
-                transparent 70%);
+                rgba(155, 89, 182, 0.4) 0%, 
+                rgba(142, 68, 173, 0.2) 40%, 
+                transparent 80%);
             border-radius: 50%;
-            animation: flameGlow 0.6s ease-out;
+            animation: poisonCloudGlow 0.8s ease-out;
         }
         
-        @keyframes flameGlow {
+        @keyframes poisonCloudGlow {
             0% {
                 transform: translate(-50%, -50%) scale(0);
                 opacity: 0;
             }
-            50% {
-                transform: translate(-50%, -50%) scale(1.5);
+            40% {
+                transform: translate(-50%, -50%) scale(1.2);
                 opacity: 0.8;
             }
+            70% {
+                transform: translate(-50%, -50%) scale(2);
+                opacity: 0.4;
+            }
             100% {
-                transform: translate(-50%, -50%) scale(2.5);
+                transform: translate(-50%, -50%) scale(3);
                 opacity: 0;
             }
         }
         
-        /* Improved particle effects */
-        .bottled-flame-particle {
+        /* Enhanced particle effects */
+        .poison-vial-particle {
             text-shadow: 
-                0 0 8px #ff4444,
-                0 0 16px #ff6600,
-                0 0 24px #ffaa00;
+                0 0 12px #9b59b6,
+                0 0 24px #8e44ad,
+                0 0 36px #6a1b9a;
         }
         
-        /* Responsive flame effects */
+        /* Responsive poison effects */
         @media (max-width: 768px) {
-            .bottled-flame-burst {
-                font-size: 40px !important;
+            .poison-vial-cloud {
+                font-size: 50px !important;
             }
             
-            .bottled-flame-particle {
-                font-size: 16px !important;
+            .poison-vial-particle {
+                font-size: 14px !important;
             }
         }
         
         /* High contrast mode support */
         @media (prefers-contrast: high) {
-            .bottled-flame-burst {
+            .poison-vial-cloud {
                 text-shadow: 
-                    0 0 10px #ffffff,
-                    0 0 20px #000000;
+                    0 0 15px #ffffff,
+                    0 0 30px #000000;
             }
             
-            .bottled-flame-particle {
+            .poison-vial-particle {
                 text-shadow: 
-                    0 0 5px #ffffff,
-                    0 0 10px #000000;
+                    0 0 8px #ffffff,
+                    0 0 16px #000000;
             }
         }
         
         /* Reduced motion support */
         @media (prefers-reduced-motion: reduce) {
-            .bottled-flame-burst {
-                animation: bottledFlameReducedMotion 0.3s ease-out forwards;
+            .poison-vial-cloud {
+                animation: poisonVialReducedMotion 0.4s ease-out forwards;
             }
             
-            .bottled-flame-particle {
+            .poison-vial-particle {
                 animation: none;
                 opacity: 0;
             }
             
-            .bottled-flame-screen-flash {
+            .poison-vial-screen-tint {
                 animation: none;
                 opacity: 0;
             }
         }
         
-        @keyframes bottledFlameReducedMotion {
+        @keyframes poisonVialReducedMotion {
             0% {
                 opacity: 0;
                 transform: translate(-50%, -50%) scale(0.8);
@@ -711,11 +723,53 @@ if (typeof document !== 'undefined' && !document.getElementById('bottledFlameSty
         }
         
         /* Performance optimizations */
-        .bottled-flame-burst,
-        .bottled-flame-particle {
+        .poison-vial-cloud,
+        .poison-vial-particle {
             backface-visibility: hidden;
             perspective: 1000px;
             transform-style: preserve-3d;
+        }
+        
+        /* Additional poison-specific effects */
+        .poison-vial-cloud {
+            background: radial-gradient(circle, 
+                rgba(155, 89, 182, 0.1) 0%, 
+                transparent 70%);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Lingering poison mist effect */
+        .poison-vial-particle:after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: rgba(155, 89, 182, 0.2);
+            border-radius: 50%;
+            animation: poisonMist 1s ease-out;
+        }
+        
+        @keyframes poisonMist {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 0.6;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.5);
+                opacity: 0.3;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2.5);
+                opacity: 0;
+            }
         }
     `;
     document.head.appendChild(style);
@@ -723,7 +777,7 @@ if (typeof document !== 'undefined' && !document.getElementById('bottledFlameSty
 
 // Attach to window for global access
 if (typeof window !== 'undefined') {
-    window.BottledFlamePotion = BottledFlamePotion;
+    window.PoisonVialPotion = PoisonVialPotion;
 }
 
-console.log('Enhanced BottledFlame potion module loaded with multi-player integration');
+console.log('Enhanced PoisonVial potion module loaded with multi-player integration');

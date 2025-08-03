@@ -1,6 +1,6 @@
 // main.js - Main Application Entry Point
 
-import { firebaseConfig, rtcConfig } from './config.js';
+import { firebaseConfig, rtcConfig, gameConfig } from './config.js';
 import { StorageManager } from './storage.js';
 import { UIManager } from './uiManager.js';
 import { RoomManager } from './roomManager.js';
@@ -58,7 +58,7 @@ class ProjectPixelParties {
 
     // Initialize managers that depend on Firebase
     initializeManagers() {
-        this.roomManager = new RoomManager(this.database, this.playerId, this.storageManager);
+        this.roomManager = new RoomManager(this.database, this.playerId, this.storageManager, gameConfig);
         this.webRTCManager = new WebRTCManager(rtcConfig, this.roomManager, this.uiManager);
         this.gameManager = new GameManager(this.roomManager, this.webRTCManager, this.uiManager);
     }

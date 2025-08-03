@@ -7,6 +7,8 @@ import VenomInfusionSpell from './Spells/venomInfusion.js';
 import PoisonedWellSpell from './Spells/poisonedWell.js';
 import ToxicFumesSpell from './Spells/toxicFumes.js';
 import PoisonPollenSpell from './Spells/poisonPollen.js';
+import ToxicTrapSpell from './Spells/toxicTrap.js';
+
 
 
 export class BattleSpellSystem {
@@ -28,8 +30,8 @@ export class BattleSpellSystem {
         // Register FlameAvalanche
         const flameAvalanche = new FlameAvalancheSpell(this.battleManager);
         this.spellImplementations.set('FlameAvalanche', flameAvalanche);
-    
-        // Register Fireball - Add these lines
+
+        // Register Fireball
         const fireball = new FireballSpell(this.battleManager);
         this.spellImplementations.set('Fireball', fireball);
         
@@ -53,9 +55,9 @@ export class BattleSpellSystem {
         const poisonPollen = new PoisonPollenSpell(this.battleManager);
         this.spellImplementations.set('PoisonPollen', poisonPollen);
         
-        // Future spells can be added here:
-        // const otherSpell = new OtherSpell(this.battleManager);  
-        // this.spellImplementations.set('OtherSpell', otherSpell);
+        // Register ToxicTrap
+        const toxicTrap = new ToxicTrapSpell(this.battleManager);
+        this.spellImplementations.set('ToxicTrap', toxicTrap);
         
         console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
     }
@@ -93,10 +95,34 @@ export class BattleSpellSystem {
             return null; // No castable spells
         }
 
-        console.log(`🔮 ${hero.name} has ${castableSpells.length}/${allSpells.length} castable spells, checking for casting...`);
+        // NEW: Filter out spells that can't be cast due to conditions
+        const availableSpells = castableSpells.filter(spell => {
+            // Check if we have a specific implementation for this spell
+            if (this.spellImplementations.has(spell.name)) {
+                const spellImpl = this.spellImplementations.get(spell.name);
+                
+                // If the spell implementation has a canCast method, use it
+                if (spellImpl.canCast && typeof spellImpl.canCast === 'function') {
+                    const canCast = spellImpl.canCast(hero);
+                    if (!canCast) {
+                        console.log(`🚫 ${hero.name} cannot cast ${spell.name} - conditions not met`);
+                        return false;
+                    }
+                }
+            }
+            
+            return true; // Spell is available to cast
+        });
+
+        if (availableSpells.length === 0) {
+            console.log(`🔮 ${hero.name} has ${castableSpells.length} castable spells, but none can be used right now (conditions not met)`);
+            return null; // No spells can be cast right now
+        }
+
+        console.log(`🔮 ${hero.name} has ${availableSpells.length}/${castableSpells.length} available spells, checking for casting...`);
 
         // Sort spells by level (higher level first)
-        const sortedSpells = this.sortSpellsByLevel(castableSpells);
+        const sortedSpells = this.sortSpellsByLevel(availableSpells);
         
         // Process each spell in order
         for (let i = 0; i < sortedSpells.length; i++) {

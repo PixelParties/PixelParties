@@ -285,7 +285,7 @@ export class ArtifactHandler {
     }
 
     isDraggableArtifact(cardName) {
-        const draggableArtifacts = ['TreasureChest', 'MagneticGlove'];
+        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat'];
         return draggableArtifacts.includes(cardName);
     }
 
@@ -294,7 +294,7 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove'];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat'];
         return clickableArtifacts.includes(cardName);
     }
 
@@ -304,7 +304,7 @@ export class ArtifactHandler {
     }
 
     async preloadAllArtifacts() {
-        const knownArtifacts = ['treasureChest', 'magneticGlove'];
+        const knownArtifacts = ['treasureChest', 'magneticGlove', 'poisonedMeat'];
         
         const loadPromises = knownArtifacts.map(async (moduleName) => {
             try {

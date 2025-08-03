@@ -769,8 +769,13 @@ export class BattleManager {
                         this
                     );
                 }
-                
                 console.log('✅ All potion effects applied successfully');
+
+                // Apply other start of battle effects (like Poisoned Meat)
+                const { applyPoisonedMeatDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
+                await applyPoisonedMeatDelayedEffects(this, window.heroSelection);
+                
+                console.log('✅ All start of battle effects applied successfully');
             } catch (error) {
                 console.error('❌ Error applying potion effects at battle start:', error);
                 this.addCombatLog('⚠️ Some potion effects failed to apply', 'warning');
@@ -1610,7 +1615,7 @@ export class BattleManager {
         if (!attack || !attack.target) return;
         
         if (attack.target.type === 'creature') {
-            // Apply damage to creature
+            // Apply damage to creature (creatures don't have toxic trap)
             this.authoritative_applyDamageToCreature({
                 hero: attack.target.hero,
                 creature: attack.target.creature,
@@ -1620,16 +1625,26 @@ export class BattleManager {
                 side: attack.target.side
             });
         } else {
-            // Apply damage to hero
+            // Hero-to-hero attack - check for toxic trap first
+            const defender = attack.target.hero;
+            const attacker = attack.hero;
+            
+            
             this.authoritative_applyDamage({
-                target: attack.target.hero,
+                target: defender,
                 damage: attack.damage,
-                newHp: Math.max(0, attack.target.hero.currentHp - attack.damage),
-                died: (attack.target.hero.currentHp - attack.damage) <= 0
+                newHp: Math.max(0, defender.currentHp - attack.damage),
+                died: (defender.currentHp - attack.damage) <= 0
             });
             
+            // Check for toxic trap
+            if (this.checkAndApplyToxicTrap(attacker, defender)) {
+                // Toxic trap triggered - original attack is blocked
+                console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
+            }
+
             // Check for fireshield recoil damage (only for hero-to-hero attacks)
-            this.checkAndApplyFireshieldRecoil(attack.hero, attack.target.hero);
+            this.checkAndApplyFireshieldRecoil(attacker, defender);
         }
     }
 
@@ -1651,6 +1666,25 @@ export class BattleManager {
         if (recoilDamage > 0) {
             fireshieldSpell.applyRecoilDamage(attacker, defender, recoilDamage);
         }
+    }
+
+    // Check and apply toxic trap effect
+    checkAndApplyToxicTrap(attacker, defender) {
+        if (!this.isAuthoritative || !this.spellSystem) return false;
+        
+        // Get toxic trap spell implementation
+        const toxicTrapSpell = this.spellSystem.spellImplementations.get('ToxicTrap');
+        if (!toxicTrapSpell) return false;
+        
+        // Check if toxic trap should trigger
+        if (!toxicTrapSpell.shouldTriggerToxicTrap(attacker, defender)) {
+            return false;
+        }
+        
+        // Apply toxic trap effect (poison attacker instead of damaging defender)
+        const blocked = toxicTrapSpell.applyToxicTrapEffect(attacker, defender);
+        
+        return blocked; // true if attack was blocked
     }
 
     // Apply damage to a creature
@@ -1938,6 +1972,10 @@ export class BattleManager {
             case 'fireshield_applied':
                 this.guest_handleFireshieldApplied(data);
                 break;
+
+            case 'toxic_trap_applied':
+                this.guest_handleToxicTrapApplied(data);
+                break;
         }
     }
 
@@ -1968,6 +2006,16 @@ export class BattleManager {
             fireshieldSpell.handleGuestFireshieldApplied(data);
         } else {
             console.warn('Received fireshield applied but fireshield spell not available');
+        }
+    }
+
+    guest_handleToxicTrapApplied(data) {
+        // Forward to the toxic trap spell implementation if available
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('ToxicTrap')) {
+            const toxicTrapSpell = this.spellSystem.spellImplementations.get('ToxicTrap');
+            toxicTrapSpell.handleGuestToxicTrapApplied(data);
+        } else {
+            console.warn('Received toxic trap applied but toxic trap spell not available');
         }
     }
     

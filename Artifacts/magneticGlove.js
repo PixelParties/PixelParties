@@ -1,4 +1,4 @@
-// magneticGlove.js - Magnetic Glove Artifact Implementation
+// magneticGlove.js - Enhanced Magnetic Glove Artifact with Exclusive Artifact System Integration
 // "Choose any card from your deck and add a copy of it to your hand."
 
 export const magneticGloveArtifact = {
@@ -28,13 +28,18 @@ export const magneticGloveArtifact = {
             heroSelection.getGoldManager().addPlayerGold(-cost, 'magnetic_glove_use');
         }
         
-        // Enter Magnetic Glove Mode
+        // Enter Magnetic Glove Mode and register as exclusive
         await this.enterMagneticGloveMode(heroSelection, cost);
     },
 
-    // Enter Magnetic Glove Mode
+    // Enter Magnetic Glove Mode with exclusive artifact registration
     async enterMagneticGloveMode(heroSelection, goldSpent = 0) {
         console.log('🧲 Entering Magnetic Glove Mode');
+        
+        // IMPORTANT: Register as exclusive artifact FIRST
+        if (window.artifactHandler) {
+            window.artifactHandler.setExclusiveArtifactActive('MagneticGlove');
+        }
         
         // Store the mode state
         this.setMagneticGloveState(heroSelection, {
@@ -61,7 +66,7 @@ export const magneticGloveArtifact = {
         console.log('🧲 Magnetic Glove Mode activated successfully');
     },
 
-    // Exit Magnetic Glove Mode
+    // Exit Magnetic Glove Mode with exclusive artifact cleanup
     async exitMagneticGloveMode(heroSelection, cancelled = false) {
         console.log('🧲 Exiting Magnetic Glove Mode');
         
@@ -82,6 +87,11 @@ export const magneticGloveArtifact = {
             }
         }
         
+        // IMPORTANT: Clear exclusive artifact state FIRST
+        if (window.artifactHandler) {
+            window.artifactHandler.clearExclusiveArtifactActive();
+        }
+        
         // Clear the mode state
         this.clearMagneticGloveState(heroSelection);
         
@@ -97,7 +107,7 @@ export const magneticGloveArtifact = {
         // Remove click handlers from deck cards
         this.removeDeckCardClickHandlers();
         
-        // Update displays
+        // Update displays - This will refresh the hand and show unblocked exclusive artifacts
         heroSelection.updateHandDisplay();
         heroSelection.updateGoldDisplay();
         
@@ -107,7 +117,7 @@ export const magneticGloveArtifact = {
         console.log('🧲 Magnetic Glove Mode deactivated');
     },
 
-    // Show notification UI
+    // Show notification UI with enhanced styling
     showMagneticGloveNotification(heroSelection) {
         // Remove any existing notification
         this.hideMagneticGloveNotification();
@@ -118,7 +128,7 @@ export const magneticGloveArtifact = {
         notification.innerHTML = `
             <div class="magnetic-glove-content">
                 <span class="magnetic-glove-icon">🧲</span>
-                <span class="magnetic-glove-text">Choose a card to add to your hand.</span>
+                <span class="magnetic-glove-text">Choose a card from your deck to add to your hand.</span>
                 <button class="magnetic-glove-cancel-btn" onclick="window.cancelMagneticGlove()">Cancel</button>
             </div>
         `;
@@ -213,6 +223,12 @@ export const magneticGloveArtifact = {
     async selectDeckCard(heroSelection, cardName) {
         console.log(`🧲 Selected card from deck: ${cardName}`);
         
+        // Check if hand is full before adding
+        if (heroSelection.getHandManager().isHandFull()) {
+            this.showError('Your hand is full! Cannot add more cards.');
+            return;
+        }
+        
         // Add the selected card to hand
         const success = heroSelection.addCardToHand(cardName);
         
@@ -222,11 +238,11 @@ export const magneticGloveArtifact = {
             // Show success feedback
             this.showCardSelectedFeedback(cardName);
             
-            // Exit Magnetic Glove Mode (not cancelled)
+            // Exit Magnetic Glove Mode (not cancelled, so exclusive state is cleared)
             await this.exitMagneticGloveMode(heroSelection, false);
         } else {
-            console.error(`🧲 Failed to add ${cardName} to hand (hand might be full)`);
-            this.showError('Your hand is full! Cannot add more cards.');
+            console.error(`🧲 Failed to add ${cardName} to hand`);
+            this.showError('Could not add card to hand. Please try again.');
         }
     },
 
@@ -307,7 +323,8 @@ export const magneticGloveArtifact = {
         }
     },
 
-    // State management
+    // === STATE MANAGEMENT ===
+
     setMagneticGloveState(heroSelection, state) {
         if (!heroSelection._magneticGloveState) {
             heroSelection._magneticGloveState = {};
@@ -337,7 +354,9 @@ export const magneticGloveArtifact = {
             .trim();
     },
 
-    // State persistence methods
+    // === ENHANCED STATE PERSISTENCE WITH EXCLUSIVE INTEGRATION ===
+
+    // Export state for saving - integrates with exclusive artifact system
     exportMagneticGloveState(heroSelection) {
         const state = this.getMagneticGloveState(heroSelection);
         if (state && state.active) {
@@ -352,6 +371,7 @@ export const magneticGloveArtifact = {
         };
     },
 
+    // Restore state from saved data - integrates with exclusive artifact system
     async restoreMagneticGloveState(heroSelection, savedState) {
         if (savedState && savedState.magneticGloveActive) {
             console.log('🧲 Restoring Magnetic Glove Mode from saved state');
@@ -369,6 +389,11 @@ export const magneticGloveArtifact = {
     // Special version for restoration that doesn't consume resources
     async enterMagneticGloveModeFromRestore(heroSelection, goldSpent) {
         console.log('🧲 Entering Magnetic Glove Mode from restore');
+        
+        // IMPORTANT: Register as exclusive artifact FIRST (for restoration)
+        if (window.artifactHandler) {
+            window.artifactHandler.setExclusiveArtifactActive('MagneticGlove');
+        }
         
         // Store the mode state
         this.setMagneticGloveState(heroSelection, {
@@ -390,11 +415,62 @@ export const magneticGloveArtifact = {
         // Add click handlers to deck cards
         this.addDeckCardClickHandlers(heroSelection);
         
-        console.log('🧲 Magnetic Glove Mode restored successfully');
+        console.log('🧲 Magnetic Glove Mode restored successfully with exclusive registration');
+    },
+
+    // === CLEANUP AND RESET ===
+
+    // Clean up magnetic glove state (called during game reset)
+    cleanup(heroSelection) {
+        console.log('🧲 Cleaning up Magnetic Glove state');
+        
+        // Clear exclusive artifact state
+        if (window.artifactHandler) {
+            const activeExclusive = window.artifactHandler.getActiveExclusiveArtifact();
+            if (activeExclusive === 'MagneticGlove') {
+                window.artifactHandler.clearExclusiveArtifactActive();
+            }
+        }
+        
+        // Clear local state
+        this.clearMagneticGloveState(heroSelection);
+        
+        // Clean up UI
+        this.hideMagneticGloveNotification();
+        this.highlightDeckCards(false);
+        this.disableToBattleButton(false);
+        this.removeDeckCardClickHandlers();
+    },
+
+    // Emergency exit (for error recovery)
+    async emergencyExit(heroSelection) {
+        console.log('🧲 Emergency exit from Magnetic Glove Mode');
+        
+        try {
+            // Force exit without save to avoid potential issues
+            if (window.artifactHandler) {
+                window.artifactHandler.clearExclusiveArtifactActive();
+            }
+            
+            this.clearMagneticGloveState(heroSelection);
+            this.hideMagneticGloveNotification();
+            this.highlightDeckCards(false);
+            this.disableToBattleButton(false);
+            this.removeDeckCardClickHandlers();
+            
+            // Try to update UI
+            if (heroSelection.updateHandDisplay) {
+                heroSelection.updateHandDisplay();
+            }
+            
+            console.log('🧲 Emergency exit completed');
+        } catch (error) {
+            console.error('🧲 Error during emergency exit:', error);
+        }
     }
 };
 
-// Add CSS styles for Magnetic Glove mode
+// Enhanced CSS styles for Magnetic Glove with exclusive artifact integration
 if (typeof document !== 'undefined' && !document.getElementById('magneticGloveStyles')) {
     const style = document.createElement('style');
     style.id = 'magneticGloveStyles';
@@ -413,6 +489,7 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
             z-index: 10000;
             font-weight: bold;
             animation: magneticGloveSlideIn 0.5s ease-out;
+            border: 2px solid rgba(255, 255, 255, 0.2);
         }
         
         .magnetic-glove-content {
@@ -428,6 +505,7 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
         
         .magnetic-glove-text {
             font-size: 16px;
+            flex: 1;
         }
         
         .magnetic-glove-cancel-btn {
@@ -439,6 +517,7 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
             cursor: pointer;
             font-weight: bold;
             transition: all 0.2s ease;
+            white-space: nowrap;
         }
         
         .magnetic-glove-cancel-btn:hover {
@@ -490,6 +569,7 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             z-index: 10001;
             animation: magneticGloveFeedback 2s ease-out forwards;
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
         .feedback-content {
@@ -518,6 +598,7 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             z-index: 10001;
             animation: magneticGloveError 3s ease-out forwards;
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
         .error-content {
@@ -600,6 +681,11 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
                 opacity: 0;
                 transform: translate(-50%, -50%) scale(0.9);
             }
+        }
+        
+        /* Integration with other exclusive artifacts */
+        .magnetic-glove-notification + .exclusive-restriction-error {
+            top: 80px; /* Push other exclusive errors below our notification */
         }
     `;
     document.head.appendChild(style);

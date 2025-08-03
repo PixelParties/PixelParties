@@ -375,8 +375,12 @@ export class HeroSelection {
         // Reset actions at the start of each turn (team building phase)
         this.actionManager.resetActions();
 
-        // ===== UPDATED: Reset potions for the new turn (preserves active effects) =====
-        this.potionHandler.resetPotionsForTurn(); // This method already exists and works correctly
+        if (this.potionHandler) {
+            this.potionHandler.updateAlchemyBonuses(this);
+            this.potionHandler.resetPotionsForTurn();
+
+            console.log('🧪 Alchemy bonuses recalculated for new turn based on current heroes');
+        }
         
         // Reset Leadership usage and ability attachment tracking for new turn
         if (this.heroAbilitiesManager) {
@@ -697,7 +701,7 @@ export class HeroSelection {
                     gameState.hostMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
 
-                // ===== MODIFIED: Save potion state for host (now includes active effects) =====
+                // Save potion state for host (now includes active effects)
                 if (this.potionHandler) {
                     gameState.hostPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
                     console.log(`💾 Host saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
@@ -706,6 +710,12 @@ export class HeroSelection {
                 // Save Nicolas effect state for host
                 if (this.nicolasEffectManager) {
                     gameState.hostNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
+                }
+
+                // ===== NEW: Save delayed artifact effects for host =====
+                if (this.delayedArtifactEffects) {
+                    gameState.hostDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
+                    console.log(`💾 Host saving ${this.delayedArtifactEffects.length} delayed artifact effects`);
                 }
 
             } else if (!this.isHost && this.selectedCharacter) {
@@ -767,7 +777,7 @@ export class HeroSelection {
                     gameState.guestMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
 
-                // ===== MODIFIED: Save potion state for guest (now includes active effects) =====
+                // Save potion state for guest (now includes active effects)
                 if (this.potionHandler) {
                     gameState.guestPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
                     console.log(`💾 Guest saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
@@ -776,6 +786,12 @@ export class HeroSelection {
                 // Save Nicolas effect state for guest
                 if (this.nicolasEffectManager) {
                     gameState.guestNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
+                }
+
+                // ===== NEW: Save delayed artifact effects for guest =====
+                if (this.delayedArtifactEffects) {
+                    gameState.guestDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
+                    console.log(`💾 Guest saving ${this.delayedArtifactEffects.length} delayed artifact effects`);
                 }
             }
 
@@ -831,7 +847,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, delayedArtifactEffectsData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -864,7 +880,7 @@ export class HeroSelection {
                 // Don't call updateAlchemyBonuses here - it will be called by reconnectionManager if needed
             }
         } else {
-            // ===== Initialize potion state for new game =====
+            // Initialize potion state for new game
             this.potionHandler.resetForNewGame(); // Use new method that clears any lingering effects
             this.potionHandler.updateAlchemyBonuses(this);
             console.log('📝 No potion data found - initialized fresh for new game');
@@ -882,6 +898,21 @@ export class HeroSelection {
                 this.nicolasEffectManager.reset();
                 console.log('📝 No Nicolas data found - initialized fresh state');
             }
+        }
+
+        // ===== NEW: Restore delayed artifact effects =====
+        if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
+            this.delayedArtifactEffects = [...delayedArtifactEffectsData];
+            console.log(`✅ Restored ${this.delayedArtifactEffects.length} delayed artifact effects`);
+            
+            // Log what effects were restored
+            this.delayedArtifactEffects.forEach((effect, index) => {
+                console.log(`🥩 Restored effect ${index + 1}: ${effect.source} - ${effect.description}`);
+            });
+        } else {
+            // Initialize empty array if no saved data
+            this.delayedArtifactEffects = [];
+            console.log('📝 No delayed artifact effects found - initialized empty array');
         }
         
         // Restore player-specific global spell state (including Guard Change mode)

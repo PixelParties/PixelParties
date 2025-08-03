@@ -15,19 +15,10 @@ export class PoisonPollenSpell {
 
     // Execute Poison Pollen spell effect
     async executeSpell(caster, spell) {
-        console.log(`🌸 ${caster.name} attempting to cast ${this.displayName}!`);
+        console.log(`🌸 ${caster.name} casting ${this.displayName}!`);
         
-        // Check if there are any poisoned enemies
+        // Find poisoned enemies (we know there are some because canCast was checked)
         const poisonedTargets = this.findPoisonedEnemies(caster);
-        
-        if (poisonedTargets.length === 0) {
-            console.log(`🌸 ${this.displayName}: No poisoned enemies found - spell fizzles!`);
-            this.battleManager.addCombatLog(
-                `🌸 ${caster.name}'s ${this.displayName} fizzles - no poisoned enemies to target!`,
-                'info'
-            );
-            return;
-        }
         
         console.log(`🌸 ${caster.name} casting ${this.displayName} on ${poisonedTargets.length} poisoned enemies!`);
         
@@ -38,6 +29,13 @@ export class PoisonPollenSpell {
         await this.playPoisonPollenAnimation(caster, poisonedTargets);
         
         console.log(`🌸 ${this.displayName} completed!`);
+    }
+
+    // Check if this spell can be cast (requires poisoned enemies)
+    canCast(caster) {
+        // Check if there are any poisoned enemies
+        const poisonedTargets = this.findPoisonedEnemies(caster);
+        return poisonedTargets.length > 0;
     }
 
     // ============================================

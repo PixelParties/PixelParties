@@ -614,9 +614,9 @@ const CARD_DATABASE = {
         cardType: 'Spell',
         level: 1,
         cost: 0,
-        action: false,
+        action: true,
         spellSchool: 'DecayMagic',
-        subtype: 'Trap'
+        subtype: 'Equip'
     },
     'VenomInfusion': {
         name: 'VenomInfusion',

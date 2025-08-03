@@ -209,7 +209,8 @@ export class ReconnectionManager {
                     gameState.hostGoldData,
                     gameState.hostGlobalSpellState,
                     gameState.hostPotionState,
-                    gameState.hostNicolasState  
+                    gameState.hostNicolasState,
+                    gameState.hostDelayedArtifactEffects 
                 );
                 
             } else if (!this.isHost && gameState.guestSelected) {
@@ -232,7 +233,8 @@ export class ReconnectionManager {
                     gameState.guestGoldData,
                     gameState.guestGlobalSpellState,
                     gameState.guestPotionState,
-                    gameState.guestNicolasState  
+                    gameState.guestNicolasState,
+                    gameState.guestDelayedArtifactEffects
                 );
             }
 

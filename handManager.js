@@ -458,6 +458,8 @@ export class HandManager {
             // Check if this is a potion card
             const isPotionCard = window.potionHandler?.isPotionCard(cardName, window.heroSelection) || false;
 
+            
+
             // Check if this is an artifact and if it's unaffordable
             let isUnaffordable = false;
             let dataCardType = 'other';
@@ -476,6 +478,12 @@ export class HandManager {
                     const playerGold = window.heroSelection?.goldManager?.getPlayerGold() || 0;
                     isUnaffordable = playerGold < cardInfo.cost;
                 }
+            }
+
+            // Check if this is an equip artifact
+            const isEquipArtifact = cardInfo && cardInfo.cardType === 'Artifact' && cardInfo.subtype === 'Equip';
+            if (isEquipArtifact) {
+                dataCardType = 'equip-artifact';
             }
             
             // If ANY exclusive artifact is active, ALL cards are disabled

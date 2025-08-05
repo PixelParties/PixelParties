@@ -15,6 +15,7 @@ import { BattleAnimationManager } from './battleAnimationManager.js';
 
 
 import { NecromancyManager } from './Abilities/necromancy.js';
+import { ResistanceManager, applyResistancePatches } from './Abilities/resistance.js';
 
 import JigglesCreature from './Creatures/jiggles.js';
 
@@ -771,14 +772,19 @@ export class BattleManager {
                 }
                 console.log('✅ All potion effects applied successfully');
 
-                // Apply other start of battle effects (like Poisoned Meat)
-                const { applyPoisonedMeatDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
-                await applyPoisonedMeatDelayedEffects(this, window.heroSelection);
+                // Apply delayed artifact effects from both players (like Poisoned Meat)
+                console.log('🥩 Applying delayed artifact effects from both players at battle start...');
+                const delayedEffects = await this.getBothPlayersDelayedEffects();
+                
+                if (delayedEffects) {
+                    const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
+                    await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, this);
+                }
                 
                 console.log('✅ All start of battle effects applied successfully');
             } catch (error) {
-                console.error('❌ Error applying potion effects at battle start:', error);
-                this.addCombatLog('⚠️ Some potion effects failed to apply', 'warning');
+                console.error('❌ Error applying battle start effects:', error);
+                this.addCombatLog('⚠️ Some battle start effects failed to apply', 'warning');
             }
         }
         
@@ -1643,6 +1649,12 @@ export class BattleManager {
                 console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
             }
 
+            // Check for frost rune
+            if (this.checkAndApplyFrostRune(attacker, defender)) {
+                // Frost rune triggered - original attack is blocked
+                console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
+            }
+
             // Check for fireshield recoil damage (only for hero-to-hero attacks)
             this.checkAndApplyFireshieldRecoil(attacker, defender);
         }
@@ -1683,6 +1695,24 @@ export class BattleManager {
         
         // Apply toxic trap effect (poison attacker instead of damaging defender)
         const blocked = toxicTrapSpell.applyToxicTrapEffect(attacker, defender);
+        
+        return blocked; // true if attack was blocked
+    }
+
+    checkAndApplyFrostRune(attacker, defender) {
+        if (!this.isAuthoritative || !this.spellSystem) return false;
+        
+        // Get frost rune spell implementation
+        const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
+        if (!frostRuneSpell) return false;
+        
+        // Check if frost rune should trigger
+        if (!frostRuneSpell.shouldTriggerFrostRune(attacker, defender)) {
+            return false;
+        }
+        
+        // Apply frost rune effect (freeze attacker instead of damaging defender)
+        const blocked = frostRuneSpell.applyFrostRuneEffect(attacker, defender);
         
         return blocked; // true if attack was blocked
     }
@@ -1883,8 +1913,9 @@ export class BattleManager {
                 this.handleGuestReconnectionReady();
             }
             // Don't return early - let host process other messages too if needed
-            return;
+            //return;
         }
+        
 
         // Guest message processing
         const { type, data } = message;
@@ -1976,6 +2007,10 @@ export class BattleManager {
             case 'toxic_trap_applied':
                 this.guest_handleToxicTrapApplied(data);
                 break;
+
+            case 'frost_rune_applied':
+                this.guest_handleFrostRuneApplied(data);
+                break;
         }
     }
 
@@ -2016,6 +2051,16 @@ export class BattleManager {
             toxicTrapSpell.handleGuestToxicTrapApplied(data);
         } else {
             console.warn('Received toxic trap applied but toxic trap spell not available');
+        }
+    }
+
+    guest_handleFrostRuneApplied(data) {
+        // Forward to the frost rune spell implementation if available
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('FrostRune')) {
+            const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
+            frostRuneSpell.handleGuestFrostRuneApplied(data);
+        } else {
+            console.warn('Received frost rune applied but frost rune spell not available');
         }
     }
     
@@ -2380,7 +2425,7 @@ export class BattleManager {
             }
         }
         
-        // ===== NEW: CLEAR POTION EFFECTS AFTER BATTLE (GUEST) =====
+        // ===== CLEAR POTION EFFECTS AFTER BATTLE (GUEST) =====
         if (window.potionHandler) {
             try {
                 console.log('🧪 Guest clearing potion effects after battle...');
@@ -2389,6 +2434,11 @@ export class BattleManager {
             } catch (error) {
                 console.error('❌ Guest error clearing potion effects after battle:', error);
             }
+        }
+        
+        if (window.heroSelection) {
+            console.log('🥩 HOST: Clearing processed delayed artifact effects...');
+            window.heroSelection.clearProcessedDelayedEffects();
         }
         
         const myMessage = this.getResultMessage(myResult);
@@ -2422,6 +2472,28 @@ export class BattleManager {
         return totalWealthBonus;
     }
 
+    async getBothPlayersDelayedEffects() {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return null;
+        }
+        
+        try {
+            const roomRef = this.roomManager.getRoomRef();
+            const snapshot = await roomRef.child('gameState').once('value');
+            const gameState = snapshot.val();
+            
+            if (!gameState) return null;
+            
+            return {
+                host: gameState.hostDelayedArtifactEffects || [],
+                guest: gameState.guestDelayedArtifactEffects || []
+            };
+        } catch (error) {
+            console.error('Error getting delayed artifact effects from Firebase:', error);
+            return null;
+        }
+    }
+
     // Apply battle results
     applyBattleResults(hostResult, guestResult, hostLives, guestLives, hostGold, guestGold) {
         if (this.lifeManager) {
@@ -2431,16 +2503,6 @@ export class BattleManager {
             } else {
                 this.lifeManager.setPlayerLives(guestLives);
                 this.lifeManager.setOpponentLives(hostLives);
-            }
-        }
-        
-        if (this.goldManager && hostGold !== undefined && guestGold !== undefined) {
-            if (this.isHost) {
-                this.goldManager.setPlayerGold(hostGold);
-                this.goldManager.setOpponentGold(guestGold);
-            } else {
-                this.goldManager.setPlayerGold(guestGold);
-                this.goldManager.setOpponentGold(hostGold);
             }
         }
     }
@@ -2481,6 +2543,12 @@ export class BattleManager {
         // Clear all status effects from the hero when it dies
         if (this.statusEffectsManager) {
             this.statusEffectsManager.clearAllStatusEffects(hero);
+        }
+
+        // Remove frost rune effects when hero dies
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('FrostRune')) {
+            const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
+            frostRuneSpell.removeFrostRuneOnDeath(hero, hero.side, hero.position);
         }
 
         this.addCombatLog(`☠️ ${hero.name} has been defeated!`, 'error');
@@ -2665,7 +2733,6 @@ export class BattleManager {
             
             await this.saveBattleStateToPersistence();
             
-            // 🔥 NEW: INCREMENT TURN BEFORE SENDING BATTLE_END MESSAGE
             let newTurn = 1;
             if (this.battleScreen && this.battleScreen.turnTracker) {
                 newTurn = await this.battleScreen.turnTracker.incrementTurn();
@@ -2677,7 +2744,7 @@ export class BattleManager {
                 }
             }
             
-            // ===== NEW: CLEAR POTION EFFECTS AFTER BATTLE =====
+            // ===== CLEAR POTION EFFECTS AFTER BATTLE =====
             if (window.potionHandler) {
                 try {
                     console.log('🧪 Clearing potion effects after battle...');
@@ -2686,6 +2753,11 @@ export class BattleManager {
                 } catch (error) {
                     console.error('❌ Error clearing potion effects after battle:', error);
                 }
+            }
+            
+            if (window.heroSelection) {
+                console.log('🥩 HOST: Clearing processed delayed artifact effects...');
+                window.heroSelection.clearProcessedDelayedEffects();
             }
             
             const battleEndData = {
@@ -2698,7 +2770,7 @@ export class BattleManager {
                 newTurn: newTurn  // 🔥 NEW: Include the new turn number
             };
             
-            // NEW: Save final battle state before cleanup
+            // Save final battle state before cleanup
             await this.saveFinalBattleState();
             
             this.sendBattleUpdate('battle_end', battleEndData);
@@ -2770,6 +2842,11 @@ export class BattleManager {
             } else {
                 // Fallback restoration
                 this.restoreBattleState(finalState);
+            }
+
+            // Sync abilities for tooltip display
+            if (this.battleScreen && this.battleScreen.syncAbilitiesFromBattleManager) {
+                this.battleScreen.syncAbilitiesFromBattleManager();
             }
             
             // Make sure battle appears ended
@@ -3276,6 +3353,14 @@ export class BattleManager {
         // Restore fireshield visual effects
         this.restoreFireshieldVisuals();
 
+        // Restore frostRune visual effects
+       this.restoreFrostRuneVisuals();
+
+        // Sync abilities to battle screen for tooltip display
+        if (this.battleScreen && this.battleScreen.syncAbilitiesFromBattleManager) {
+            this.battleScreen.syncAbilitiesFromBattleManager();
+        }
+
         console.log('✅ All hero visuals updated');
     }
 
@@ -3284,6 +3369,13 @@ export class BattleManager {
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Fireshield')) {
             const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
             fireshieldSpell.restoreFireshieldVisuals();
+        }
+    }
+
+    restoreFrostRuneVisuals() {
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('FrostRune')) {
+            const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
+            frostRuneSpell.restoreFrostRuneVisuals();
         }
     }
 
@@ -3388,6 +3480,12 @@ export class BattleManager {
             fireshieldSpell.cleanupFireshieldEffects();
         }
 
+        // Cleanup frost rune visual effects
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('FrostRune')) {
+            const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
+            frostRuneSpell.cleanupFrostRuneEffects();
+        }
+
         // Reset randomness system
         this.randomness = null;
         this.randomnessSeed = null;
@@ -3447,3 +3545,5 @@ export class BattleManager {
 
 
 export default BattleManager;
+
+applyResistancePatches(BattleManager);

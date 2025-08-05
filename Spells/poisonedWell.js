@@ -28,13 +28,58 @@ export class PoisonedWellSpell {
             return;
         }
         
-        // Log the spell effect
-        this.logSpellEffect(caster, poisonStacks, targets);
+        // Check resistance for each target BEFORE animations
+        const resistanceResults = this.checkResistanceForAllTargets(targets);
+        
+        // Log the spell effect with resistance info
+        this.logSpellEffect(caster, poisonStacks, targets, resistanceResults);
         
         // Play poisoned rain animation and apply poison when rain hits
-        await this.playPoisonedRainAnimation(caster, targets, poisonStacks);
+        await this.playPoisonedRainAnimation(caster, targets, poisonStacks, resistanceResults);
         
         console.log(`☔ ${this.displayName} completed!`);
+    }
+
+    // ============================================
+    // RESISTANCE CHECKING
+    // ============================================
+
+    // Check resistance for all targets upfront
+    checkResistanceForAllTargets(targets) {
+        const resistanceMap = new Map();
+        
+        targets.forEach(target => {
+            let resisted = false;
+            
+            // Check resistance based on target type
+            if (this.battleManager.resistanceManager) {
+                if (target.type === 'hero') {
+                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+                } else if (target.type === 'creature') {
+                    // For area spells, shouldResistAreaSpell handles creatures differently
+                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName);
+                }
+            }
+            
+            // Create a unique key for each target
+            const key = this.getTargetKey(target);
+            resistanceMap.set(key, resisted);
+            
+            if (resisted) {
+                console.log(`🛡️ Target resisted: ${target.type} ${target.name} at ${target.position}${target.type === 'creature' ? ` (index ${target.creatureIndex})` : ''}`);
+            }
+        });
+        
+        return resistanceMap;
+    }
+
+    // Get unique key for a target
+    getTargetKey(target) {
+        if (target.type === 'hero') {
+            return `hero_${target.side}_${target.position}`;
+        } else {
+            return `creature_${target.side}_${target.position}_${target.creatureIndex}`;
+        }
     }
 
     // ============================================
@@ -114,35 +159,40 @@ export class PoisonedWellSpell {
     // ============================================
 
     // Apply poison stacks to all targets
-    async applyPoisonToAllTargets(targets, poisonStacks) {
+    async applyPoisonToAllTargets(targets, poisonStacks, resistanceResults) {
         const poisonPromises = [];
         
         targets.forEach((target, index) => {
             // Stagger poison application for visual effect
             const delay = index * 50; // 50ms between each target
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
             
             const poisonPromise = new Promise((resolve) => {
                 setTimeout(() => {
-                    let actualTarget;
-                    
-                    if (target.type === 'creature') {
-                        actualTarget = target.creature;
-                    } else {
-                        actualTarget = target.hero;
-                    }
-                    
-                    // Apply poison status effect using the status effects manager
-                    if (this.battleManager.statusEffectsManager) {
-                        const success = this.battleManager.statusEffectsManager.applyStatusEffect(
-                            actualTarget, 
-                            'poisoned', 
-                            poisonStacks
-                        );
+                    // Only apply poison if not resisted
+                    if (!isResisted) {
+                        let actualTarget;
                         
-                        if (success) {
-                            console.log(`☔ Applied ${poisonStacks} poison stacks to ${actualTarget.name}`);
+                        if (target.type === 'creature') {
+                            actualTarget = target.creature;
                         } else {
-                            console.error(`☔ Failed to apply poison to ${actualTarget.name}`);
+                            actualTarget = target.hero;
+                        }
+                        
+                        // Apply poison status effect using the status effects manager
+                        if (this.battleManager.statusEffectsManager) {
+                            const success = this.battleManager.statusEffectsManager.applyStatusEffect(
+                                actualTarget, 
+                                'poisoned', 
+                                poisonStacks
+                            );
+                            
+                            if (success) {
+                                console.log(`☔ Applied ${poisonStacks} poison stacks to ${actualTarget.name}`);
+                            } else {
+                                console.error(`☔ Failed to apply poison to ${actualTarget.name}`);
+                            }
                         }
                     }
                     
@@ -162,7 +212,7 @@ export class PoisonedWellSpell {
     // ============================================
 
     // Play the poisoned rain animation across the enemy side
-    async playPoisonedRainAnimation(caster, targets, poisonStacks) {
+    async playPoisonedRainAnimation(caster, targets, poisonStacks, resistanceResults) {
         console.log(`☔ Playing Poisoned Rain animation across enemy side...`);
         
         // Determine enemy side for rain positioning
@@ -177,10 +227,10 @@ export class PoisonedWellSpell {
         
         // Start applying poison partway through the rain
         setTimeout(() => {
-            this.applyPoisonToAllTargets(targets, poisonStacks);
+            this.applyPoisonToAllTargets(targets, poisonStacks, resistanceResults);
             
             // Create impact effects on all targets
-            this.createTargetImpactEffects(targets);
+            this.createTargetImpactEffects(targets, resistanceResults);
         }, this.battleManager.getSpeedAdjustedDelay(poisonApplicationDelay));
         
         // Wait for full rain duration
@@ -306,8 +356,11 @@ export class PoisonedWellSpell {
     }
 
     // Create impact effects on all targets when poison is applied
-    createTargetImpactEffects(targets) {
+    createTargetImpactEffects(targets, resistanceResults) {
         targets.forEach((target, index) => {
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
+            
             setTimeout(() => {
                 let targetElement;
                 
@@ -320,19 +373,35 @@ export class PoisonedWellSpell {
                 }
                 
                 if (targetElement) {
-                    this.createPoisonImpactEffect(targetElement);
+                    this.createPoisonImpactEffect(targetElement, isResisted);
                 }
             }, this.battleManager.getSpeedAdjustedDelay(index * 50)); // Staggered impacts
         });
     }
 
     // Create poison impact effect on a single target
-    createPoisonImpactEffect(targetElement) {
+    createPoisonImpactEffect(targetElement, isResisted) {
         const impact = document.createElement('div');
         impact.className = 'poisoned-rain-impact';
-        impact.innerHTML = '☠️💜';
         
-        impact.style.cssText = `
+        if (isResisted) {
+            // Show shield effect for resisted targets
+            impact.innerHTML = '🛡️✨';
+            impact.classList.add('resisted');
+            impact.style.textShadow = `
+                0 0 15px rgba(100, 200, 255, 1),
+                0 0 30px rgba(150, 150, 255, 0.8),
+                0 0 45px rgba(200, 200, 255, 0.6)
+            `;
+        } else {
+            impact.innerHTML = '☠️💜';
+            impact.style.textShadow = `
+                0 0 15px rgba(128, 0, 128, 1),
+                0 0 30px rgba(75, 0, 130, 0.8)
+            `;
+        }
+        
+        impact.style.cssText += `
             position: absolute;
             top: 50%;
             left: 50%;
@@ -340,10 +409,7 @@ export class PoisonedWellSpell {
             font-size: 32px;
             z-index: 450;
             pointer-events: none;
-            animation: poisonedRainImpact ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
-            text-shadow: 
-                0 0 15px rgba(128, 0, 128, 1),
-                0 0 30px rgba(75, 0, 130, 0.8);
+            animation: ${isResisted ? 'poisonRainResisted' : 'poisonedRainImpact'} ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
         `;
         
         targetElement.appendChild(impact);
@@ -405,6 +471,21 @@ export class PoisonedWellSpell {
                 }
             }
             
+            @keyframes poisonRainResisted {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5) rotate(0deg); 
+                }
+                50% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(45deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(1.5) rotate(90deg); 
+                }
+            }
+            
             /* Enhanced visual effects */
             .poisoned-rain-container {
                 will-change: transform;
@@ -427,29 +508,72 @@ export class PoisonedWellSpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, poisonStacks, targets) {
+    logSpellEffect(caster, poisonStacks, targets, resistanceResults) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
-        const heroTargets = targets.filter(t => t.type === 'hero').length;
-        const creatureTargets = targets.filter(t => t.type === 'creature').length;
+        // Count actual hits vs resisted
+        let heroHits = 0, heroResists = 0;
+        let creatureHits = 0, creatureResists = 0;
         
-        let targetDescription = '';
-        if (heroTargets > 0 && creatureTargets > 0) {
-            targetDescription = `${heroTargets} hero${heroTargets > 1 ? 's' : ''} and ${creatureTargets} creature${creatureTargets > 1 ? 's' : ''}`;
-        } else if (heroTargets > 0) {
-            targetDescription = `${heroTargets} hero${heroTargets > 1 ? 's' : ''}`;
-        } else if (creatureTargets > 0) {
-            targetDescription = `${creatureTargets} creature${creatureTargets > 1 ? 's' : ''}`;
+        targets.forEach(target => {
+            const key = this.getTargetKey(target);
+            const resisted = resistanceResults.get(key);
+            
+            if (target.type === 'hero') {
+                if (resisted) heroResists++;
+                else heroHits++;
+            } else {
+                if (resisted) creatureResists++;
+                else creatureHits++;
+            }
+        });
+        
+        // Build description of what was hit
+        const parts = [];
+        if (heroHits > 0) {
+            parts.push(`${heroHits} hero${heroHits > 1 ? 'es' : ''}`);
+        }
+        if (creatureHits > 0) {
+            parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
+        }
+        
+        let message = `☔ ${this.displayName} rains poison down`;
+        
+        if (parts.length > 0) {
+            message += ` on ${parts.join(' and ')}, applying ${poisonStacks} poison stack${poisonStacks > 1 ? 's' : ''} each!`;
         } else {
-            targetDescription = 'no targets';
+            // All targets resisted
+            message += `, but all targets resisted!`;
         }
         
         // Main spell effect log
-        this.battleManager.addCombatLog(
-            `☔ ${this.displayName} rains poison down on ${targetDescription}, applying ${poisonStacks} poison stack${poisonStacks > 1 ? 's' : ''} each!`,
-            logType
-        );
+        this.battleManager.addCombatLog(message, logType);
+        
+        // Add resistance info if any
+        if (heroResists > 0 || creatureResists > 0) {
+            const resistParts = [];
+            if (heroResists > 0) {
+                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
+            }
+            if (creatureResists > 0) {
+                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
+            }
+            
+            // Only add this line if some targets were hit
+            if (parts.length > 0) {
+                this.battleManager.addCombatLog(
+                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
+                    'info'
+                );
+            }
+        }
+        
+        // Convert resistance map to serializable format for guest
+        const resistanceData = {};
+        resistanceResults.forEach((resisted, key) => {
+            resistanceData[key] = resisted;
+        });
         
         // Send spell effect update to guest
         this.battleManager.sendBattleUpdate('spell_effect', {
@@ -460,8 +584,11 @@ export class PoisonedWellSpell {
             casterPosition: caster.position,
             poisonStacks: poisonStacks,
             targetCount: targets.length,
-            heroTargets: heroTargets,
-            creatureTargets: creatureTargets,
+            heroHits: heroHits,
+            heroResists: heroResists,
+            creatureHits: creatureHits,
+            creatureResists: creatureResists,
+            resistanceData: resistanceData,
             targets: targets.map(t => ({
                 type: t.type,
                 name: t.name,
@@ -479,30 +606,50 @@ export class PoisonedWellSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, poisonStacks, heroTargets, creatureTargets } = data;
+        const { displayName, casterName, poisonStacks, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const casterLocalSide = (data.casterAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const logType = casterLocalSide === 'player' ? 'success' : 'error';
         
-        // Create target description
-        let targetDescription = '';
-        if (heroTargets > 0 && creatureTargets > 0) {
-            targetDescription = `${heroTargets} hero${heroTargets > 1 ? 's' : ''} and ${creatureTargets} creature${creatureTargets > 1 ? 's' : ''}`;
-        } else if (heroTargets > 0) {
-            targetDescription = `${heroTargets} hero${heroTargets > 1 ? 's' : ''}`;
-        } else if (creatureTargets > 0) {
-            targetDescription = `${creatureTargets} creature${creatureTargets > 1 ? 's' : ''}`;
-        } else {
-            targetDescription = 'no targets';
+        // Build description matching host
+        const parts = [];
+        if (heroHits > 0) {
+            parts.push(`${heroHits} hero${heroHits > 1 ? 'es' : ''}`);
+        }
+        if (creatureHits > 0) {
+            parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        // Add to battle log
-        this.battleManager.addCombatLog(
-            `☔ ${displayName} rains poison down on ${targetDescription}, applying ${poisonStacks} poison stack${poisonStacks > 1 ? 's' : ''} each!`,
-            logType
-        );
+        let message = `☔ ${displayName} rains poison down`;
+        
+        if (parts.length > 0) {
+            message += ` on ${parts.join(' and ')}, applying ${poisonStacks} poison stack${poisonStacks > 1 ? 's' : ''} each!`;
+        } else {
+            message += `, but all targets resisted!`;
+        }
+        
+        // Add main log
+        this.battleManager.addCombatLog(message, logType);
+        
+        // Add resistance info if any
+        if (heroResists > 0 || creatureResists > 0) {
+            const resistParts = [];
+            if (heroResists > 0) {
+                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
+            }
+            if (creatureResists > 0) {
+                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
+            }
+            
+            if (parts.length > 0) {
+                this.battleManager.addCombatLog(
+                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
+                    'info'
+                );
+            }
+        }
         
         // Create mock caster for animation
         const mockCaster = {
@@ -523,14 +670,22 @@ export class PoisonedWellSpell {
             };
         });
         
+        // Convert resistance data to Map format for guest
+        const guestResistanceMap = new Map();
+        if (resistanceData) {
+            Object.entries(resistanceData).forEach(([key, resisted]) => {
+                guestResistanceMap.set(key, resisted);
+            });
+        }
+        
         // Play visual effects on guest side (no poison application)
-        this.playPoisonedRainAnimationGuestSide(mockCaster, mockTargets, poisonStacks);
+        this.playPoisonedRainAnimationGuestSide(mockCaster, mockTargets, poisonStacks, guestResistanceMap);
         
         console.log(`☔ GUEST: ${casterName} used ${displayName} affecting ${data.targetCount} targets (${poisonStacks} poison stacks each)`);
     }
 
     // Guest-side animation (visual only, no poison application)
-    async playPoisonedRainAnimationGuestSide(caster, targets, poisonStacks) {
+    async playPoisonedRainAnimationGuestSide(caster, targets, poisonStacks, resistanceResults) {
         console.log(`☔ GUEST: Playing Poisoned Rain animation...`);
         
         // Determine enemy side for rain positioning
@@ -545,7 +700,7 @@ export class PoisonedWellSpell {
         
         // Create impact effects on targets (visual only)
         setTimeout(() => {
-            this.createTargetImpactEffects(targets);
+            this.createTargetImpactEffects(targets, resistanceResults);
         }, this.battleManager.getSpeedAdjustedDelay(impactDelay));
         
         // Wait for full rain duration

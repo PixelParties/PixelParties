@@ -143,6 +143,13 @@ export class ArtifactHandler {
 
     // Main handler for artifact click operations - simplified for entire hand disabling
     async handleArtifactClick(cardIndex, cardName, heroSelection) {
+        // Check if it's an equip artifact - these should NOT be handled on click
+        const cardInfo = heroSelection?.getCardInfo ? heroSelection.getCardInfo(cardName) : null;
+        if (cardInfo && cardInfo.cardType === 'Artifact' && cardInfo.subtype === 'Equip') {
+            // Don't handle equip artifacts on click - they should only be drag-and-dropped
+            return false;
+        }
+        
         // For exclusive artifacts, the hand disabling is handled at the HandManager level
         // We just need to proceed with normal artifact handling since the HandManager
         // already prevents clicks when any exclusive artifact is active

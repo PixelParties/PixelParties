@@ -52,7 +52,7 @@ const CARD_DATABASE = {
         subtype: null,
         hp: 400,
         atk: 40,
-        ability1: 'MagicArts',
+        ability1: 'DecayMagic',
         ability2: 'Resistance'
     },
     'Ida': {
@@ -433,11 +433,11 @@ const CARD_DATABASE = {
         name: 'FrostRune',
         image: './Cards/All/FrostRune.png',
         cardType: 'Spell',
-        level: 3,
+        level: 0,
         cost: 0,
-        action: false,
+        action: true,
         spellSchool: 'DecayMagic',
-        subtype: 'Trap'
+        subtype: 'Equip'
     },
     'HeartOfIce': {
         name: 'HeartOfIce',
@@ -452,19 +452,19 @@ const CARD_DATABASE = {
         name: 'Icebolt',
         image: './Cards/All/Icebolt.png',
         cardType: 'Spell',
-        level: 2,
+        level: 1,
         cost: 0,
         action: true,
-        spellSchool: 'DestructionMagic',
+        spellSchool: 'DecayMagic',
         subtype: null
     },
     'IcyGrave': {
         name: 'IcyGrave',
         image: './Cards/All/IcyGrave.png',
         cardType: 'Spell',
-        level: 2,
+        level: 0,
         cost: 0,
-        action: false,
+        action: true,
         spellSchool: 'DecayMagic',
         subtype: null
     },

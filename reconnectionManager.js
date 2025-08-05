@@ -272,7 +272,7 @@ export class ReconnectionManager {
         }
     }
 
-    // Restore advanced data (abilities, spellbooks, creatures, actions)
+    // Restore advanced data (abilities, spellbooks, creatures, equipment, actions)
     async restoreAdvancedData(gameState) {
         // Restore abilities
         if (this.isHost && gameState.hostAbilitiesState) {
@@ -304,6 +304,25 @@ export class ReconnectionManager {
             this.heroSelection.heroCreatureManager.importCreaturesState(gameState.hostCreaturesState);
         } else if (!this.isHost && gameState.guestCreaturesState) {
             this.heroSelection.heroCreatureManager.importCreaturesState(gameState.guestCreaturesState);
+        }
+
+        // Restore equipment
+        if (this.isHost && gameState.hostEquipmentState) {
+            const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.hostEquipmentState);
+            if (equipmentRestored) {
+                console.log('✅ Host equipment state restored during reconnection');
+            }
+        } else if (!this.isHost && gameState.guestEquipmentState) {
+            const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.guestEquipmentState);
+            if (equipmentRestored) {
+                console.log('✅ Guest equipment state restored during reconnection');
+            }
+        } else {
+            // Initialize equipment state if no saved data
+            if (this.heroSelection.heroEquipmentManager) {
+                this.heroSelection.heroEquipmentManager.reset();
+                console.log('📝 No equipment data found during reconnection - initialized fresh state');
+            }
         }
 
         // CRITICAL: Re-sync Guard Change mode with HeroCreatureManager after creature restoration
@@ -1008,6 +1027,13 @@ export class ReconnectionManager {
             
             if (restoredFromPersistence) {
                 this.addCombatLog('✅ Battle state restored from Firebase!', 'success');
+                
+                // NEW: Ensure abilities are synced for tooltip display
+                const battleScreen = this.heroSelection.battleScreen;
+                if (battleScreen && battleScreen.syncAbilitiesFromBattleManager) {
+                    battleScreen.syncAbilitiesFromBattleManager();
+                    this.addCombatLog('🔄 Opponent abilities synchronized for display', 'info');
+                }
                 
                 // Verify the restored state is valid
                 if (!battleManager.battleActive || battleManager.currentTurn === 0) {

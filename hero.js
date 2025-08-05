@@ -46,6 +46,9 @@ export class Hero {
 
         // Creatures - array of creature cards summoned by this hero
         this.creatures = [];
+
+        // Equipment array
+        this.equipment = [];
         
         // NEW: Necromancy stacks tracking
         this.necromancyStacks = 0;
@@ -93,7 +96,7 @@ export class Hero {
         console.log(`${this.name} abilities set:`, this.abilities);
     }
     
-    // NEW: Initialize necromancy stacks based on ability level
+    // Initialize necromancy stacks based on ability level
     initializeNecromancyStacks() {
         if (this.hasAbility('Necromancy')) {
             const necromancyLevel = this.getAbilityStackCount('Necromancy');
@@ -197,6 +200,51 @@ export class Hero {
     // Get spell count for a specific spell
     getSpecificSpellCount(spellName) {
         return this.spellbook.filter(spell => spell.name === spellName).length;
+    }
+
+    setEquipment(equipment) {
+        if (Array.isArray(equipment)) {
+            this.equipment = [...equipment]; // Deep copy to avoid reference issues
+        } else {
+            this.equipment = [];
+        }
+    }
+
+    // Get equipment for this hero (sorted alphabetically)
+    getEquipment() {
+        return [...this.equipment].sort((a, b) => {
+            const nameA = a.name || a.cardName || '';
+            const nameB = b.name || b.cardName || '';
+            return nameA.localeCompare(nameB);
+        });
+    }
+
+    // Check if hero has specific equipment
+    hasEquipment(equipmentName) {
+        return this.equipment.some(item => 
+            item.name === equipmentName || item.cardName === equipmentName
+        );
+    }
+
+    // Add equipment to hero
+    addEquipment(equipmentData) {
+        this.equipment.push({...equipmentData, equippedAt: Date.now()});
+    }
+
+    // Remove equipment by name
+    removeEquipment(equipmentName) {
+        const index = this.equipment.findIndex(item => 
+            item.name === equipmentName || item.cardName === equipmentName
+        );
+        if (index > -1) {
+            return this.equipment.splice(index, 1)[0];
+        }
+        return null;
+    }
+
+    // Get equipment count
+    getEquipmentCount() {
+        return this.equipment.length;
     }
 
     // Set creatures from HeroCreatureManager data
@@ -416,7 +464,10 @@ export class Hero {
             // Creatures
             creatures: this.creatures.map(creature => ({ ...creature })),
             
-            // NEW: Necromancy stacks
+            // Equipped Artifacts
+            equipment: this.equipment.map(item => ({...item})),
+            
+            // Necromancy stacks
             necromancyStacks: this.necromancyStacks,
             maxNecromancyStacks: this.maxNecromancyStacks,
             
@@ -461,8 +512,13 @@ export class Hero {
 
         // Restore creatures
         hero.creatures = savedState.creatures || [];
+
+        // Restore equipped Artifacts
+        if (savedState.equipment) {
+            hero.setEquipment(savedState.equipment);
+        }
         
-        // NEW: Restore necromancy stacks
+        // Restore necromancy stacks
         hero.necromancyStacks = savedState.necromancyStacks || 0;
         hero.maxNecromancyStacks = savedState.maxNecromancyStacks || 0;
         

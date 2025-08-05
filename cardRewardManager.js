@@ -2783,6 +2783,11 @@ export class CardRewardManager {
                             if (heroInfo && this.heroSelection.heroAbilitiesManager) {
                                 // Initialize hero abilities
                                 this.heroSelection.heroAbilitiesManager.updateHeroPlacement(targetSlot, heroInfo);
+                                
+                                if (this.heroSelection.potionHandler) {
+                                    this.heroSelection.potionHandler.updateAlchemyBonuses(this.heroSelection);
+                                    console.log('🧪 Updated potion bonuses after adding new hero with abilities');
+                                }
                             }
                             
                             // Initialize empty spellbook for the new hero

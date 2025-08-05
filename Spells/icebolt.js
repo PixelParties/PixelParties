@@ -1,30 +1,30 @@
-// ./Spells/venomInfusion.js - Venom Infusion Spell Implementation
+// ./Spells/icebolt.js - Icebolt Spell Implementation
 
-export class VenomInfusionSpell {
+export class IceboltSpell {
     constructor(battleManager) {
         this.battleManager = battleManager;
-        this.spellName = 'VenomInfusion';
-        this.displayName = 'Venom Infusion';
+        this.spellName = 'Icebolt';
+        this.displayName = 'Icebolt';
         
-        console.log('🐍 Venom Infusion spell module initialized');
+        console.log('🧊 Icebolt spell module initialized');
     }
 
     // ============================================
     // CORE SPELL EXECUTION
     // ============================================
 
-    // Execute Venom Infusion spell effect
+    // Execute Icebolt spell effect
     async executeSpell(caster, spell) {
-        console.log(`🐍 ${caster.name} casting ${this.displayName}!`);
+        console.log(`🧊 ${caster.name} casting ${this.displayName}!`);
         
-        // Calculate poison stacks based on DecayMagic level
-        const poisonStacks = this.calculatePoisonStacks(caster);
+        // Calculate frozen stacks based on DecayMagic level
+        const frozenStacks = this.calculateFrozenStacks(caster);
         
         // Find target using normal attack targeting logic
         const target = this.findTarget(caster);
         
         if (!target) {
-            console.log(`🐍 ${this.displayName}: No valid target found!`);
+            console.log(`🧊 ${this.displayName}: No valid target found!`);
             return;
         }
 
@@ -36,31 +36,41 @@ export class VenomInfusionSpell {
             console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);
         } else {
             // Log the spell effect only if not resisted
-            this.logSpellEffect(caster, poisonStacks, target);
+            this.logSpellEffect(caster, frozenStacks, target);
         }
         
-        // Play venom infusion animation (poison will only be applied if not resisted)
-        await this.playVenomInfusionAnimation(caster, target, poisonStacks, isResisted);
+        // Play icebolt animation (frozen will only be applied if not resisted, but ice animation always shows)
+        await this.playIceboltAnimation(caster, target, frozenStacks, isResisted);
         
-        console.log(`🐍 ${this.displayName} completed!`);
+        console.log(`🧊 ${this.displayName} completed!`);
     }
 
     // ============================================
-    // POISON STACK CALCULATION
+    // FROZEN STACK CALCULATION
     // ============================================
 
-    // Calculate poison stacks: X+1 (X = DecayMagic level)
-    calculatePoisonStacks(caster) {
+    // Calculate frozen stacks: 1 + floor(DecayMagic level / 2) + 1 if caster is Gon
+    calculateFrozenStacks(caster) {
         // Get DecayMagic level (defaults to 0 if hero doesn't have the ability)
         const decayMagicLevel = caster.hasAbility('DecayMagic') 
             ? caster.getAbilityStackCount('DecayMagic') 
             : 0;
         
-        const poisonStacks = decayMagicLevel + 1;
+        const additionalStacks = Math.floor(decayMagicLevel / 2);
+        let frozenStacks = 1 + additionalStacks;
         
-        console.log(`🐍 ${caster.name} DecayMagic level ${decayMagicLevel}: ${poisonStacks} poison stacks`);
+        // Special bonus for Gon
+        const gonBonus = caster.name === 'Gon' ? 1 : 0;
+        frozenStacks += gonBonus;
         
-        return poisonStacks;
+        let logDetails = `1 base + ${additionalStacks} from DecayMagic`;
+        if (gonBonus > 0) {
+            logDetails += ` + ${gonBonus} from Gon's mastery`;
+        }
+        
+        console.log(`🧊 ${caster.name} DecayMagic level ${decayMagicLevel}: ${frozenStacks} frozen stacks (${logDetails})`);
+        
+        return frozenStacks;
     }
 
     // ============================================
@@ -88,38 +98,38 @@ export class VenomInfusionSpell {
     }
 
     // ============================================
-    // POISON APPLICATION
+    // FROZEN APPLICATION
     // ============================================
 
-    // Apply poison stacks to the target
-    applyPoisonToTarget(target, poisonStacks) {
+    // Apply frozen stacks to the target
+    applyFrozenToTarget(target, frozenStacks) {
         let actualTarget;
         
         if (target.type === 'creature') {
-            // Apply poison to the creature
+            // Apply frozen to the creature
             actualTarget = target.creature;
         } else {
-            // Apply poison to the hero
+            // Apply frozen to the hero
             actualTarget = target.hero;
         }
         
-        // Apply poison status effect using the status effects manager
+        // Apply frozen status effect using the status effects manager
         if (this.battleManager.statusEffectsManager) {
             const success = this.battleManager.statusEffectsManager.applyStatusEffect(
                 actualTarget, 
-                'poisoned', 
-                poisonStacks
+                'frozen', 
+                frozenStacks
             );
             
             if (success) {
-                console.log(`🐍 Successfully applied ${poisonStacks} poison stacks to ${actualTarget.name}`);
+                console.log(`🧊 Successfully applied ${frozenStacks} frozen stacks to ${actualTarget.name}`);
                 return true;
             } else {
-                console.error(`🐍 Failed to apply poison to ${actualTarget.name}`);
+                console.error(`🧊 Failed to apply frozen to ${actualTarget.name}`);
                 return false;
             }
         } else {
-            console.error('🐍 Status effects manager not available!');
+            console.error('🧊 Status effects manager not available!');
             return false;
         }
     }
@@ -128,9 +138,9 @@ export class VenomInfusionSpell {
     // VISUAL EFFECTS
     // ============================================
 
-    // Play the venom infusion projectile and poison application animation
-    async playVenomInfusionAnimation(caster, target, poisonStacks, isResisted = false) {
-        console.log(`🐍 Playing Venom Infusion animation from ${caster.name} to target... (resisted: ${isResisted})`);
+    // Play the icebolt projectile and ice formation animation
+    async playIceboltAnimation(caster, target, frozenStacks, isResisted = false) {
+        console.log(`🧊 Playing Icebolt animation from ${caster.name} to target... (resisted: ${isResisted})`);
         
         // Get caster and target elements
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
@@ -147,10 +157,10 @@ export class VenomInfusionSpell {
         }
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for venom infusion animation');
-            // Still apply the poison effect even if animation fails (unless resisted)
+            console.error('Could not find caster or target elements for icebolt animation');
+            // Still apply the frozen effect even if animation fails (unless resisted)
             if (!isResisted) {
-                this.applyPoisonToTarget(target, poisonStacks);
+                this.applyFrozenToTarget(target, frozenStacks);
             }
             return;
         }
@@ -164,84 +174,84 @@ export class VenomInfusionSpell {
         const endX = targetRect.left + targetRect.width / 2;
         const endY = targetRect.top + targetRect.height / 2;
         
-        // Create venom projectile
-        const venomProjectile = this.createVenomProjectile(startX, startY, endX, endY);
+        // Create icebolt projectile
+        const iceboltProjectile = this.createIceboltProjectile(startX, startY, endX, endY);
         
-        // Animation timing (similar to fireball but slightly faster)
-        const projectileTime = 240; // 240ms for projectile travel
-        const poisonTime = 180;     // 180ms for poison application effect
+        // Animation timing
+        const projectileTime = 260; // 260ms for projectile travel (slightly slower than venom)
+        const iceTime = 200;        // 200ms for ice formation effect
         
         // Wait for projectile to reach target
         await this.battleManager.delay(projectileTime);
         
-        // Remove projectile and apply poison
-        if (venomProjectile && venomProjectile.parentNode) {
-            venomProjectile.remove();
+        // Remove projectile and apply frozen/show ice effect
+        if (iceboltProjectile && iceboltProjectile.parentNode) {
+            iceboltProjectile.remove();
         }
         
-        // Apply poison ONLY if not resisted
+        // Apply frozen ONLY if not resisted
         if (!isResisted) {
-            this.applyPoisonToTarget(target, poisonStacks);
+            this.applyFrozenToTarget(target, frozenStacks);
         }
         
-        // Create poison or resistance effect
-        this.createPoisonApplicationEffect(targetElement, poisonStacks, isResisted);
+        // ALWAYS create ice formation effect (regardless of resistance)
+        this.createIceFormationEffect(targetElement, frozenStacks, isResisted);
         
-        // Wait for poison effect to complete
-        await this.battleManager.delay(poisonTime);
+        // Wait for ice effect to complete
+        await this.battleManager.delay(iceTime);
         
         // Cleanup
-        this.cleanupVenomEffects();
+        this.cleanupIceboltEffects();
     }
 
-    // Create the venom projectile element
-    createVenomProjectile(startX, startY, endX, endY) {
-        const venom = document.createElement('div');
-        venom.className = 'venom-projectile';
-        venom.innerHTML = '🐍💨';
+    // Create the icebolt projectile element
+    createIceboltProjectile(startX, startY, endX, endY) {
+        const icebolt = document.createElement('div');
+        icebolt.className = 'icebolt-projectile';
+        icebolt.innerHTML = '🧊💨';
         
         // Calculate travel distance for scaling effect
         const distance = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
         const maxDistance = 800; // Approximate max battlefield width
-        const sizeMultiplier = 1 + (distance / maxDistance) * 0.3; // Smaller scaling than fireball
+        const sizeMultiplier = 1 + (distance / maxDistance) * 0.25; // Smaller scaling than fireball
         
-        venom.style.cssText = `
+        icebolt.style.cssText = `
             position: fixed;
             left: ${startX}px;
             top: ${startY}px;
-            font-size: ${Math.min(36 * sizeMultiplier, 54)}px;
+            font-size: ${Math.min(34 * sizeMultiplier, 50)}px;
             z-index: 400;
             pointer-events: none;
             transform: translate(-50%, -50%);
-            animation: venomTravel ${this.battleManager.getSpeedAdjustedDelay(240)}ms ease-out forwards;
+            animation: iceboltTravel ${this.battleManager.getSpeedAdjustedDelay(260)}ms ease-out forwards;
             text-shadow: 
-                0 0 15px rgba(128, 0, 128, 0.9),
-                0 0 30px rgba(75, 0, 130, 0.7),
-                0 0 45px rgba(148, 0, 211, 0.5);
-            filter: drop-shadow(0 0 6px rgba(128, 0, 128, 0.8));
+                0 0 15px rgba(100, 200, 255, 0.9),
+                0 0 30px rgba(150, 220, 255, 0.7),
+                0 0 45px rgba(200, 240, 255, 0.5);
+            filter: drop-shadow(0 0 6px rgba(100, 200, 255, 0.8));
         `;
         
         // Set CSS custom properties for target position
-        venom.style.setProperty('--target-x', `${endX}px`);
-        venom.style.setProperty('--target-y', `${endY}px`);
+        icebolt.style.setProperty('--target-x', `${endX}px`);
+        icebolt.style.setProperty('--target-y', `${endY}px`);
         
-        document.body.appendChild(venom);
+        document.body.appendChild(icebolt);
         
         // Ensure CSS exists
-        this.ensureVenomCSS();
+        this.ensureIceboltCSS();
         
-        return venom;
+        return icebolt;
     }
 
-    // Create poison application effect at target location
-    createPoisonApplicationEffect(targetElement, poisonStacks, isResisted = false) {
-        // Create main effect
+    // Create ice formation effect at target location (always shown)
+    createIceFormationEffect(targetElement, frozenStacks, isResisted = false) {
+        // Create main ice effect
         const effect = document.createElement('div');
-        effect.className = isResisted ? 'venom-resistance-shield' : 'venom-poison-cloud';
+        effect.className = isResisted ? 'icebolt-resistance-shield' : 'icebolt-ice-formation';
         
         if (isResisted) {
-            // Show shield effect for resisted
-            effect.innerHTML = '🛡️✨';
+            // Show shield effect for resisted, but still with ice theme
+            effect.innerHTML = '🛡️❄️';
             effect.style.cssText = `
                 position: absolute;
                 top: 50%;
@@ -250,15 +260,15 @@ export class VenomInfusionSpell {
                 font-size: 48px;
                 z-index: 450;
                 pointer-events: none;
-                animation: venomResisted ${this.battleManager.getSpeedAdjustedDelay(180)}ms ease-out forwards;
+                animation: iceboltResisted ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
                 text-shadow: 
                     0 0 20px rgba(100, 200, 255, 1),
                     0 0 40px rgba(150, 150, 255, 0.8),
                     0 0 60px rgba(200, 200, 255, 0.6);
             `;
         } else {
-            // Normal poison cloud
-            effect.innerHTML = '☠️💚☠️';
+            // Normal ice formation
+            effect.innerHTML = '❄️🧊❄️';
             effect.style.cssText = `
                 position: absolute;
                 top: 50%;
@@ -267,19 +277,19 @@ export class VenomInfusionSpell {
                 font-size: 48px;
                 z-index: 450;
                 pointer-events: none;
-                animation: venomPoisonCloud ${this.battleManager.getSpeedAdjustedDelay(180)}ms ease-out forwards;
+                animation: iceboltIceFormation ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
                 text-shadow: 
-                    0 0 20px rgba(128, 0, 128, 1),
-                    0 0 40px rgba(75, 0, 130, 0.8),
-                    0 0 60px rgba(148, 0, 211, 0.6);
+                    0 0 20px rgba(100, 200, 255, 1),
+                    0 0 40px rgba(150, 220, 255, 0.8),
+                    0 0 60px rgba(200, 240, 255, 0.6);
             `;
         }
         
         targetElement.appendChild(effect);
         
-        // Create additional poison bubbles for multiple stacks (only if not resisted)
+        // Create additional ice crystals for multiple stacks (only if not resisted)
         if (!isResisted) {
-            this.createPoisonBubbles(targetElement, poisonStacks);
+            this.createIceCrystals(targetElement, frozenStacks);
         }
         
         // Remove effect after animation
@@ -287,26 +297,26 @@ export class VenomInfusionSpell {
             if (effect && effect.parentNode) {
                 effect.remove();
             }
-        }, this.battleManager.getSpeedAdjustedDelay(180));
+        }, this.battleManager.getSpeedAdjustedDelay(200));
     }
 
-    // Create additional poison bubbles to represent multiple stacks
-    createPoisonBubbles(targetElement, stackCount) {
-        const maxBubbles = Math.min(stackCount, 6); // Cap visual bubbles at 6
+    // Create additional ice crystals to represent multiple stacks
+    createIceCrystals(targetElement, stackCount) {
+        const maxCrystals = Math.min(stackCount, 6); // Cap visual crystals at 6
         
-        for (let i = 0; i < maxBubbles; i++) {
+        for (let i = 0; i < maxCrystals; i++) {
             setTimeout(() => {
-                const bubble = document.createElement('div');
-                bubble.className = 'venom-poison-bubble';
-                bubble.innerHTML = '💚';
+                const crystal = document.createElement('div');
+                crystal.className = 'icebolt-ice-crystal';
+                crystal.innerHTML = '❄️';
                 
                 // Random positioning around the target
-                const angle = (i / maxBubbles) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+                const angle = (i / maxCrystals) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
                 const distance = 30 + Math.random() * 25;
                 const x = Math.cos(angle) * distance;
                 const y = Math.sin(angle) * distance;
                 
-                bubble.style.cssText = `
+                crystal.style.cssText = `
                     position: absolute;
                     top: calc(50% + ${y}px);
                     left: calc(50% + ${x}px);
@@ -314,53 +324,53 @@ export class VenomInfusionSpell {
                     font-size: ${16 + Math.random() * 12}px;
                     z-index: 350;
                     pointer-events: none;
-                    animation: venomPoisonBubble ${this.battleManager.getSpeedAdjustedDelay(120)}ms ease-out forwards;
+                    animation: iceboltIceCrystal ${this.battleManager.getSpeedAdjustedDelay(140)}ms ease-out forwards;
                     text-shadow: 
-                        0 0 8px rgba(128, 0, 128, 0.8),
-                        0 0 16px rgba(75, 0, 130, 0.6);
+                        0 0 8px rgba(100, 200, 255, 0.8),
+                        0 0 16px rgba(150, 220, 255, 0.6);
                 `;
                 
-                targetElement.appendChild(bubble);
+                targetElement.appendChild(crystal);
                 
                 setTimeout(() => {
-                    if (bubble && bubble.parentNode) {
-                        bubble.remove();
+                    if (crystal && crystal.parentNode) {
+                        crystal.remove();
                     }
-                }, this.battleManager.getSpeedAdjustedDelay(120));
-            }, this.battleManager.getSpeedAdjustedDelay(i * 20)); // Staggered bubble creation
+                }, this.battleManager.getSpeedAdjustedDelay(140));
+            }, this.battleManager.getSpeedAdjustedDelay(i * 25)); // Staggered crystal creation
         }
     }
 
-    // Clean up any remaining venom effects
-    cleanupVenomEffects() {
+    // Clean up any remaining icebolt effects
+    cleanupIceboltEffects() {
         // Remove any remaining projectiles
-        const projectiles = document.querySelectorAll('.venom-projectile');
+        const projectiles = document.querySelectorAll('.icebolt-projectile');
         projectiles.forEach(projectile => projectile.remove());
         
-        // Remove any remaining poison effects
-        const poisonEffects = document.querySelectorAll('.venom-poison-cloud, .venom-poison-bubble, .venom-resistance-shield');
-        poisonEffects.forEach(effect => effect.remove());
+        // Remove any remaining ice effects
+        const iceEffects = document.querySelectorAll('.icebolt-ice-formation, .icebolt-ice-crystal, .icebolt-resistance-shield');
+        iceEffects.forEach(effect => effect.remove());
     }
 
-    // Ensure CSS animations exist for venom effects
-    ensureVenomCSS() {
-        if (document.getElementById('venomInfusionCSS')) return;
+    // Ensure CSS animations exist for icebolt effects
+    ensureIceboltCSS() {
+        if (document.getElementById('iceboltCSS')) return;
         
         const style = document.createElement('style');
-        style.id = 'venomInfusionCSS';
+        style.id = 'iceboltCSS';
         style.textContent = `
-            @keyframes venomTravel {
+            @keyframes iceboltTravel {
                 0% { 
                     transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
                     opacity: 1;
                 }
                 20% {
-                    transform: translate(-50%, -50%) scale(1.1) rotate(72deg);
+                    transform: translate(-50%, -50%) scale(1.1) rotate(60deg);
                     opacity: 1;
                 }
                 80% {
                     opacity: 1;
-                    transform: translate(-50%, -50%) scale(1.2) rotate(288deg);
+                    transform: translate(-50%, -50%) scale(1.2) rotate(300deg);
                 }
                 100% { 
                     left: var(--target-x);
@@ -370,65 +380,65 @@ export class VenomInfusionSpell {
                 }
             }
             
-            @keyframes venomPoisonCloud {
+            @keyframes iceboltIceFormation {
                 0% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(0.4) rotate(0deg); 
+                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
                 }
                 30% { 
                     opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.3) rotate(120deg); 
+                    transform: translate(-50%, -50%) scale(1.4) rotate(90deg); 
                 }
                 70% { 
                     opacity: 0.9; 
-                    transform: translate(-50%, -50%) scale(1.5) rotate(240deg); 
+                    transform: translate(-50%, -50%) scale(1.6) rotate(180deg); 
                 }
                 100% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(1.8) rotate(360deg); 
+                    transform: translate(-50%, -50%) scale(1.8) rotate(270deg); 
                 }
             }
             
-            @keyframes venomResisted {
+            @keyframes iceboltResisted {
                 0% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(0.4) rotate(0deg); 
+                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
                 }
                 30% { 
                     opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.3) rotate(45deg); 
+                    transform: translate(-50%, -50%) scale(1.4) rotate(45deg); 
                 }
                 70% { 
                     opacity: 0.8; 
-                    transform: translate(-50%, -50%) scale(1.4) rotate(90deg); 
+                    transform: translate(-50%, -50%) scale(1.5) rotate(90deg); 
                 }
                 100% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(1.6) rotate(135deg); 
+                    transform: translate(-50%, -50%) scale(1.7) rotate(135deg); 
                 }
             }
             
-            @keyframes venomPoisonBubble {
+            @keyframes iceboltIceCrystal {
                 0% { 
                     opacity: 0; 
                     transform: translate(-50%, -50%) scale(0.2) rotate(0deg); 
                 }
                 40% { 
                     opacity: 0.9; 
-                    transform: translate(-50%, -50%) scale(1.0) rotate(180deg); 
+                    transform: translate(-50%, -50%) scale(1.0) rotate(120deg); 
                 }
                 100% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(1.2) rotate(360deg); 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(240deg); 
                 }
             }
             
             /* Enhanced visual effects */
-            .venom-projectile {
+            .icebolt-projectile {
                 will-change: transform, opacity;
             }
             
-            .venom-poison-cloud, .venom-poison-bubble, .venom-resistance-shield {
+            .icebolt-ice-formation, .icebolt-ice-crystal, .icebolt-resistance-shield {
                 will-change: transform, opacity;
             }
         `;
@@ -441,7 +451,7 @@ export class VenomInfusionSpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, poisonStacks, target) {
+    logSpellEffect(caster, frozenStacks, target) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
@@ -453,10 +463,14 @@ export class VenomInfusionSpell {
         }
         
         // Main spell effect log
-        this.battleManager.addCombatLog(
-            `🐍 ${this.displayName} infects ${targetName} with ${poisonStacks} poison stack${poisonStacks > 1 ? 's' : ''}!`,
-            logType
-        );
+        let logMessage = `🧊 ${this.displayName} freezes ${targetName} with ${frozenStacks} frozen stack${frozenStacks > 1 ? 's' : ''}!`;
+        
+        // Add special message for Gon's bonus
+        if (caster.name === 'Gon') {
+            logMessage += ` (Gon's mastery adds extra ice!)`;
+        }
+        
+        this.battleManager.addCombatLog(logMessage, logType);
         
         // Send spell effect update to guest
         this.battleManager.sendBattleUpdate('spell_effect', {
@@ -470,9 +484,10 @@ export class VenomInfusionSpell {
             targetPosition: target.position,
             targetType: target.type,
             targetCreatureIndex: target.type === 'creature' ? target.creatureIndex : undefined,
-            poisonStacks: poisonStacks,
+            frozenStacks: frozenStacks,
             isResisted: false,
-            effectType: 'poison_application',
+            effectType: 'frozen_application',
+            hasGonBonus: caster.name === 'Gon', // NEW: Include Gon bonus info for guest
             timestamp: Date.now()
         });
     }
@@ -483,7 +498,7 @@ export class VenomInfusionSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, targetName, poisonStacks, isResisted } = data;
+        const { displayName, casterName, targetName, frozenStacks, isResisted, hasGonBonus } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
@@ -492,10 +507,14 @@ export class VenomInfusionSpell {
         
         // Add to battle log only if not resisted
         if (!isResisted) {
-            this.battleManager.addCombatLog(
-                `🐍 ${displayName} infects ${targetName} with ${poisonStacks} poison stack${poisonStacks > 1 ? 's' : ''}!`,
-                logType
-            );
+            let logMessage = `🧊 ${displayName} freezes ${targetName} with ${frozenStacks} frozen stack${frozenStacks > 1 ? 's' : ''}!`;
+            
+            // Add special message for Gon's bonus
+            if (hasGonBonus) {
+                logMessage += ` (Gon's mastery adds extra ice!)`;
+            }
+            
+            this.battleManager.addCombatLog(logMessage, logType);
         }
         
         // Create mock objects for guest-side animation
@@ -527,14 +546,14 @@ export class VenomInfusionSpell {
             };
         }
         
-        // Play visual effects on guest side (no poison application)
-        this.playVenomInfusionAnimationGuestSide(mockCaster, mockTarget, poisonStacks, isResisted);
+        // Play visual effects on guest side (no frozen application)
+        this.playIceboltAnimationGuestSide(mockCaster, mockTarget, frozenStacks, isResisted);
         
-        console.log(`🐍 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''} (${poisonStacks} poison stacks)`);
+        console.log(`🧊 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''}${hasGonBonus ? ' (Gon bonus)' : ''} (${frozenStacks} frozen stacks)`);
     }
 
-    // Guest-side animation (visual only, no poison application)
-    async playVenomInfusionAnimationGuestSide(caster, target, poisonStacks, isResisted = false) {
+    // Guest-side animation (visual only, no frozen application)
+    async playIceboltAnimationGuestSide(caster, target, frozenStacks, isResisted = false) {
         // Get caster element
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         
@@ -549,7 +568,7 @@ export class VenomInfusionSpell {
         }
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for guest venom infusion animation');
+            console.error('Could not find caster or target elements for guest icebolt animation');
             return;
         }
         
@@ -562,29 +581,29 @@ export class VenomInfusionSpell {
         const endX = targetRect.left + targetRect.width / 2;
         const endY = targetRect.top + targetRect.height / 2;
         
-        // Create venom projectile
-        const venomProjectile = this.createVenomProjectile(startX, startY, endX, endY);
+        // Create icebolt projectile
+        const iceboltProjectile = this.createIceboltProjectile(startX, startY, endX, endY);
         
         // Animation timing
-        const projectileTime = 240;
-        const poisonTime = 180;
+        const projectileTime = 260;
+        const iceTime = 200;
         
         // Wait for projectile to reach target
         await this.battleManager.delay(projectileTime);
         
-        // Remove projectile and create poison effect
-        if (venomProjectile && venomProjectile.parentNode) {
-            venomProjectile.remove();
+        // Remove projectile and create ice effect
+        if (iceboltProjectile && iceboltProjectile.parentNode) {
+            iceboltProjectile.remove();
         }
         
-        // Create poison application effect (visual only)
-        this.createPoisonApplicationEffect(targetElement, poisonStacks, isResisted);
+        // Create ice formation effect (visual only)
+        this.createIceFormationEffect(targetElement, frozenStacks, isResisted);
         
-        // Wait for poison effect to complete
-        await this.battleManager.delay(poisonTime);
+        // Wait for ice effect to complete
+        await this.battleManager.delay(iceTime);
         
         // Cleanup
-        this.cleanupVenomEffects();
+        this.cleanupIceboltEffects();
     }
 
     // ============================================
@@ -601,8 +620,8 @@ export class VenomInfusionSpell {
         return {
             name: this.spellName,
             displayName: this.displayName,
-            description: 'Infuses the target with venomous poison, applying poison stacks based on DecayMagic level',
-            effectFormula: '(DecayMagic level + 1) poison stacks',
+            description: 'Launches an icy projectile that freezes the target, applying frozen stacks based on DecayMagic level. Gon gains +1 bonus frozen stack.',
+            effectFormula: '1 frozen stack + floor(DecayMagic level / 2) additional stacks + 1 if caster is Gon',
             targetType: 'single_target_next_opposite',
             spellSchool: 'DecayMagic'
         };
@@ -610,15 +629,15 @@ export class VenomInfusionSpell {
 
     // Cleanup (called when battle ends)
     cleanup() {
-        this.cleanupVenomEffects();
+        this.cleanupIceboltEffects();
         
         // Remove CSS if needed
-        const css = document.getElementById('venomInfusionCSS');
+        const css = document.getElementById('iceboltCSS');
         if (css) css.remove();
         
-        console.log('🐍 Venom Infusion spell cleaned up');
+        console.log('🧊 Icebolt spell cleaned up');
     }
 }
 
 // Export for use in spell system
-export default VenomInfusionSpell;
+export default IceboltSpell;

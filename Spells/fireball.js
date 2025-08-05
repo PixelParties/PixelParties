@@ -27,12 +27,20 @@ export class FireballSpell {
             console.log(`🔥 ${this.displayName}: No valid target found!`);
             return;
         }
+
+        // Check if target hero resists the spell
+        const isResisted = this.battleManager.resistanceManager && 
+            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
         
-        // Log the spell effect
-        this.logSpellEffect(caster, damage, target);
+        if (isResisted) {
+            console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);
+        } else {
+            // Log the spell effect only if not resisted
+            this.logSpellEffect(caster, damage, target);
+        }
         
-        // Play fireball animation and apply damage when explosion hits
-        await this.playFireballAnimation(caster, target, damage);
+        // Play fireball animation (damage will only be applied if not resisted)
+        await this.playFireballAnimation(caster, target, damage, isResisted);
         
         console.log(`🔥 ${this.displayName} completed!`);
     }
@@ -142,7 +150,7 @@ export class FireballSpell {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
-            });
+            }, { source: 'spell' });
         }
         
         // Apply damage to all living creatures of the target hero with small delays
@@ -158,7 +166,7 @@ export class FireballSpell {
                                 damage: damage,
                                 position: target.position,
                                 side: target.side
-                            });
+                            }, { source: 'spell' });
                             resolve();
                         }, this.battleManager.getSpeedAdjustedDelay(30 + index * 20)); // Staggered for visual effect
                     });
@@ -176,8 +184,8 @@ export class FireballSpell {
     // ============================================
 
     // Play the fireball projectile and explosion animation
-    async playFireballAnimation(caster, target, damage) {
-        console.log(`🔥 Playing Fireball animation from ${caster.name} to ${target.hero.name}...`);
+    async playFireballAnimation(caster, target, damage, isResisted = false) {
+        console.log(`🔥 Playing Fireball animation from ${caster.name} to ${target.hero.name}... (resisted: ${isResisted})`);
         
         // Get caster and target elements
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
@@ -212,11 +220,13 @@ export class FireballSpell {
             fireball.remove();
         }
         
-        // Apply damage right when explosion starts
-        await this.applyDamageToTarget(target, damage, caster);
+        // Apply damage ONLY if not resisted
+        if (!isResisted) {
+            await this.applyDamageToTarget(target, damage, caster);
+        }
         
-        // Create explosion effect
-        this.createExplosionEffect(targetElement, target);
+        // Create explosion effect (visual happens regardless of resistance)
+        this.createExplosionEffect(targetElement, target, isResisted);
         
         // Wait for explosion to complete
         await this.battleManager.delay(explosionTime);
@@ -265,31 +275,52 @@ export class FireballSpell {
     }
 
     // Create explosion effect at target location
-    createExplosionEffect(targetElement, target) {
+    createExplosionEffect(targetElement, target, isResisted = false) {
         // Create main explosion
         const explosion = document.createElement('div');
         explosion.className = 'fireball-explosion';
-        explosion.innerHTML = '💥🔥💥';
         
-        explosion.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 64px;
-            z-index: 450;
-            pointer-events: none;
-            animation: fireballExplode ${this.battleManager.getSpeedAdjustedDelay(150)}ms ease-out forwards;
-            text-shadow: 
-                0 0 30px rgba(255, 50, 0, 1),
-                0 0 60px rgba(255, 100, 0, 0.8),
-                0 0 90px rgba(255, 200, 0, 0.6);
-        `;
+        // Change visual if resisted
+        if (isResisted) {
+            explosion.innerHTML = '🛡️✨🔥';
+            explosion.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 64px;
+                z-index: 450;
+                pointer-events: none;
+                animation: fireballResisted ${this.battleManager.getSpeedAdjustedDelay(150)}ms ease-out forwards;
+                text-shadow: 
+                    0 0 30px rgba(100, 200, 255, 1),
+                    0 0 60px rgba(150, 150, 255, 0.8),
+                    0 0 90px rgba(200, 200, 255, 0.6);
+            `;
+        } else {
+            explosion.innerHTML = '💥🔥💥';
+            explosion.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 64px;
+                z-index: 450;
+                pointer-events: none;
+                animation: fireballExplode ${this.battleManager.getSpeedAdjustedDelay(150)}ms ease-out forwards;
+                text-shadow: 
+                    0 0 30px rgba(255, 50, 0, 1),
+                    0 0 60px rgba(255, 100, 0, 0.8),
+                    0 0 90px rgba(255, 200, 0, 0.6);
+            `;
+        }
         
         targetElement.appendChild(explosion);
         
-        // Create secondary explosion effects around target
-        this.createSecondaryExplosionEffects(targetElement, target);
+        // Create secondary explosion effects around target (only if not resisted)
+        if (!isResisted) {
+            this.createSecondaryExplosionEffects(targetElement, target);
+        }
         
         // Remove explosion after animation
         setTimeout(() => {
@@ -448,6 +479,25 @@ export class FireballSpell {
                 }
             }
             
+            @keyframes fireballResisted {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5) rotate(0deg); 
+                }
+                20% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(45deg); 
+                }
+                70% { 
+                    opacity: 0.8; 
+                    transform: translate(-50%, -50%) scale(1.5) rotate(90deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(1.7) rotate(135deg); 
+                }
+            }
+            
             @keyframes fireballSmallExplode {
                 0% { 
                     opacity: 0; 
@@ -536,6 +586,7 @@ export class FireballSpell {
             damage: damage,
             creatureCount: livingCreatures,
             effectType: 'single_target_explosion',
+            isResisted: false,
             timestamp: Date.now()
         });
     }
@@ -546,31 +597,35 @@ export class FireballSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, targetName, damage, creatureCount, targetHeroAlive } = data;
+        const { displayName, casterName, targetName, damage, creatureCount, targetHeroAlive, isResisted } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const casterLocalSide = (data.casterAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const logType = casterLocalSide === 'player' ? 'success' : 'error';
         
-        // Create target description
-        let targetDescription = '';
-        
-        if (targetHeroAlive) {
-            targetDescription = targetName;
-            if (creatureCount > 0) {
-                targetDescription += ` and ${creatureCount} creature${creatureCount > 1 ? 's' : ''}`;
+        // If spell was resisted, guest should already have the resistance log from the resistance manager
+        // Only add the spell effect log if it wasn't resisted
+        if (!isResisted) {
+            // Create target description
+            let targetDescription = '';
+            
+            if (targetHeroAlive) {
+                targetDescription = targetName;
+                if (creatureCount > 0) {
+                    targetDescription += ` and ${creatureCount} creature${creatureCount > 1 ? 's' : ''}`;
+                }
+            } else {
+                // Hero is dead, only targeting creatures
+                targetDescription = `${creatureCount} creature${creatureCount > 1 ? 's' : ''} in ${data.targetPosition} slot`;
             }
-        } else {
-            // Hero is dead, only targeting creatures
-            targetDescription = `${creatureCount} creature${creatureCount > 1 ? 's' : ''} in ${data.targetPosition} slot`;
+            
+            // Add to battle log
+            this.battleManager.addCombatLog(
+                `🔥 ${displayName} explodes on ${targetDescription}, dealing ${damage} damage!`,
+                logType
+            );
         }
-        
-        // Add to battle log
-        this.battleManager.addCombatLog(
-            `🔥 ${displayName} explodes on ${targetDescription}, dealing ${damage} damage!`,
-            logType
-        );
         
         // Create mock objects for guest-side animation
         const mockCaster = {
@@ -592,14 +647,14 @@ export class FireballSpell {
         
         // Play visual effects on guest side (even if hero is dead, we still want the explosion visual)
         if (mockTarget.hero) {
-            this.playFireballAnimationGuestSide(mockCaster, mockTarget);
+            this.playFireballAnimationGuestSide(mockCaster, mockTarget, isResisted);
         }
         
-        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${targetDescription}`);
+        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''}`);
     }
 
     // Guest-side animation (visual only, no damage)
-    async playFireballAnimationGuestSide(caster, target) {
+    async playFireballAnimationGuestSide(caster, target, isResisted = false) {
         // Get caster and target elements
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         const targetElement = this.battleManager.getHeroElement(target.side, target.position);
@@ -633,8 +688,8 @@ export class FireballSpell {
             fireball.remove();
         }
         
-        // Create explosion effect (visual only)
-        this.createExplosionEffect(targetElement, target);
+        // Create explosion effect (visual only, with resistance effect if applicable)
+        this.createExplosionEffect(targetElement, target, isResisted);
         
         // Wait for explosion to complete
         await this.battleManager.delay(explosionTime);

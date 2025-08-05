@@ -183,17 +183,46 @@ export class StatusEffectsManager {
             // Remove the effect entirely
             this.removeStatusEffectFromTarget(target, effectName);
             this.removeStatusVisualEffect(target, effectName);
+        } else {
+            // FIX: Update the visual indicator to show new stack count
+            this.updateStatusVisualIndicator(target, effectName);
         }
 
         // Log the removal
         this.logStatusEffectRemoval(target, effectName, stacks, oldStacks, statusEffect.stacks);
 
         // Sync with guest if host
-        if (this.battleManager.isAuthoritative && statusEffect.stacks === 0) {
-            this.syncStatusEffectToGuest(target, effectName, 0, 'removed');
+        if (this.battleManager.isAuthoritative) {
+            if (statusEffect.stacks === 0) {
+                this.syncStatusEffectToGuest(target, effectName, 0, 'removed');
+            } else {
+                // FIX: Sync the updated stack count to guest
+                this.syncStatusEffectToGuest(target, effectName, statusEffect.stacks, 'updated');
+            }
         }
 
         return true;
+    }
+
+    updateStatusVisualIndicator(target, effectName) {
+        // Don't update indicators for dead targets
+        const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
+        if (!isTargetAlive) {
+            console.log(`⚰️ Skipping status indicator update for dead target: ${target.name}`);
+            return;
+        }
+
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+
+        // Remove existing indicator and create updated one
+        const existingIndicator = targetElement.querySelector(`.status-indicator-${effectName}`);
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+
+        // Create new indicator with updated stack count
+        this.createPersistentStatusIndicator(targetElement, target, effectName);
     }
 
     // Get status effect from target

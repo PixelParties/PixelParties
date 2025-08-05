@@ -21,96 +21,153 @@ export class HeroSelectionUI {
         
         // Get spellbook data
         const spellbook = window.heroSelection?.heroSpellbookManager?.getHeroSpellbook(position);
-        if (!spellbook || spellbook.length === 0) return;
         
-        // Remove any existing spellbook tooltip
+        // NEW: Get equipment data
+        const equipment = window.heroSelection?.heroEquipmentManager?.getHeroEquipment(position);
+        
+        // Don't show tooltip if no spells AND no equipment
+        if ((!spellbook || spellbook.length === 0) && (!equipment || equipment.length === 0)) return;
+        
+        // Remove any existing tooltip
         this.hideHeroSpellbookTooltip();
         
-        // Create spellbook tooltip
+        // Create enhanced tooltip
         const tooltip = document.createElement('div');
-        tooltip.className = 'formation-spellbook-tooltip';
+        tooltip.className = 'formation-spellbook-tooltip enhanced-hero-tooltip'; // NEW: Added class
         tooltip.id = 'formationSpellbookTooltip';
         
-        // Sort spells by school first, then by name
-        const sortedSpells = [...spellbook].sort((a, b) => {
-            const schoolCompare = (a.spellSchool || 'Unknown').localeCompare(b.spellSchool || 'Unknown');
-            if (schoolCompare !== 0) return schoolCompare;
-            return a.name.localeCompare(b.name);
-        });
-        
-        // Build spellbook HTML
-        let spellbookHTML = `
+        let tooltipHTML = `
             <div class="spellbook-tooltip-container">
-                <h4 class="spellbook-tooltip-title">📜 ${hero.name}'s Spellbook</h4>
-                <div class="spellbook-list">
+                <h4 class="spellbook-tooltip-title">📋 ${hero.name}'s Arsenal</h4>
         `;
         
-        let currentSchool = null;
-        sortedSpells.forEach(spell => {
-            const spellSchool = spell.spellSchool || 'Unknown';
+        // Add spellbook section if spells exist
+        if (spellbook && spellbook.length > 0) {
+            // Sort spells by school first, then by name
+            const sortedSpells = [...spellbook].sort((a, b) => {
+                const schoolCompare = (a.spellSchool || 'Unknown').localeCompare(b.spellSchool || 'Unknown');
+                if (schoolCompare !== 0) return schoolCompare;
+                return a.name.localeCompare(b.name);
+            });
             
-            // Add school header if new school
-            if (spellSchool !== currentSchool) {
-                if (currentSchool !== null) {
-                    spellbookHTML += '</div>'; // Close previous school section
-                }
-                currentSchool = spellSchool;
-                
-                // School styling
-                const schoolColors = {
-                    'DestructionMagic': '#ff6b6b',
-                    'SupportMagic': '#ffd43b',
-                    'DecayMagic': '#845ef7',
-                    'MagicArts': '#4dabf7',
-                    'SummoningMagic': '#51cf66',
-                    'Fighting': '#ff8c42',
-                    'Unknown': '#868e96'
-                };
-                const schoolColor = schoolColors[spellSchool] || '#868e96';
-                
-                const schoolIcons = {
-                    'DestructionMagic': '🔥',
-                    'SupportMagic': '✨',
-                    'DecayMagic': '💀',
-                    'MagicArts': '🔮',
-                    'SummoningMagic': '🌿',
-                    'Fighting': '⚔️',
-                    'Unknown': '❓'
-                };
-                const schoolIcon = schoolIcons[spellSchool] || '❓';
-                
-                const displaySchoolName = this.formatCardName(spellSchool);
-                
-                spellbookHTML += `
-                    <div class="spell-school-header" style="color: ${schoolColor};">
-                        <span class="school-icon">${schoolIcon}</span> ${displaySchoolName}
+            tooltipHTML += `
+                <div class="tooltip-section spellbook-section">
+                    <div class="section-header">
+                        <span class="section-icon">📜</span>
+                        <span class="section-title">Spellbook (${sortedSpells.length})</span>
                     </div>
-                    <div class="spell-school-section">
+                    <div class="spellbook-list">
+            `;
+            
+            let currentSchool = null;
+            sortedSpells.forEach(spell => {
+                const spellSchool = spell.spellSchool || 'Unknown';
+                
+                // Add school header if new school
+                if (spellSchool !== currentSchool) {
+                    if (currentSchool !== null) {
+                        tooltipHTML += '</div>'; // Close previous school section
+                    }
+                    currentSchool = spellSchool;
+                    
+                    // School styling
+                    const schoolColors = {
+                        'DestructionMagic': '#ff6b6b',
+                        'SupportMagic': '#ffd43b',
+                        'DecayMagic': '#845ef7',
+                        'MagicArts': '#4dabf7',
+                        'SummoningMagic': '#51cf66',
+                        'Fighting': '#ff8c42',
+                        'Unknown': '#868e96'
+                    };
+                    const schoolColor = schoolColors[spellSchool] || '#868e96';
+                    
+                    const schoolIcons = {
+                        'DestructionMagic': '🔥',
+                        'SupportMagic': '✨',
+                        'DecayMagic': '💀',
+                        'MagicArts': '🔮',
+                        'SummoningMagic': '🌿',
+                        'Fighting': '⚔️',
+                        'Unknown': '❓'
+                    };
+                    const schoolIcon = schoolIcons[spellSchool] || '❓';
+                    
+                    const displaySchoolName = this.formatCardName(spellSchool);
+                    
+                    tooltipHTML += `
+                        <div class="spell-school-header" style="color: ${schoolColor};">
+                            <span class="school-icon">${schoolIcon}</span> ${displaySchoolName}
+                        </div>
+                        <div class="spell-school-section">
+                    `;
+                }
+                
+                const spellLevel = spell.level !== undefined ? spell.level : 0;
+                const spellName = this.formatCardName(spell.name);
+                
+                tooltipHTML += `
+                    <div class="spell-entry">
+                        <span class="spell-name">${spellName}</span>
+                        <span class="spell-level">Lv${spellLevel}</span>
+                    </div>
                 `;
+            });
+            
+            if (currentSchool !== null) {
+                tooltipHTML += '</div>'; // Close last school section
             }
             
-            const spellLevel = spell.level !== undefined ? spell.level : 0;
-            const spellName = this.formatCardName(spell.name);
-            
-            spellbookHTML += `
-                <div class="spell-entry">
-                    <span class="spell-name">${spellName}</span>
-                    <span class="spell-level">Lv${spellLevel}</span>
+            tooltipHTML += `
+                    </div>
                 </div>
             `;
-        });
-        
-        if (currentSchool !== null) {
-            spellbookHTML += '</div>'; // Close last school section
         }
         
-        spellbookHTML += `
+        // NEW: Add separator and equipment section if equipment exists
+        if (equipment && equipment.length > 0) {
+            // Add separator if there are spells above
+            if (spellbook && spellbook.length > 0) {
+                tooltipHTML += '<div class="tooltip-separator"></div>';
+            }
+            
+            tooltipHTML += `
+                <div class="tooltip-section equipment-section">
+                    <div class="section-header">
+                        <span class="section-icon">⚔️</span>
+                        <span class="section-title">Equipment (${equipment.length})</span>
+                    </div>
+                    <div class="equipment-list">
+            `;
+            
+            // Equipment is already sorted alphabetically by getHeroEquipment()
+            equipment.forEach((artifact, index) => {
+                const artifactName = artifact.name || artifact.cardName || 'Unknown Artifact';
+                const artifactCost = artifact.cost || 0;
+                const formattedName = this.formatCardName(artifactName);
+                
+                tooltipHTML += `
+                    <div class="equipment-item" data-equipment-index="${index}">
+                        <span class="equipment-name">${formattedName}</span>
+                        ${artifactCost > 0 ? `<span class="equipment-cost">💰${artifactCost}</span>` : ''}
+                    </div>
+                `;
+            });
+            
+            tooltipHTML += `
+                    </div>
                 </div>
-                <div class="spell-count">Total Spells: ${sortedSpells.length}</div>
+            `;
+        }
+        
+        // Add summary line
+        const totalItems = (spellbook?.length || 0) + (equipment?.length || 0);
+        tooltipHTML += `
+                <div class="arsenal-summary">Total Items: ${totalItems}</div>
             </div>
         `;
         
-        tooltip.innerHTML = spellbookHTML;
+        tooltip.innerHTML = tooltipHTML;
         document.body.appendChild(tooltip);
         
         // Position tooltip to the left of the hero card
@@ -486,6 +543,7 @@ export class HeroSelectionUI {
                         <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
                         <p class="drag-hint">🎯 Drag Abilities to a Hero slot to attach them!</p>
                         <p class="drag-hint">📜 Drag Spell to Heroes to add them to their Spellbook!</p>
+                        <p class="drag-hint">⚔️ Drag Equip Artifacts to Heroes to equip them!</p> <!-- NEW -->
                         <p class="drag-hint">🐾 Drag and drop Creatures to reorder them within the same Hero!</p>
                     </div>
                     
@@ -533,7 +591,7 @@ let currentTooltipSlot = null;
 
 // Helper function to clean up any existing tooltips
 function cleanupAllAbilityTooltips() {
-    const allTooltips = document.querySelectorAll('.ability-drop-tooltip, .spell-drop-tooltip');
+    const allTooltips = document.querySelectorAll('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip');
     allTooltips.forEach(tooltip => tooltip.remove());
     currentTooltip = null;
     currentTooltipSlot = null;
@@ -639,7 +697,7 @@ function onTeamSlotDragOver(event, position) {
 
         // Check if it's a spell card
         if (window.heroSelection.heroSpellbookManager.isSpellCard(cardName)) {
-            // NEW: Check if it's a global spell - if so, just prevent default and return
+            // Check if it's a global spell - if so, just prevent default and return
             if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -758,6 +816,111 @@ function onTeamSlotDragOver(event, position) {
             
             return;
         }
+
+        // NEW: Check if it's an equip artifact card
+        if (window.heroSelection.heroEquipmentManager && 
+            window.heroSelection.heroEquipmentManager.isEquipArtifactCard(cardName)) {
+            
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const slot = event.currentTarget;
+            
+            // Clean up tooltip from other slots if we're over a different slot
+            if (currentTooltipSlot && currentTooltipSlot !== slot) {
+                cleanupAllAbilityTooltips();
+                if (currentTooltipSlot && currentTooltipSlot.classList) {
+                    currentTooltipSlot.classList.remove('equip-drop-ready', 'equip-drop-invalid');
+                }
+            }
+            
+            // Check if tooltip already exists for this slot
+            let existingTooltip = slot.querySelector('.equip-drop-tooltip');
+            
+            if (!existingTooltip) {
+                // Check if hero can equip the artifact WITHOUT actually equipping it
+                const equipCheck = window.heroSelection.heroEquipmentManager.canEquipArtifact(position, cardName);
+                const formation = window.heroSelection.formationManager.getBattleFormation();
+                const hero = formation[position];
+                
+                // Set visual state
+                if (equipCheck.success) {
+                    slot.classList.add('equip-drop-ready');
+                    slot.classList.remove('equip-drop-invalid');
+                } else {
+                    slot.classList.add('equip-drop-invalid');
+                    slot.classList.remove('equip-drop-ready');
+                }
+                
+                // Create tooltip
+                const tooltip = document.createElement('div');
+                tooltip.className = `equip-drop-tooltip ${equipCheck.success ? 'can-equip' : 'cannot-equip'}`;
+                
+                // Add long-text class if needed
+                if (equipCheck.reason && equipCheck.reason.length > 30) {
+                    tooltip.className += ' long-text';
+                }
+                
+                const heroName = hero ? hero.name : 'Hero';
+                
+                tooltip.textContent = equipCheck.success ? 
+                    `${heroName} can equip ${window.heroSelection.formatCardName(cardName)}!` : 
+                    equipCheck.reason;
+                
+                // Style the tooltip
+                tooltip.style.cssText = `
+                    position: absolute;
+                    top: -40px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    white-space: nowrap;
+                    z-index: 1000;
+                    pointer-events: none;
+                    animation: fadeIn 0.3s ease-out;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                    ${equipCheck.success ? 
+                        'background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%); color: #212529; border-color: rgba(255, 255, 255, 0.5);' : 
+                        'background: linear-gradient(135deg, #dc3545 0%, #e63946 100%); color: white; border-color: rgba(255, 255, 255, 0.3);'}
+                `;
+                
+                // Handle long text tooltips
+                if (equipCheck.reason && equipCheck.reason.length > 30) {
+                    tooltip.style.maxWidth = '250px';
+                    tooltip.style.whiteSpace = 'normal';
+                    tooltip.style.textAlign = 'center';
+                    tooltip.style.lineHeight = '1.3';
+                }
+                
+                slot.appendChild(tooltip);
+                
+                // Track current tooltip and slot
+                currentTooltip = tooltip;
+                currentTooltipSlot = slot;
+                
+            } else {
+                // Tooltip already exists, just update the classes
+                const equipCheck = window.heroSelection.heroEquipmentManager.canEquipArtifact(position, cardName);
+                
+                if (equipCheck.canEquip) {
+                    slot.classList.add('equip-drop-ready');
+                    slot.classList.remove('equip-drop-invalid');
+                } else {
+                    slot.classList.add('equip-drop-invalid');
+                    slot.classList.remove('equip-drop-ready');
+                }
+                
+                // Update tracking
+                currentTooltip = existingTooltip;
+                currentTooltipSlot = slot;
+            }
+            
+            return;
+        }
     }
     
     // Otherwise handle hero drag
@@ -807,11 +970,13 @@ function onTeamSlotDragLeave(event) {
         y < rect.top - margin || y > rect.bottom + margin) {
         
         slot.classList.remove('drag-over', 'ability-drop-ready', 'ability-drop-invalid');
-        slot.classList.remove('global-spell-hover'); // NEW: Remove global spell hover class
+        slot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
+        slot.classList.remove('equip-drop-ready', 'equip-drop-invalid');
+        slot.classList.remove('global-spell-hover');
         
         // Remove tooltip if this is the current tooltip slot
         if (currentTooltipSlot === slot) {
-            const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip');
+            const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip'); 
             if (tooltip) {
                 console.log('🔍 Removing tooltip on drag leave');
                 tooltip.remove();
@@ -819,9 +984,6 @@ function onTeamSlotDragLeave(event) {
             currentTooltip = null;
             currentTooltipSlot = null;
         }
-
-        // Also remove spell-specific classes
-        slot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
     }
 }
 
@@ -836,16 +998,32 @@ async function onTeamSlotDrop(event, targetSlot) {
     
     // Clean up visual states
     slot.classList.remove('drag-over', 'ability-drop-ready', 'ability-drop-invalid');
+    slot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
+    slot.classList.remove('equip-drop-ready', 'equip-drop-invalid'); // NEW
     
-    // Check if it's an ability card being dropped
-    if (window.heroSelection && window.heroSelection.heroAbilitiesManager && 
-        window.handManager && window.handManager.isHandDragging()) {
+    // Check if it's a card being dropped from hand
+    if (window.heroSelection && window.handManager && window.handManager.isHandDragging()) {
         const dragState = window.handManager.getHandDragState();
         const cardName = dragState.draggedCardName;
         
-        if (window.heroSelection.heroAbilitiesManager.isAbilityCard(cardName)) {
+        // Check for ability card
+        if (window.heroSelection.heroAbilitiesManager?.isAbilityCard(cardName)) {
             window.onTeamSlotAbilityDrop(event, targetSlot);
             return false;
+        }
+        
+        // Check for spell card
+        if (window.heroSelection.heroSpellbookManager?.isSpellCard(cardName)) {
+            // Handle spell drop through heroSelection
+            const success = await window.heroSelection.handleSpellDrop(targetSlot);
+            return success;
+        }
+        
+        // NEW: Check for equip artifact card
+        if (window.heroSelection.heroEquipmentManager?.isEquipArtifactCard(cardName)) {
+            // Handle equipment drop through heroSelection
+            const success = await window.heroSelection.handleEquipArtifactDrop(targetSlot);
+            return success;
         }
     }
     
@@ -1274,127 +1452,158 @@ if (typeof window !== 'undefined') {
 }
 
 // Add clickable ability and creature drag styles
-if (typeof document !== 'undefined' && !document.getElementById('clickableAbilityStyles')) {
+if (typeof document !== 'undefined' && !document.getElementById('equipmentTooltipStyles')) {
     const style = document.createElement('style');
-    style.id = 'clickableAbilityStyles';
+    style.id = 'equipmentTooltipStyles';
     style.textContent = `
-        /* Clickable Ability Styles */
-        .ability-card-image.clickable-ability {
-            cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+        /* Enhanced Hero Tooltip Styles */
+        .enhanced-hero-tooltip {
+            min-width: 320px;
+            max-width: 400px;
         }
-
-        .ability-card-image.clickable-ability:hover {
-            transform: scale(1.1);
-            filter: brightness(1.2);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        
+        .tooltip-separator {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            margin: 12px 0;
         }
-
-        .ability-card-image.clickable-ability:active {
-            transform: scale(0.95);
+        
+        .tooltip-section {
+            margin-bottom: 8px;
         }
-
-        .ability-zone.ability-clicked {
-            animation: abilityClickPulse 0.3s ease-out;
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            font-weight: bold;
         }
-
-        @keyframes abilityClickPulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.15); }
-            100% { transform: scale(1); }
+        
+        .section-icon {
+            font-size: 14px;
         }
-
-        /* Make sure ability zones have proper z-index for clicks */
-        .ability-zone.filled {
+        
+        .section-title {
+            font-size: 13px;
+        }
+        
+        .spellbook-section .section-header {
+            color: #4dabf7;
+        }
+        
+        .equipment-section .section-header {
+            color: #ffc107;
+        }
+        
+        .equipment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .equipment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            background: rgba(255, 193, 7, 0.1);
+            border-radius: 4px;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .equipment-name {
+            font-size: 12px;
+            color: #fff;
+            font-weight: 500;
+        }
+        
+        .equipment-cost {
+            font-size: 11px;
+            color: #ffc107;
+            font-weight: bold;
+        }
+        
+        .arsenal-summary {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            padding-top: 6px;
+        }
+        
+        /* Equipment Drop States */
+        .team-slot.equip-drop-ready {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.2) 0%, rgba(255, 202, 44, 0.2) 100%);
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.3);
+        }
+        
+        .team-slot.equip-drop-invalid {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(229, 57, 53, 0.2) 100%);
+            border-color: #f44336;
+            box-shadow: 0 0 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        .equip-drop-tooltip {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .equip-drop-tooltip.can-equip {
+            background: linear-gradient(135deg, #ffc107 0%, #ffca2c 100%);
+            color: #212529;
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .equip-drop-tooltip.cannot-equip {
+            background: linear-gradient(135deg, #dc3545 0%, #e63946 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .equip-drop-tooltip.long-text {
+            max-width: 250px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.3;
+        }
+        
+        /* Hand Card Equipment Styling */
+        .hand-card.equip-artifact-card {
+            border: 2px solid #ffc107;
+            box-shadow: 0 0 10px rgba(255, 193, 7, 0.3);
             position: relative;
+        }
+        
+        .hand-card.equip-artifact-card:hover {
+            border-color: #ffca2c;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .hand-card.equip-artifact-card::before {
+            content: "⚔️";
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 12px;
+            background: rgba(255, 193, 7, 0.9);
+            color: #212529;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
             z-index: 10;
         }
-
-        .ability-zone.filled .ability-card-image {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Nicolas Hero Click Styles - Updated for Green Border */
-        .nicolas-clickable {
-            position: relative;
-            cursor: pointer;
-        }
-
-        .nicolas-hero-image {
-            transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
-            cursor: pointer;
-        }
-
-        .nicolas-hero-image:hover {
-            transform: scale(1.05);
-            filter: brightness(1.1);
-        }
-
-        /* Nicolas Effect Usable Border - Green border when effect is available */
-        .character-image-container.nicolas-effect-usable {
-            position: relative;
-            border: 3px solid #28a745;
-            border-radius: 8px;
-            animation: nicolasUsablePulse 2s ease-in-out infinite;
-            box-shadow: 0 0 15px rgba(40, 167, 69, 0.4);
-        }
-
-        .character-image-container.nicolas-effect-usable .nicolas-hero-image:hover {
-            box-shadow: 0 0 20px rgba(40, 167, 69, 0.6);
-        }
-
-        @keyframes nicolasUsablePulse {
-            0%, 100% { 
-                border-color: #28a745;
-                box-shadow: 0 0 15px rgba(40, 167, 69, 0.4);
-            }
-            50% { 
-                border-color: #20c997;
-                box-shadow: 0 0 20px rgba(32, 201, 151, 0.6);
-            }
-        }
-
-        /* Make sure the border doesn't interfere with the image */
-        .character-image-container.nicolas-effect-usable .character-image {
-            border-radius: 5px; /* Slightly smaller radius to fit within container */
-        }
-
-        /* Creature Drag and Drop Styles */
-        .creature-icon {
-            cursor: grab;
-            transition: transform 0.2s ease, opacity 0.2s ease;
-            position: relative;
-        }
-
-        .creature-icon:hover {
-            transform: scale(1.05);
-        }
-
-        .creature-icon.creature-dragging {
-            opacity: 0.5;
-            transform: scale(0.9);
-            cursor: grabbing;
-        }
-
-        .hero-creatures {
-            transition: background-color 0.2s ease, border-color 0.2s ease;
-            border: 2px solid transparent;
-            border-radius: 8px;
-            padding: 4px;
-            min-height: 40px;
-            position: relative;
-        }
-
-        .hero-creatures.creature-drop-ready {
-            background-color: rgba(76, 175, 80, 0.1);
-            border-color: rgba(76, 175, 80, 0.5);
-        }
-
-        .hero-creatures.creature-drop-invalid {
-            background-color: rgba(244, 67, 54, 0.1);
-            border-color: rgba(244, 67, 54, 0.5);
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
     `;
     document.head.appendChild(style);

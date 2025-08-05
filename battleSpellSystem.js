@@ -8,6 +8,9 @@ import PoisonedWellSpell from './Spells/poisonedWell.js';
 import ToxicFumesSpell from './Spells/toxicFumes.js';
 import PoisonPollenSpell from './Spells/poisonPollen.js';
 import ToxicTrapSpell from './Spells/toxicTrap.js';
+import IceboltSpell from './Spells/icebolt.js'; 
+import FrostRuneSpell from './Spells/frostRune.js';
+import IcyGraveSpell from './Spells/icyGrave.js';
 
 
 
@@ -58,6 +61,18 @@ export class BattleSpellSystem {
         // Register ToxicTrap
         const toxicTrap = new ToxicTrapSpell(this.battleManager);
         this.spellImplementations.set('ToxicTrap', toxicTrap);
+        
+        // Register Icebolt
+        const icebolt = new IceboltSpell(this.battleManager);
+        this.spellImplementations.set('Icebolt', icebolt);
+
+        // Register FrostRune
+        const frostRune = new FrostRuneSpell(this.battleManager);
+        this.spellImplementations.set('FrostRune', frostRune);
+
+        // Register Icy Grave
+        const icyGrave = new IcyGraveSpell(this.battleManager);
+        this.spellImplementations.set('IcyGrave', icyGrave);
         
         console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
     }

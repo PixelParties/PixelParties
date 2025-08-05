@@ -21,24 +21,69 @@ export class FlameAvalancheSpell {
         const damage = this.calculateDamage(caster);
         
         // Find all enemy targets
-        const targets = this.findAllEnemyTargets(caster);
+        const allTargets = this.findAllEnemyTargets(caster);
         
-        if (targets.length === 0) {
+        if (allTargets.length === 0) {
             console.log(`🔥 ${this.displayName}: No valid targets found!`);
             return;
         }
         
-        // Log the spell effect
-        this.logSpellEffect(caster, damage, targets);
+        // Check resistance for each target BEFORE animations
+        const resistanceResults = this.checkResistanceForAllTargets(allTargets);
         
-        // Start visual effects and damage application simultaneously
-        const animationPromise = this.playFlameAvalancheAnimation(targets, caster);
-        const damagePromise = this.applyDamageToAllTargets(targets, damage, caster);
+        // Log the spell effect with resistance info
+        this.logSpellEffect(caster, damage, allTargets, resistanceResults);
+        
+        // Start visual effects and damage application
+        const animationPromise = this.playFlameAvalancheAnimation(allTargets, caster, resistanceResults);
+        const damagePromise = this.applyDamageToAllTargets(allTargets, damage, caster, resistanceResults);
         
         // Wait for both to complete
         await Promise.all([animationPromise, damagePromise]);
         
         console.log(`🔥 ${this.displayName} completed!`);
+    }
+
+    // ============================================
+    // RESISTANCE CHECKING
+    // ============================================
+
+    // Check resistance for all targets upfront
+    checkResistanceForAllTargets(targets) {
+        const resistanceMap = new Map();
+        
+        targets.forEach(target => {
+            let resisted = false;
+            
+            // Check resistance based on target type
+            if (this.battleManager.resistanceManager) {
+                if (target.type === 'hero') {
+                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+                } else if (target.type === 'creature') {
+                    // For area spells, shouldResistAreaSpell handles creatures differently
+                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName);
+                }
+            }
+            
+            // Create a unique key for each target
+            const key = this.getTargetKey(target);
+            resistanceMap.set(key, resisted);
+            
+            if (resisted) {
+                console.log(`🛡️ Target resisted: ${target.type} at ${target.position}${target.type === 'creature' ? ` (index ${target.creatureIndex})` : ''}`);
+            }
+        });
+        
+        return resistanceMap;
+    }
+
+    // Get unique key for a target
+    getTargetKey(target) {
+        if (target.type === 'hero') {
+            return `hero_${target.side}_${target.position}`;
+        } else {
+            return `creature_${target.side}_${target.position}_${target.creatureIndex}`;
+        }
     }
 
     // ============================================
@@ -112,16 +157,21 @@ export class FlameAvalancheSpell {
     // ============================================
 
     // Apply damage to all targets with staggered timing for visual effect
-    async applyDamageToAllTargets(targets, damage, caster) {
+    async applyDamageToAllTargets(targets, damage, caster, resistanceResults) {
         const damagePromises = [];
         
         // Apply damage to all targets with slight delays for visual effect
         targets.forEach((target, index) => {
-            const delay = index * 50; // 50ms delay between each target
+            const delay = index * 50;
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
             
             const damagePromise = new Promise((resolve) => {
                 setTimeout(() => {
-                    this.applyDamageToTarget(target, damage, caster);
+                    // Only apply damage if not resisted
+                    if (!isResisted) {
+                        this.applyDamageToTarget(target, damage, caster);
+                    }
                     resolve();
                 }, this.battleManager.getSpeedAdjustedDelay(delay));
             });
@@ -142,7 +192,7 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
-            });
+            }, { source: 'spell' });
             
         } else if (target.type === 'creature') {
             // Apply damage to creature
@@ -153,7 +203,7 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 position: target.position,
                 side: target.side
-            });
+            }, { source: 'spell' });
         }
     }
 
@@ -162,7 +212,7 @@ export class FlameAvalancheSpell {
     // ============================================
 
     // Play the main FlameAvalanche animation with flying flames
-    async playFlameAvalancheAnimation(targets, caster) {
+    async playFlameAvalancheAnimation(targets, caster, resistanceResults) {
         console.log(`🔥 Playing Flame Avalanche animation with ${targets.length} targets...`);
         
         // Total animation duration: ~400ms (same as melee attack)
@@ -176,7 +226,7 @@ export class FlameAvalancheSpell {
         for (let wave = 0; wave < 3; wave++) {
             const wavePromise = new Promise((resolve) => {
                 setTimeout(() => {
-                    this.spawnFlameWave(targets, caster, wave + 1, waveDuration);
+                    this.spawnFlameWave(targets, caster, wave + 1, waveDuration, resistanceResults);
                     resolve();
                 }, this.battleManager.getSpeedAdjustedDelay(wave * waveDelay));
             });
@@ -192,7 +242,7 @@ export class FlameAvalancheSpell {
     }
 
     // Spawn a single wave of 10X flames (10 flames per target)
-    spawnFlameWave(targets, caster, waveNumber, waveDuration) {
+    spawnFlameWave(targets, caster, waveNumber, waveDuration, resistanceResults) {
         console.log(`🔥 Spawning wave ${waveNumber} with ${targets.length * 10} flames`);
         
         // Get caster position for flame spawn point
@@ -208,6 +258,9 @@ export class FlameAvalancheSpell {
         
         // Spawn 10 flames for each target
         targets.forEach((target, targetIndex) => {
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
+            
             for (let flameIndex = 0; flameIndex < 10; flameIndex++) {
                 setTimeout(() => {
                     this.spawnFlyingFlame(
@@ -217,7 +270,8 @@ export class FlameAvalancheSpell {
                         waveNumber, 
                         targetIndex, 
                         flameIndex,
-                        waveDuration
+                        waveDuration,
+                        isResisted
                     );
                 }, this.battleManager.getSpeedAdjustedDelay(flameIndex * 5)); // Slight stagger within each target
             }
@@ -225,7 +279,7 @@ export class FlameAvalancheSpell {
     }
 
     // Spawn a single flying flame that moves from caster to target
-    spawnFlyingFlame(startX, startY, target, waveNumber, targetIndex, flameIndex, duration) {
+    spawnFlyingFlame(startX, startY, target, waveNumber, targetIndex, flameIndex, duration, isResisted) {
         // Get target position
         let targetElement = null;
         
@@ -285,7 +339,7 @@ export class FlameAvalancheSpell {
             if (flame && flame.parentNode) {
                 // Create impact effect at target (only for some flames to avoid spam)
                 if (flameIndex % 3 === 0) { // Every 3rd flame creates impact
-                    this.createFlameImpactEffect(targetElement, target.type);
+                    this.createFlameImpactEffect(targetElement, target.type, isResisted);
                 }
                 flame.remove();
             }
@@ -322,10 +376,17 @@ export class FlameAvalancheSpell {
     }
 
     // Create impact effect when flame hits target
-    createFlameImpactEffect(targetElement, targetType) {
+    createFlameImpactEffect(targetElement, targetType, isResisted) {
         const impactEffect = document.createElement('div');
         impactEffect.className = 'flame-impact-effect';
-        impactEffect.innerHTML = '💥🔥';
+        
+        if (isResisted) {
+            // Show shield effect for resisted targets
+            impactEffect.innerHTML = '🛡️✨';
+            impactEffect.classList.add('resisted');
+        } else {
+            impactEffect.innerHTML = '💥🔥';
+        }
         
         const fontSize = targetType === 'hero' ? '32px' : '20px';
         
@@ -337,8 +398,16 @@ export class FlameAvalancheSpell {
             font-size: ${fontSize};
             z-index: 250;
             pointer-events: none;
-            animation: flameImpact ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
+            animation: ${isResisted ? 'flameResisted' : 'flameImpact'} ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
         `;
+        
+        if (isResisted) {
+            impactEffect.style.textShadow = `
+                0 0 10px rgba(100, 200, 255, 0.9),
+                0 0 20px rgba(150, 150, 255, 0.7),
+                0 0 30px rgba(200, 200, 255, 0.5)
+            `;
+        }
         
         targetElement.appendChild(impactEffect);
         
@@ -408,6 +477,25 @@ export class FlameAvalancheSpell {
                 }
             }
             
+            @keyframes flameResisted {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
+                }
+                30% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(45deg); 
+                }
+                70% { 
+                    opacity: 0.8; 
+                    transform: translate(-50%, -50%) scale(1.2) rotate(90deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(1.4) rotate(135deg); 
+                }
+            }
+            
             .flying-flame {
                 text-shadow: 
                     0 0 8px rgba(255, 100, 0, 0.8),
@@ -421,6 +509,13 @@ export class FlameAvalancheSpell {
                     0 0 10px rgba(255, 50, 0, 0.9),
                     0 0 20px rgba(255, 100, 0, 0.7),
                     0 0 30px rgba(255, 200, 0, 0.5);
+            }
+            
+            .flame-impact-effect.resisted {
+                text-shadow: 
+                    0 0 10px rgba(100, 200, 255, 0.9),
+                    0 0 20px rgba(150, 150, 255, 0.7),
+                    0 0 30px rgba(200, 200, 255, 0.5);
             }
             
             /* Cleanup styles for better performance */
@@ -437,27 +532,72 @@ export class FlameAvalancheSpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, damage, targets) {
-        const heroTargets = targets.filter(t => t.type === 'hero').length;
-        const creatureTargets = targets.filter(t => t.type === 'creature').length;
-        
+    logSpellEffect(caster, damage, targets, resistanceResults) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
-        // Main spell effect log
-        let targetDescription = '';
-        if (heroTargets > 0 && creatureTargets > 0) {
-            targetDescription = `${heroTargets} heroes and ${creatureTargets} creatures`;
-        } else if (heroTargets > 0) {
-            targetDescription = `${heroTargets} hero${heroTargets > 1 ? 's' : ''}`;
-        } else if (creatureTargets > 0) {
-            targetDescription = `${creatureTargets} creature${creatureTargets > 1 ? 's' : ''}`;
+        // Count actual hits vs resisted
+        let heroHits = 0, heroResists = 0;
+        let creatureHits = 0, creatureResists = 0;
+        
+        targets.forEach(target => {
+            const key = this.getTargetKey(target);
+            const resisted = resistanceResults.get(key);
+            
+            if (target.type === 'hero') {
+                if (resisted) heroResists++;
+                else heroHits++;
+            } else {
+                if (resisted) creatureResists++;
+                else creatureHits++;
+            }
+        });
+        
+        // Build description of what was hit
+        const parts = [];
+        if (heroHits > 0) {
+            parts.push(`${heroHits} hero${heroHits > 1 ? 'es' : ''}`);
+        }
+        if (creatureHits > 0) {
+            parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        this.battleManager.addCombatLog(
-            `🔥 ${this.displayName} engulfs the battlefield, hitting ${targetDescription} for ${damage} damage each!`,
-            logType
-        );
+        let message = `🔥 ${this.displayName} engulfs the battlefield`;
+        
+        if (parts.length > 0) {
+            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+        } else {
+            // All targets resisted
+            message += `, but all targets resisted!`;
+        }
+        
+        // Add resistance info if any
+        if (heroResists > 0 || creatureResists > 0) {
+            const resistParts = [];
+            if (heroResists > 0) {
+                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
+            }
+            if (creatureResists > 0) {
+                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
+            }
+            
+            // Only add this line if some targets were hit
+            if (parts.length > 0) {
+                this.battleManager.addCombatLog(
+                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
+                    'info'
+                );
+            }
+        }
+        
+        // Main spell effect log
+        this.battleManager.addCombatLog(message, logType);
+        
+        // Convert resistance map to serializable format for guest
+        const resistanceData = {};
+        resistanceResults.forEach((resisted, key) => {
+            resistanceData[key] = resisted;
+        });
         
         // Send spell effect update to guest
         this.battleManager.sendBattleUpdate('spell_effect', {
@@ -468,8 +608,11 @@ export class FlameAvalancheSpell {
             casterPosition: caster.position,
             damage: damage,
             targetCount: targets.length,
-            heroTargets: heroTargets,
-            creatureTargets: creatureTargets,
+            heroHits: heroHits,
+            heroResists: heroResists,
+            creatureHits: creatureHits,
+            creatureResists: creatureResists,
+            resistanceData: resistanceData,
             effectType: 'area_damage',
             timestamp: Date.now()
         });
@@ -481,28 +624,50 @@ export class FlameAvalancheSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, damage, targetCount, heroTargets, creatureTargets } = data;
+        const { displayName, casterName, damage, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const casterLocalSide = (data.casterAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const logType = casterLocalSide === 'player' ? 'success' : 'error';
         
-        // Create target description
-        let targetDescription = '';
-        if (heroTargets > 0 && creatureTargets > 0) {
-            targetDescription = `${heroTargets} heroes and ${creatureTargets} creatures`;
-        } else if (heroTargets > 0) {
-            targetDescription = `${heroTargets} hero${heroTargets > 1 ? 's' : ''}`;
-        } else if (creatureTargets > 0) {
-            targetDescription = `${creatureTargets} creature${creatureTargets > 1 ? 's' : ''}`;
+        // Build description matching host
+        const parts = [];
+        if (heroHits > 0) {
+            parts.push(`${heroHits} hero${heroHits > 1 ? 'es' : ''}`);
+        }
+        if (creatureHits > 0) {
+            parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        // Add to battle log
-        this.battleManager.addCombatLog(
-            `🔥 ${displayName} engulfs the battlefield, hitting ${targetDescription} for ${damage} damage each!`,
-            logType
-        );
+        let message = `🔥 ${displayName} engulfs the battlefield`;
+        
+        if (parts.length > 0) {
+            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+        } else {
+            message += `, but all targets resisted!`;
+        }
+        
+        // Add main log
+        this.battleManager.addCombatLog(message, logType);
+        
+        // Add resistance info if any
+        if (heroResists > 0 || creatureResists > 0) {
+            const resistParts = [];
+            if (heroResists > 0) {
+                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
+            }
+            if (creatureResists > 0) {
+                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
+            }
+            
+            if (parts.length > 0) {
+                this.battleManager.addCombatLog(
+                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
+                    'info'
+                );
+            }
+        }
         
         // Find the caster and targets for guest-side animation
         const casterSide = casterLocalSide;
@@ -518,12 +683,20 @@ export class FlameAvalancheSpell {
         // Find targets on guest side
         const guestTargets = this.findAllEnemyTargetsForGuest(mockCaster);
         
-        // Play visual effects on guest side
-        if (guestTargets.length > 0) {
-            this.playFlameAvalancheAnimation(guestTargets, mockCaster);
+        // Convert resistance data to Map format for guest
+        const guestResistanceMap = new Map();
+        if (resistanceData) {
+            Object.entries(resistanceData).forEach(([key, resisted]) => {
+                guestResistanceMap.set(key, resisted);
+            });
         }
         
-        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${targetCount} targets`);
+        // Play visual effects on guest side
+        if (guestTargets.length > 0) {
+            this.playFlameAvalancheAnimation(guestTargets, mockCaster, guestResistanceMap);
+        }
+        
+        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${data.targetCount} targets`);
     }
 
     // Find enemy targets for guest-side animation (simplified version)

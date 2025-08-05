@@ -283,7 +283,129 @@ export async function applyPoisonedMeatDelayedEffects(battleManager, heroSelecti
     }
 }
 
-// Apply poison to all player-controlled targets
+// NEW: Apply delayed effects from both players
+export async function applyBothPlayersDelayedEffects(hostEffects, guestEffects, battleManager) {
+    console.log('🥩 Processing delayed artifact effects from both players...');
+    
+    // Process host's delayed effects (apply to host's heroes)
+    if (hostEffects && hostEffects.length > 0) {
+        const hostPoisonEffects = hostEffects.filter(
+            effect => effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat'
+        );
+        
+        if (hostPoisonEffects.length > 0) {
+            console.log('🥩 Applying HOST PoisonedMeat curse...');
+            await poisonPlayerTargets(battleManager, hostPoisonEffects, 'host');
+        }
+    }
+    
+    // Process guest's delayed effects (apply to guest's heroes)
+    if (guestEffects && guestEffects.length > 0) {
+        const guestPoisonEffects = guestEffects.filter(
+            effect => effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat'
+        );
+        
+        if (guestPoisonEffects.length > 0) {
+            console.log('🥩 Applying GUEST PoisonedMeat curse...');
+            await poisonPlayerTargets(battleManager, guestPoisonEffects, 'guest');
+        }
+    }
+    
+    // Clear the processed effects from Firebase
+    await clearProcessedDelayedEffects(battleManager, hostEffects, guestEffects);
+}
+
+// Apply poison to targets of a specific player (host or guest)
+async function poisonPlayerTargets(battleManager, poisonEffects, playerSide) {
+    if (!battleManager.statusEffectsManager) {
+        console.error('StatusEffectsManager not available for PoisonedMeat curse');
+        return;
+    }
+    
+    // Calculate total stacks from all effects
+    const totalStacks = poisonEffects.reduce((sum, effect) => sum + effect.stacks, 0);
+    
+    let targetsAffected = 0;
+    
+    // Determine which heroes to poison based on player side
+    // From the host's perspective: host = playerHeroes, guest = opponentHeroes
+    const heroesToPoison = playerSide === 'host' 
+        ? battleManager.playerHeroes 
+        : battleManager.opponentHeroes;
+    
+    const playerName = playerSide === 'host' ? 'Host' : 'Guest';
+    const logType = playerSide === 'host' ? 'error' : 'success';
+    
+    // Apply poison to all of this player's heroes
+    ['left', 'center', 'right'].forEach(position => {
+        const hero = heroesToPoison[position];
+        if (hero && hero.alive) {
+            console.log(`🥩 Applying poison to ${playerName}'s ${hero.name} (id: ${hero.id || 'no-id'})`);
+            battleManager.statusEffectsManager.applyStatusEffect(hero, 'poisoned', totalStacks);
+            
+            // Verify it was applied
+            const poisonStacks = battleManager.statusEffectsManager.getStatusEffectStacks(hero, 'poisoned');
+            console.log(`🥩 Verification: ${hero.name} now has ${poisonStacks} poison stacks`);
+            targetsAffected++;
+
+            // Apply poison to hero's creatures
+            if (hero.creatures && hero.creatures.length > 0) {
+                hero.creatures.forEach(creature => {
+                    if (creature.alive) {
+                        battleManager.statusEffectsManager.applyStatusEffect(creature, 'poisoned', totalStacks);
+                        targetsAffected++;
+                        console.log(`☠️ PoisonedMeat curse: Applied ${totalStacks} poison to ${playerName}'s ${creature.name}`);
+                    }
+                });
+            }
+        }
+    });
+    
+    // Add combat log message
+    if (targetsAffected > 0) {
+        const message = playerSide === 'host' 
+            ? `🥩 Your PoisonedMeat curse activates! ${targetsAffected} of your targets are poisoned with ${totalStacks} stack${totalStacks > 1 ? 's' : ''}!`
+            : `🥩 Opponent's PoisonedMeat curse activates! ${targetsAffected} of their targets are poisoned with ${totalStacks} stack${totalStacks > 1 ? 's' : ''}!`;
+            
+        battleManager.addCombatLog(message, logType);
+    }
+    
+    // Small delay for visual effect processing
+    await battleManager.delay(300);
+}
+
+// NEW: Clear processed delayed effects from Firebase
+async function clearProcessedDelayedEffects(battleManager, hostEffects, guestEffects) {
+    if (!battleManager.roomManager || !battleManager.roomManager.getRoomRef()) {
+        return;
+    }
+    
+    try {
+        const roomRef = battleManager.roomManager.getRoomRef();
+        
+        // Filter out processed PoisonedMeat effects
+        const filteredHostEffects = hostEffects ? hostEffects.filter(
+            effect => !(effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+        ) : [];
+        
+        const filteredGuestEffects = guestEffects ? guestEffects.filter(
+            effect => !(effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+        ) : [];
+        
+        // Update Firebase with filtered effects
+        await roomRef.child('gameState').update({
+            hostDelayedArtifactEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
+            guestDelayedArtifactEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
+            delayedEffectsProcessedAt: Date.now()
+        });
+        
+        console.log('🧹 Cleared processed PoisonedMeat effects from Firebase');
+    } catch (error) {
+        console.error('Error clearing processed delayed effects:', error);
+    }
+}
+
+// Apply poison to all player targets (original function - kept for backward compatibility)
 async function poisonAllPlayerTargets(battleManager, poisonEffects) {
     if (!battleManager.statusEffectsManager) {
         console.error('StatusEffectsManager not available for PoisonedMeat curse');

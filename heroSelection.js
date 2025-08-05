@@ -16,6 +16,7 @@ import { HeroCreatureManager } from './creatures.js';
 import { GameStateMachine } from './gameStateMachine.js';
 import { globalSpellManager } from './globalSpellManager.js';
 import { potionHandler } from './potionHandler.js';
+import { HeroEquipmentManager } from './heroEquipment.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 
@@ -62,6 +63,8 @@ export class HeroSelection {
         this.heroSpellbookManager = new HeroSpellbookManager();
         this.actionManager = new ActionManager();
         this.heroCreatureManager = new HeroCreatureManager();
+        this.heroEquipmentManager = new HeroEquipmentManager();
+
         this.potionHandler = potionHandler; 
 
 
@@ -100,6 +103,17 @@ export class HeroSelection {
             this.formationManager,
             async () => {
                 // Callback for when creature state changes
+                this.updateBattleFormationUI();
+                await this.saveGameState();
+            }
+        );
+
+        this.heroEquipmentManager.init(
+            this.handManager,
+            this.formationManager,
+            this.goldManager,
+            async () => {
+                // Callback for when equipment state changes
                 this.updateBattleFormationUI();
                 await this.saveGameState();
             }
@@ -672,6 +686,10 @@ export class HeroSelection {
                 const creaturesState = this.heroCreatureManager.exportCreaturesState();
                 gameState.hostCreaturesState = sanitizeForFirebase(creaturesState);
 
+                // Save equipment
+                const equipmentState = this.heroEquipmentManager.exportEquipmentState();
+                gameState.hostEquipmentState = sanitizeForFirebase(equipmentState);
+
                 // Save Guard Change state for HOST only
                 const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
                 gameState.hostGlobalSpellState = sanitizeForFirebase(globalSpellState);
@@ -689,6 +707,11 @@ export class HeroSelection {
                 // Save opponent creatures data if we have it
                 if (this.opponentCreaturesData) {
                     gameState.guestCreaturesData = sanitizeForFirebase(this.opponentCreaturesData);
+                }
+                
+                // Save opponent equipment data if we have it
+                if (this.opponentEquipmentData) {
+                    gameState.guestEquipmentData = sanitizeForFirebase(this.opponentEquipmentData);
                 }
                 
                 // Save action data for host
@@ -712,7 +735,7 @@ export class HeroSelection {
                     gameState.hostNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
 
-                // ===== NEW: Save delayed artifact effects for host =====
+                // Save delayed artifact effects for host
                 if (this.delayedArtifactEffects) {
                     gameState.hostDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
                     console.log(`💾 Host saving ${this.delayedArtifactEffects.length} delayed artifact effects`);
@@ -748,6 +771,10 @@ export class HeroSelection {
                 const creaturesState = this.heroCreatureManager.exportCreaturesState();
                 gameState.guestCreaturesState = sanitizeForFirebase(creaturesState);
 
+                // Save equipment
+                const equipmentState = this.heroEquipmentManager.exportEquipmentState();
+                gameState.guestEquipmentState = sanitizeForFirebase(equipmentState);
+
                 // Save Guard Change state for GUEST only
                 const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
                 gameState.guestGlobalSpellState = sanitizeForFirebase(globalSpellState);
@@ -765,6 +792,11 @@ export class HeroSelection {
                 // Save opponent creatures data if we have it
                 if (this.opponentCreaturesData) {
                     gameState.hostCreaturesData = sanitizeForFirebase(this.opponentCreaturesData);
+                }
+                
+                // Save opponent equipment data if we have it
+                if (this.opponentEquipmentData) {
+                    gameState.hostEquipmentData = sanitizeForFirebase(this.opponentEquipmentData);
                 }
                 
                 // Save action data for guest
@@ -788,7 +820,7 @@ export class HeroSelection {
                     gameState.guestNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
 
-                // ===== NEW: Save delayed artifact effects for guest =====
+                // Save delayed artifact effects for guest
                 if (this.delayedArtifactEffects) {
                     gameState.guestDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
                     console.log(`💾 Guest saving ${this.delayedArtifactEffects.length} delayed artifact effects`);
@@ -808,6 +840,7 @@ export class HeroSelection {
             await roomRef.child('gameState').update(sanitizedGameState);
             return true;
         } catch (error) {
+            console.error('Error saving game state:', error);
             return false;
         }
     }
@@ -1176,6 +1209,12 @@ export class HeroSelection {
                 center: this.heroCreatureManager.getHeroCreatures('center'),
                 right: this.heroCreatureManager.getHeroCreatures('right')
             };
+
+            const equipmentData = {
+                left: this.heroEquipmentManager.getHeroEquipment('left'),
+                center: this.heroEquipmentManager.getHeroEquipment('center'),
+                right: this.heroEquipmentManager.getHeroEquipment('right')
+            };
             
             // Send all data
             this.gameDataSender('formation_update', {
@@ -1183,7 +1222,8 @@ export class HeroSelection {
                 battleFormation: this.formationManager.getBattleFormation(),
                 abilities: abilitiesData,
                 spellbooks: spellbooksData,
-                creatures: creaturesData
+                creatures: creaturesData,
+                equipment: equipmentData 
             });
         }
     }
@@ -1462,7 +1502,7 @@ export class HeroSelection {
             // STEP 1: Set game phase to Formation immediately
             await this.setGamePhase('Formation');
             
-            // ===== NEW: CLEAR POTION EFFECTS WHEN RETURNING TO FORMATION =====
+            // ===== CLEAR POTION EFFECTS WHEN RETURNING TO FORMATION =====
             if (this.potionHandler) {
                 try {
                     console.log('🧪 Clearing potion effects when returning to formation...');
@@ -1471,6 +1511,11 @@ export class HeroSelection {
                 } catch (error) {
                     console.error('❌ Error clearing potion effects during formation return:', error);
                 }
+            }
+            
+            if (window.heroSelection) {
+                console.log('🥩 HOST: Clearing processed delayed artifact effects...');
+                window.heroSelection.clearProcessedDelayedEffects();
             }
             
             // STEP 2: IMMEDIATE UI UPDATES (no waiting for Firebase)
@@ -2234,6 +2279,28 @@ export class HeroSelection {
         }
     }
 
+    // Clear processed delayed artifact effects
+    clearProcessedDelayedEffects() {
+        if (this.delayedArtifactEffects && this.delayedArtifactEffects.length > 0) {
+            // Filter out processed PoisonedMeat effects
+            const filteredEffects = this.delayedArtifactEffects.filter(
+                effect => !(effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+            );
+            
+            const removedCount = this.delayedArtifactEffects.length - filteredEffects.length;
+            this.delayedArtifactEffects = filteredEffects;
+            
+            if (removedCount > 0) {
+                console.log(`🧹 Cleared ${removedCount} processed PoisonedMeat effects from local state`);
+                
+                // Save updated state to Firebase
+                this.saveGameState().then(() => {
+                    console.log('💾 Updated game state after clearing delayed effects');
+                });
+            }
+        }
+    }
+
     // Drag and Drop delegation to FormationManager with ability card handling
     startDrag(character, fromSlot, draggedElement) {
         this.formationManager.startDrag(character, fromSlot, draggedElement);
@@ -2263,6 +2330,12 @@ export class HeroSelection {
             return success;
         }
         
+        // Check if we're dropping an equip artifact card
+        if (this.isDraggingEquipArtifactCard()) {
+            const success = await this.handleEquipArtifactDrop(targetSlot);
+            return success;
+        }
+        
         // Otherwise, handle hero swapping as normal
         const swapInfo = await this.formationManager.handleDrop(targetSlot);
         if (swapInfo) {
@@ -2271,10 +2344,11 @@ export class HeroSelection {
             
             // Update ability zones based on hero movement
             if (swapInfo.wasSwap) {
-                // Heroes swapped positions - swap their abilities and creatures
+                // Heroes swapped positions - swap their abilities, spellbooks, creatures, and equipment
                 this.heroAbilitiesManager.moveHeroAbilities(swapInfo.from, swapInfo.to);
                 this.heroSpellbookManager.moveHeroSpellbook(swapInfo.from, swapInfo.to);
                 this.heroCreatureManager.moveHeroCreatures(swapInfo.from, swapInfo.to);
+                this.heroEquipmentManager.moveHeroEquipment(swapInfo.from, swapInfo.to);
             } else {
                 // Hero moved to empty slot
                 this.heroAbilitiesManager.moveHeroAbilities(swapInfo.from, swapInfo.to);
@@ -2283,6 +2357,8 @@ export class HeroSelection {
                 this.heroSpellbookManager.clearHeroSpellbook(swapInfo.from);
                 this.heroCreatureManager.moveHeroCreatures(swapInfo.from, swapInfo.to);
                 this.heroCreatureManager.clearHeroCreatures(swapInfo.from);
+                this.heroEquipmentManager.moveHeroEquipment(swapInfo.from, swapInfo.to);
+                this.heroEquipmentManager.clearHeroEquipment(swapInfo.from);
             }
             
             this.updateBattleFormationUI();
@@ -2727,6 +2803,88 @@ export class HeroSelection {
         }
 
         return { canLearn: true, heroName: hero.name };
+    }
+
+    // Add helper method to check if dragging an equip artifact card
+    isDraggingEquipArtifactCard() {
+        if (!this.handManager || !this.handManager.isHandDragging()) {
+            return false;
+        }
+        
+        const dragState = this.handManager.getHandDragState();
+        const cardName = dragState.draggedCardName;
+        
+        return this.heroEquipmentManager.isEquipArtifactCard(cardName);
+    }
+
+    async handleEquipArtifactDrop(targetSlot) {
+        const dragState = this.handManager.getHandDragState();
+        const artifactCardName = dragState.draggedCardName;
+        const cardIndex = dragState.draggedCardIndex;
+        
+        // Add artifact to hero
+        const result = this.heroEquipmentManager.addArtifactToHero(targetSlot, artifactCardName);
+        
+        if (result.success) {
+            // Remove from hand
+            this.handManager.removeCardFromHandByIndex(cardIndex);
+            
+            // Show success message
+            const formation = this.formationManager.getBattleFormation();
+            const hero = formation[targetSlot];
+            const successMessage = `${hero.name} equipped ${this.formatCardName(artifactCardName)}!`;
+            this.showEquipDropResult(targetSlot, successMessage, true);
+            
+            // Update UI and save
+            this.updateHandDisplay();
+            this.updateGoldDisplay();
+            await this.saveGameState();
+            await this.sendFormationUpdate();
+        } else {
+            // Show error message
+            this.showEquipDropResult(targetSlot, result.reason, false);
+        }
+        
+        this.handManager.endHandCardDrag();
+        return result.success;
+    }
+
+    showEquipDropResult(heroPosition, message, success) {
+        const teamSlot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
+        if (!teamSlot) return;
+        
+        // Create feedback element
+        const feedback = document.createElement('div');
+        feedback.className = `equip-drop-feedback ${success ? 'success' : 'error'}`;
+        feedback.textContent = message;
+        
+        // Style the feedback
+        feedback.style.cssText = `
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1000;
+            animation: fadeInOut 2s ease-out;
+            pointer-events: none;
+            ${success ? 
+                'background: rgba(255, 193, 7, 0.9); color: #212529;' : 
+                'background: rgba(244, 67, 54, 0.9); color: white;'}
+        `;
+        
+        // Add to slot
+        teamSlot.style.position = 'relative';
+        teamSlot.appendChild(feedback);
+        
+        // Remove after animation
+        setTimeout(() => {
+            feedback.remove();
+        }, 2000);
     }
 }
 

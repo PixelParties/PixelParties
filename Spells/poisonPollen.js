@@ -22,11 +22,14 @@ export class PoisonPollenSpell {
         
         console.log(`🌸 ${caster.name} casting ${this.displayName} on ${poisonedTargets.length} poisoned enemies!`);
         
-        // Log the spell effect
-        this.logSpellEffect(caster, poisonedTargets);
+        // Check resistance for each target BEFORE animations
+        const resistanceResults = this.checkResistanceForAllTargets(poisonedTargets);
+        
+        // Log the spell effect with resistance info
+        this.logSpellEffect(caster, poisonedTargets, resistanceResults);
         
         // Play purple particle rain animation and apply stun afterwards
-        await this.playPoisonPollenAnimation(caster, poisonedTargets);
+        await this.playPoisonPollenAnimation(caster, poisonedTargets, resistanceResults);
         
         console.log(`🌸 ${this.displayName} completed!`);
     }
@@ -36,6 +39,48 @@ export class PoisonPollenSpell {
         // Check if there are any poisoned enemies
         const poisonedTargets = this.findPoisonedEnemies(caster);
         return poisonedTargets.length > 0;
+    }
+
+    // ============================================
+    // RESISTANCE CHECKING
+    // ============================================
+
+    // Check resistance for all targets upfront
+    checkResistanceForAllTargets(targets) {
+        const resistanceMap = new Map();
+        
+        targets.forEach(target => {
+            let resisted = false;
+            
+            // Check resistance based on target type
+            if (this.battleManager.resistanceManager) {
+                if (target.type === 'hero') {
+                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+                } else if (target.type === 'creature') {
+                    // For area spells, shouldResistAreaSpell handles creatures differently
+                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName);
+                }
+            }
+            
+            // Create a unique key for each target
+            const key = this.getTargetKey(target);
+            resistanceMap.set(key, resisted);
+            
+            if (resisted) {
+                console.log(`🛡️ Target resisted: ${target.type} ${target.name} at ${target.position}${target.type === 'creature' ? ` (index ${target.creatureIndex})` : ''}`);
+            }
+        });
+        
+        return resistanceMap;
+    }
+
+    // Get unique key for a target
+    getTargetKey(target) {
+        if (target.type === 'hero') {
+            return `hero_${target.side}_${target.position}`;
+        } else {
+            return `creature_${target.side}_${target.position}_${target.creatureIndex}`;
+        }
     }
 
     // ============================================
@@ -98,35 +143,40 @@ export class PoisonPollenSpell {
     // ============================================
 
     // Apply stun to all poisoned targets
-    async applyStunToTargets(targets) {
+    async applyStunToTargets(targets, resistanceResults) {
         const stunPromises = [];
         
         targets.forEach((target, index) => {
             // Stagger stun application for visual effect
             const delay = index * 50; // 50ms between each target
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
             
             const stunPromise = new Promise((resolve) => {
                 setTimeout(() => {
-                    let actualTarget;
-                    
-                    if (target.type === 'creature') {
-                        actualTarget = target.creature;
-                    } else {
-                        actualTarget = target.hero;
-                    }
-                    
-                    // Apply stun status effect using the status effects manager
-                    if (this.battleManager.statusEffectsManager) {
-                        const success = this.battleManager.statusEffectsManager.applyStatusEffect(
-                            actualTarget, 
-                            'stunned', 
-                            1 // Always 1 stack of stun
-                        );
+                    // Only apply stun if not resisted
+                    if (!isResisted) {
+                        let actualTarget;
                         
-                        if (success) {
-                            console.log(`🌸 Applied 1 stun stack to ${actualTarget.name}`);
+                        if (target.type === 'creature') {
+                            actualTarget = target.creature;
                         } else {
-                            console.error(`🌸 Failed to apply stun to ${actualTarget.name}`);
+                            actualTarget = target.hero;
+                        }
+                        
+                        // Apply stun status effect using the status effects manager
+                        if (this.battleManager.statusEffectsManager) {
+                            const success = this.battleManager.statusEffectsManager.applyStatusEffect(
+                                actualTarget, 
+                                'stunned', 
+                                1 // Always 1 stack of stun
+                            );
+                            
+                            if (success) {
+                                console.log(`🌸 Applied 1 stun stack to ${actualTarget.name}`);
+                            } else {
+                                console.error(`🌸 Failed to apply stun to ${actualTarget.name}`);
+                            }
                         }
                     }
                     
@@ -146,11 +196,11 @@ export class PoisonPollenSpell {
     // ============================================
 
     // Play the poison pollen animation on poisoned targets
-    async playPoisonPollenAnimation(caster, targets) {
+    async playPoisonPollenAnimation(caster, targets, resistanceResults) {
         console.log(`🌸 Playing Poison Pollen animation on ${targets.length} targets...`);
         
         // Create pollen particle effects on each target
-        this.createPollenEffectsOnTargets(targets);
+        this.createPollenEffectsOnTargets(targets, resistanceResults);
         
         // Animation timing
         const pollenDuration = 1000; // 1 second of pollen particles
@@ -158,7 +208,7 @@ export class PoisonPollenSpell {
         
         // Start applying stun near the end of the pollen effect
         setTimeout(() => {
-            this.applyStunToTargets(targets);
+            this.applyStunToTargets(targets, resistanceResults);
         }, this.battleManager.getSpeedAdjustedDelay(stunApplicationDelay));
         
         // Wait for full pollen duration
@@ -169,8 +219,11 @@ export class PoisonPollenSpell {
     }
 
     // Create pollen particle effects on specific targets
-    createPollenEffectsOnTargets(targets) {
+    createPollenEffectsOnTargets(targets, resistanceResults) {
         targets.forEach((target, index) => {
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
+            
             setTimeout(() => {
                 let targetElement;
                 
@@ -183,7 +236,7 @@ export class PoisonPollenSpell {
                 }
                 
                 if (targetElement) {
-                    this.createPollenParticleEffect(targetElement);
+                    this.createPollenParticleEffect(targetElement, isResisted);
                 }
             }, this.battleManager.getSpeedAdjustedDelay(index * 100)); // Staggered start
         });
@@ -193,7 +246,7 @@ export class PoisonPollenSpell {
     }
 
     // Create pollen particle effect on a single target
-    createPollenParticleEffect(targetElement) {
+    createPollenParticleEffect(targetElement, isResisted) {
         const pollenContainer = document.createElement('div');
         pollenContainer.className = 'poison-pollen-container';
         
@@ -218,16 +271,25 @@ export class PoisonPollenSpell {
         
         for (let i = 0; i < particleCount; i++) {
             setTimeout(() => {
-                this.createPollenParticle(pollenContainer, rect);
+                this.createPollenParticle(pollenContainer, rect, isResisted);
             }, this.battleManager.getSpeedAdjustedDelay(i * 40)); // Stagger particle creation
+        }
+        
+        // Create final impact effect
+        if (isResisted) {
+            setTimeout(() => {
+                this.createResistanceShieldEffect(targetElement);
+            }, this.battleManager.getSpeedAdjustedDelay(900));
         }
     }
 
     // Create a single pollen particle
-    createPollenParticle(container, targetRect) {
+    createPollenParticle(container, targetRect, isResisted) {
         const particle = document.createElement('div');
         particle.className = 'poison-pollen-particle';
-        particle.innerHTML = '🌸';
+        
+        // Use different icon for resisted particles
+        particle.innerHTML = isResisted ? '🛡️' : '🌸';
         
         // Random particle characteristics
         const x = Math.random() * (targetRect.width + 60);
@@ -244,12 +306,22 @@ export class PoisonPollenSpell {
             font-size: ${14 * size}px;
             transform: rotate(${rotation}deg);
             animation: pollenParticleFloat ${this.battleManager.getSpeedAdjustedDelay(duration)}ms ease-out forwards;
-            text-shadow: 
+            filter: drop-shadow(0 0 4px ${isResisted ? 'rgba(100, 200, 255, 0.8)' : 'rgba(138, 43, 226, 0.8)'});
+        `;
+        
+        if (isResisted) {
+            particle.style.textShadow = `
+                0 0 8px rgba(100, 200, 255, 0.9),
+                0 0 16px rgba(150, 150, 255, 0.7),
+                0 0 24px rgba(200, 200, 255, 0.5)
+            `;
+        } else {
+            particle.style.textShadow = `
                 0 0 8px rgba(138, 43, 226, 0.9),
                 0 0 16px rgba(128, 0, 128, 0.7),
-                0 0 24px rgba(75, 0, 130, 0.5);
-            filter: drop-shadow(0 0 4px rgba(138, 43, 226, 0.8));
-        `;
+                0 0 24px rgba(75, 0, 130, 0.5)
+            `;
+        }
         
         // Set drift amount
         particle.style.setProperty('--drift-amount', `${drift}px`);
@@ -264,15 +336,45 @@ export class PoisonPollenSpell {
         }, this.battleManager.getSpeedAdjustedDelay(duration + 100));
     }
 
+    // Create resistance shield effect
+    createResistanceShieldEffect(targetElement) {
+        const shield = document.createElement('div');
+        shield.className = 'pollen-resistance-shield';
+        shield.innerHTML = '🛡️✨';
+        
+        shield.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            z-index: 450;
+            pointer-events: none;
+            animation: pollenResistanceShield ${this.battleManager.getSpeedAdjustedDelay(300)}ms ease-out forwards;
+            text-shadow: 
+                0 0 20px rgba(100, 200, 255, 1),
+                0 0 40px rgba(150, 150, 255, 0.8),
+                0 0 60px rgba(200, 200, 255, 0.6);
+        `;
+        
+        targetElement.appendChild(shield);
+        
+        setTimeout(() => {
+            if (shield && shield.parentNode) {
+                shield.remove();
+            }
+        }, this.battleManager.getSpeedAdjustedDelay(300));
+    }
+
     // Clean up any remaining pollen effects
     cleanupPollenEffects() {
         // Remove pollen containers
         const containers = document.querySelectorAll('.poison-pollen-container');
         containers.forEach(container => container.remove());
         
-        // Remove any remaining particles
-        const particles = document.querySelectorAll('.poison-pollen-particle');
-        particles.forEach(particle => particle.remove());
+        // Remove any remaining particles and shields
+        const effects = document.querySelectorAll('.poison-pollen-particle, .pollen-resistance-shield');
+        effects.forEach(effect => effect.remove());
     }
 
     // Ensure CSS animations exist for pollen effects
@@ -301,12 +403,31 @@ export class PoisonPollenSpell {
                 }
             }
             
+            @keyframes pollenResistanceShield {
+                0% { 
+                    opacity: 0;
+                    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+                }
+                50% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%) scale(1.2) rotate(45deg);
+                }
+                100% { 
+                    opacity: 0;
+                    transform: translate(-50%, -50%) scale(1.4) rotate(90deg);
+                }
+            }
+            
             /* Enhanced visual effects */
             .poison-pollen-container {
                 will-change: transform;
             }
             
             .poison-pollen-particle {
+                will-change: transform, opacity;
+            }
+            
+            .pollen-resistance-shield {
                 will-change: transform, opacity;
             }
         `;
@@ -319,27 +440,72 @@ export class PoisonPollenSpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, targets) {
+    logSpellEffect(caster, targets, resistanceResults) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
-        const heroTargets = targets.filter(t => t.type === 'hero').length;
-        const creatureTargets = targets.filter(t => t.type === 'creature').length;
+        // Count actual hits vs resisted
+        let heroHits = 0, heroResists = 0;
+        let creatureHits = 0, creatureResists = 0;
         
-        let targetDescription = '';
-        if (heroTargets > 0 && creatureTargets > 0) {
-            targetDescription = `${heroTargets} poisoned hero${heroTargets > 1 ? 's' : ''} and ${creatureTargets} poisoned creature${creatureTargets > 1 ? 's' : ''}`;
-        } else if (heroTargets > 0) {
-            targetDescription = `${heroTargets} poisoned hero${heroTargets > 1 ? 's' : ''}`;
-        } else if (creatureTargets > 0) {
-            targetDescription = `${creatureTargets} poisoned creature${creatureTargets > 1 ? 's' : ''}`;
+        targets.forEach(target => {
+            const key = this.getTargetKey(target);
+            const resisted = resistanceResults.get(key);
+            
+            if (target.type === 'hero') {
+                if (resisted) heroResists++;
+                else heroHits++;
+            } else {
+                if (resisted) creatureResists++;
+                else creatureHits++;
+            }
+        });
+        
+        // Build description of what was hit
+        const parts = [];
+        if (heroHits > 0) {
+            parts.push(`${heroHits} poisoned hero${heroHits > 1 ? 'es' : ''}`);
+        }
+        if (creatureHits > 0) {
+            parts.push(`${creatureHits} poisoned creature${creatureHits > 1 ? 's' : ''}`);
+        }
+        
+        let message = `🌸 ${this.displayName} covers `;
+        
+        if (parts.length > 0) {
+            message += `${parts.join(' and ')} in stunning pollen, applying 1 stun stack each!`;
+        } else {
+            // All targets resisted
+            message += `${targets.length} poisoned target${targets.length > 1 ? 's' : ''} in pollen, but all resisted!`;
         }
         
         // Main spell effect log
-        this.battleManager.addCombatLog(
-            `🌸 ${this.displayName} covers ${targetDescription} in stunning pollen, applying 1 stun stack each!`,
-            logType
-        );
+        this.battleManager.addCombatLog(message, logType);
+        
+        // Add resistance info if any
+        if (heroResists > 0 || creatureResists > 0) {
+            const resistParts = [];
+            if (heroResists > 0) {
+                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
+            }
+            if (creatureResists > 0) {
+                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
+            }
+            
+            // Only add this line if some targets were hit
+            if (parts.length > 0) {
+                this.battleManager.addCombatLog(
+                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
+                    'info'
+                );
+            }
+        }
+        
+        // Convert resistance map to serializable format for guest
+        const resistanceData = {};
+        resistanceResults.forEach((resisted, key) => {
+            resistanceData[key] = resisted;
+        });
         
         // Send spell effect update to guest
         this.battleManager.sendBattleUpdate('spell_effect', {
@@ -349,8 +515,11 @@ export class PoisonPollenSpell {
             casterAbsoluteSide: caster.absoluteSide,
             casterPosition: caster.position,
             targetCount: targets.length,
-            heroTargets: heroTargets,
-            creatureTargets: creatureTargets,
+            heroHits: heroHits,
+            heroResists: heroResists,
+            creatureHits: creatureHits,
+            creatureResists: creatureResists,
+            resistanceData: resistanceData,
             targets: targets.map(t => ({
                 type: t.type,
                 name: t.name,
@@ -368,28 +537,50 @@ export class PoisonPollenSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, heroTargets, creatureTargets } = data;
+        const { displayName, casterName, heroHits, heroResists, creatureHits, creatureResists, resistanceData, targetCount } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const casterLocalSide = (data.casterAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const logType = casterLocalSide === 'player' ? 'success' : 'error';
         
-        // Create target description
-        let targetDescription = '';
-        if (heroTargets > 0 && creatureTargets > 0) {
-            targetDescription = `${heroTargets} poisoned hero${heroTargets > 1 ? 's' : ''} and ${creatureTargets} poisoned creature${creatureTargets > 1 ? 's' : ''}`;
-        } else if (heroTargets > 0) {
-            targetDescription = `${heroTargets} poisoned hero${heroTargets > 1 ? 's' : ''}`;
-        } else if (creatureTargets > 0) {
-            targetDescription = `${creatureTargets} poisoned creature${creatureTargets > 1 ? 's' : ''}`;
+        // Build description matching host
+        const parts = [];
+        if (heroHits > 0) {
+            parts.push(`${heroHits} poisoned hero${heroHits > 1 ? 'es' : ''}`);
+        }
+        if (creatureHits > 0) {
+            parts.push(`${creatureHits} poisoned creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        // Add to battle log
-        this.battleManager.addCombatLog(
-            `🌸 ${displayName} covers ${targetDescription} in stunning pollen, applying 1 stun stack each!`,
-            logType
-        );
+        let message = `🌸 ${displayName} covers `;
+        
+        if (parts.length > 0) {
+            message += `${parts.join(' and ')} in stunning pollen, applying 1 stun stack each!`;
+        } else {
+            message += `${targetCount} poisoned target${targetCount > 1 ? 's' : ''} in pollen, but all resisted!`;
+        }
+        
+        // Add main log
+        this.battleManager.addCombatLog(message, logType);
+        
+        // Add resistance info if any
+        if (heroResists > 0 || creatureResists > 0) {
+            const resistParts = [];
+            if (heroResists > 0) {
+                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
+            }
+            if (creatureResists > 0) {
+                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
+            }
+            
+            if (parts.length > 0) {
+                this.battleManager.addCombatLog(
+                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
+                    'info'
+                );
+            }
+        }
         
         // Create mock caster for animation
         const mockCaster = {
@@ -410,18 +601,26 @@ export class PoisonPollenSpell {
             };
         });
         
+        // Convert resistance data to Map format for guest
+        const guestResistanceMap = new Map();
+        if (resistanceData) {
+            Object.entries(resistanceData).forEach(([key, resisted]) => {
+                guestResistanceMap.set(key, resisted);
+            });
+        }
+        
         // Play visual effects on guest side (no stun application)
-        this.playPollenAnimationGuestSide(mockCaster, mockTargets);
+        this.playPollenAnimationGuestSide(mockCaster, mockTargets, guestResistanceMap);
         
         console.log(`🌸 GUEST: ${casterName} used ${displayName} affecting ${data.targetCount} poisoned targets`);
     }
 
     // Guest-side animation (visual only, no stun application)
-    async playPollenAnimationGuestSide(caster, targets) {
+    async playPollenAnimationGuestSide(caster, targets, resistanceResults) {
         console.log(`🌸 GUEST: Playing Poison Pollen animation...`);
         
         // Create pollen particle effects on each target
-        this.createPollenEffectsOnTargets(targets);
+        this.createPollenEffectsOnTargets(targets, resistanceResults);
         
         // Wait for full pollen duration
         await this.battleManager.delay(1000);

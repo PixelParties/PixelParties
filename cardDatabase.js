@@ -462,7 +462,7 @@ const CARD_DATABASE = {
         name: 'IcyGrave',
         image: './Cards/All/IcyGrave.png',
         cardType: 'Spell',
-        level: 0,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
@@ -1052,7 +1052,7 @@ const CARD_DATABASE = {
         name: 'TheMastersSword',
         image: './Cards/All/TheMastersSword.png',
         cardType: 'Artifact',
-        cost: 8,
+        cost: 5,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -1070,7 +1070,7 @@ const CARD_DATABASE = {
         name: 'TheSunSword',
         image: './Cards/All/TheSunSword.png',
         cardType: 'Artifact',
-        cost: 14,
+        cost: 0,
         action: false,
         spellSchool: null,
         subtype: 'Equip'

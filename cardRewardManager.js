@@ -2,6 +2,10 @@
 
 import { CardPreviewManager } from './cardPreviewManager.js';
 import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js';
+import { killTracker } from '../killTracker.js';
+
+
+import { calculateFormationWantedPosterBonuses, generateWantedPosterBonusHTML, getWantedPosterStyles } from '../Artifacts/wantedPoster.js';
 
 import ThievingManager from './Abilities/thieving.js';
 
@@ -69,20 +73,21 @@ export class CardRewardManager {
 
     // Calculate and store gold breakdown for current battle result
     calculateGoldBreakdown(battleResult) {
-        // If no battle result provided, try to detect it
         if (!battleResult || battleResult === undefined) {
             battleResult = this.detectBattleResultFromGoldManager();
         }
         
         const breakdown = {
-            baseGold: 4, // Standard base reward
+            baseGold: 4,
             battleBonus: 0,
             wealthBonus: 0,
             wealthDetails: [],
             semiBonus: 0,
-            thievingGained: 0,      
-            thievingLost: 0,       
-            thievingDetails: [],   
+            thievingGained: 0,
+            thievingLost: 0,
+            thievingDetails: [],
+            wantedPosterBonus: 0,
+            wantedPosterDetails: [],
             total: 0
         };
 
@@ -156,9 +161,30 @@ export class CardRewardManager {
         breakdown.thievingLost = thievingResult.thievingLost;
         breakdown.thievingDetails = thievingResult.thievingDetails;
 
+        // Calculate Wanted Poster bonuses using the module
+        if (this.heroSelection && this.heroSelection.heroEquipmentManager) {
+            const formation = this.heroSelection.formationManager.getBattleFormation();
+            
+            // Ensure we're passing the correct side ('player' for our heroes)
+            const wantedPosterData = calculateFormationWantedPosterBonuses(
+                formation,
+                this.heroSelection.heroEquipmentManager,
+                'player'  // Always 'player' since we're calculating our own rewards
+            );
+            
+            breakdown.wantedPosterBonus = wantedPosterData.totalBonus;
+            breakdown.wantedPosterDetails = wantedPosterData.details;
+            
+            // Log for debugging
+            if (wantedPosterData.totalBonus > 0) {
+                console.log('💰 Wanted Poster bonuses calculated:', wantedPosterData);
+            }
+        }
+        
         // Calculate total
         breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
-                        breakdown.semiBonus + breakdown.thievingGained - breakdown.thievingLost;
+                        breakdown.semiBonus + breakdown.thievingGained - breakdown.thievingLost +
+                        breakdown.wantedPosterBonus;
         
         return breakdown;
     }
@@ -288,6 +314,12 @@ export class CardRewardManager {
                         thievingGained: breakdown.thievingGained,
                         thievingLost: breakdown.thievingLost,
                         thievingDetails: breakdown.thievingDetails
+                    })}
+
+                    <!-- Wanted Poster Section (THIS IS THE KEY PART) -->
+                    ${generateWantedPosterBonusHTML({ 
+                        totalBonus: breakdown.wantedPosterBonus, 
+                        details: breakdown.wantedPosterDetails 
                     })}
                     
                     <!-- Redraw Deduction (if any) -->
@@ -2345,6 +2377,9 @@ export class CardRewardManager {
                 }
             }
         `;
+
+        // Add Wanted Poster styles
+        style.textContent += getWantedPosterStyles();
         
         document.head.appendChild(style);
     }

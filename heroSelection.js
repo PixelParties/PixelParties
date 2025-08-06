@@ -1992,6 +1992,19 @@ export class HeroSelection {
         if (this.opponentSpellbooksData) {
             opponentSpellbooks = this.opponentSpellbooksData;
         }
+
+        // Get equipment data for all player heroes
+        const playerEquipment = {
+            left: this.heroEquipmentManager.getHeroEquipment('left'),
+            center: this.heroEquipmentManager.getHeroEquipment('center'),
+            right: this.heroEquipmentManager.getHeroEquipment('right')
+        };
+
+        // Get opponent equipment (from stored data if available)
+        let opponentEquipment = null;
+        if (this.opponentEquipmentData) {
+            opponentEquipment = this.opponentEquipmentData;
+        }
         
         // Get creature data for all player heroes
         const playerCreatures = {
@@ -2025,7 +2038,9 @@ export class HeroSelection {
                 opponentSpellbooks,
                 this.actionManager,
                 playerCreatures,      
-                opponentCreatures     
+                opponentCreatures,
+                playerEquipment,
+                opponentEquipment      
             );
             return true;
             

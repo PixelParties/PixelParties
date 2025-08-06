@@ -7,6 +7,8 @@ import { BattleSpeedManager } from './battleSpeedManager.js';
 import { BattleRandomness } from './battleRandomness.js';
 import { BattleSpellSystem } from './battleSpellSystem.js';
 import StatusEffectsManager from './statusEffects.js';
+import AttackEffectsManager from './attackEffects.js';
+import { killTracker } from './killTracker.js';
 
 
 import { BattleRandomnessManager } from './battleRandomnessManager.js';
@@ -18,6 +20,8 @@ import { NecromancyManager } from './Abilities/necromancy.js';
 import { ResistanceManager, applyResistancePatches } from './Abilities/resistance.js';
 
 import JigglesCreature from './Creatures/jiggles.js';
+
+import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
 
 
 export class BattleManager {
@@ -59,6 +63,9 @@ export class BattleManager {
         //CREATURE STUFF
         this.jigglesManager = null;
 
+        // Attack effects
+        this.attackEffectsManager = null;
+
         // OPTIMIZED SYNCHRONIZATION
         this.pendingAcks = {};
         this.ackTimeouts = {};
@@ -90,6 +97,13 @@ export class BattleManager {
         
         this.statusEffectsManager = null;
         this.animationManager = null;
+        this.killTracker = killTracker;
+        
+        // Make globally accessible for reward calculations
+        if (typeof window !== 'undefined') {
+            window.killTracker = killTracker;
+            window.battleManager = this;
+        }
     }
 
 
@@ -177,7 +191,8 @@ export class BattleManager {
         lifeManager, goldManager, onBattleEnd, roomManager = null,
         playerAbilities = null, opponentAbilities = null,
         playerSpellbooks = null, opponentSpellbooks = null,
-        playerCreatures = null, opponentCreatures = null) {
+        playerCreatures = null, opponentCreatures = null,
+        playerEquips = null, opponentEquips = null) {
         
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;
@@ -191,6 +206,8 @@ export class BattleManager {
         this.isAuthoritative = isHost;
         
         this.speedManager.init(this, isHost);
+
+        this.killTracker.init(this);
         
         // Initialize persistence manager
         if (this.roomManager) {
@@ -211,7 +228,9 @@ export class BattleManager {
         this.playerSpellbooks = playerSpellbooks;
         this.opponentSpellbooks = opponentSpellbooks;
         this.playerCreatures = playerCreatures;  
-        this.opponentCreatures = opponentCreatures;  
+        this.opponentCreatures = opponentCreatures;
+        this.playerEquips = playerEquips;
+        this.opponentEquips = opponentEquips;
         
         // Initialize heroes with full HP, abilities, and fresh visual state
         this.initializeHeroes();
@@ -228,6 +247,10 @@ export class BattleManager {
         this.statusEffectsManager = new StatusEffectsManager(this);
         this.statusEffectsManager.ensureStatusEffectsCSS();
         this.animationManager = new BattleAnimationManager(this);
+
+        // Initialize Attack Effects Manager
+        this.attackEffectsManager = new AttackEffectsManager(this);
+        this.attackEffectsManager.init();
     }
 
     setBattleSpeed(speed) {
@@ -505,17 +528,17 @@ export class BattleManager {
         const mySide = this.isHost ? 'host' : 'guest';
         const opponentSide = this.isHost ? 'guest' : 'host';
         
-        // Initialize all heroes
+        // Initialize all heroes - NOW INCLUDING EQUIPMENT
         this.initializeHeroesForSide('player', this.playerFormation, this.playerHeroes, 
                                     this.playerAbilities, this.playerSpellbooks, 
-                                    this.playerCreatures, mySide);
+                                    this.playerCreatures, this.playerEquips, mySide);  // Added playerEquips
         this.initializeHeroesForSide('opponent', this.opponentFormation, this.opponentHeroes, 
                                     this.opponentAbilities, this.opponentSpellbooks, 
-                                    this.opponentCreatures, opponentSide);
+                                    this.opponentCreatures, this.opponentEquips, opponentSide);  // Added opponentEquips
     }
 
     // Initialize heroes for a specific side
-    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, absoluteSide) {
+    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide) {  // Added equipment parameter
         ['left', 'center', 'right'].forEach(position => {
             const heroData = formation[position];
             if (heroData) {
@@ -557,6 +580,12 @@ export class BattleManager {
 
                     // Initialize necromancy stacks for each hero
                     hero.initializeNecromancyStacks();
+                }
+                
+                // ADD EQUIPMENT TO HERO
+                if (equipment && equipment[position]) {
+                    hero.setEquipment(equipment[position]);
+                    console.log(`⚔️ Set ${equipment[position].length} equipment items for ${side} ${position} hero`);
                 }
                 
                 heroesObj[position] = hero;
@@ -755,6 +784,8 @@ export class BattleManager {
         // Log any SummoningMagic bonuses applied to creatures
         this.logSummoningMagicBonuses();
         
+        this.logTorasEquipmentBonuses();
+        
         if (this.isAuthoritative) {
             try {
                 console.log('🧪 Applying potion effects from both players at battle start...');
@@ -856,6 +887,61 @@ export class BattleManager {
         }
     }
 
+    logTorasEquipmentBonuses() {
+        let bonusesApplied = false;
+        
+        // Check player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            const playerHero = this.playerHeroes[position];
+            if (playerHero && playerHero.name === 'Toras' && playerHero.equipment && playerHero.equipment.length > 0) {
+                // Count unique equipment
+                const uniqueEquipmentNames = new Set();
+                playerHero.equipment.forEach(item => {
+                    const itemName = item.name || item.cardName;
+                    if (itemName) {
+                        uniqueEquipmentNames.add(itemName);
+                    }
+                });
+                
+                const uniqueCount = uniqueEquipmentNames.size;
+                if (uniqueCount > 0) {
+                    const bonus = uniqueCount * 10;
+                    this.addCombatLog(
+                        `⚔️ Toras gains +${bonus} ATK from mastering ${uniqueCount} unique equipment!`, 
+                        'success'
+                    );
+                    bonusesApplied = true;
+                }
+            }
+            
+            const opponentHero = this.opponentHeroes[position];
+            if (opponentHero && opponentHero.name === 'Toras' && opponentHero.equipment && opponentHero.equipment.length > 0) {
+                // Count unique equipment
+                const uniqueEquipmentNames = new Set();
+                opponentHero.equipment.forEach(item => {
+                    const itemName = item.name || item.cardName;
+                    if (itemName) {
+                        uniqueEquipmentNames.add(itemName);
+                    }
+                });
+                
+                const uniqueCount = uniqueEquipmentNames.size;
+                if (uniqueCount > 0) {
+                    const bonus = uniqueCount * 10;
+                    this.addCombatLog(
+                        `⚔️ Opponent's Toras gains +${bonus} ATK from mastering ${uniqueCount} unique equipment!`, 
+                        'error'
+                    );
+                    bonusesApplied = true;
+                }
+            }
+        });
+        
+        if (bonusesApplied) {
+            this.addCombatLog('🗡️ Toras\'s equipment mastery enhances combat prowess!', 'info');
+        }
+    }
+
     // Initialize extensible state
     initializeExtensibleState() {
         this.globalEffects = [];
@@ -928,6 +1014,33 @@ export class BattleManager {
             const stackCount = hero.getAbilityStackCount('Fighting');
             modifiers.attackBonus += stackCount * 10;
             modifiers.specialEffects.push(`Fighting (+${stackCount * 10} ATK)`);
+        }
+        
+        // Special case for Toras: +10 ATK per unique equipment
+        if (hero.name === 'Toras') {
+            let uniqueEquipmentCount = 0;
+            
+            // Use synchronized count if available (for guest displaying opponent's Toras)
+            if (hero._syncedUniqueEquipmentCount !== undefined) {
+                uniqueEquipmentCount = hero._syncedUniqueEquipmentCount;
+            } 
+            // Otherwise calculate locally (for own heroes or host)
+            else if (hero.equipment && hero.equipment.length > 0) {
+                const uniqueEquipmentNames = new Set();
+                hero.equipment.forEach(item => {
+                    const itemName = item.name || item.cardName;
+                    if (itemName) {
+                        uniqueEquipmentNames.add(itemName);
+                    }
+                });
+                uniqueEquipmentCount = uniqueEquipmentNames.size;
+            }
+            
+            if (uniqueEquipmentCount > 0) {
+                const equipmentBonus = uniqueEquipmentCount * 10;
+                modifiers.attackBonus += equipmentBonus;
+                modifiers.specialEffects.push(`Toras Equipment Mastery (+${equipmentBonus} ATK from ${uniqueEquipmentCount} unique items)`);
+            }
         }
         
         return modifiers;
@@ -1342,29 +1455,76 @@ export class BattleManager {
         
         // Only proceed with attack animations/damage for heroes that are attacking
         if (playerValidAttack || opponentValidAttack) {
-            const playerDamage = playerValidAttack ? 
+            // Calculate base damage
+            let playerDamage = playerValidAttack ? 
                 this.calculateDamage(playerHeroActor.data, true) : 0;
-            const opponentDamage = opponentValidAttack ? 
+            let opponentDamage = opponentValidAttack ? 
                 this.calculateDamage(opponentHeroActor.data, true) : 0;
             
+            // ============================================
+            // NEW: APPLY DAMAGE MODIFIERS (TheMastersSword, etc.)
+            // ============================================
+            let playerEffectsTriggered = [];
+            let opponentEffectsTriggered = [];
+            
+            if (playerValidAttack && this.attackEffectsManager) {
+                const playerModResult = this.attackEffectsManager.calculateDamageModifiers(
+                    playerHeroActor.data,
+                    playerTarget.type === 'creature' ? playerTarget.creature : playerTarget.hero,
+                    playerDamage
+                );
+                playerDamage = playerModResult.modifiedDamage;
+                playerEffectsTriggered = playerModResult.effectsTriggered;
+            }
+            
+            if (opponentValidAttack && this.attackEffectsManager) {
+                const opponentModResult = this.attackEffectsManager.calculateDamageModifiers(
+                    opponentHeroActor.data,
+                    opponentTarget.type === 'creature' ? opponentTarget.creature : opponentTarget.hero,
+                    opponentDamage
+                );
+                opponentDamage = opponentModResult.modifiedDamage;
+                opponentEffectsTriggered = opponentModResult.effectsTriggered;
+            }
+            
+            // Create turn data with potentially modified damage
             const turnData = this.createTurnDataWithCreatures(
                 position, 
                 playerValidAttack ? playerHeroActor.data : null, playerTarget, playerDamage,
                 opponentValidAttack ? opponentHeroActor.data : null, opponentTarget, opponentDamage
             );
             
+            // NEW: Add damage modifier info to turn data for network sync
+            if (playerEffectsTriggered.length > 0 || opponentEffectsTriggered.length > 0) {
+                turnData.damageModifiers = {
+                    player: playerEffectsTriggered.map(e => ({
+                        name: e.name,
+                        multiplier: e.multiplier,
+                        swordCount: e.swordCount || 0
+                    })),
+                    opponent: opponentEffectsTriggered.map(e => ({
+                        name: e.name,
+                        multiplier: e.multiplier,
+                        swordCount: e.swordCount || 0
+                    }))
+                };
+            }
+            
             this.sendBattleUpdate('hero_turn_execution', turnData);
             
+            // Execute attacks with modified damage and effects
             const executionPromise = this.executeHeroAttacksWithDamage(
                 playerValidAttack ? { 
                     hero: playerHeroActor.data, 
                     target: playerTarget, 
-                    damage: playerDamage 
+                    damage: playerDamage,
+                    effectsTriggered: playerEffectsTriggered  // NEW: Pass effects for animation
                 } : null,
                 opponentValidAttack ? { 
                     hero: opponentHeroActor.data, 
                     target: opponentTarget, 
-                    damage: opponentDamage 
+                    damage: opponentDamage,
+                    effectsTriggered: opponentEffectsTriggered  // NEW: Pass effects for animation
                 } : null
             );
             
@@ -1510,51 +1670,65 @@ export class BattleManager {
 
     // Create turn data object with creatures
     createTurnDataWithCreatures(position, playerHero, playerTarget, playerDamage, 
-                               opponentHero, opponentTarget, opponentDamage) {
-        const createActionData = (hero, target, damage) => {
-            if (!hero || !hero.alive) return null;
-            
-            const actionData = {
-                attacker: position,
-                targetType: target ? target.type : null,
-                damage: damage,
-                attackerData: {
-                    absoluteSide: hero.absoluteSide,
-                    position: hero.position,
-                    name: hero.name,
-                    abilities: hero.getAllAbilities()
+                                opponentHero, opponentTarget, opponentDamage) {
+            const createActionData = (hero, target, damage) => {
+                if (!hero || !hero.alive) return null;
+                
+                const actionData = {
+                    attacker: position,
+                    targetType: target ? target.type : null,
+                    damage: damage,
+                    attackerData: {
+                        absoluteSide: hero.absoluteSide,
+                        position: hero.position,
+                        name: hero.name,
+                        abilities: hero.getAllAbilities(),
+                        // NEW: Add equipment count for Toras synchronization
+                        uniqueEquipmentCount: 0
+                    }
+                };
+                
+                // Calculate unique equipment count if hero is Toras
+                if (hero.name === 'Toras' && hero.equipment && hero.equipment.length > 0) {
+                    const uniqueEquipmentNames = new Set();
+                    hero.equipment.forEach(item => {
+                        const itemName = item.name || item.cardName;
+                        if (itemName) {
+                            uniqueEquipmentNames.add(itemName);
+                        }
+                    });
+                    actionData.attackerData.uniqueEquipmentCount = uniqueEquipmentNames.size;
                 }
+                
+                if (target) {
+                    if (target.type === 'creature') {
+                        actionData.targetData = {
+                            type: 'creature',
+                            absoluteSide: target.hero.absoluteSide,
+                            position: target.position,
+                            creatureIndex: target.creatureIndex,
+                            creatureName: target.creature.name
+                        };
+                    } else {
+                        actionData.targetData = {
+                            type: 'hero',
+                            absoluteSide: target.hero.absoluteSide,
+                            position: target.position,
+                            name: target.hero.name
+                        };
+                    }
+                }
+                
+                return actionData;
             };
-            
-            if (target) {
-                if (target.type === 'creature') {
-                    actionData.targetData = {
-                        type: 'creature',
-                        absoluteSide: target.hero.absoluteSide,
-                        position: target.position,
-                        creatureIndex: target.creatureIndex,
-                        creatureName: target.creature.name
-                    };
-                } else {
-                    actionData.targetData = {
-                        type: 'hero',
-                        absoluteSide: target.hero.absoluteSide,
-                        position: target.position,
-                        name: target.hero.name
-                    };
-                }
-            }
-            
-            return actionData;
-        };
 
-        return {
-            turn: this.currentTurn,
-            position: position,
-            playerAction: createActionData(playerHero, playerTarget, playerDamage),
-            opponentAction: createActionData(opponentHero, opponentTarget, opponentDamage)
-        };
-    }
+            return {
+                turn: this.currentTurn,
+                position: position,
+                playerAction: createActionData(playerHero, playerTarget, playerDamage),
+                opponentAction: createActionData(opponentHero, opponentTarget, opponentDamage)
+            };
+        }
 
     // Clear temporary modifiers at end of turn
     clearTurnModifiers(playerHero, opponentHero, position) {
@@ -1569,7 +1743,7 @@ export class BattleManager {
     }
 
     // Execute hero attacks with damage application
-     async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
+    async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
         if (playerAttack && opponentAttack) {
             // Both heroes attack - log host's attack first, then guest's attack
             let hostAttack, guestAttack;
@@ -1587,11 +1761,31 @@ export class BattleManager {
                 this.battleScreen.battleLog.logAttackMessage(hostAttack);
                 this.battleScreen.battleLog.logAttackMessage(guestAttack);
             }
-
             
             // Both heroes attack - collision animation (meet in middle)
             await this.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
+            // ============================================
+            // NEW: Apply damage modifier visual effects BEFORE damage
+            // ============================================
+            if (this.attackEffectsManager) {
+                // Small delay to let attack animation reach target
+                await this.delay(100);
+                
+                if (playerAttack.effectsTriggered && playerAttack.effectsTriggered.length > 0) {
+                    this.attackEffectsManager.applyDamageModifierEffects(playerAttack.effectsTriggered);
+                }
+                if (opponentAttack.effectsTriggered && opponentAttack.effectsTriggered.length > 0) {
+                    this.attackEffectsManager.applyDamageModifierEffects(opponentAttack.effectsTriggered);
+                }
+                
+                // Wait for effect animations
+                if (playerAttack.effectsTriggered?.length > 0 || opponentAttack.effectsTriggered?.length > 0) {
+                    await this.delay(400);
+                }
+            }
+            
+            // Apply damage with potentially modified values
             this.applyAttackDamageToTarget(playerAttack);
             this.applyAttackDamageToTarget(opponentAttack);
             
@@ -1611,7 +1805,23 @@ export class BattleManager {
             }
             
             await this.animationManager.animateHeroAttack(attack.hero, attack.target);
+            
+            // ============================================
+            // NEW: Apply damage modifier visual effects BEFORE damage
+            // ============================================
+            if (this.attackEffectsManager && attack.effectsTriggered && attack.effectsTriggered.length > 0) {
+                // Small delay to let attack animation complete
+                await this.delay(100);
+                
+                this.attackEffectsManager.applyDamageModifierEffects(attack.effectsTriggered);
+                
+                // Wait for effect animation
+                await this.delay(400);
+            }
+            
+            // Apply damage with potentially modified value
             this.applyAttackDamageToTarget(attack);
+            
             await this.animationManager.animateReturn(attack.hero, side);
         }
     }
@@ -1621,7 +1831,9 @@ export class BattleManager {
         if (!attack || !attack.target) return;
         
         if (attack.target.type === 'creature') {
-            // Apply damage to creature (creatures don't have toxic trap)
+            const wasAlive = attack.target.creature.alive;
+            
+            // Apply damage to creature
             this.authoritative_applyDamageToCreature({
                 hero: attack.target.hero,
                 creature: attack.target.creature,
@@ -1630,12 +1842,44 @@ export class BattleManager {
                 position: attack.target.position,
                 side: attack.target.side
             });
+            
+            // Check if creature died from this attack
+            if (wasAlive && !attack.target.creature.alive && this.isAuthoritative) {
+                // Use the Wanted Poster module's visual feedback function
+                recordKillWithVisualFeedback(this, attack.hero, attack.target.creature, 'creature');
+            }
+            
+            // Process attack effects for creature targets
+            if (this.attackEffectsManager) {
+                this.attackEffectsManager.processAttackEffects(
+                    attack.hero,
+                    attack.target.creature,
+                    attack.damage,
+                    'basic'
+                );
+            }
         } else {
-            // Hero-to-hero attack - check for toxic trap first
+            // Hero-to-hero attack
             const defender = attack.target.hero;
             const attacker = attack.hero;
             
+            const wasAlive = defender.alive;
             
+            // Check for toxic trap
+            if (this.checkAndApplyToxicTrap(attacker, defender)) {
+                // Toxic trap triggered - original attack is blocked
+                console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
+                return; // Don't process attack effects if attack was blocked
+            }
+
+            // Check for frost rune
+            if (this.checkAndApplyFrostRune(attacker, defender)) {
+                // Frost rune triggered - original attack is blocked
+                console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
+                return; // Don't process attack effects if attack was blocked
+            }
+            
+            // Apply the damage
             this.authoritative_applyDamage({
                 target: defender,
                 damage: attack.damage,
@@ -1643,16 +1887,20 @@ export class BattleManager {
                 died: (defender.currentHp - attack.damage) <= 0
             });
             
-            // Check for toxic trap
-            if (this.checkAndApplyToxicTrap(attacker, defender)) {
-                // Toxic trap triggered - original attack is blocked
-                console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
+            // Check if hero died from this attack
+            if (wasAlive && !defender.alive && this.isAuthoritative) {
+                // Use the Wanted Poster module's visual feedback function
+                recordKillWithVisualFeedback(this, attacker, defender, 'hero');
             }
 
-            // Check for frost rune
-            if (this.checkAndApplyFrostRune(attacker, defender)) {
-                // Frost rune triggered - original attack is blocked
-                console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
+            // Process attack effects for hero targets (after damage is applied)
+            if (this.attackEffectsManager) {
+                this.attackEffectsManager.processAttackEffects(
+                    attacker,
+                    defender,
+                    attack.damage,
+                    'basic'
+                );
             }
 
             // Check for fireshield recoil damage (only for hero-to-hero attacks)
@@ -1718,12 +1966,14 @@ export class BattleManager {
     }
 
     // Apply damage to a creature
-    authoritative_applyDamageToCreature(damageData) {
+    authoritative_applyDamageToCreature(damageData, context = {}) {
         if (!this.isAuthoritative) return;
         
         const { hero, creature, creatureIndex, damage, position, side } = damageData;
+        const { source, attacker } = context;
         
         const oldHp = creature.currentHp;
+        const wasAlive = creature.alive;
         creature.currentHp = Math.max(0, creature.currentHp - damage);
         creature.alive = creature.currentHp > 0;
         
@@ -1742,7 +1992,11 @@ export class BattleManager {
         const damageSource = arguments[1]?.source || 'attack';
         this.animationManager.createDamageNumberOnCreature(side, position, creatureIndex, damage, creature.maxHp, damageSource);
         
-        if (!creature.alive && oldHp > 0) {
+        if (!creature.alive && wasAlive) {
+            // If we have an attacker and it's a spell kill, record with visual feedback
+            if (attacker && source === 'spell') {
+                recordKillWithVisualFeedback(this, attacker, creature, 'creature');
+            }
             this.handleCreatureDeath(hero, creature, creatureIndex, side, position);
         }
         
@@ -1864,11 +2118,13 @@ export class BattleManager {
     }
 
     // Apply damage to target
-    authoritative_applyDamage(damageResult) {
+    authoritative_applyDamage(damageResult, context = {}) {
         if (!this.isAuthoritative) return;
 
         const { target, damage, newHp, died } = damageResult;
+        const { source, attacker } = context;
         
+        const wasAlive = target.alive;
         const result = target.takeDamage(damage);
         
         if (!this.totalDamageDealt[target.absoluteSide]) {
@@ -1885,7 +2141,11 @@ export class BattleManager {
         const damageSource = arguments[1]?.source || 'attack';
         this.animationManager.createDamageNumber(target.side, target.position, damage, target.maxHp, damageSource);
         
-        if (result.died && result.oldHp > 0) {
+        if (result.died && wasAlive) {
+            // If we have an attacker and it's a spell kill, record with visual feedback
+            if (attacker && source === 'spell') {
+                recordKillWithVisualFeedback(this, attacker, target, 'hero');
+            }
             this.handleHeroDeath(target);
         }
 
@@ -1912,8 +2172,6 @@ export class BattleManager {
             if (message.type === 'guest_reconnection_ready') {
                 this.handleGuestReconnectionReady();
             }
-            // Don't return early - let host process other messages too if needed
-            //return;
         }
         
 
@@ -1973,6 +2231,10 @@ export class BattleManager {
                 this.guest_handleStatusEffectChange(data);
                 break;
 
+            case 'kill_tracked':
+                this.guest_handleKillTracked(data);
+                break;
+
 
 
                 
@@ -1987,6 +2249,20 @@ export class BattleManager {
                 if (this.jigglesManager) {
                     this.jigglesManager.handleGuestSpecialAttack(data);
                 }
+                break;
+
+
+
+            case 'blade_frost_triggered':
+                this.guest_handleBladeFrostTriggered(data);
+                break;
+
+            case 'sun_sword_burn':
+                this.guest_handleSunSwordBurn(data);
+                break;
+                
+            case 'sun_sword_frozen_resist':
+                this.guest_handleSunSwordFrozenResist(data);
                 break;
 
 
@@ -2033,9 +2309,32 @@ export class BattleManager {
             console.warn('Received spell effect but spell system not initialized');
         }
     }
+    
+    guest_handleKillTracked(data) {
+        if (this.killTracker) {
+            this.killTracker.handleSyncedKill(data);
+        }
+    }
+
+    guest_handleBladeFrostTriggered(data) {
+        if (this.attackEffectsManager) {
+            this.attackEffectsManager.handleGuestBladeFrostTrigger(data);
+        }
+    }
+
+    guest_handleSunSwordBurn(data) {
+        if (this.attackEffectsManager && this.attackEffectsManager.sunSwordEffect) {
+            this.attackEffectsManager.sunSwordEffect.handleGuestSunSwordBurn(data);
+        }
+    }
+
+    guest_handleSunSwordFrozenResist(data) {
+        if (this.attackEffectsManager && this.attackEffectsManager.sunSwordEffect) {
+            this.attackEffectsManager.sunSwordEffect.handleGuestFrozenResistance(data);
+        }
+    }
 
     guest_handleFireshieldApplied(data) {
-        // Forward to the fireshield spell implementation if available
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Fireshield')) {
             const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
             fireshieldSpell.handleGuestFireshieldApplied(data);
@@ -2045,7 +2344,6 @@ export class BattleManager {
     }
 
     guest_handleToxicTrapApplied(data) {
-        // Forward to the toxic trap spell implementation if available
         if (this.spellSystem && this.spellSystem.spellImplementations.has('ToxicTrap')) {
             const toxicTrapSpell = this.spellSystem.spellImplementations.get('ToxicTrap');
             toxicTrapSpell.handleGuestToxicTrapApplied(data);
@@ -2055,7 +2353,6 @@ export class BattleManager {
     }
 
     guest_handleFrostRuneApplied(data) {
-        // Forward to the frost rune spell implementation if available
         if (this.spellSystem && this.spellSystem.spellImplementations.has('FrostRune')) {
             const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
             frostRuneSpell.handleGuestFrostRuneApplied(data);
@@ -2068,7 +2365,6 @@ export class BattleManager {
         return this.spellSystem ? this.spellSystem.getSpellStatistics() : null;
     }
 
-    // Handle randomness seed from host (for GUEST)
     guest_handleRandomnessSeed(data) {
         const { seed } = data;
         if (seed) {
@@ -2092,6 +2388,16 @@ export class BattleManager {
     guest_handleTurnStart(data) {
         this.currentTurn = data.turn;
         this.addCombatLog(`📍 Turn ${this.currentTurn} begins`, 'info');
+        
+        // NEW: Clear any cached equipment counts at turn start
+        ['left', 'center', 'right'].forEach(position => {
+            if (this.playerHeroes[position]) {
+                delete this.playerHeroes[position]._syncedUniqueEquipmentCount;
+            }
+            if (this.opponentHeroes[position]) {
+                delete this.opponentHeroes[position]._syncedUniqueEquipmentCount;
+            }
+        });
     }
 
     // GUEST: Handle creature action
@@ -2114,8 +2420,8 @@ export class BattleManager {
     }
 
     // GUEST: Handle combined turn execution
-    async guest_handleCombinedTurnExecution(data) {
-        const { playerAction, opponentAction, position } = data;
+        async guest_handleCombinedTurnExecution(data) {
+        const { playerAction, opponentAction, position, damageModifiers } = data;  // NEW: damageModifiers added
         
         this.updateGuestHeroDisplays(playerAction, opponentAction);
         
@@ -2135,9 +2441,78 @@ export class BattleManager {
             await this.guest_executeSingleAttack(opponentAction);
         }
         
+        // ============================================
+        // Handle damage modifier visual effects for guest
+        // ============================================
+        if (damageModifiers && this.attackEffectsManager && this.attackEffectsManager.mastersSwordEffect) {
+            // Small delay to sync with animation timing
+            await this.delay(100);
+            
+            if (damageModifiers.player && damageModifiers.player.length > 0) {
+                for (const mod of damageModifiers.player) {
+                    if (mod.name === 'TheMastersSword' && playerAction && playerAction.targetData) {
+                        // Find the target and apply visual effect
+                        const target = this.findTargetFromActionData(playerAction.targetData);
+                        if (target) {
+                            this.attackEffectsManager.mastersSwordEffect.createSwordSlashAnimation(
+                                target,
+                                mod.swordCount,
+                                mod.multiplier
+                            );
+                            this.addCombatLog(
+                                `⚔️ The Master's Sword activates! Damage ×${mod.multiplier}!`,
+                                'success'
+                            );
+                        }
+                    }
+                }
+            }
+            
+            if (damageModifiers.opponent && damageModifiers.opponent.length > 0) {
+                for (const mod of damageModifiers.opponent) {
+                    if (mod.name === 'TheMastersSword' && opponentAction && opponentAction.targetData) {
+                        // Find the target and apply visual effect
+                        const target = this.findTargetFromActionData(opponentAction.targetData);
+                        if (target) {
+                            this.attackEffectsManager.mastersSwordEffect.createSwordSlashAnimation(
+                                target,
+                                mod.swordCount,
+                                mod.multiplier
+                            );
+                            this.addCombatLog(
+                                `⚔️ Opponent's Master's Sword activates! Damage ×${mod.multiplier}!`,
+                                'error'
+                            );
+                        }
+                    }
+                }
+            }
+            
+            // Wait for effect animations if any were triggered
+            if ((damageModifiers.player?.length > 0) || (damageModifiers.opponent?.length > 0)) {
+                await this.delay(400);
+            }
+        }
+        
         this.clearAllTemporaryModifiers();
         
         this.sendAcknowledgment('turn_complete');
+    }
+
+    findTargetFromActionData(targetData) {
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        if (targetData.type === 'hero') {
+            const heroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+            return heroes[targetData.position];
+        } else if (targetData.type === 'creature') {
+            const heroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+            const hero = heroes[targetData.position];
+            return hero?.creatures?.[targetData.creatureIndex];
+        }
+        
+        return null;
     }
 
     // GUEST: Handle actor action (creatures or heroes)
@@ -2161,7 +2536,7 @@ export class BattleManager {
 
     // GUEST: Handle hero turn execution (reuse existing logic)
     async guest_handleHeroTurnExecution(data) {
-        // This is essentially the same as guest_handleCombinedTurnExecution
+        // This now includes damage modifier handling through guest_handleCombinedTurnExecution
         await this.guest_handleCombinedTurnExecution(data);
     }
 
@@ -2182,6 +2557,10 @@ export class BattleManager {
             const hero = heroesObj[action.attackerData.position];
             
             if (hero) {
+                // Store the unique equipment count from the authoritative source
+                if (action.attackerData.name === 'Toras' && action.attackerData.uniqueEquipmentCount !== undefined) {
+                    hero._syncedUniqueEquipmentCount = action.attackerData.uniqueEquipmentCount;
+                }
                 this.updateHeroAttackDisplay(localSide, action.attackerData.position, hero);
             }
         };
@@ -3196,6 +3575,7 @@ export class BattleManager {
             heroEffects: this.heroEffects,
             fieldEffects: this.fieldEffects,
             totalDamageDealt: this.totalDamageDealt,
+            killTrackerState: this.killTracker ? this.killTracker.exportState() : null,
             abilitiesUsed: this.abilitiesUsed,
             weatherEffects: this.weatherEffects,
             terrainModifiers: this.terrainModifiers,
@@ -3260,12 +3640,14 @@ export class BattleManager {
             this.terrainModifiers = stateData.terrainModifiers || [];
             this.specialRules = stateData.specialRules || [];
 
-            // Restore randomness state
             if (stateData.randomnessState) {
                 this.randomnessManager.importState(stateData.randomnessState);
             }
 
-            // NEW: Restore BattleLog state
+            if (stateData.killTrackerState && this.killTracker) {
+                this.killTracker.importState(stateData.killTrackerState);
+            }
+
             if (stateData.battleLogState && this.battleScreen && this.battleScreen.restoreBattleLogState) {
                 this.battleScreen.restoreBattleLogState(stateData.battleLogState);
                 console.log('📜 BattleLog state restored');
@@ -3501,6 +3883,11 @@ export class BattleManager {
             this.animationManager = null;
         }
         
+        if (this.attackEffectsManager) {
+            this.attackEffectsManager.cleanup();
+            this.attackEffectsManager = null;
+        }
+
         if (this.persistenceManager) {
             this.persistenceManager.cleanup();
         }
@@ -3508,6 +3895,10 @@ export class BattleManager {
         if (this.statusEffectsManager) {
             this.statusEffectsManager.cleanup();
             this.statusEffectsManager = null;
+        }
+
+        if (this.killTracker) {
+            this.killTracker.reset();
         }
         
         // NEW: Reset BattleLog through BattleScreen

@@ -192,7 +192,7 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
-            }, { source: 'spell' });
+            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
             
         } else if (target.type === 'creature') {
             // Apply damage to creature
@@ -203,7 +203,7 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 position: target.position,
                 side: target.side
-            }, { source: 'spell' });
+            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
         }
     }
 

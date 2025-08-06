@@ -139,6 +139,31 @@ export class StatusEffectsManager {
             console.log(`⚰️ Ignoring status effect application to dead target: ${target.name}`);
             return false;
         }
+        
+        // ☀️ TheSunSword: Check for frozen resistance  // <-- ADD THIS ENTIRE BLOCK
+        if (effectName === 'frozen' && this.battleManager && this.battleManager.attackEffectsManager) {
+            const sunSwordEffect = this.battleManager.attackEffectsManager.sunSwordEffect;
+            
+            if (sunSwordEffect && sunSwordEffect.checkFrozenResistance(target)) {
+                // Resistance successful!
+                sunSwordEffect.createFrozenResistanceEffect(target);
+                
+                this.battleManager.addCombatLog(
+                    `☀️ ${target.name}'s Sun Sword resists the frozen effect!`,
+                    target.side === 'player' ? 'success' : 'info'
+                );
+                
+                // Sync to guest if host
+                if (this.battleManager.isAuthoritative) {
+                    this.battleManager.sendBattleUpdate('sun_sword_frozen_resist', {
+                        targetInfo: this.getTargetSyncInfo(target),
+                        timestamp: Date.now()
+                    });
+                }
+                
+                return false; // Don't apply the frozen effect
+            }
+        }
 
         // Handle special interactions BEFORE applying the effect
         this.handleStatusInteractions(target, effectName);

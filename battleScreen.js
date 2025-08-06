@@ -46,7 +46,8 @@ export class BattleScreen {
         playerAbilities = null, opponentAbilities = null,
         playerSpellbooks = null, opponentSpellbooks = null,
         actionManager = null,
-        playerCreatures = null, opponentCreatures = null) {
+        playerCreatures = null, opponentCreatures = null,
+        playerEquips = null, opponentEquips = null) {
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -61,7 +62,9 @@ export class BattleScreen {
         this.playerSpellbooks = playerSpellbooks;
         this.opponentSpellbooks = opponentSpellbooks;
         this.playerCreatures = playerCreatures;  
-        this.opponentCreatures = opponentCreatures;  
+        this.opponentCreatures = opponentCreatures;
+        this.playerEquips = playerEquips;
+        this.opponentEquips = opponentEquips;
         
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
@@ -79,7 +82,9 @@ export class BattleScreen {
             playerSpellbooks,
             opponentSpellbooks,
             playerCreatures, 
-            opponentCreatures  
+            opponentCreatures,
+            playerEquips,
+            opponentEquips
         );
     }
 
@@ -329,6 +334,7 @@ export class BattleScreen {
                     this.battleManager.opponentAbilities,
                     this.battleManager.opponentSpellbooks,
                     this.battleManager.opponentCreatures,
+                    this.battleManager.opponentEquips,
                     'host' // Host is always the opponent for guest
                 );
             }
@@ -394,6 +400,7 @@ export class BattleScreen {
                     this.battleManager.opponentAbilities,
                     this.battleManager.opponentSpellbooks,
                     this.battleManager.opponentCreatures,
+                    this.battleManager.opponentEquips,
                     'guest' // Guest is the opponent for host
                 );
                 
@@ -1098,7 +1105,13 @@ export class BattleScreen {
 
         // Get creature count
         const creatureCount = hero.creatures ? hero.creatures.length : 0;
-                
+        
+        // Get equipment from the hero (sorted alphabetically)
+        const equipment = hero.getEquipment ? hero.getEquipment() : [];
+
+        console.log("--- TEST EQUIPMENT ---")
+        console.log(equipment);
+                    
         // Create a floating tooltip to show abilities
         const existingTooltip = document.querySelector('.hero-abilities-debug');
         if (existingTooltip) {
@@ -1217,6 +1230,29 @@ export class BattleScreen {
             spellbookHTML = '<div style="color: #999;">No spells learned</div>';
         }
         
+        // Format equipment for display
+        let equipmentHTML = '';
+        if (equipment.length > 0) {
+            equipmentHTML = '<div class="equipment-list">';
+            
+            equipment.forEach(item => {
+                const itemName = item.name || item.cardName || 'Unknown Item';
+                const itemCost = item.cost !== undefined ? item.cost : 0;
+                
+                equipmentHTML += `
+                    <div class="equipment-item">
+                        <span class="equipment-icon">⚔️</span>
+                        <span class="equipment-name">${this.formatCardName(itemName)}</span>
+                        ${itemCost > 0 ? `<span class="equipment-cost">${itemCost}💰</span>` : ''}
+                    </div>
+                `;
+            });
+            
+            equipmentHTML += '</div>';
+        } else {
+            equipmentHTML = '<div style="color: #999;">No equipment</div>';
+        }
+        
         tooltip.innerHTML = `
             <div class="hero-tooltip-container">
                 <h4 class="hero-tooltip-title">${hero.name}${creatureCount > 0 ? ` (${creatureCount} creatures)` : ''}</h4>
@@ -1234,6 +1270,15 @@ export class BattleScreen {
                         ${spellbookHTML}
                     </div>
                 </div>
+                
+                ${equipment.length > 0 ? `
+                    <div class="equipment-section">
+                        <h5 class="section-title">🛡️ Equipment (${equipment.length})</h5>
+                        <div class="equipment-content">
+                            ${equipmentHTML}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
         
@@ -1248,6 +1293,9 @@ export class BattleScreen {
             z-index: 10000;
             pointer-events: none;
             animation: fadeIn 0.3s ease-out;
+            max-height: 40vh;  /* Add max height - 60% of viewport height */
+            overflow-y: auto;  /* Add scrollbar when needed */
+            overflow-x: hidden;
         `;
         
         // Add to body first to calculate dimensions
@@ -1256,11 +1304,10 @@ export class BattleScreen {
         // Calculate position after adding to DOM
         const tooltipRect = tooltip.getBoundingClientRect();
         const leftPos = heroRect.left + (heroRect.width / 2) - (tooltipRect.width / 2);
-        const topPos = heroRect.top - tooltipRect.height - 10; // 10px gap above hero
+        let topPos = heroRect.top - tooltipRect.height - 10; // 10px gap above hero
         
         // Apply calculated position
         tooltip.style.left = `${leftPos}px`;
-        tooltip.style.top = `${topPos}px`;
         
         // Check if tooltip goes off screen and adjust
         if (leftPos < 10) {
@@ -1271,8 +1318,28 @@ export class BattleScreen {
         
         if (topPos < 10) {
             // If tooltip would go off top, position it below the hero instead
-            tooltip.style.top = `${heroRect.bottom + 10}px`;
+            topPos = heroRect.bottom + 10;
         }
+        
+        // If still too tall, just position at top with margin
+        if (topPos + tooltipRect.height > window.innerHeight - 10) {
+            topPos = 10;
+        }
+        
+        tooltip.style.top = `${topPos}px`;
+        
+        // Add global wheel event listener for scrolling the tooltip
+        const wheelHandler = (e) => {
+            const activeTooltip = document.querySelector('.hero-abilities-debug');
+            if (activeTooltip) {
+                e.preventDefault(); // Prevent any page scrolling
+                activeTooltip.scrollTop += e.deltaY;
+            }
+        };
+        
+        // Store handler reference so we can remove it later
+        tooltip._wheelHandler = wheelHandler;
+        document.addEventListener('wheel', wheelHandler, { passive: false });
     }
 
     // Ensure tooltip styles are loaded
@@ -1299,6 +1366,32 @@ export class BattleScreen {
                 backdrop-filter: blur(10px);
             }
             
+            /* Custom scrollbar for the tooltip */
+            .hero-abilities-debug::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .hero-abilities-debug::-webkit-scrollbar-track {
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 4px;
+            }
+            
+            .hero-abilities-debug::-webkit-scrollbar-thumb {
+                background: rgba(102, 126, 234, 0.6);
+                border-radius: 4px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            
+            .hero-abilities-debug::-webkit-scrollbar-thumb:hover {
+                background: rgba(102, 126, 234, 0.8);
+            }
+            
+            /* Firefox scrollbar */
+            .hero-abilities-debug {
+                scrollbar-width: thin;
+                scrollbar-color: rgba(102, 126, 234, 0.6) rgba(0, 0, 0, 0.3);
+            }
+            
             .hero-tooltip-title {
                 margin: 0 0 15px 0;
                 color: #fff;
@@ -1313,11 +1406,13 @@ export class BattleScreen {
             }
             
             .abilities-section,
-            .spellbook-section {
+            .spellbook-section,
+            .equipment-section {
                 margin-bottom: 15px;
             }
             
-            .spellbook-section {
+            .spellbook-section,
+            .equipment-section {
                 border-top: 1px solid rgba(102, 126, 234, 0.3);
                 padding-top: 15px;
             }
@@ -1345,27 +1440,32 @@ export class BattleScreen {
                 border-left: 3px solid #667eea;
             }
             
-            .spellbook-content {
+            .spellbook-content,
+            .equipment-content {
                 max-height: 400px;
                 overflow-y: auto;
                 padding-right: 5px;
             }
             
-            .spellbook-content::-webkit-scrollbar {
+            .spellbook-content::-webkit-scrollbar,
+            .equipment-content::-webkit-scrollbar {
                 width: 6px;
             }
             
-            .spellbook-content::-webkit-scrollbar-track {
+            .spellbook-content::-webkit-scrollbar-track,
+            .equipment-content::-webkit-scrollbar-track {
                 background: rgba(0, 0, 0, 0.2);
                 border-radius: 3px;
             }
             
-            .spellbook-content::-webkit-scrollbar-thumb {
+            .spellbook-content::-webkit-scrollbar-thumb,
+            .equipment-content::-webkit-scrollbar-thumb {
                 background: rgba(102, 126, 234, 0.5);
                 border-radius: 3px;
             }
             
-            .spellbook-content::-webkit-scrollbar-thumb:hover {
+            .spellbook-content::-webkit-scrollbar-thumb:hover,
+            .equipment-content::-webkit-scrollbar-thumb:hover {
                 background: rgba(102, 126, 234, 0.7);
             }
             
@@ -1439,6 +1539,53 @@ export class BattleScreen {
             .spellbook-list {
                 font-size: 14px;
             }
+            
+            /* Equipment styles */
+            .equipment-list {
+                font-size: 14px;
+                padding-left: 10px;
+            }
+            
+            .equipment-item {
+                background: rgba(255, 193, 7, 0.1);
+                border: 1px solid rgba(255, 193, 7, 0.2);
+                border-radius: 6px;
+                padding: 8px 12px;
+                margin: 6px 0;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.2s ease;
+            }
+            
+            .equipment-item:hover {
+                background: rgba(255, 193, 7, 0.15);
+                border-color: rgba(255, 193, 7, 0.3);
+                transform: translateX(2px);
+                box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+            }
+            
+            .equipment-icon {
+                font-size: 16px;
+                filter: drop-shadow(0 0 2px rgba(255, 193, 7, 0.5));
+            }
+            
+            .equipment-name {
+                flex: 1;
+                font-weight: 600;
+                color: #ffd700;
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            }
+            
+            .equipment-cost {
+                font-size: 12px;
+                padding: 2px 6px;
+                background: rgba(255, 193, 7, 0.2);
+                border-radius: 10px;
+                color: #ffd700;
+                font-weight: bold;
+                white-space: nowrap;
+            }
         `;
         
         document.head.appendChild(style);
@@ -1458,6 +1605,11 @@ export class BattleScreen {
     hideHeroInBattleTooltip() {
         const tooltip = document.querySelector('.hero-abilities-debug');
         if (tooltip) {
+            // Remove the wheel event listener
+            if (tooltip._wheelHandler) {
+                document.removeEventListener('wheel', tooltip._wheelHandler);
+            }
+            
             tooltip.style.animation = 'fadeOut 0.3s ease-out';
             setTimeout(() => tooltip.remove(), this.getSpeedAdjustedDelay(300));
         }

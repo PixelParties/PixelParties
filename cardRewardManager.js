@@ -2,10 +2,10 @@
 
 import { CardPreviewManager } from './cardPreviewManager.js';
 import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js';
-import { killTracker } from '../killTracker.js';
+import { killTracker } from './killTracker.js';
 
 
-import { calculateFormationWantedPosterBonuses, generateWantedPosterBonusHTML, getWantedPosterStyles } from '../Artifacts/wantedPoster.js';
+import { calculateFormationWantedPosterBonuses, generateWantedPosterBonusHTML, getWantedPosterStyles } from './Artifacts/wantedPoster.js';
 
 import ThievingManager from './Abilities/thieving.js';
 

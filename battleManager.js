@@ -450,7 +450,7 @@ export class BattleManager {
                         let hpMultiplier = 1.0;
                         if (hero.hasAbility('SummoningMagic')) {
                             const summoningMagicLevel = hero.getAbilityStackCount('SummoningMagic');
-                            hpMultiplier = 1 + (0.1 * summoningMagicLevel); // +10% per level
+                            hpMultiplier = 1 + (0.5 * summoningMagicLevel); // +50% per level
                         }
                         
                         const finalHp = Math.floor(baseHp * hpMultiplier);

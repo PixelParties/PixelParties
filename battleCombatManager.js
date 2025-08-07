@@ -439,7 +439,6 @@ export class BattleCombatManager {
             if (this.checkAndApplyFrostRune(attacker, defender)) {
                 // Frost rune triggered - original attack is blocked
                 console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
-                return; // Don't process attack effects if attack was blocked
             }
             
             // Apply the damage

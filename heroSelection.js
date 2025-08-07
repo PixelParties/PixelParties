@@ -22,6 +22,8 @@ import { leadershipAbility } from './Abilities/leadership.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
 
+import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
+
 
 export class HeroSelection {
     constructor() {
@@ -70,6 +72,8 @@ export class HeroSelection {
 
         this.nicolasEffectManager = new NicolasEffectManager();
 
+        this.crusaderArtifactsHandler = crusaderArtifactsHandler;
+
         // Initialize hero abilities manager with references
         this.heroAbilitiesManager.init(
             this.handManager,
@@ -79,7 +83,7 @@ export class HeroSelection {
                 this.updateBattleFormationUI();
                 this.updateHandDisplay();
                 
-                // NEW: Update potion bonuses when abilities change
+                // Update potion bonuses when abilities change
                 this.potionHandler.updateAlchemyBonuses(this);
                 
                 await this.saveGameState();
@@ -160,6 +164,7 @@ export class HeroSelection {
         this.gameDataSender = gameDataSender;
         this.onSelectionComplete = onSelectionComplete;
         this.roomManager = roomManager;
+
         
         // Initialize turn tracker with dependencies
         this.turnTracker.init(
@@ -188,6 +193,8 @@ export class HeroSelection {
         this.stateMachine.onStateChange((fromState, toState, context) => {
             console.log(`HeroSelection state changed: ${fromState} -> ${toState}`, context);
         });
+
+        this.crusaderArtifactsHandler.init(this);
         
         return this.loadCharacters();
     }
@@ -1254,6 +1261,13 @@ export class HeroSelection {
         if (data.creatures) {
             // Store for later use when battle starts
             this.opponentCreaturesData = data.creatures;
+        }
+        
+        // Store opponent equipment if included - THIS WAS MISSING!
+        if (data.equipment) {
+            // Store for later use when battle starts
+            this.opponentEquipmentData = data.equipment;
+            console.log('📦 Received opponent equipment data:', data.equipment);
         }
     }
 
@@ -2605,6 +2619,11 @@ export class HeroSelection {
         // Reset Nicolas effect manager
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.reset();
+        }
+        
+        // Reset crusader artifacts handler
+        if (this.crusaderArtifactsHandler) {
+            this.crusaderArtifactsHandler.reset();
         }
         
         // Hide battle waiting overlay

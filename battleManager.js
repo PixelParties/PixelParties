@@ -1,4 +1,4 @@
-// battleManager.js - Complete Battle Manager with BattleLog Integration
+// battleManager.js - Complete Battle Manager with BattleLog Integration (REFACTORED)
 
 import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
@@ -10,11 +10,11 @@ import StatusEffectsManager from './statusEffects.js';
 import AttackEffectsManager from './attackEffects.js';
 import { killTracker } from './killTracker.js';
 
-
 import { BattleRandomnessManager } from './battleRandomnessManager.js';
 import { BattleAnimationManager } from './battleAnimationManager.js';
-
-
+import { BattleNetworkManager } from './battleNetworkManager.js';  
+import { BattleFlowManager } from './battleFlowManager.js';
+import { BattleCombatManager } from './battleCombatManager.js';
 
 import { NecromancyManager } from './Abilities/necromancy.js';
 import { ResistanceManager, applyResistancePatches } from './Abilities/resistance.js';
@@ -22,6 +22,7 @@ import { ResistanceManager, applyResistancePatches } from './Abilities/resistanc
 import JigglesCreature from './Creatures/jiggles.js';
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
+import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 
 
 export class BattleManager {
@@ -46,13 +47,11 @@ export class BattleManager {
         // CENTRALIZED AUTHORITY: Only host runs simulation
         this.isAuthoritative = false;
         
-        // CONNECTION-AWARE SIMULATION
-        this.opponentConnected = true;
-        this.battlePaused = false;
+        // Room manager reference
         this.roomManager = null;
-        this.connectionListener = null;
-        this.pauseStartTime = null;
-        this.totalPauseTime = 0;
+        
+        this.flowManager = null;
+        this.combatManager = null;
         
         // Spell System
         this.spellSystem = null;
@@ -65,15 +64,19 @@ export class BattleManager {
 
         // Attack effects
         this.attackEffectsManager = null;
-
-        // OPTIMIZED SYNCHRONIZATION
-        this.pendingAcks = {};
-        this.ackTimeouts = {};
-        this.connectionLatency = 100;
         
         // PERSISTENCE INTEGRATION
         this.persistenceManager = null;
+
         
+        
+        // Individual cards
+        this.crusaderArtifactsHandler = null;
+        
+
+
+
+
         // EXTENSIBLE STATE
         this.globalEffects = [];
         this.heroEffects = {};
@@ -92,8 +95,8 @@ export class BattleManager {
         // DETERMINISTIC RANDOMNESS SYSTEM
         this.randomnessManager = new BattleRandomnessManager(this);
 
-        this.tabWasHidden = false;
-        this.setupTabVisibilityListener();
+        // NETWORK MANAGER - NEW
+        this.networkManager = new BattleNetworkManager(this);
         
         this.statusEffectsManager = null;
         this.animationManager = null;
@@ -106,6 +109,90 @@ export class BattleManager {
         }
     }
 
+    // ============================================
+    // NETWORK FUNCTIONALITY WRAPPERS
+    // ============================================
+
+    // Connection monitoring wrappers
+    setupOpponentConnectionMonitoring() {
+        return this.networkManager.setupOpponentConnectionMonitoring();
+    }
+
+    pauseBattle(reason) {
+        return this.networkManager.pauseBattle(reason);
+    }
+
+    async resumeBattle(reason) {
+        return await this.networkManager.resumeBattle(reason);
+    }
+
+    handleGuestReconnecting() {
+        return this.networkManager.handleGuestReconnecting();
+    }
+
+    handleGuestReconnectionReady() {
+        return this.networkManager.handleGuestReconnectionReady();
+    }
+
+    handleGuestReconnectionTimeout() {
+        return this.networkManager.handleGuestReconnectionTimeout();
+    }
+
+    // Battle data sync wrappers
+    sendBattleUpdate(type, data) {
+        return this.networkManager.sendBattleUpdate(type, data);
+    }
+
+    sendBattleData(type, data) {
+        return this.networkManager.sendBattleData(type, data);
+    }
+
+    // Acknowledgment system wrappers
+    async waitForGuestAcknowledgment(ackType, timeout = 500) {
+        return await this.networkManager.waitForGuestAcknowledgment(ackType, timeout);
+    }
+
+    receiveBattleAcknowledgment(ackData) {
+        return this.networkManager.receiveBattleAcknowledgment(ackData);
+    }
+
+    sendAcknowledgment(ackType) {
+        return this.networkManager.sendAcknowledgment(ackType);
+    }
+
+    getAdaptiveTimeout() {
+        return this.networkManager.getAdaptiveTimeout();
+    }
+
+    // Main receive battle data wrapper
+    receiveBattleData(message) {
+        return this.networkManager.receiveBattleData(message);
+    }
+
+    // Property accessors for moved properties
+    get opponentConnected() {
+        return this.networkManager.opponentConnected;
+    }
+
+    set opponentConnected(value) {
+        this.networkManager.opponentConnected = value;
+    }
+
+    get battlePaused() {
+        return this.networkManager.battlePaused;
+    }
+
+    set battlePaused(value) {
+        this.networkManager.battlePaused = value;
+    }
+
+    get guestReconnecting() {
+        return this.networkManager.guestReconnecting;
+    }
+
+    set guestReconnecting(value) {
+        this.networkManager.guestReconnecting = value;
+    }
 
     // ============================================
     // DETERMINISTIC RANDOMNESS SYSTEM - DELEGATED
@@ -214,7 +301,7 @@ export class BattleManager {
             this.persistenceManager = new BattlePersistenceManager(this.roomManager, this.isHost);
         }
         
-        // Setup connection monitoring (only for host)
+        // Setup connection monitoring (now through network manager)
         if (this.isAuthoritative && this.roomManager) {
             this.setupOpponentConnectionMonitoring();
         }
@@ -251,6 +338,14 @@ export class BattleManager {
         // Initialize Attack Effects Manager
         this.attackEffectsManager = new AttackEffectsManager(this);
         this.attackEffectsManager.init();
+        
+        // Initialize flow manager (add this after other manager initializations)
+        this.flowManager = new BattleFlowManager(this);
+        this.combatManager = new BattleCombatManager(this);
+
+
+        this.crusaderArtifactsHandler = crusaderArtifactsHandler;
+        this.crusaderArtifactsHandler.initBattleEffects(this);
     }
 
     setBattleSpeed(speed) {
@@ -297,24 +392,6 @@ export class BattleManager {
         }
     }
 
-    setupTabVisibilityListener() {
-        if (typeof document !== 'undefined') {
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    this.tabWasHidden = true;
-                } else if (this.tabWasHidden) {
-                    this.tabWasHidden = false;
-                    // Clear any stuck pause overlays after a brief delay (speed-adjusted)
-                    setTimeout(() => {
-                        if (this.opponentConnected && this.battlePaused) {
-                            this.resumeBattle('Tab visibility restored');
-                        }
-                    }, this.getSpeedAdjustedDelay(1000));
-                }
-            });
-        }
-    }
-
     getSpeedAdjustedDelay(ms) {
         if (this.speedManager) {
             return this.speedManager.calculateAdjustedDelay(ms);
@@ -324,203 +401,14 @@ export class BattleManager {
         }
     }
 
-    // Setup monitoring of opponent's connection status
-    setupOpponentConnectionMonitoring() {
-        if (!this.roomManager || !this.roomManager.getRoomRef()) {
-            return;
-        }
-
-        const roomRef = this.roomManager.getRoomRef();
-        
-        this.connectionListener = roomRef.on('value', (snapshot) => {
-            const room = snapshot.val();
-            if (!room) return;
-
-            const guestOnline = room.guestOnline || false;
-            const guestConnected = room.guest && guestOnline;
-            const guestReconnecting = room.guestReconnecting || false; // NEW
-            
-            const wasConnected = this.opponentConnected;
-            this.opponentConnected = guestConnected;
-            
-            // NEW: Check if guest is reconnecting
-            if (guestReconnecting && !this.guestReconnecting) {
-                this.handleGuestReconnecting();
-                return;
-            }
-            
-            if (wasConnected && !guestConnected) {
-                // Don't pause immediately if this might be a tab switch
-                if (this.tabWasHidden) {
-                    console.log('Opponent appears disconnected but our tab was hidden - waiting before pausing');
-                    setTimeout(() => {
-                        if (!this.opponentConnected && this.battleActive) {
-                            this.pauseBattle('Guest disconnected');
-                        }
-                    }, this.getSpeedAdjustedDelay(3000)); // Wait 3 seconds before pausing (speed-adjusted)
-                } else {
-                    this.pauseBattle('Guest disconnected');
-                }
-            }
-        });
-    }
-
-    // Pause battle simulation
-    pauseBattle(reason) {
-        if (!this.isAuthoritative || this.battlePaused) return;
-        
-        this.battlePaused = true;
-        this.pauseStartTime = Date.now();
-        
-        this.addCombatLog(`⏸️ Battle paused: ${reason}`, 'warning');
-        this.addCombatLog('⏳ Waiting for opponent to reconnect...', 'info');
-        
-        this.saveBattleStateToPersistence();
-        
-        this.sendBattleUpdate('battle_paused', {
-            reason: reason,
-            timestamp: Date.now()
-        });
-        
-        this.showBattlePauseUI(reason);
-    }
-
-    // Resume battle simulation
-    async resumeBattle(reason) {
-        if (!this.isAuthoritative || !this.battlePaused) return;
-        
-        this.battlePaused = false;
-        
-        if (this.pauseStartTime) {
-            this.totalPauseTime += Date.now() - this.pauseStartTime;
-            this.pauseStartTime = null;
-        }
-        
-        this.addCombatLog(`▶️ Battle resumed: ${reason}`, 'success');
-        this.addCombatLog('⚔️ Continuing from where we left off...', 'info');
-        
-        await this.saveBattleStateToPersistence();
-        
-        this.sendBattleUpdate('battle_resumed', {
-            reason: reason,
-            timestamp: Date.now()
-        });
-    
-        this.hideBattlePauseUI();
-        
-        // Force clear overlay if it's still there
-        setTimeout(() => {
-            this.clearStuckPauseOverlay();
-        }, 500);
-        
-        if (this.battleActive && !this.checkBattleEnd()) {
-            setTimeout(() => {
-                this.authoritative_battleLoop();
-            }, 500);
-        }
-    }
-
     // Show battle pause UI
     showBattlePauseUI(reason) {
-        const existingOverlay = document.getElementById('battlePauseOverlay');
-        if (existingOverlay) existingOverlay.remove();
-        
-        const pauseOverlay = document.createElement('div');
-        pauseOverlay.id = 'battlePauseOverlay';
-        pauseOverlay.className = 'battle-pause-overlay';
-        pauseOverlay.innerHTML = `
-            <div class="battle-pause-content">
-                <div class="pause-icon">⏸️</div>
-                <h2>Battle Paused</h2>
-                <p>${reason}</p>
-                <div class="pause-spinner"></div>
-                <div class="pause-details">
-                    <p>• Battle state is preserved</p>
-                    <p>• Waiting for opponent to return</p>
-                    <p>• Will resume automatically</p>
-                </div>
-            </div>
-        `;
-        
-        pauseOverlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            animation: fadeIn 0.3s ease-out;
-        `;
-        
-        document.body.appendChild(pauseOverlay);
-        
-        if (!document.getElementById('battlePauseStyles')) {
-            const style = document.createElement('style');
-            style.id = 'battlePauseStyles';
-            style.textContent = `
-                .battle-pause-content {
-                    text-align: center;
-                    color: white;
-                    padding: 40px;
-                    border-radius: 20px;
-                    background: rgba(0, 0, 0, 0.9);
-                    border: 2px solid rgba(255, 193, 7, 0.5);
-                    max-width: 400px;
-                }
-                
-                .pause-icon {
-                    font-size: 4rem;
-                    margin-bottom: 20px;
-                }
-                
-                .battle-pause-content h2 {
-                    font-size: 2rem;
-                    margin: 0 0 10px 0;
-                    color: #ffc107;
-                }
-                
-                .pause-spinner {
-                    width: 40px;
-                    height: 40px;
-                    border: 3px solid rgba(255, 193, 7, 0.3);
-                    border-top: 3px solid #ffc107;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin: 20px auto;
-                }
-                
-                .pause-details {
-                    margin-top: 20px;
-                    font-size: 0.9rem;
-                    color: rgba(255, 255, 255, 0.8);
-                }
-                
-                .pause-details p {
-                    margin: 5px 0;
-                }
-                
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `;
-            
-            document.head.appendChild(style);
-        }
+        return this.networkManager.showBattlePauseUI(reason);
     }
 
     // Hide battle pause UI
     hideBattlePauseUI() {
-        const pauseOverlay = document.getElementById('battlePauseOverlay');
-        if (pauseOverlay) {
-            pauseOverlay.style.animation = 'fadeOut 0.3s ease-out';
-            setTimeout(() => pauseOverlay.remove(), 300);
-        }
+        return this.networkManager.hideBattlePauseUI();
     }
 
     // Initialize heroes with Hero class and abilities
@@ -734,101 +622,11 @@ export class BattleManager {
 
     // Start the battle
     async startBattle() {
-        if (this.battleActive) {
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
             return;
         }
-
-        this.battleActive = true;
-        this.currentTurn = 0;
-        this.battleLog = []; // UPDATED: Clear legacy array, delegate to BattleScreen
-        this.turnInProgress = false;
-        this.pendingAcks = {};
-        this.ackTimeouts = {};
-        
-        // Reset connection-aware state
-        this.battlePaused = false;
-        this.pauseStartTime = null;
-        this.totalPauseTime = 0;
-
-        // Initialize speed control UI
-        if (this.battleScreen && this.battleScreen.initializeSpeedControl) {
-            this.battleScreen.initializeSpeedControl(this.isAuthoritative);
-        }
-        
-        // Initialize extensible state
-        this.initializeExtensibleState();
-        
-        // Re-initialize heroes to ensure fresh health/state
-        this.initializeHeroes();
-
-        // Initialize necromancy manager and stacks
-        this.necromancyManager = new NecromancyManager(this);
-        this.necromancyManager.initializeNecromancyStacks();
-        this.necromancyManager.initializeNecromancyStackDisplays();
-        
-        // Initialize Jiggles manager
-        this.jigglesManager = new JigglesCreature(this);
-        
-        // Ensure randomness is initialized before battle starts
-        if (this.isAuthoritative && !this.randomnessInitialized) {
-            this.initializeRandomness();
-        }
-        
-        // Add randomness info to combat log
-        if (this.randomnessManager.isInitialized) {
-            this.addCombatLog(`🎲 Battle randomness initialized (seed: ${this.randomnessManager.seed.slice(0, 8)}...)`, 'info');
-        }
-        
-        this.addCombatLog('⚔️ Battle begins with Hero abilities and creatures!', 'success');
-        
-        // Log any SummoningMagic bonuses applied to creatures
-        this.logSummoningMagicBonuses();
-        
-        this.logTorasEquipmentBonuses();
-        
-        if (this.isAuthoritative) {
-            try {
-                console.log('🧪 Applying potion effects from both players at battle start...');
-                
-                // Get both players' potion states from Firebase
-                const potionStates = await this.getBothPlayersPotionStates();
-                
-                // Let the potion handler deal with applying effects from both states
-                if (window.potionHandler && potionStates) {
-                    await window.potionHandler.applyBothPlayersPotionEffectsAtBattleStart(
-                        potionStates.host, 
-                        potionStates.guest, 
-                        this
-                    );
-                }
-                console.log('✅ All potion effects applied successfully');
-
-                // Apply delayed artifact effects from both players (like Poisoned Meat)
-                console.log('🥩 Applying delayed artifact effects from both players at battle start...');
-                const delayedEffects = await this.getBothPlayersDelayedEffects();
-                
-                if (delayedEffects) {
-                    const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
-                    await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, this);
-                }
-                
-                console.log('✅ All start of battle effects applied successfully');
-            } catch (error) {
-                console.error('❌ Error applying battle start effects:', error);
-                this.addCombatLog('⚠️ Some battle start effects failed to apply', 'warning');
-            }
-        }
-        
-        await this.saveBattleStateToPersistence();
-        
-        if (this.isAuthoritative) {
-            if (!this.opponentConnected) {
-                this.pauseBattle('Opponent not connected at battle start');
-            } else {
-                await this.delay(50);
-                this.authoritative_battleLoop();
-            }
-        }
+        return this.flowManager.startBattle();
     }
 
     async getBothPlayersPotionStates() {
@@ -956,172 +754,27 @@ export class BattleManager {
 
     // Battle loop with connection awareness and persistence
     async authoritative_battleLoop() {
-        if (!this.isAuthoritative) {
-            console.error('NON-AUTHORITATIVE client tried to run battle loop!');
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
             return;
         }
-
-        while (this.battleActive && !this.checkBattleEnd()) {
-            if (!this.opponentConnected) {
-                this.pauseBattle('Opponent disconnected');
-                return;
-            }
-
-            if (this.battlePaused) {
-                return;
-            }
-
-            this.currentTurn++;
-            this.addCombatLog(`📍 Turn ${this.currentTurn} begins`, 'info');
-            
-            this.sendBattleUpdate('turn_start', { turn: this.currentTurn });
-            
-            await this.saveBattleStateToPersistence();
-            
-            for (const position of ['left', 'center', 'right']) {
-                if (!this.battleActive || this.checkBattleEnd()) break;
-                
-                if (!this.opponentConnected) {
-                    this.pauseBattle('Opponent disconnected during turn');
-                    return;
-                }
-                
-                if (this.battlePaused) {
-                    return;
-                }
-                
-                await this.authoritative_processTurnForPosition(position);
-                await this.saveBattleStateToPersistence();
-                await this.delay(15);
-            }
-            
-            await this.delay(10);
-        }
-        
-        await this.delay(200);
-        this.handleBattleEnd();
+        return this.flowManager.authoritative_battleLoop();
     }
 
     // Get hero ability modifiers for damage calculation
     getHeroAbilityModifiers(hero) {
-        const modifiers = {
-            attackBonus: 0,
-            defenseBonus: 0,
-            specialEffects: []
-        };
-        
-        if (hero.hasAbility('Fighting')) {
-            const stackCount = hero.getAbilityStackCount('Fighting');
-            modifiers.attackBonus += stackCount * 10;
-            modifiers.specialEffects.push(`Fighting (+${stackCount * 10} ATK)`);
-        }
-        
-        // Special case for Toras: +10 ATK per unique equipment
-        if (hero.name === 'Toras') {
-            let uniqueEquipmentCount = 0;
-            
-            // Use synchronized count if available (for guest displaying opponent's Toras)
-            if (hero._syncedUniqueEquipmentCount !== undefined) {
-                uniqueEquipmentCount = hero._syncedUniqueEquipmentCount;
-            } 
-            // Otherwise calculate locally (for own heroes or host)
-            else if (hero.equipment && hero.equipment.length > 0) {
-                const uniqueEquipmentNames = new Set();
-                hero.equipment.forEach(item => {
-                    const itemName = item.name || item.cardName;
-                    if (itemName) {
-                        uniqueEquipmentNames.add(itemName);
-                    }
-                });
-                uniqueEquipmentCount = uniqueEquipmentNames.size;
-            }
-            
-            if (uniqueEquipmentCount > 0) {
-                const equipmentBonus = uniqueEquipmentCount * 10;
-                modifiers.attackBonus += equipmentBonus;
-                modifiers.specialEffects.push(`Toras Equipment Mastery (+${equipmentBonus} ATK from ${uniqueEquipmentCount} unique items)`);
-            }
-        }
-        
-        return modifiers;
+        return this.combatManager ? 
+            this.combatManager.getHeroAbilityModifiers(hero) : 
+            { attackBonus: 0, defenseBonus: 0, specialEffects: [] };
     }
 
     // Process turn for a specific position with creatures
     async authoritative_processTurnForPosition(position) {
-        if (!this.isAuthoritative) return;
-
-        this.turnInProgress = true;
-        
-        const playerHero = this.playerHeroes[position];
-        const opponentHero = this.opponentHeroes[position];
-        
-        const playerCanAct = playerHero && playerHero.alive;
-        const opponentCanAct = opponentHero && opponentHero.alive;
-        
-        if (!playerCanAct && !opponentCanAct) {
-            this.turnInProgress = false;
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
             return;
         }
-
-        // Build complete actor lists for both sides
-        const playerActors = this.buildActorList(playerHero, playerCanAct);
-        const opponentActors = this.buildActorList(opponentHero, opponentCanAct);
-        
-        // Process all actors in paired sequence
-        const maxActors = Math.max(playerActors.length, opponentActors.length);
-        
-        for (let i = 0; i < maxActors; i++) {
-            // Check if battle should end before processing more actors
-            if (this.checkBattleEnd()) {
-                console.log('Battle ended during actor processing, stopping turn');
-                break;
-            }
-            
-            // Get actors for this iteration
-            let playerActor = playerActors[i] || null;
-            let opponentActor = opponentActors[i] || null;
-            
-            // FILTER OUT DEAD ACTORS before they act
-            if (playerActor && !this.isActorAlive(playerActor)) {
-                this.addCombatLog(`💀 ${playerActor.name} has died and cannot act!`, 'info');
-                playerActor = null;
-            }
-            
-            if (opponentActor && !this.isActorAlive(opponentActor)) {
-                this.addCombatLog(`💀 ${opponentActor.name} has died and cannot act!`, 'info');
-                opponentActor = null;
-            }
-            
-            // Skip if both actors are dead/invalid
-            if (!playerActor && !opponentActor) continue;
-            
-            // Send actor action update
-            const actorActionData = {
-                position: position,
-                playerActor: playerActor ? {
-                    type: playerActor.type,
-                    name: playerActor.name,
-                    index: playerActor.index,
-                    side: 'player'
-                } : null,
-                opponentActor: opponentActor ? {
-                    type: opponentActor.type,
-                    name: opponentActor.name,
-                    index: opponentActor.index,
-                    side: 'opponent'
-                } : null
-            };
-            
-            this.sendBattleUpdate('actor_action', actorActionData);
-            
-            // Execute actor actions
-            await this.executeActorActions(playerActor, opponentActor, position);
-            
-            await this.delay(300); // Brief pause between actor pairs (now speed-adjusted)
-        }
-        
-        this.clearTurnModifiers(playerHero, opponentHero, position);
-        this.turnInProgress = false;
+        return this.flowManager.authoritative_processTurnForPosition(position);
     }
 
     // Force clear any stuck pause overlays
@@ -1135,50 +788,19 @@ export class BattleManager {
     }
 
     isActorAlive(actor) {
-        if (!actor) return false;
-        
-        if (actor.type === 'hero') {
-            return actor.data && actor.data.alive;
-        } else if (actor.type === 'creature') {
-            // Check if the creature is still alive
-            return actor.data && actor.data.alive;
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
+            return false;
         }
-        
-        return false;
+        return this.flowManager.isActorAlive(actor);
     }
 
     buildActorList(hero, canAct) {
-        const actors = [];
-        
-        if (!canAct || !hero) return actors;
-        
-        // Add living creatures in NORMAL order (first creature first)
-        // This matches the targeting order where heroes target the first creature first
-        const livingCreatures = hero.creatures.filter(c => c.alive);
-        
-        // Process creatures in normal order - first creature acts first
-        for (let i = 0; i < livingCreatures.length; i++) {
-            const creature = livingCreatures[i];
-            const originalIndex = hero.creatures.indexOf(creature);
-            
-            actors.push({
-                type: 'creature',
-                name: creature.name,
-                data: creature,
-                index: originalIndex, // Keep the original index for targeting
-                hero: hero
-            });
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
+            return [];
         }
-        
-        // Add hero last (after all creatures have acted)
-        actors.push({
-            type: 'hero',
-            name: hero.name,
-            data: hero,
-            hero: hero
-        });
-        
-        return actors;
+        return this.flowManager.buildActorList(hero, canAct);
     }
 
     // Process creature actions (paired from the end)
@@ -1222,316 +844,29 @@ export class BattleManager {
         }
     }
 
-    async executeActorActions(playerActor, opponentActor, position) {
-        // Check if battle ended before executing actions
-        if (this.checkBattleEnd()) {
-            console.log('Battle ended before actor actions, skipping');
+     async executeActorActions(playerActor, opponentActor, position) {
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
             return;
         }
-        
-        // ============================================
-        // REMEMBER ORIGINAL ACTORS FOR STATUS EFFECTS
-        // ============================================
-        
-        // Remember original actors before filtering for stun/freeze
-        // This ensures that stunned/frozen actors still get status effect processing
-        const originalPlayerActor = playerActor;
-        const originalOpponentActor = opponentActor;
-        
-        // ============================================
-        // STATUS EFFECTS: Check action restrictions
-        // ============================================
-        
-        // Check if player actor can take action (not stunned/frozen)
-        if (playerActor && this.statusEffectsManager && !this.statusEffectsManager.canTakeAction(playerActor.data)) {
-            const stunned = this.statusEffectsManager.hasStatusEffect(playerActor.data, 'stunned');
-            const frozen = this.statusEffectsManager.hasStatusEffect(playerActor.data, 'frozen');
-            
-            if (stunned) {
-                this.statusEffectsManager.processTurnSkip(playerActor.data, 'stunned');
-            } else if (frozen) {
-                this.statusEffectsManager.processTurnSkip(playerActor.data, 'frozen');
-            }
-            
-            playerActor = null; // Skip this actor's turn
-        }
-        
-        // Check if opponent actor can take action (not stunned/frozen)
-        if (opponentActor && this.statusEffectsManager && !this.statusEffectsManager.canTakeAction(opponentActor.data)) {
-            const stunned = this.statusEffectsManager.hasStatusEffect(opponentActor.data, 'stunned');
-            const frozen = this.statusEffectsManager.hasStatusEffect(opponentActor.data, 'frozen');
-            
-            if (stunned) {
-                this.statusEffectsManager.processTurnSkip(opponentActor.data, 'stunned');
-            } else if (frozen) {
-                this.statusEffectsManager.processTurnSkip(opponentActor.data, 'frozen');
-            }
-            
-            opponentActor = null; // Skip this actor's turn
-        }
-        
-        // ============================================
-        // EXISTING ACTOR ACTION LOGIC
-        // ============================================
-        
-        const actions = [];
-        let hasJigglesAttacks = false;
-        let hasHeroActions = false;
-        
-        // Collect all creature actions (including Jiggles special attacks)
-        if (playerActor && playerActor.type === 'creature') {
-            if (JigglesCreature.isJiggles(playerActor.name)) {
-                // Don't await yet - add to actions array
-                actions.push(this.jigglesManager.executeSpecialAttack(playerActor, position));
-                hasJigglesAttacks = true;
-            } else {
-                actions.push(this.animationManager.shakeCreature('player', position, playerActor.index));
-                this.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
-            }
-        }
-        
-        if (opponentActor && opponentActor.type === 'creature') {
-            if (JigglesCreature.isJiggles(opponentActor.name)) {
-                // Don't await yet - add to actions array
-                actions.push(this.jigglesManager.executeSpecialAttack(opponentActor, position));
-                hasJigglesAttacks = true;
-            } else {
-                actions.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                this.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
-            }
-        }
-        
-        // Check if we have hero actions to execute
-        if ((playerActor && playerActor.type === 'hero') || 
-            (opponentActor && opponentActor.type === 'hero')) {
-            hasHeroActions = true;
-        }
-        
-        // If we have both Jiggles attacks and hero actions, start them simultaneously
-        if (hasJigglesAttacks && hasHeroActions) {            
-            // Start hero actions without awaiting
-            const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;
-            const opponentHeroAction = opponentActor && opponentActor.type === 'hero' ? opponentActor : null;
-            
-            const heroActionPromise = this.executeHeroActions(playerHeroAction, opponentHeroAction, position);
-            
-            // Add hero actions to the actions array
-            actions.push(heroActionPromise);
-            
-            // Wait for all actions (Jiggles + heroes) to complete simultaneously
-            await Promise.all(actions);
-            
-            // Check if battle ended after all actions
-            if (this.checkBattleEnd()) {
-                return;
-            }
-        } 
-        // If we only have Jiggles attacks (no heroes), execute them and check battle end
-        else if (hasJigglesAttacks) {
-            await Promise.all(actions);
-            
-            // Check if battle ended after Jiggles attacks
-            if (this.checkBattleEnd()) {
-                return;
-            }
-        }
-        // If we only have hero actions (no Jiggles), execute them normally
-        else if (hasHeroActions) {
-            // Final check before hero actions
-            if (this.checkBattleEnd()) {
-                return;
-            }
-            
-            const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;
-            const opponentHeroAction = opponentActor && opponentActor.type === 'hero' ? opponentActor : null;
-            
-            await this.executeHeroActions(playerHeroAction, opponentHeroAction, position);
-        }
-        // If we only have regular creature actions, execute them
-        else if (actions.length > 0) {
-            await Promise.all(actions);
-        }
-        
-        // ============================================
-        // STATUS EFFECTS: Post-turn processing (FIXED)
-        // ============================================
-        
-        // Process status effects after actor actions complete
-        // This handles poison damage, burn damage, silenced duration, etc.
-        // FIXED: Process for ALL original actors, not just those that acted
-        // This ensures that stunned/frozen actors still take poison and burn damage
-        if (this.statusEffectsManager) {
-            const statusEffectPromises = [];
-            
-            // Process status effects for ALL original actors (including stunned/frozen)
-            // This is the key fix - we use originalPlayerActor and originalOpponentActor
-            // instead of the potentially null playerActor and opponentActor
-            if (originalPlayerActor && originalPlayerActor.data && originalPlayerActor.data.alive) {
-                statusEffectPromises.push(
-                    this.statusEffectsManager.processStatusEffectsAfterTurn(originalPlayerActor.data)
-                );
-            }
-            
-            if (originalOpponentActor && originalOpponentActor.data && originalOpponentActor.data.alive) {
-                statusEffectPromises.push(
-                    this.statusEffectsManager.processStatusEffectsAfterTurn(originalOpponentActor.data)
-                );
-            }
-            
-            // Wait for all status effect processing to complete
-            if (statusEffectPromises.length > 0) {
-                await Promise.all(statusEffectPromises);
-                
-                // Small delay after status effects for visual clarity
-                await this.delay(200);
-            }
-        }
-        
-        // ============================================
-        // FINAL BATTLE STATE CHECK
-        // ============================================
-        
-        // Final check if battle ended due to status effect damage
-        if (this.checkBattleEnd()) {
-            console.log('Battle ended due to status effect damage');
-            return;
-        }
+        return this.flowManager.executeActorActions(playerActor, opponentActor, position);
     }
 
     async executeHeroActions(playerHeroActor, opponentHeroActor, position) {
-        // Check if battle ended before executing actions
-        if (this.checkBattleEnd()) {
-            console.log('Battle ended before hero actions, skipping');
+        if (!this.combatManager) {
+            console.error('Combat manager not initialized');
             return;
         }
-        
-        const playerCanAttack = playerHeroActor !== null;
-        const opponentCanAttack = opponentHeroActor !== null;
-        
-        // NEW: Check for spell casting before attacking
-        let playerSpellToCast = null;
-        let opponentSpellToCast = null;
-        let playerWillAttack = playerCanAttack;
-        let opponentWillAttack = opponentCanAttack;
-        
-        if (playerCanAttack && this.spellSystem) {
-            playerSpellToCast = this.spellSystem.checkSpellCasting(playerHeroActor.data);
-            if (playerSpellToCast) {
-                playerWillAttack = false; // Hero spent turn casting spell
-            }
-        }
-        
-        if (opponentCanAttack && this.spellSystem) {
-            opponentSpellToCast = this.spellSystem.checkSpellCasting(opponentHeroActor.data);
-            if (opponentSpellToCast) {
-                opponentWillAttack = false; // Hero spent turn casting spell
-            }
-        }
-        
-        // Execute spell casting if applicable
-        if (playerSpellToCast && this.spellSystem) {
-            this.spellSystem.executeSpellCasting(playerHeroActor.data, playerSpellToCast);
-        }
-        
-        if (opponentSpellToCast && this.spellSystem) {
-            this.spellSystem.executeSpellCasting(opponentHeroActor.data, opponentSpellToCast);
-        }
-        
-        // Continue with normal attack logic for heroes that didn't cast spells
-        const playerTarget = playerWillAttack ? 
-            this.authoritative_findTargetWithCreatures(position, 'player') : null;
-        const opponentTarget = opponentWillAttack ? 
-            this.authoritative_findTargetWithCreatures(position, 'opponent') : null;
-        
-        // Check if targets are valid before proceeding
-        const playerValidAttack = playerWillAttack && playerTarget;
-        const opponentValidAttack = opponentWillAttack && opponentTarget;
-        
-        // If no valid attacks can be made and no spells were cast, skip animation
-        if (!playerValidAttack && !opponentValidAttack && !playerSpellToCast && !opponentSpellToCast) {
-            this.addCombatLog('💨 No actions taken this turn!', 'info');
+        return this.combatManager.executeHeroActions(playerHeroActor, opponentHeroActor, position);
+    }
+
+    // Execute hero attacks with damage application
+    async executeHeroAttacksWithDamage(playerAttack, opponentAttack) {
+        if (!this.combatManager) {
+            console.error('Combat manager not initialized');
             return;
         }
-        
-        // Only proceed with attack animations/damage for heroes that are attacking
-        if (playerValidAttack || opponentValidAttack) {
-            // Calculate base damage
-            let playerDamage = playerValidAttack ? 
-                this.calculateDamage(playerHeroActor.data, true) : 0;
-            let opponentDamage = opponentValidAttack ? 
-                this.calculateDamage(opponentHeroActor.data, true) : 0;
-            
-            // ============================================
-            // NEW: APPLY DAMAGE MODIFIERS (TheMastersSword, etc.)
-            // ============================================
-            let playerEffectsTriggered = [];
-            let opponentEffectsTriggered = [];
-            
-            if (playerValidAttack && this.attackEffectsManager) {
-                const playerModResult = this.attackEffectsManager.calculateDamageModifiers(
-                    playerHeroActor.data,
-                    playerTarget.type === 'creature' ? playerTarget.creature : playerTarget.hero,
-                    playerDamage
-                );
-                playerDamage = playerModResult.modifiedDamage;
-                playerEffectsTriggered = playerModResult.effectsTriggered;
-            }
-            
-            if (opponentValidAttack && this.attackEffectsManager) {
-                const opponentModResult = this.attackEffectsManager.calculateDamageModifiers(
-                    opponentHeroActor.data,
-                    opponentTarget.type === 'creature' ? opponentTarget.creature : opponentTarget.hero,
-                    opponentDamage
-                );
-                opponentDamage = opponentModResult.modifiedDamage;
-                opponentEffectsTriggered = opponentModResult.effectsTriggered;
-            }
-            
-            // Create turn data with potentially modified damage
-            const turnData = this.createTurnDataWithCreatures(
-                position, 
-                playerValidAttack ? playerHeroActor.data : null, playerTarget, playerDamage,
-                opponentValidAttack ? opponentHeroActor.data : null, opponentTarget, opponentDamage
-            );
-            
-            // NEW: Add damage modifier info to turn data for network sync
-            if (playerEffectsTriggered.length > 0 || opponentEffectsTriggered.length > 0) {
-                turnData.damageModifiers = {
-                    player: playerEffectsTriggered.map(e => ({
-                        name: e.name,
-                        multiplier: e.multiplier,
-                        swordCount: e.swordCount || 0
-                    })),
-                    opponent: opponentEffectsTriggered.map(e => ({
-                        name: e.name,
-                        multiplier: e.multiplier,
-                        swordCount: e.swordCount || 0
-                    }))
-                };
-            }
-            
-            this.sendBattleUpdate('hero_turn_execution', turnData);
-            
-            // Execute attacks with modified damage and effects
-            const executionPromise = this.executeHeroAttacksWithDamage(
-                playerValidAttack ? { 
-                    hero: playerHeroActor.data, 
-                    target: playerTarget, 
-                    damage: playerDamage,
-                    effectsTriggered: playerEffectsTriggered  // NEW: Pass effects for animation
-                } : null,
-                opponentValidAttack ? { 
-                    hero: opponentHeroActor.data, 
-                    target: opponentTarget, 
-                    damage: opponentDamage,
-                    effectsTriggered: opponentEffectsTriggered  // NEW: Pass effects for animation
-                } : null
-            );
-            
-            const ackPromise = this.waitForGuestAcknowledgment('turn_complete', this.getAdaptiveTimeout());
-            
-            await Promise.all([executionPromise, ackPromise]);
-        }
+        return this.combatManager.executeHeroAttacksWithDamage(playerAttack, opponentAttack);
     }
 
     // Execute creature actions (shake animations)
@@ -1555,191 +890,38 @@ export class BattleManager {
 
     // Find target with creatures (heroes now target last creature)
     authoritative_findTargetWithCreatures(attackerPosition, attackerSide) {
-        if (!this.isAuthoritative) return null;
-
-        const targets = attackerSide === 'player' ? this.opponentHeroes : this.playerHeroes;
-        
-        // Helper function to create creature target if hero has living creatures
-        const createCreatureTargetIfAvailable = (hero, heroPosition) => {
-            if (!hero || !hero.alive) return null;
-            
-            const livingCreatures = hero.creatures.filter(c => c.alive);
-            if (livingCreatures.length > 0) {
-                // Target the FIRST living creature (newest to oldest as mentioned)
-                return {
-                    type: 'creature',
-                    hero: hero,
-                    creature: livingCreatures[0],
-                    creatureIndex: hero.creatures.indexOf(livingCreatures[0]),
-                    position: heroPosition,
-                    side: attackerSide === 'player' ? 'opponent' : 'player'
-                };
-            }
-            return null;
-        };
-
-        // Helper function to create hero target
-        const createHeroTarget = (hero, heroPosition) => {
-            if (!hero || !hero.alive) return null;
-            
-            return {
-                type: 'hero',
-                hero: hero,
-                position: heroPosition,
-                side: attackerSide === 'player' ? 'opponent' : 'player'
-            };
-        };
-
-        // Helper function to get target (creature first, then hero) for any position
-        const getTargetForPosition = (heroPosition) => {
-            const hero = targets[heroPosition];
-            if (!hero || !hero.alive) return null;
-            
-            // Always check creatures first, regardless of position
-            const creatureTarget = createCreatureTargetIfAvailable(hero, heroPosition);
-            if (creatureTarget) return creatureTarget;
-            
-            // If no creatures, target the hero
-            return createHeroTarget(hero, heroPosition);
-        };
-
-        // Get all alive targets for fallback
-        const aliveTargets = Object.values(targets).filter(hero => hero && hero.alive);
-        if (aliveTargets.length === 0) return null;
-
-        // Primary targeting: try same position first
-        const primaryTarget = getTargetForPosition(attackerPosition);
-        if (primaryTarget) return primaryTarget;
-
-        // Alternative targeting with creature priority
-        switch (attackerPosition) {
-            case 'left':
-                // Try center first, then right
-                const leftToCenterTarget = getTargetForPosition('center');
-                if (leftToCenterTarget) return leftToCenterTarget;
-                
-                const leftToRightTarget = getTargetForPosition('right');
-                if (leftToRightTarget) return leftToRightTarget;
-                break;
-                
-            case 'center':
-                // Random target selection, but still check creatures first
-                const randomTargetHero = this.getRandomChoice(aliveTargets);
-                if (randomTargetHero) {
-                    const randomTarget = getTargetForPosition(randomTargetHero.position);
-                    if (randomTarget) return randomTarget;
-                }
-                break;
-                
-            case 'right':
-                // Try center first, then left
-                const rightToCenterTarget = getTargetForPosition('center');
-                if (rightToCenterTarget) return rightToCenterTarget;
-                
-                const rightToLeftTarget = getTargetForPosition('left');
-                if (rightToLeftTarget) return rightToLeftTarget;
-                break;
-        }
-        
-        // Last resort - find any alive target (creature first, then hero)
-        for (const hero of aliveTargets) {
-            const lastResortTarget = getTargetForPosition(hero.position);
-            if (lastResortTarget) return lastResortTarget;
-        }
-        
-        // This should never happen if there are alive targets, but safety fallback
-        return createHeroTarget(aliveTargets[0], aliveTargets[0].position);
+        return this.combatManager ? 
+            this.combatManager.authoritative_findTargetWithCreatures(attackerPosition, attackerSide) : 
+            null;
     }
 
     // Calculate damage for a hero
     calculateDamage(hero, canAct) {
-        if (!canAct) return 0;
-        
-        let damage = hero.getCurrentAttack();
-        const modifiers = this.getHeroAbilityModifiers(hero);
-        damage += modifiers.attackBonus;
-        
-        this.updateHeroAttackDisplay(hero.side, hero.position, hero);
-        
-        if (modifiers.specialEffects.length > 0) {
-            this.addCombatLog(`🎯 ${hero.name} abilities: ${modifiers.specialEffects.join(', ')}`, 'info');
-        }
-        
-        return damage;
+        return this.combatManager ? 
+            this.combatManager.calculateDamage(hero, canAct) : 
+            0;
     }
 
     // Create turn data object with creatures
     createTurnDataWithCreatures(position, playerHero, playerTarget, playerDamage, 
                                 opponentHero, opponentTarget, opponentDamage) {
-            const createActionData = (hero, target, damage) => {
-                if (!hero || !hero.alive) return null;
-                
-                const actionData = {
-                    attacker: position,
-                    targetType: target ? target.type : null,
-                    damage: damage,
-                    attackerData: {
-                        absoluteSide: hero.absoluteSide,
-                        position: hero.position,
-                        name: hero.name,
-                        abilities: hero.getAllAbilities(),
-                        // NEW: Add equipment count for Toras synchronization
-                        uniqueEquipmentCount: 0
-                    }
-                };
-                
-                // Calculate unique equipment count if hero is Toras
-                if (hero.name === 'Toras' && hero.equipment && hero.equipment.length > 0) {
-                    const uniqueEquipmentNames = new Set();
-                    hero.equipment.forEach(item => {
-                        const itemName = item.name || item.cardName;
-                        if (itemName) {
-                            uniqueEquipmentNames.add(itemName);
-                        }
-                    });
-                    actionData.attackerData.uniqueEquipmentCount = uniqueEquipmentNames.size;
-                }
-                
-                if (target) {
-                    if (target.type === 'creature') {
-                        actionData.targetData = {
-                            type: 'creature',
-                            absoluteSide: target.hero.absoluteSide,
-                            position: target.position,
-                            creatureIndex: target.creatureIndex,
-                            creatureName: target.creature.name
-                        };
-                    } else {
-                        actionData.targetData = {
-                            type: 'hero',
-                            absoluteSide: target.hero.absoluteSide,
-                            position: target.position,
-                            name: target.hero.name
-                        };
-                    }
-                }
-                
-                return actionData;
-            };
-
-            return {
-                turn: this.currentTurn,
-                position: position,
-                playerAction: createActionData(playerHero, playerTarget, playerDamage),
-                opponentAction: createActionData(opponentHero, opponentTarget, opponentDamage)
-            };
+        if (!this.combatManager) {
+            console.error('Combat manager not initialized');
+            return {};
         }
+        return this.combatManager.createTurnDataWithCreatures(
+            position, playerHero, playerTarget, playerDamage,
+            opponentHero, opponentTarget, opponentDamage
+        );
+    }
 
     // Clear temporary modifiers at end of turn
     clearTurnModifiers(playerHero, opponentHero, position) {
-        if (playerHero) {
-            playerHero.clearTemporaryModifiers();
-            this.updateHeroAttackDisplay('player', position, playerHero);
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
+            return;
         }
-        if (opponentHero) {
-            opponentHero.clearTemporaryModifiers();
-            this.updateHeroAttackDisplay('opponent', position, opponentHero);
-        }
+        return this.flowManager.clearTurnModifiers(playerHero, opponentHero, position);
     }
 
     // Execute hero attacks with damage application
@@ -1828,141 +1010,28 @@ export class BattleManager {
 
     // Apply damage to target (hero or creature)
     applyAttackDamageToTarget(attack) {
-        if (!attack || !attack.target) return;
-        
-        if (attack.target.type === 'creature') {
-            const wasAlive = attack.target.creature.alive;
-            
-            // Apply damage to creature
-            this.authoritative_applyDamageToCreature({
-                hero: attack.target.hero,
-                creature: attack.target.creature,
-                creatureIndex: attack.target.creatureIndex,
-                damage: attack.damage,
-                position: attack.target.position,
-                side: attack.target.side
-            });
-            
-            // Check if creature died from this attack
-            if (wasAlive && !attack.target.creature.alive && this.isAuthoritative) {
-                // Use the Wanted Poster module's visual feedback function
-                recordKillWithVisualFeedback(this, attack.hero, attack.target.creature, 'creature');
-            }
-            
-            // Process attack effects for creature targets
-            if (this.attackEffectsManager) {
-                this.attackEffectsManager.processAttackEffects(
-                    attack.hero,
-                    attack.target.creature,
-                    attack.damage,
-                    'basic'
-                );
-            }
-        } else {
-            // Hero-to-hero attack
-            const defender = attack.target.hero;
-            const attacker = attack.hero;
-            
-            const wasAlive = defender.alive;
-            
-            // Check for toxic trap
-            if (this.checkAndApplyToxicTrap(attacker, defender)) {
-                // Toxic trap triggered - original attack is blocked
-                console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
-                return; // Don't process attack effects if attack was blocked
-            }
-
-            // Check for frost rune
-            if (this.checkAndApplyFrostRune(attacker, defender)) {
-                // Frost rune triggered - original attack is blocked
-                console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
-                return; // Don't process attack effects if attack was blocked
-            }
-            
-            // Apply the damage
-            this.authoritative_applyDamage({
-                target: defender,
-                damage: attack.damage,
-                newHp: Math.max(0, defender.currentHp - attack.damage),
-                died: (defender.currentHp - attack.damage) <= 0
-            });
-            
-            // Check if hero died from this attack
-            if (wasAlive && !defender.alive && this.isAuthoritative) {
-                // Use the Wanted Poster module's visual feedback function
-                recordKillWithVisualFeedback(this, attacker, defender, 'hero');
-            }
-
-            // Process attack effects for hero targets (after damage is applied)
-            if (this.attackEffectsManager) {
-                this.attackEffectsManager.processAttackEffects(
-                    attacker,
-                    defender,
-                    attack.damage,
-                    'basic'
-                );
-            }
-
-            // Check for fireshield recoil damage (only for hero-to-hero attacks)
-            this.checkAndApplyFireshieldRecoil(attacker, defender);
+        if (!this.combatManager) {
+            console.error('Combat manager not initialized');
+            return;
         }
+        return this.combatManager.applyAttackDamageToTarget(attack);
     }
 
     // Check and apply fireshield recoil damage
     checkAndApplyFireshieldRecoil(attacker, defender) {
-        if (!this.isAuthoritative || !this.spellSystem) return;
-        
-        // Get fireshield spell implementation
-        const fireshieldSpell = this.spellSystem.spellImplementations.get('Fireshield');
-        if (!fireshieldSpell) return;
-        
-        // Check if recoil should trigger
-        if (!fireshieldSpell.shouldTriggerRecoil(attacker, defender, this.currentTurn)) {
-            return;
-        }
-        
-        // Calculate and apply recoil damage
-        const recoilDamage = fireshieldSpell.calculateRecoilDamage(defender);
-        if (recoilDamage > 0) {
-            fireshieldSpell.applyRecoilDamage(attacker, defender, recoilDamage);
-        }
+        if (!this.combatManager) return;
+        return this.combatManager.checkAndApplyFireshieldRecoil(attacker, defender);
     }
 
     // Check and apply toxic trap effect
     checkAndApplyToxicTrap(attacker, defender) {
-        if (!this.isAuthoritative || !this.spellSystem) return false;
-        
-        // Get toxic trap spell implementation
-        const toxicTrapSpell = this.spellSystem.spellImplementations.get('ToxicTrap');
-        if (!toxicTrapSpell) return false;
-        
-        // Check if toxic trap should trigger
-        if (!toxicTrapSpell.shouldTriggerToxicTrap(attacker, defender)) {
-            return false;
-        }
-        
-        // Apply toxic trap effect (poison attacker instead of damaging defender)
-        const blocked = toxicTrapSpell.applyToxicTrapEffect(attacker, defender);
-        
-        return blocked; // true if attack was blocked
+        if (!this.combatManager) return false;
+        return this.combatManager.checkAndApplyToxicTrap(attacker, defender);
     }
 
     checkAndApplyFrostRune(attacker, defender) {
-        if (!this.isAuthoritative || !this.spellSystem) return false;
-        
-        // Get frost rune spell implementation
-        const frostRuneSpell = this.spellSystem.spellImplementations.get('FrostRune');
-        if (!frostRuneSpell) return false;
-        
-        // Check if frost rune should trigger
-        if (!frostRuneSpell.shouldTriggerFrostRune(attacker, defender)) {
-            return false;
-        }
-        
-        // Apply frost rune effect (freeze attacker instead of damaging defender)
-        const blocked = frostRuneSpell.applyFrostRuneEffect(attacker, defender);
-        
-        return blocked; // true if attack was blocked
+        if (!this.combatManager) return false;
+        return this.combatManager.checkAndApplyFrostRune(attacker, defender);
     }
 
     // Apply damage to a creature
@@ -2079,217 +1148,16 @@ export class BattleManager {
         }
     }
 
-    // Adaptive timeout based on connection quality
-    getAdaptiveTimeout() {
-        const baseTimeout = Math.max(300, this.connectionLatency * 3);
-        const maxTimeout = 1000;
-        return Math.min(baseTimeout, maxTimeout);
-    }
-
-    // Wait for guest acknowledgment
-    async waitForGuestAcknowledgment(ackType, timeout = 500) {
-        const startTime = Date.now();
-        
-        // Apply speed adjustment to the timeout
-        //const adjustedTimeout = this.getSpeedAdjustedDelay(timeout);
-        const adjustedTimeout = 1;
-        
-        return new Promise((resolve) => {
-            const timeoutId = setTimeout(() => {
-                delete this.pendingAcks[ackType];
-                delete this.ackTimeouts[ackType];
-                
-                this.connectionLatency = Math.min(this.connectionLatency * 1.2, 500);
-                resolve();
-            }, adjustedTimeout);
-            
-            this.pendingAcks[ackType] = () => {
-                const responseTime = Date.now() - startTime;
-                clearTimeout(timeoutId);
-                delete this.pendingAcks[ackType];
-                delete this.ackTimeouts[ackType];
-                
-                this.connectionLatency = Math.max(responseTime + 50, 50);
-                resolve();
-            };
-            
-            this.ackTimeouts[ackType] = timeoutId;
-        });
-    }
-
     // Apply damage to target
     authoritative_applyDamage(damageResult, context = {}) {
-        if (!this.isAuthoritative) return;
-
-        const { target, damage, newHp, died } = damageResult;
-        const { source, attacker } = context;
-        
-        const wasAlive = target.alive;
-        const result = target.takeDamage(damage);
-        
-        if (!this.totalDamageDealt[target.absoluteSide]) {
-            this.totalDamageDealt[target.absoluteSide] = 0;
+        if (!this.combatManager) {
+            console.error('Combat manager not initialized');
+            return;
         }
-        this.totalDamageDealt[target.absoluteSide] += damage;
-        
-        this.addCombatLog(
-            `💔 ${target.name} takes ${damage} damage! (${result.oldHp} → ${result.newHp} HP)`,
-            target.side === 'player' ? 'error' : 'success'
-        );
-
-        this.updateHeroHealthBar(target.side, target.position, result.newHp, target.maxHp);
-        const damageSource = arguments[1]?.source || 'attack';
-        this.animationManager.createDamageNumber(target.side, target.position, damage, target.maxHp, damageSource);
-        
-        if (result.died && wasAlive) {
-            // If we have an attacker and it's a spell kill, record with visual feedback
-            if (attacker && source === 'spell') {
-                recordKillWithVisualFeedback(this, attacker, target, 'hero');
-            }
-            this.handleHeroDeath(target);
-        }
-
-        this.sendBattleUpdate('damage_applied', {
-            targetAbsoluteSide: target.absoluteSide,
-            targetPosition: target.position,
-            damage: damage,
-            oldHp: result.oldHp,
-            newHp: result.newHp,
-            maxHp: target.maxHp,
-            died: result.died,
-            targetName: target.name
-        });
-        
-        this.saveBattleStateToPersistence().catch(error => {
-            console.error('Error saving state after damage:', error);
-        });
+        return this.combatManager.authoritative_applyDamage(damageResult, context);
     }
 
-    // Receive battle data from host (for GUEST) - UPDATED
-    receiveBattleData(message) {        
-        // Handle host-specific messages first
-        if (this.isAuthoritative) {
-            if (message.type === 'guest_reconnection_ready') {
-                this.handleGuestReconnectionReady();
-            }
-        }
-        
-
-        // Guest message processing
-        const { type, data } = message;
-        
-        switch (type) {
-            case 'turn_start':
-                this.guest_handleTurnStart(data);
-                break;
-                
-            case 'speed_change':
-                this.guest_handleSpeedChange(data);
-                break;
-                
-            case 'randomness_seed':
-                this.guest_handleRandomnessSeed(data);
-                break;
-                
-            case 'creature_action':
-                this.guest_handleCreatureAction(data);
-                break;
-                
-            case 'combined_turn_execution':
-                this.guest_handleCombinedTurnExecution(data);
-                break;
-                
-            case 'damage_applied':
-                this.guest_handleDamageApplied(data);
-                break;
-                
-            case 'creature_damage_applied':
-                this.guest_handleCreatureDamageApplied(data);
-                break;
-                
-            case 'battle_end':
-                this.guest_handleBattleEnd(data);
-                break;
-                
-            case 'battle_paused':
-                this.guest_handleBattlePaused(data);
-                break;
-                
-            case 'battle_resumed':
-                this.guest_handleBattleResumed(data);
-                break;
-
-            case 'actor_action':
-                this.guest_handleActorAction(data);
-                break;
-                
-            case 'hero_turn_execution':
-                this.guest_handleHeroTurnExecution(data);
-                break;
-                
-            case 'status_effect_change':
-                this.guest_handleStatusEffectChange(data);
-                break;
-
-            case 'kill_tracked':
-                this.guest_handleKillTracked(data);
-                break;
-
-
-
-                
-            case 'necromancy_revival':
-                this.guest_handleNecromancyRevival(data);
-                break;
-
-
-
-                
-            case 'jiggles_special_attack':
-                if (this.jigglesManager) {
-                    this.jigglesManager.handleGuestSpecialAttack(data);
-                }
-                break;
-
-
-
-            case 'blade_frost_triggered':
-                this.guest_handleBladeFrostTriggered(data);
-                break;
-
-            case 'sun_sword_burn':
-                this.guest_handleSunSwordBurn(data);
-                break;
-                
-            case 'sun_sword_frozen_resist':
-                this.guest_handleSunSwordFrozenResist(data);
-                break;
-
-
-
-                
-            case 'spell_cast':
-                this.guest_handleSpellCast(data);
-                break;
-                
-            case 'spell_effect':
-                this.guest_handleSpellEffect(data);
-                break;
-                
-            case 'fireshield_applied':
-                this.guest_handleFireshieldApplied(data);
-                break;
-
-            case 'toxic_trap_applied':
-                this.guest_handleToxicTrapApplied(data);
-                break;
-
-            case 'frost_rune_applied':
-                this.guest_handleFrostRuneApplied(data);
-                break;
-        }
-    }
-
+    // Guest handlers that remain in battleManager
     guest_handleStatusEffectChange(data) {
         if (this.statusEffectsManager) {
             this.statusEffectsManager.handleGuestStatusEffectUpdate(data);
@@ -2360,6 +1228,24 @@ export class BattleManager {
             console.warn('Received frost rune applied but frost rune spell not available');
         }
     }
+
+
+
+    guest_handleCrusaderCannonBarrage(data) {
+        if (this.crusaderArtifactsHandler) {
+            this.crusaderArtifactsHandler.handleGuestCannonBarrage(data);
+        }
+    }
+    
+
+    guest_handleCrusaderCutlassAttack(data) {
+        if (this.crusaderArtifactsHandler) {
+            this.crusaderArtifactsHandler.handleGuestCutlassAttack(data);
+        }
+    }
+
+
+
     
     getSpellStatistics() {
         return this.spellSystem ? this.spellSystem.getSpellStatistics() : null;
@@ -2373,35 +1259,8 @@ export class BattleManager {
         }
     }
 
-    // Receive acknowledgment from guest (for HOST)
-    receiveBattleAcknowledgment(ackData) {
-        if (!this.isAuthoritative) return;
-        
-        const { type } = ackData;
-        
-        if (this.pendingAcks && this.pendingAcks[type]) {
-            this.pendingAcks[type]();
-        }
-    }
-
-    // GUEST: Handle turn start
-    guest_handleTurnStart(data) {
-        this.currentTurn = data.turn;
-        this.addCombatLog(`📍 Turn ${this.currentTurn} begins`, 'info');
-        
-        // NEW: Clear any cached equipment counts at turn start
-        ['left', 'center', 'right'].forEach(position => {
-            if (this.playerHeroes[position]) {
-                delete this.playerHeroes[position]._syncedUniqueEquipmentCount;
-            }
-            if (this.opponentHeroes[position]) {
-                delete this.opponentHeroes[position]._syncedUniqueEquipmentCount;
-            }
-        });
-    }
-
-    // GUEST: Handle creature action
-    async guest_handleCreatureAction(data) {
+    guest_handleCreatureAction(data) {
+        // This remains here as it uses battleManager internals
         const { position, playerCreature, opponentCreature } = data;
         
         const shakePromises = [];
@@ -2416,11 +1275,41 @@ export class BattleManager {
             this.addCombatLog(`🌟 ${opponentCreature.name} activates!`, 'error');
         }
         
-        await Promise.all(shakePromises);
+        return Promise.all(shakePromises);
+    }
+
+    guest_handleActorAction(data) {
+        // This remains here as it uses battleManager internals
+        const { position, playerActor, opponentActor } = data;
+        
+        const shakePromises = [];
+        
+        if (playerActor && playerActor.type === 'creature') {
+            shakePromises.push(this.animationManager.shakeCreature('player', position, playerActor.index));
+            this.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+        }
+        
+        if (opponentActor && opponentActor.type === 'creature') {
+            shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
+            this.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
+        }
+        
+        return Promise.all(shakePromises);
+    }
+
+    guest_handleHeroTurnExecution(data) {
+        // This remains here as it uses battleManager internals
+        return this.guest_handleCombinedTurnExecution(data);
+    }
+
+    guest_handleNecromancyRevival(data) {
+        if (this.necromancyManager) {
+            this.necromancyManager.handleGuestNecromancyRevival(data);
+        }
     }
 
     // GUEST: Handle combined turn execution
-        async guest_handleCombinedTurnExecution(data) {
+    async guest_handleCombinedTurnExecution(data) {
         const { playerAction, opponentAction, position, damageModifiers } = data;  // NEW: damageModifiers added
         
         this.updateGuestHeroDisplays(playerAction, opponentAction);
@@ -2513,37 +1402,6 @@ export class BattleManager {
         }
         
         return null;
-    }
-
-    // GUEST: Handle actor action (creatures or heroes)
-    async guest_handleActorAction(data) {
-        const { position, playerActor, opponentActor } = data;
-        
-        const shakePromises = [];
-        
-        if (playerActor && playerActor.type === 'creature') {
-            shakePromises.push(this.animationManager.shakeCreature('player', position, playerActor.index));
-            this.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
-        }
-        
-        if (opponentActor && opponentActor.type === 'creature') {
-            shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
-            this.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
-        }
-        
-        await Promise.all(shakePromises);
-    }
-
-    // GUEST: Handle hero turn execution (reuse existing logic)
-    async guest_handleHeroTurnExecution(data) {
-        // This now includes damage modifier handling through guest_handleCombinedTurnExecution
-        await this.guest_handleCombinedTurnExecution(data);
-    }
-
-    guest_handleNecromancyRevival(data) {
-        if (this.necromancyManager) {
-            this.necromancyManager.handleGuestNecromancyRevival(data);
-        }
     }
 
     // Update guest hero displays
@@ -2688,167 +1546,10 @@ export class BattleManager {
         }
     }
 
-    // GUEST: Handle damage applied
-    guest_handleDamageApplied(data) {
-        const { targetAbsoluteSide, targetPosition, damage, oldHp, newHp, maxHp, died, targetName } = data;
-        
-        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
-        const targetLocalSide = (targetAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
-        
-        const localTarget = targetLocalSide === 'player' 
-            ? this.playerHeroes[targetPosition]
-            : this.opponentHeroes[targetPosition];
-
-        if (localTarget) {
-            localTarget.currentHp = newHp;
-            localTarget.alive = !died;
-            
-            this.addCombatLog(
-                `💔 ${targetName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
-                targetLocalSide === 'player' ? 'error' : 'success'
-            );
-
-            this.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
-            this.animationManager.createDamageNumber(targetLocalSide, targetPosition, damage, maxHp, 'attack');
-            
-            if (died && oldHp > 0) {
-                this.handleHeroDeath(localTarget);
-            }
-        }
-    }
-
-    // GUEST: Handle creature damage applied
-    guest_handleCreatureDamageApplied(data) {
-        const { heroAbsoluteSide, heroPosition, creatureIndex, damage, oldHp, newHp, maxHp, died, creatureName } = data;
-        
-        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
-        const heroLocalSide = (heroAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
-        
-        const localHero = heroLocalSide === 'player' 
-            ? this.playerHeroes[heroPosition]
-            : this.opponentHeroes[heroPosition];
-
-        if (localHero && localHero.creatures[creatureIndex]) {
-            const creature = localHero.creatures[creatureIndex];
-            creature.currentHp = newHp;
-            creature.alive = !died;
-            
-            this.addCombatLog(
-                `💔 ${creatureName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
-                heroLocalSide === 'player' ? 'error' : 'success'
-            );
-
-            this.updateCreatureHealthBar(heroLocalSide, heroPosition, creatureIndex, newHp, maxHp);
-            this.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, creatureIndex, damage, creature.maxHp, 'attack');
-            
-            if (died && oldHp > 0) {
-                this.handleCreatureDeath(localHero, creature, creatureIndex, heroLocalSide, heroPosition);
-            }
-        }
-    }
-
-    // Guest handles battle pause notification
-    guest_handleBattlePaused(data) {
-        this.battlePaused = true;
-        
-        this.addCombatLog(`⏸️ Battle paused: ${data.reason}`, 'warning');
-        this.addCombatLog('⏳ Host is waiting for stable connection...', 'info');
-        
-        this.showBattlePauseUI(data.reason || 'Connection issue');
-    }
-
-    // Guest handles battle resume notification
-    guest_handleBattleResumed(data) {
-        this.battlePaused = false;
-        
-        this.addCombatLog(`▶️ Battle resumed: ${data.reason}`, 'success');
-        this.addCombatLog('⚔️ Battle continues...', 'info');
-        
-        this.hideBattlePauseUI();
-    }
-
-    // GUEST: Handle battle end
-    async guest_handleBattleEnd(data) {
-        this.battleActive = false;
-        
-        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn } = data;
-        
-        // 🔥 NEW: Update turn from the battle_end message BEFORE showing rewards
-        if (newTurn && this.battleScreen && this.battleScreen.turnTracker) {
-            this.battleScreen.turnTracker.setCurrentTurn(newTurn);
-            console.log(`🎯 Guest updated turn to ${newTurn} from battle_end message`);
-            
-            // Reset ability tracking for the new turn
-            if (window.heroSelection && window.heroSelection.heroAbilitiesManager) {
-                window.heroSelection.heroAbilitiesManager.resetTurnBasedTracking();
-                console.log('✅ Guest reset ability tracking after turn update');
-            }
-        }
-        
-        const myResult = this.isHost ? hostResult : guestResult;
-        
-        // Apply battle results first
-        this.applyBattleResults(hostResult, guestResult, hostLives, guestLives, hostGold, guestGold);
-        
-        // Calculate and apply wealth bonuses for guest
-        if (!this.isHost) {
-            const myWealthBonus = this.calculateWealthBonus(this.playerHeroes);
-            const opponentWealthBonus = this.calculateWealthBonus(this.opponentHeroes);
-            
-            if (myWealthBonus > 0) {
-                this.goldManager.addPlayerGold(myWealthBonus);
-            }
-            
-            if (opponentWealthBonus > 0) {
-                this.goldManager.addOpponentGold(opponentWealthBonus);
-            }
-        }
-        
-        // ===== CLEAR POTION EFFECTS AFTER BATTLE (GUEST) =====
-        if (window.potionHandler) {
-            try {
-                console.log('🧪 Guest clearing potion effects after battle...');
-                window.potionHandler.clearPotionEffects();
-                console.log('✅ Guest potion effects cleared successfully');
-            } catch (error) {
-                console.error('❌ Guest error clearing potion effects after battle:', error);
-            }
-        }
-        
-        if (window.heroSelection) {
-            console.log('🥩 HOST: Clearing processed delayed artifact effects...');
-            window.heroSelection.clearProcessedDelayedEffects();
-        }
-        
-        const myMessage = this.getResultMessage(myResult);
-        this.addCombatLog(myMessage, myResult === 'victory' ? 'success' : myResult === 'defeat' ? 'error' : 'info');
-        
-        await this.cleanupBattleState();
-        
-        await this.showBattleResult(myMessage);
-        
-        // Show rewards with the correct turn number (already updated above)
-        if (this.battleScreen && this.battleScreen.showCardRewardsAndReturn) {
-            setTimeout(() => {
-                this.battleScreen.showCardRewardsAndReturn(myResult);
-            }, 0);
-        }
-    }
-
     calculateWealthBonus(heroes) {
-        let totalWealthBonus = 0;
-        
-        // Check each hero position
-        ['left', 'center', 'right'].forEach(position => {
-            const hero = heroes[position];
-            if (hero && hero.alive && hero.hasAbility('Wealth')) {
-                const wealthLevel = hero.getAbilityStackCount('Wealth');
-                const bonusGold = wealthLevel * 4; // 4 gold per Wealth level
-                totalWealthBonus += bonusGold;
-            }
-        });
-        
-        return totalWealthBonus;
+        return this.combatManager ? 
+            this.combatManager.calculateWealthBonus(heroes) : 
+            0;
     }
 
     async getBothPlayersDelayedEffects() {
@@ -2902,18 +1603,6 @@ export class BattleManager {
             }
         } catch (error) {
             console.error('Error clearing battle state:', error);
-        }
-    }
-
-    // Send acknowledgment to host
-    sendAcknowledgment(ackType) {
-        if (this.isAuthoritative) return;
-        
-        if (this.gameDataSender) {
-            this.gameDataSender('battle_ack', {
-                type: ackType,
-                timestamp: Date.now()
-            });
         }
     }
 
@@ -3059,13 +1748,11 @@ export class BattleManager {
 
     // Check if battle should end
     checkBattleEnd() {
-        const playerHeroesAlive = Object.values(this.playerHeroes).filter(hero => hero && hero.alive);
-        const opponentHeroesAlive = Object.values(this.opponentHeroes).filter(hero => hero && hero.alive);
-        
-        const playerAlive = playerHeroesAlive.length > 0;
-        const opponentAlive = opponentHeroesAlive.length > 0;
-        
-        return !playerAlive || !opponentAlive;
+        if (!this.flowManager) {
+            console.error('BattleFlowManager not initialized');
+            return false;
+        }
+        return this.flowManager.checkBattleEnd();
     }
 
     // Handle battle end
@@ -3507,29 +2194,6 @@ export class BattleManager {
         });
     }
 
-    // Send battle update to guest
-    sendBattleUpdate(type, data) {
-        if (!this.isAuthoritative) return;
-        
-        this.sendBattleData(type, data);
-    }
-
-    // Send battle data to opponent
-    sendBattleData(type, data) {
-        
-        if (this.gameDataSender) {
-            
-            this.gameDataSender('battle_data', {
-                type: type,
-                data: data,
-                timestamp: Date.now()
-            });
-            
-        } else {
-            console.error('❌ HOST: gameDataSender is not available!');
-        }
-    }
-
     // Get result message based on outcome
     getResultMessage(result) {
         switch (result) {
@@ -3584,19 +2248,13 @@ export class BattleManager {
             // Export randomness state
             randomnessState: this.randomnessManager.exportState(),
             
+            // Export network manager state
+            networkState: this.networkManager.exportState(),
+            
             // Export BattleLog state if available
             battleLogState: this.battleScreen && this.battleScreen.getBattleLogState ? 
                             this.battleScreen.getBattleLogState() : null
         };
-
-        if (this.isAuthoritative) {
-            baseState.connectionAware = {
-                opponentConnected: this.opponentConnected,
-                battlePaused: this.battlePaused,
-                pauseStartTime: this.pauseStartTime,
-                totalPauseTime: this.totalPauseTime
-            };
-        }
 
         return baseState;
     }
@@ -3644,6 +2302,10 @@ export class BattleManager {
                 this.randomnessManager.importState(stateData.randomnessState);
             }
 
+            if (stateData.networkState) {
+                this.networkManager.importState(stateData.networkState);
+            }
+
             if (stateData.killTrackerState && this.killTracker) {
                 this.killTracker.importState(stateData.killTrackerState);
             }
@@ -3655,15 +2317,6 @@ export class BattleManager {
 
             if (stateData.spellSystemState && this.spellSystem) {
                 this.spellSystem.importState(stateData.spellSystemState);
-            }
-
-            if (this.isAuthoritative && stateData.connectionAware) {
-                this.battlePaused = stateData.connectionAware.battlePaused || false;
-                this.totalPauseTime = stateData.connectionAware.totalPauseTime || 0;
-                
-                if (this.battlePaused) {
-                    this.showBattlePauseUI('Battle was paused when restored');
-                }
             }
             
             this.updateAllHeroVisuals();
@@ -3780,10 +2433,6 @@ export class BattleManager {
         this.turnInProgress = false;
         this.currentTurn = 0;
         
-        this.battlePaused = false;
-        this.pauseStartTime = null;
-        this.totalPauseTime = 0;
-        
         // Reset randomness system
         if (this.isAuthoritative) {
             this.initializeRandomness();
@@ -3809,21 +2458,10 @@ export class BattleManager {
         this.battleLog = []; // UPDATED: Clear legacy array
         this.turnInProgress = false;
         
-        this.battlePaused = false;
-        this.pauseStartTime = null;
-        this.totalPauseTime = 0;
-        
-        if (this.connectionListener && this.roomManager && this.roomManager.getRoomRef()) {
-            this.roomManager.getRoomRef().off('value', this.connectionListener);
-            this.connectionListener = null;
-        }
+        // Cleanup network manager
+        this.networkManager.cleanup();
         
         this.hideBattlePauseUI();
-        
-        this.pendingAcks = {};
-        Object.values(this.ackTimeouts).forEach(timeoutId => clearTimeout(timeoutId));
-        this.ackTimeouts = {};
-        this.connectionLatency = 100;
         
         this.initializeExtensibleState();
         
@@ -3844,6 +2482,15 @@ export class BattleManager {
         
         this.randomnessManager.reset();
 
+        
+        if (this.flowManager) {
+            this.flowManager = null;
+        }
+
+        
+        if (this.combatManager) {
+            this.combatManager = null;
+        }
 
         if (this.necromancyManager) {
             this.necromancyManager.cleanup();
@@ -3854,6 +2501,11 @@ export class BattleManager {
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
             this.jigglesManager = null;
+        }
+
+        if (this.crusaderArtifactsHandler) {
+            this.crusaderArtifactsHandler.reset();
+            this.crusaderArtifactsHandler = null;
         }
 
         // Cleanup fireshield visual effects
@@ -3904,32 +2556,6 @@ export class BattleManager {
         // NEW: Reset BattleLog through BattleScreen
         if (this.battleScreen && this.battleScreen.battleLog) {
             this.battleScreen.battleLog.clear();
-        }
-    }
-
-    handleGuestReconnectionReady() {
-        if (!this.isAuthoritative) return;
-        
-        console.log('✅ HOST: Guest signaled ready after reconnection');
-        
-        // Clear timeout
-        if (this.reconnectionHandshakeTimeout) {
-            clearTimeout(this.reconnectionHandshakeTimeout);
-            this.reconnectionHandshakeTimeout = null;
-        }
-        
-        // Add a small delay to ensure guest is fully ready (speed-adjusted)
-        setTimeout(() => {
-            if (this.opponentConnected && !this.checkBattleEnd()) {
-                this.resumeBattle('Guest reconnected and ready');
-            }
-        }, this.getSpeedAdjustedDelay(500));
-    }
-
-    handleGuestReconnectionTimeout() {
-        // If battle hasn't ended, resume anyway
-        if (this.battleActive && !this.checkBattleEnd() && this.opponentConnected) {
-            this.resumeBattle('Reconnection timeout - resuming battle');
         }
     }
 }

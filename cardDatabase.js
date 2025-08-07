@@ -433,7 +433,7 @@ const CARD_DATABASE = {
         name: 'FrostRune',
         image: './Cards/All/FrostRune.png',
         cardType: 'Spell',
-        level: 0,
+        level: 3,
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',

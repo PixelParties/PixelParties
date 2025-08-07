@@ -29,8 +29,41 @@ export function calculateFormationWantedPosterBonuses(formation, heroEquipmentMa
         ).length;
         
         if (wantedPosterCount > 0) {
-            // Get kill count for this hero (capped at 5 per poster)
-            const rawKills = killTracker.getKillCount(side, position);
+            let rawKills = 0;
+            
+            // ENHANCED: Use multiple strategies to find kills
+            // Strategy 1: Use the provided side
+            rawKills = killTracker.getKillCount(side, position);
+            
+            // Strategy 2: If no kills found, try opposite side (P2P perspective issue)
+            if (rawKills === 0) {
+                const oppositeSide = side === 'player' ? 'opponent' : 'player';
+                rawKills = killTracker.getKillCount(oppositeSide, position);
+                
+                if (rawKills > 0) {
+                    console.log(`🔄 Found ${rawKills} kills for ${hero.name} on ${oppositeSide} side instead of ${side} side`);
+                }
+            }
+            
+            // Strategy 3: If hero has absoluteSide property, try using that for more robust lookup
+            if (rawKills === 0 && hero.absoluteSide && killTracker.getKillCountByAbsoluteSide) {
+                rawKills = killTracker.getKillCountByAbsoluteSide(hero.absoluteSide, position);
+                
+                if (rawKills > 0) {
+                    console.log(`🎯 Found ${rawKills} kills for ${hero.name} using absoluteSide: ${hero.absoluteSide}`);
+                }
+            }
+            
+            // Strategy 4: Last resort - search all sides for this hero's kills
+            if (rawKills === 0 && killTracker.getAllKillsForHero) {
+                const allKills = killTracker.getAllKillsForHero(hero.name, position);
+                rawKills = allKills.length;
+                
+                if (rawKills > 0) {
+                    console.log(`🔍 Found ${rawKills} kills for ${hero.name} via hero name search`);
+                }
+            }
+            
             const effectiveKillsPerPoster = Math.min(rawKills, 5);
             
             // Calculate gold bonus: 2 gold per kill per poster
@@ -50,6 +83,9 @@ export function calculateFormationWantedPosterBonuses(formation, heroEquipmentMa
                 });
                 
                 console.log(`💰 ${hero.name} Wanted Poster bonus: ${heroBonus} gold (${effectiveKillsPerPoster} kills × ${wantedPosterCount} posters)`);
+            } else if (wantedPosterCount > 0) {
+                // Debug: Log when we have posters but no kills found
+                console.log(`🔍 DEBUG: ${hero.name} has ${wantedPosterCount} Wanted Poster(s) but 0 kills found on any side`);
             }
         }
     });

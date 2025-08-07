@@ -341,7 +341,23 @@ export class BattleManager {
         
         // Initialize flow manager (add this after other manager initializations)
         this.flowManager = new BattleFlowManager(this);
+        
+        
+        console.log('🔧 DEBUG: Initializing combat manager...');
         this.combatManager = new BattleCombatManager(this);
+        
+        // Verify initialization
+        if (!this.combatManager) {
+            console.error('❌ CRITICAL: Combat manager failed to initialize!');
+        } else if (!this.combatManager.battleManager) {
+            console.error('❌ CRITICAL: Combat manager has no battleManager reference!');
+        } else if (this.combatManager.battleManager !== this) {
+            console.error('❌ CRITICAL: Combat manager has wrong battleManager reference!');
+            console.log('Expected:', this);
+            console.log('Actual:', this.combatManager.battleManager);
+        } else {
+            console.log('✅ Combat manager initialized correctly');
+        }
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
@@ -1010,10 +1026,20 @@ export class BattleManager {
 
     // Apply damage to target (hero or creature)
     applyAttackDamageToTarget(attack) {
+        console.log('🎯 DEBUG: applyAttackDamageToTarget called');
+        console.log('Attack object:', attack);
+        
         if (!this.combatManager) {
-            console.error('Combat manager not initialized');
+            console.error('❌ CRITICAL: Combat manager not initialized when applying damage!');
+            console.error('Available managers:', {
+                combatManager: !!this.combatManager,
+                flowManager: !!this.flowManager,
+                animationManager: !!this.animationManager
+            });
             return;
         }
+        
+        console.log('✅ Delegating to combat manager...');
         return this.combatManager.applyAttackDamageToTarget(attack);
     }
 

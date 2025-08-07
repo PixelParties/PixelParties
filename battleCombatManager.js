@@ -406,6 +406,17 @@ export class BattleCombatManager {
                 side: attack.target.side
             });
             
+    
+            if (!this.battleManager) {
+                console.error('❌ CRITICAL: No battleManager reference in combat manager!');
+                return;
+            }
+            
+            if (!this.battleManager.killTracker) {
+                console.error('❌ CRITICAL: No killTracker in battleManager!');
+                return;
+            }
+            
             // Check if creature died from this attack
             if (wasAlive && !attack.target.creature.alive && this.battleManager.isAuthoritative) {
                 // Use the Wanted Poster module's visual feedback function
@@ -451,6 +462,11 @@ export class BattleCombatManager {
             // Check if hero died from this attack
             if (wasAlive && !defender.alive && this.battleManager.isAuthoritative) {
                 // Use the Wanted Poster module's visual feedback function
+                console.log('💀 KILL DETECTED:', {
+                    attacker: attacker.name + ' (' + attacker.side + ')',
+                    defender: defender.name + ' (' + defender.side + ')',
+                    battleManagerInstance: this.battleManager.constructor.name
+                });
                 recordKillWithVisualFeedback(this.battleManager, attacker, defender, 'hero');
             }
 

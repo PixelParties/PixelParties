@@ -1231,16 +1231,35 @@ export class BattleManager {
 
 
 
+    //GUEST EQUIP HANDLERS
+
     guest_handleCrusaderCannonBarrage(data) {
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.handleGuestCannonBarrage(data);
         }
     }
-    
 
     guest_handleCrusaderCutlassAttack(data) {
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.handleGuestCutlassAttack(data);
+        }
+    }
+
+    guest_handleCrusaderFlintlockAttack(data) {
+        if (this.crusaderArtifactsHandler) {
+            this.crusaderArtifactsHandler.handleGuestFlintlockAttack(data);
+        }
+    }
+ 
+    guest_handleCrusaderHookshotSwap(data) {
+        if (this.crusaderArtifactsHandler) {
+            this.crusaderArtifactsHandler.handleGuestHookshotSwap(data);
+        }
+    }
+
+    guest_handleStormbladeWindSwap(data) {
+        if (this.attackEffectsManager && this.attackEffectsManager.stormbladeEffect) {
+            this.attackEffectsManager.stormbladeEffect.handleGuestWindSwap(data);
         }
     }
 
@@ -1307,6 +1326,7 @@ export class BattleManager {
             this.necromancyManager.handleGuestNecromancyRevival(data);
         }
     }
+
 
     // GUEST: Handle combined turn execution
     async guest_handleCombinedTurnExecution(data) {
@@ -2105,8 +2125,13 @@ export class BattleManager {
         if (this.persistenceManager) {
             await this.persistenceManager.clearBattleState();
         }
+
+        // Clear all status effects from creatures and heroes
+        if (this.statusEffectsManager) {
+            this.statusEffectsManager.clearAllBattleStatusEffects();
+        }
         
-        // ADD: Cleanup Jiggles effects
+        // Cleanup Jiggles effects
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
         }
@@ -2553,7 +2578,7 @@ export class BattleManager {
             this.killTracker.reset();
         }
         
-        // NEW: Reset BattleLog through BattleScreen
+        // Reset BattleLog through BattleScreen
         if (this.battleScreen && this.battleScreen.battleLog) {
             this.battleScreen.battleLog.clear();
         }

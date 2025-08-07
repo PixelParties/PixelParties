@@ -192,15 +192,22 @@ export class ReconnectionManager {
             if (this.isHost && gameState.hostSelected) {
                 this.heroSelection.selectedCharacter = gameState.hostSelected;
                 
-                if (gameState.hostBattleFormation) {
+                // Skip formation restoration during battle reconnection
+                // Let battle persistence handle formations to preserve hookshot swaps
+                const isBattleReconnection = gameState.gamePhase === 'Battle' && gameState.battleActive;
+                
+                if (gameState.hostBattleFormation && !isBattleReconnection) {
+                    // Only restore formations if NOT during battle reconnection
                     this.heroSelection.formationManager.importFormationState({
                         battleFormation: gameState.hostBattleFormation,
                         opponentBattleFormation: gameState.guestBattleFormation ? 
                             this.heroSelection.formationManager.alignOpponentFormation(gameState.guestBattleFormation) : null
                     }, true);
-                } else {
+                } else if (!isBattleReconnection) {
+                    // Only init with character if NOT during battle reconnection
                     this.heroSelection.formationManager.initWithCharacter(this.heroSelection.selectedCharacter);
                 }
+                // If it IS battle reconnection, leave formations empty - they'll be restored from battle persistence
 
                 this.heroSelection.restorePlayerData(
                     gameState.hostDeck, 
@@ -216,15 +223,21 @@ export class ReconnectionManager {
             } else if (!this.isHost && gameState.guestSelected) {
                 this.heroSelection.selectedCharacter = gameState.guestSelected;
                 
-                if (gameState.guestBattleFormation) {
+                // Skip formation restoration during battle reconnection
+                const isBattleReconnection = gameState.gamePhase === 'Battle' && gameState.battleActive;
+                
+                if (gameState.guestBattleFormation && !isBattleReconnection) {
+                    // Only restore formations if NOT during battle reconnection
                     this.heroSelection.formationManager.importFormationState({
                         battleFormation: gameState.guestBattleFormation,
                         opponentBattleFormation: gameState.hostBattleFormation ? 
                             this.heroSelection.formationManager.alignOpponentFormation(gameState.hostBattleFormation) : null
                     }, false);
-                } else {
+                } else if (!isBattleReconnection) {
+                    // Only init with character if NOT during battle reconnection
                     this.heroSelection.formationManager.initWithCharacter(this.heroSelection.selectedCharacter);
                 }
+                // If it IS battle reconnection, leave formations empty - they'll be restored from battle persistence
 
                 this.heroSelection.restorePlayerData(
                     gameState.guestDeck, 
@@ -274,7 +287,7 @@ export class ReconnectionManager {
 
     // Restore advanced data (abilities, spellbooks, creatures, equipment, actions)
     async restoreAdvancedData(gameState) {
-        // Restore abilities
+        // Restore abilities - always restore them
         if (this.isHost && gameState.hostAbilitiesState) {
             this.heroSelection.heroAbilitiesManager.importAbilitiesState(gameState.hostAbilitiesState);
         } else if (!this.isHost && gameState.guestAbilitiesState) {
@@ -292,21 +305,21 @@ export class ReconnectionManager {
             }
         }
 
-        // Restore Spellbooks
+        // Restore Spellbooks - always restore them
         if (this.isHost && gameState.hostSpellbooksState) {
             this.heroSelection.heroSpellbookManager.importSpellbooksState(gameState.hostSpellbooksState);
         } else if (!this.isHost && gameState.guestSpellbooksState) {
             this.heroSelection.heroSpellbookManager.importSpellbooksState(gameState.guestSpellbooksState);
         }
 
-        // Restore creatures
+        // Restore creatures - always restore them
         if (this.isHost && gameState.hostCreaturesState) {
             this.heroSelection.heroCreatureManager.importCreaturesState(gameState.hostCreaturesState);
         } else if (!this.isHost && gameState.guestCreaturesState) {
             this.heroSelection.heroCreatureManager.importCreaturesState(gameState.guestCreaturesState);
         }
 
-        // Restore equipment
+        // Restore equipment - always restore them
         if (this.isHost && gameState.hostEquipmentState) {
             const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.hostEquipmentState);
             if (equipmentRestored) {
@@ -488,7 +501,29 @@ export class ReconnectionManager {
         
         // Set reconnection in progress
         this.reconnectionInProgress = true;
-        
+
+        // Load battle state to get current formations (including any swaps)
+        const savedBattleState = await this.checkBattleStateExists() ? 
+            await this.getBattleStateFromFirebase() : null;
+
+        if (savedBattleState) {
+            // Update FormationManager with the current battle formations (post-swaps)
+            const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+            const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+            
+            const myCurrentFormation = savedBattleState[`${myAbsoluteSide}Formation`];
+            const opponentCurrentFormation = savedBattleState[`${opponentAbsoluteSide}Formation`];
+            
+            if (myCurrentFormation && opponentCurrentFormation) {
+                this.heroSelection.formationManager.importFormationState({
+                    battleFormation: myCurrentFormation,
+                    opponentBattleFormation: this.heroSelection.formationManager.alignOpponentFormation(opponentCurrentFormation)
+                }, this.isHost);
+                
+                console.log('⚓ Updated FormationManager with post-swap formations for battle reconnection');
+            }
+        }
+
         // Initialize battle screen immediately
         const battleInitialized = this.heroSelection.initBattleScreen();
         if (!battleInitialized) {
@@ -728,9 +763,14 @@ export class ReconnectionManager {
                 return false;
             }
             
-            // Get formations
-            const playerFormation = this.heroSelection.formationManager.getBattleFormation();
-            const opponentFormation = this.heroSelection.formationManager.getOpponentBattleFormation();
+            // Get formations from the restored battle state instead of formation manager
+            const restoredBattleState = await this.persistenceManager.loadBattleState();
+            const playerFormation = this.isHost ? 
+                restoredBattleState.hostFormation : 
+                restoredBattleState.guestFormation;
+            const opponentFormation = this.isHost ? 
+                restoredBattleState.guestFormation : 
+                restoredBattleState.hostFormation;
             
             if (!playerFormation || !opponentFormation) {
                 console.error('❌ Cannot setup battle screen - missing formations');
@@ -1385,6 +1425,21 @@ export class ReconnectionManager {
         }
         
         console.log('ReconnectionManager cleanup completed');
+    }
+
+    async getBattleStateFromFirebase() {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return null;
+        }
+        
+        try {
+            const roomRef = this.roomManager.getRoomRef();
+            const snapshot = await roomRef.child('battleState').once('value');
+            return snapshot.val();
+        } catch (error) {
+            console.error('Error getting battle state for reconnection:', error);
+            return null;
+        }
     }
 
     // Reset for new game

@@ -1,6 +1,7 @@
 // attackEffects.js - Centralized Attack Effects Handler
 import { TheMastersSwordEffect } from './Artifacts/theMastersSword.js';
 import { registerTheSunSword } from './Artifacts/theSunSword.js';
+import { registerTheStormblade } from './Artifacts/theStormblade.js'; 
 
 export class AttackEffectsManager {
     constructor(battleManager) {
@@ -15,6 +16,8 @@ export class AttackEffectsManager {
         // Equip effect instances
         this.mastersSwordEffect = new TheMastersSwordEffect(this.battleManager);
         this.sunSwordEffect = null;
+        this.stormbladeEffect = null; 
+
 
         // Register built-in handlers
         this.registerBuiltInHandlers();
@@ -30,15 +33,12 @@ export class AttackEffectsManager {
             handler: this.handleBladeOfTheFrostbringer.bind(this)
         });
         
-        // Register TheMastersSword damage modifier
+        // Register Equip item effects
         this.registerDamageModifier('TheMastersSword', {
             handler: this.handleMastersSwordDamage.bind(this)
         });
-        
-        // Register TheSunSword effect  // <-- ADD THIS
-        this.sunSwordEffect = registerTheSunSword(this, this.battleManager);  // <-- ADD THIS
-        
-        console.log('⚔️ TheMastersSword and TheSunSword effects registered');  // <-- MODIFY THIS
+        this.sunSwordEffect = registerTheSunSword(this, this.battleManager); 
+        this.stormbladeEffect = registerTheStormblade(this, this.battleManager);
     }
     
     // Register a new attack effect handler
@@ -380,6 +380,26 @@ export class AttackEffectsManager {
             return hero?.creatures?.[defenderInfo.creatureIndex];
         }
     }
+
+    // Check if TheStormblade animations are currently playing
+    hasActiveStormbladeAnimations() {
+        return this.stormbladeEffect && this.stormbladeEffect.hasActiveAnimations();
+    }
+
+    // Wait for all TheStormblade animations to complete
+    async waitForStormbladeAnimations() {
+        if (this.stormbladeEffect && this.stormbladeEffect.hasActiveAnimations()) {
+            await this.stormbladeEffect.waitForAllAnimations();
+        }
+    }
+
+    // Get time remaining for TheStormblade animations
+    getStormbladeAnimationTimeRemaining() {
+        if (this.stormbladeEffect && this.stormbladeEffect.hasActiveAnimations()) {
+            return this.stormbladeEffect.getAnimationTimeRemaining();
+        }
+        return 0;
+    }
     
     // Ensure CSS for attack effects
     ensureAttackEffectsCSS() {
@@ -464,6 +484,11 @@ export class AttackEffectsManager {
         if (this.sunSwordEffect) {
             this.sunSwordEffect.cleanup();
             this.sunSwordEffect = null;
+        }
+
+        if (this.stormbladeEffect) {
+            this.stormbladeEffect.cleanup();
+            this.stormbladeEffect = null;
         }
         
         const css = document.getElementById('attackEffectsCSS');

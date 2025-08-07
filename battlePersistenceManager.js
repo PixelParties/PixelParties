@@ -110,7 +110,7 @@ export class BattlePersistenceManager {
             // Authority and sync info
             authoritativeHost: this.isHost && battleManager.isAuthoritative,
             
-            // NEW: Randomness state
+            // Randomness state
             randomnessState: this.exportRandomnessState(battleManager),
             
             // Extensible sections for future features

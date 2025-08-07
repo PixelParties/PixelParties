@@ -233,7 +233,19 @@ export class BattleFlowManager {
             await bm.delay(300); // Brief pause between actor pairs (now speed-adjusted)
         }
         
+        
+        // Clear temporary modifiers at end of turn
         this.clearTurnModifiers(playerHero, opponentHero, position);
+        
+        // Smart delay: Only wait if TheStormblade animations are actually playing
+        if (this.battleManager.attackEffectsManager && 
+            this.battleManager.attackEffectsManager.hasActiveStormbladeAnimations()) {
+            
+            console.log('🌪️ Waiting for active Stormblade animations to complete...');
+            await this.battleManager.attackEffectsManager.waitForStormbladeAnimations();
+            console.log('🌪️ Stormblade animations completed, continuing battle...');
+        }
+
         bm.turnInProgress = false;
     }
 
@@ -422,12 +434,12 @@ export class BattleFlowManager {
         }
         
         // ============================================
-        // STATUS EFFECTS: Post-turn processing (FIXED)
+        // STATUS EFFECTS: Post-turn processing
         // ============================================
         
         // Process status effects after actor actions complete
         // This handles poison damage, burn damage, silenced duration, etc.
-        // FIXED: Process for ALL original actors, not just those that acted
+        // Process for ALL original actors, not just those that acted
         // This ensures that stunned/frozen actors still take poison and burn damage
         if (bm.statusEffectsManager) {
             const statusEffectPromises = [];

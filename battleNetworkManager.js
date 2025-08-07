@@ -510,6 +510,18 @@ export class BattleNetworkManager {
             case 'crusader_cutlass_attack':
                 bm.guest_handleCrusaderCutlassAttack(data);
                 break;
+
+            case 'crusader_flintlock_attack':
+                bm.guest_handleCrusaderFlintlockAttack(data);
+                break;
+
+            case 'crusader_hookshot_swap':
+                bm.guest_handleCrusaderHookshotSwap(data);
+                break;
+
+            case 'stormblade_wind_swap':
+                bm.guest_handleStormbladeWindSwap(data);
+                break;
         }
     }
 

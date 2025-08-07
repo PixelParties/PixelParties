@@ -247,6 +247,14 @@ export class Hero {
         return this.equipment.length;
     }
 
+    // Counts number of a SPECIFIC Equipment
+    countEquipment(equipmentName) {
+        if (!this.equipment) return 0;
+        return this.equipment.filter(item => 
+            item.name === equipmentName || item.cardName === equipmentName
+        ).length;
+    }
+
     // Set creatures from HeroCreatureManager data
     setCreatures(creaturesData) {
         if (!creaturesData || !Array.isArray(creaturesData)) return;

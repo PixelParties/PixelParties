@@ -1070,7 +1070,7 @@ const CARD_DATABASE = {
         name: 'TheSunSword',
         image: './Cards/All/TheSunSword.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 12,
         action: false,
         spellSchool: null,
         subtype: 'Equip'

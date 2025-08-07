@@ -432,7 +432,6 @@ export class BattleCombatManager {
             if (this.checkAndApplyToxicTrap(attacker, defender)) {
                 // Toxic trap triggered - original attack is blocked
                 console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
-                return; // Don't process attack effects if attack was blocked
             }
 
             // Check for frost rune
@@ -551,7 +550,7 @@ export class BattleCombatManager {
             return false;
         }
         
-        // Apply toxic trap effect (poison attacker instead of damaging defender)
+        // Apply toxic trap effect (poison attacker)
         const blocked = toxicTrapSpell.applyToxicTrapEffect(attacker, defender);
         
         return blocked; // true if attack was blocked
@@ -570,7 +569,7 @@ export class BattleCombatManager {
             return false;
         }
         
-        // Apply frost rune effect (freeze attacker instead of damaging defender)
+        // Apply frost rune effect (freeze attacker)
         const blocked = frostRuneSpell.applyFrostRuneEffect(attacker, defender);
         
         return blocked; // true if attack was blocked

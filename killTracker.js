@@ -1,4 +1,4 @@
-// killTracker.js - Generic Kill Tracking System for Battle
+// killTracker.js - Generic Kill Tracking System for Battle (UPDATED for Necromancy)
 
 export class KillTracker {
     constructor() {
@@ -20,6 +20,8 @@ export class KillTracker {
     }
     
     // Record a kill made by an attacker against a target
+    // NOTE: This is called whenever a target's HP drops to 0, regardless of whether
+    // they are subsequently revived by Necromancy or other effects
     recordKill(attacker, target, targetType = 'unknown') {
         if (!attacker || !attacker.side || !attacker.position) {
             console.warn('Invalid attacker for kill tracking');
@@ -33,7 +35,9 @@ export class KillTracker {
             targetSide: target.side || 'unknown',
             targetPosition: target.position || 'unknown',
             timestamp: Date.now(),
-            turn: this.battleManager?.currentTurn || 0
+            turn: this.battleManager?.currentTurn || 0,
+            // NEW: Track if target was revived (can be updated later)
+            wasRevived: false
         };
         
         // Add to kill list for this attacker
@@ -50,6 +54,23 @@ export class KillTracker {
         return killRecord;
     }
     
+    // NEW: Mark a kill as having been revived (for future tracking/display purposes)
+    markKillAsRevived(attacker, targetName, targetType) {
+        const kills = this.kills[attacker.side]?.[attacker.position] || [];
+        
+        // Find the most recent kill matching the target
+        for (let i = kills.length - 1; i >= 0; i--) {
+            const kill = kills[i];
+            if (kill.targetName === targetName && kill.targetType === targetType && !kill.wasRevived) {
+                kill.wasRevived = true;
+                console.log(`💀✨ Marked kill of ${targetName} as revived`);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
     // Get kill count for a specific hero
     getKillCount(side, position, filter = null) {
         const kills = this.kills[side]?.[position] || [];
@@ -60,6 +81,16 @@ export class KillTracker {
         }
         
         return kills.length;
+    }
+    
+    // NEW: Get kill count excluding revived targets (if you want to track "permanent" kills)
+    getPermanentKillCount(side, position) {
+        return this.getKillCount(side, position, kill => !kill.wasRevived);
+    }
+    
+    // NEW: Get kill count of only revived targets
+    getRevivedKillCount(side, position) {
+        return this.getKillCount(side, position, kill => kill.wasRevived);
     }
     
     // Get all kills for a specific hero
@@ -85,6 +116,7 @@ export class KillTracker {
     }
     
     // Handle Wanted Poster specific logic
+    // NOTE: Wanted Poster counts ALL kills, including revived creatures
     handleWantedPosterKill(attacker, killRecord) {
         const killCount = this.getKillCount(attacker.side, attacker.position);
         
@@ -111,21 +143,23 @@ export class KillTracker {
     handleSyncedKill(data) {
         const { attackerSide, attackerPosition, killRecord } = data;
         
-        // Add the kill to our local tracking
-        this.kills[attackerSide][attackerPosition].push(killRecord);
+        const localAttackerSide = attackerSide === 'player' ? 'opponent' : 'player';
         
-        // Get the hero to check for artifacts
-        const heroes = attackerSide === 'player' 
+        // Add the kill to our local tracking with the translated side
+        this.kills[localAttackerSide][attackerPosition].push(killRecord);
+        
+        // Get the hero to check for artifacts using the translated side
+        const heroes = localAttackerSide === 'player' 
             ? this.battleManager?.playerHeroes 
             : this.battleManager?.opponentHeroes;
         
         const attacker = heroes?.[attackerPosition];
         if (attacker && this.hasWantedPoster(attacker)) {
-            const killCount = this.getKillCount(attackerSide, attackerPosition);
+            const killCount = this.getKillCount(localAttackerSide, attackerPosition);
             if (killCount <= 5) {
                 this.battleManager?.addCombatLog(
                     `📜 ${data.attackerName} scored a bounty kill! (${Math.min(killCount, 5)}/5)`,
-                    attackerSide === 'player' ? 'success' : 'info'
+                    localAttackerSide === 'player' ? 'success' : 'info'
                 );
             }
         }
@@ -158,7 +192,7 @@ export class KillTracker {
         console.log('KillTracker reset');
     }
     
-    // Get statistics
+    // Get statistics (UPDATED with revival tracking)
     getStatistics() {
         const stats = {
             playerKills: this.getSideKillCount('player'),
@@ -170,10 +204,17 @@ export class KillTracker {
             stats.byPosition[side] = {};
             ['left', 'center', 'right'].forEach(position => {
                 const kills = this.kills[side][position];
+                const revivedKills = kills.filter(k => k.wasRevived);
+                const permanentKills = kills.filter(k => !k.wasRevived);
+                
                 stats.byPosition[side][position] = {
                     total: kills.length,
+                    permanent: permanentKills.length,
+                    revived: revivedKills.length,
                     heroes: kills.filter(k => k.targetType === 'hero').length,
-                    creatures: kills.filter(k => k.targetType === 'creature').length
+                    creatures: kills.filter(k => k.targetType === 'creature').length,
+                    heroesRevived: revivedKills.filter(k => k.targetType === 'hero').length,
+                    creaturesRevived: revivedKills.filter(k => k.targetType === 'creature').length
                 };
             });
         });
@@ -181,6 +222,7 @@ export class KillTracker {
         return stats;
     }
 
+    // Calculate Wanted Poster bonus (counts ALL kills, including revived)
     getWantedPosterBonus(side, position) {
         const kills = this.getKillCount(side, position);
         const effectiveKills = Math.min(kills, 5); // Cap at 5 kills

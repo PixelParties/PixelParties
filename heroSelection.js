@@ -21,6 +21,7 @@ import { HeroEquipmentManager } from './heroEquipment.js';
 import { leadershipAbility } from './Abilities/leadership.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
+import { VacarnEffectManager } from './Heroes/vacarn.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 
@@ -71,6 +72,7 @@ export class HeroSelection {
 
 
         this.nicolasEffectManager = new NicolasEffectManager();
+        this.vacarnEffectManager = new VacarnEffectManager();
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
 
@@ -392,7 +394,7 @@ export class HeroSelection {
     }
 
     // Handle turn changes from TurnTracker - UPDATED with Leadership reset
-    onTurnChange(turnChangeData) {
+    async onTurnChange(turnChangeData) {
         // Reset actions at the start of each turn (team building phase)
         this.actionManager.resetActions();
 
@@ -412,6 +414,14 @@ export class HeroSelection {
         // Reset Nicolas effect usage for new turn
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.resetForNewTurn();
+        }
+
+        // Reset Vacarn effect usage for new turn
+        if (this.vacarnEffectManager) {
+            this.vacarnEffectManager.resetForNewTurn();
+            
+            // Process any buried creatures that should be raised
+            await this.vacarnEffectManager.processStartOfTurn(this);
         }
         
         // Update UI to reflect new turn
@@ -741,6 +751,9 @@ export class HeroSelection {
                 if (this.nicolasEffectManager) {
                     gameState.hostNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
+                if (this.vacarnEffectManager) {
+                    gameState.hostVacarnState = sanitizeForFirebase(this.vacarnEffectManager.exportVacarnState());
+                }
 
                 // Save delayed artifact effects for host
                 if (this.delayedArtifactEffects) {
@@ -827,6 +840,11 @@ export class HeroSelection {
                     gameState.guestNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
 
+                // Save Vacarn effect state for guest
+                if (this.vacarnEffectManager) {
+                    gameState.guestVacarnState = sanitizeForFirebase(this.vacarnEffectManager.exportVacarnState());
+                }
+
                 // Save delayed artifact effects for guest
                 if (this.delayedArtifactEffects) {
                     gameState.guestDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
@@ -887,7 +905,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, delayedArtifactEffectsData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -939,8 +957,18 @@ export class HeroSelection {
                 console.log('📝 No Nicolas data found - initialized fresh state');
             }
         }
+        if (vacarnData && this.vacarnEffectManager) {
+            const vacarnRestored = this.vacarnEffectManager.importVacarnState(vacarnData);
+            if (vacarnRestored) {
+                console.log('✅ Vacarn effect state restored successfully');
+            }
+        } else {
+            if (this.vacarnEffectManager) {
+                this.vacarnEffectManager.reset();
+            }
+        }
 
-        // ===== NEW: Restore delayed artifact effects =====
+        // ===== Restore delayed artifact effects =====
         if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
             this.delayedArtifactEffects = [...delayedArtifactEffectsData];
             console.log(`✅ Restored ${this.delayedArtifactEffects.length} delayed artifact effects`);
@@ -1586,6 +1614,9 @@ export class HeroSelection {
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.resetForNewTurn();
                 console.log('✨ Nicolas effect usage reset when returning to formation');
+            }
+            if (this.vacarnEffectManager) {
+                this.vacarnEffectManager.resetForNewTurn();
             }
             
             // STEP 3: Transition to team building state BEFORE updating UI
@@ -2619,6 +2650,9 @@ export class HeroSelection {
         // Reset Nicolas effect manager
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.reset();
+        }
+        if (this.vacarnEffectManager) {
+            this.vacarnEffectManager.reset();
         }
         
         // Reset crusader artifacts handler

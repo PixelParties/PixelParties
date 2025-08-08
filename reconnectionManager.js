@@ -1,4 +1,4 @@
-// reconnectionManager.js - Centralized Reconnection Management System with Guard Change Support
+// reconnectionManager.js - Centralized Reconnection Management System with Guard Change Support and Vacarn Integration
 
 export class ReconnectionManager {
     constructor() {
@@ -217,6 +217,7 @@ export class ReconnectionManager {
                     gameState.hostGlobalSpellState,
                     gameState.hostPotionState,
                     gameState.hostNicolasState,
+                    gameState.hostVacarnState,
                     gameState.hostDelayedArtifactEffects 
                 );
                 
@@ -247,6 +248,7 @@ export class ReconnectionManager {
                     gameState.guestGlobalSpellState,
                     gameState.guestPotionState,
                     gameState.guestNicolasState,
+                    gameState.guestVacarnState,
                     gameState.guestDelayedArtifactEffects
                 );
             }
@@ -421,6 +423,63 @@ export class ReconnectionManager {
                 this.heroSelection.nicolasEffectManager.reset();
                 console.log('📝 No Nicolas data found during reconnection - initialized fresh state');
             }
+        }
+
+        // ===== NEW: RESTORE VACARN EFFECT STATE =====
+        if (this.isHost && gameState.hostVacarnState) {
+            if (this.heroSelection.vacarnEffectManager) {
+                const vacarnRestored = this.heroSelection.vacarnEffectManager.importVacarnState(gameState.hostVacarnState);
+                if (vacarnRestored) {
+                    console.log('✅ Host Vacarn effect state restored during reconnection');
+                    
+                    // Log details about what was restored
+                    const vacarnState = this.heroSelection.vacarnEffectManager.getState();
+                    const buriedCount = Object.keys(vacarnState.buriedCreatures).length;
+                    console.log(`💀 Vacarn restoration details: used=${vacarnState.vacarnUsedThisTurn}, buried=${buriedCount} creatures`);
+                    
+                    // If there are buried creatures, log what they are
+                    if (buriedCount > 0) {
+                        Object.entries(vacarnState.buriedCreatures).forEach(([position, data]) => {
+                            console.log(`💀 ${position}: ${data.creature.name} (buried turn ${data.buriedAtTurn})`);
+                        });
+                    }
+                }
+            }
+        } else if (!this.isHost && gameState.guestVacarnState) {
+            if (this.heroSelection.vacarnEffectManager) {
+                const vacarnRestored = this.heroSelection.vacarnEffectManager.importVacarnState(gameState.guestVacarnState);
+                if (vacarnRestored) {
+                    console.log('✅ Guest Vacarn effect state restored during reconnection');
+                    
+                    // Log details about what was restored
+                    const vacarnState = this.heroSelection.vacarnEffectManager.getState();
+                    const buriedCount = Object.keys(vacarnState.buriedCreatures).length;
+                    console.log(`💀 Vacarn restoration details: used=${vacarnState.vacarnUsedThisTurn}, buried=${buriedCount} creatures`);
+                    
+                    // If there are buried creatures, log what they are
+                    if (buriedCount > 0) {
+                        Object.entries(vacarnState.buriedCreatures).forEach(([position, data]) => {
+                            console.log(`💀 ${position}: ${data.creature.name} (buried turn ${data.buriedAtTurn})`);
+                        });
+                    }
+                }
+            }
+        } else {
+            // Initialize Vacarn state if no saved data
+            if (this.heroSelection.vacarnEffectManager) {
+                this.heroSelection.vacarnEffectManager.reset();
+                console.log('📝 No Vacarn data found during reconnection - initialized fresh state');
+            }
+        }
+
+        // ===== SPECIAL HANDLING FOR TURN-BASED EFFECTS DURING RECONNECTION =====
+        // After restoring all states, check if any Vacarn creatures should be raised
+        if (this.heroSelection.vacarnEffectManager) {
+            const currentTurn = this.heroSelection.getCurrentTurn();
+            console.log(`💀 Checking for Vacarn creatures to raise on reconnection (turn ${currentTurn})`);
+            
+            // Process any buried creatures that should be raised
+            await this.heroSelection.vacarnEffectManager.processStartOfTurn(this.heroSelection);
         }
     }
 

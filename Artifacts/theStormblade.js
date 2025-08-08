@@ -9,6 +9,10 @@ export class TheStormbladeEffect {
         this.activeAnimations = 0;
         this.animationPromises = [];
         
+        // NEW: Track recent attacks to prevent duplicate triggers
+        this.recentAttacks = new Map(); // attackerId -> timestamp
+        this.cooldownDuration = 100; // 100ms cooldown between attack effect triggers
+        
         console.log('🌪️ TheStormblade effect initialized');
     }
     
@@ -26,10 +30,30 @@ export class TheStormbladeEffect {
     async handleStormbladeEffect(attacker, defender, damage, equipmentItem) {
         if (!this.battleManager.isAuthoritative) return;
         
+        // NEW: Check for recent attack from this attacker to prevent duplicate triggers
+        const attackerId = this.getAttackerId(attacker);
+        const now = Date.now();
+        const lastTrigger = this.recentAttacks.get(attackerId);
+        
+        if (lastTrigger && (now - lastTrigger) < this.cooldownDuration) {
+            console.log(`🌪️ Skipping duplicate Stormblade trigger for ${attacker.name} (${now - lastTrigger}ms ago)`);
+            return;
+        }
+        
         // Count TheStormblade artifacts on the attacker
         const stormbladeCount = this.countStormblades(attacker);
         
         if (stormbladeCount === 0) return;
+        
+        // NEW: Record this trigger to prevent duplicates
+        this.recentAttacks.set(attackerId, now);
+        
+        // Clean up old entries (older than 1 second)
+        for (const [id, timestamp] of this.recentAttacks.entries()) {
+            if (now - timestamp > 1000) {
+                this.recentAttacks.delete(id);
+            }
+        }
         
         console.log(`🌪️ ${attacker.name} has ${stormbladeCount} Stormblade(s) - triggering wind swaps!`);
         
@@ -41,6 +65,11 @@ export class TheStormbladeEffect {
         
         // Track this animation
         this.trackAnimation(animationPromise);
+    }
+    
+    // Generate unique attacker ID for cooldown tracking
+    getAttackerId(attacker) {
+        return `${attacker.side}_${attacker.position}_${attacker.name}`;
     }
     
     // Track active animation
@@ -78,6 +107,7 @@ export class TheStormbladeEffect {
         // Each wind swap takes about 1600ms total
         return 1600; // Return max time in case animations just started
     }
+    
     countStormblades(hero) {
         if (!hero.equipment || hero.equipment.length === 0) return 0;
         
@@ -124,7 +154,7 @@ export class TheStormbladeEffect {
         // Track which positions have been swapped to avoid double-swapping
         const swappedPairs = new Set();
 
-        // Perform swaps
+        // Perform swaps SEQUENTIALLY with enhanced synchronization
         for (let i = 0; i < stormbladeCount; i++) {
             // Find a valid pair to swap
             let attempts = 0;
@@ -150,6 +180,9 @@ export class TheStormbladeEffect {
             if (position1 && position2 && position1 !== position2) {
                 console.log(`🌪️ Wind Swap #${i + 1}: Swapping ${position1} ↔ ${position2}`);
                 
+                // Generate unique swap ID for tracking using deterministic randomness
+                const swapId = `wind_${Date.now()}_${i}_${this.battleManager.getRandomId(9)}`;
+                
                 // Send swap data to guest for animation sync
                 const swapData = {
                     targetSide: targetSide,
@@ -161,12 +194,18 @@ export class TheStormbladeEffect {
                         name: attacker.name,
                         side: attacker.side,
                         absoluteSide: attacker.absoluteSide
-                    }
+                    },
+                    swapId: swapId
                 };
                 
                 this.battleManager.sendBattleUpdate('stormblade_wind_swap', swapData);
                 
-                // Perform the swap with wind animation
+                // Wait for guest acknowledgment at higher speeds
+                if (this.battleManager.battleSpeed > 1) {
+                    await this.battleManager.waitForGuestAcknowledgment('wind_swap_' + swapId, 300);
+                }
+                
+                // Perform the swap with wind animation (AWAITED - this ensures sequential execution)
                 await this.performWindSwap(targetSide, position1, position2);
                 
                 // Log the swap
@@ -177,14 +216,26 @@ export class TheStormbladeEffect {
                     targetSide === 'player' ? 'error' : 'success'
                 );
                 
-                // Delay between multiple swaps
+                // Speed-aware delay between swaps
                 if (i < stormbladeCount - 1) {
-                    await this.battleManager.delay(600);
+                    const swapDelay = this.getSwapDelay();
+                    await this.battleManager.delay(swapDelay);
                 }
             }
         }
     }
     
+    getSwapDelay() {
+        const baseDelay = 500;
+        const speedMultiplier = this.battleManager.battleSpeed || 1;
+        
+        // At higher speeds, ensure minimum visual time for swaps
+        const minDelay = 300; // Minimum delay even at max speed
+        const adjustedDelay = Math.max(minDelay, baseDelay / speedMultiplier);
+        
+        return adjustedDelay;
+    }
+
     // Perform the actual hero swap with wind animation (adapted from CrusadersHookshot)
     async performWindSwap(side, position1, position2) {
         // Get hero references
@@ -199,7 +250,7 @@ export class TheStormbladeEffect {
             return;
         }
 
-        // Animate the wind effect
+        // Animate the wind effect (this takes about 1600ms total)
         await this.animateWindSwap(side, position1, position2);
         
         // ===== SWAP IN HERO REFERENCES =====
@@ -279,6 +330,13 @@ export class TheStormbladeEffect {
                 this.battleManager.opponentEquips[position1] = this.battleManager.opponentEquips[position2];
                 this.battleManager.opponentEquips[position2] = tempEquips;
             }
+        }
+        
+        // ===== SWAP RESISTANCE STACKS =====
+        // NEW: Swap resistance stacks so they follow the heroes
+        if (this.battleManager.resistanceManager) {
+            this.battleManager.resistanceManager.swapResistanceStacks(side, position1, position2);
+            console.log(`🌪️ Swapped resistance stacks between ${position1} and ${position2}`);
         }
         
         // ===== SWAP VISUAL ELEMENTS =====
@@ -541,15 +599,50 @@ export class TheStormbladeEffect {
             return;
         }
 
-        // Clone the inner content
-        const content1 = slot1.innerHTML;
-        const content2 = slot2.innerHTML;
-        
-        // Swap the content
-        slot1.innerHTML = content2;
-        slot2.innerHTML = content1;
-        
-        console.log(`🌪️ Swapped visual content between ${position1} and ${position2}`);
+        // NEW: Use element-based swapping instead of innerHTML
+        try {
+            // Create temporary container
+            const tempContainer = document.createElement('div');
+            tempContainer.style.display = 'none';
+            document.body.appendChild(tempContainer);
+            
+            // Store references to all children
+            const slot1Children = Array.from(slot1.children);
+            const slot2Children = Array.from(slot2.children);
+            
+            // Move slot1 children to temp
+            slot1Children.forEach(child => tempContainer.appendChild(child));
+            
+            // Move slot2 children to slot1
+            slot2Children.forEach(child => slot1.appendChild(child));
+            
+            // Move temp children to slot2
+            Array.from(tempContainer.children).forEach(child => slot2.appendChild(child));
+            
+            // Clean up temp container
+            tempContainer.remove();
+            
+            // Add visual feedback
+            slot1.classList.add('hero-swapped');
+            slot2.classList.add('hero-swapped');
+            
+            // Remove visual feedback after brief delay
+            setTimeout(() => {
+                slot1.classList.remove('hero-swapped');
+                slot2.classList.remove('hero-swapped');
+            }, 400);
+            
+            console.log(`🌪️ Enhanced visual swap completed between ${position1} and ${position2}`);
+            
+        } catch (error) {
+            console.error('❌ Error in enhanced visual swap, falling back to innerHTML method:', error);
+            
+            // Fallback to original method
+            const content1 = slot1.innerHTML;
+            const content2 = slot2.innerHTML;
+            slot1.innerHTML = content2;
+            slot2.innerHTML = content1;
+        }
     }
     
     // Get hero element helper
@@ -571,16 +664,16 @@ export class TheStormbladeEffect {
             );
         }
         
-        // Perform the swap on guest side
-        this.performGuestWindSwap(targetSide, position1, position2, attackerInfo);
+        // Perform the swap on guest side with swap data for acknowledgment
+        this.performGuestWindSwap(targetSide, position1, position2, attackerInfo, data);
     }
     
     // Perform wind swap on guest side
-    async performGuestWindSwap(side, position1, position2, attackerInfo) {
+    async performGuestWindSwap(side, position1, position2, attackerInfo, swapData) {
         // Convert to local side perspective
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const targetIsMyPlayer = (side === 'player' && this.battleManager.isHost) || 
-                                 (side === 'opponent' && !this.battleManager.isHost);
+                                (side === 'opponent' && !this.battleManager.isHost);
         const localSide = targetIsMyPlayer ? 'player' : 'opponent';
         
         // Get hero references
@@ -592,6 +685,10 @@ export class TheStormbladeEffect {
         
         if (!hero1 || !hero2) {
             console.error(`🌪️ GUEST: Cannot swap - missing heroes at ${position1} or ${position2}`);
+            // Send acknowledgment even on error
+            if (swapData && swapData.swapId) {
+                this.battleManager.sendAcknowledgment('wind_swap_' + swapData.swapId);
+            }
             return;
         }
 
@@ -604,7 +701,7 @@ export class TheStormbladeEffect {
         // Animate the wind effect
         await this.animateWindSwap(localSide, position1, position2);
         
-        // Swap heroes in the data model
+        // ===== SWAP HEROES IN DATA MODEL =====
         heroes[position1] = hero2;
         heroes[position2] = hero1;
         
@@ -612,8 +709,34 @@ export class TheStormbladeEffect {
         hero1.position = position2;
         hero2.position = position1;
         
-        // Swap visual elements
-        this.swapHeroVisuals(localSide, position1, position2);
+        // ===== NEW: UPDATE FORMATION MANAGER ON GUEST SIDE =====
+        if (this.battleManager.heroSelection && this.battleManager.heroSelection.formationManager) {
+            const formationManager = this.battleManager.heroSelection.formationManager;
+            if (localSide === 'player') {
+                const formation = formationManager.getBattleFormation();
+                const temp = formation[position1];
+                formation[position1] = formation[position2];
+                formation[position2] = temp;
+                formationManager.battleFormation = formation;
+            } else {
+                const formation = formationManager.getOpponentBattleFormation();
+                const temp = formation[position1];
+                formation[position1] = formation[position2];
+                formation[position2] = temp;
+                formationManager.opponentBattleFormation = formation;
+            }
+            console.log(`🌪️ GUEST: Updated FormationManager for ${localSide} side`);
+        }
+        
+        // ===== ENHANCED VISUAL SWAPPING =====
+        await this.swapHeroVisuals(localSide, position1, position2);
+        
+        // ===== SWAP RESISTANCE STACKS ON GUEST SIDE =====
+        // Use local swap to avoid triggering network messages
+        if (this.battleManager.resistanceManager) {
+            this.battleManager.resistanceManager.swapResistanceStacksLocal(localSide, position1, position2);
+            console.log(`🌪️ GUEST: Swapped resistance stacks between ${position1} and ${position2}`);
+        }
         
         // Update displays
         this.battleManager.updateHeroHealthBar(localSide, position1, hero2.currentHp, hero2.maxHp);
@@ -629,6 +752,11 @@ export class TheStormbladeEffect {
         if (this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position1, hero2.necromancyStacks);
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position2, hero1.necromancyStacks);
+        }
+        
+        // NEW: Send acknowledgment when swap is complete
+        if (swapData && swapData.swapId) {
+            this.battleManager.sendAcknowledgment('wind_swap_' + swapData.swapId);
         }
         
         console.log(`🌪️ GUEST: Wind-swapped ${hero1.name} to ${position2} and ${hero2.name} to ${position1}`);
@@ -761,6 +889,9 @@ export class TheStormbladeEffect {
         // Clear any active animation tracking
         this.activeAnimations = 0;
         this.animationPromises = [];
+        
+        // NEW: Clear attack cooldown tracking
+        this.recentAttacks.clear();
         
         const css = document.getElementById('stormbladeWindStyles');
         if (css) css.remove();

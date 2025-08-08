@@ -118,7 +118,7 @@ class CrusaderArtifactsHandler {
         // Track which positions have been swapped to avoid double-swapping
         const swappedPairs = new Set();
 
-        // Perform swaps
+        // Perform swaps SEQUENTIALLY with enhanced synchronization
         for (let i = 0; i < hookshotCount; i++) {
             // Find a valid pair to swap
             let attempts = 0;
@@ -144,6 +144,9 @@ class CrusaderArtifactsHandler {
             if (position1 && position2 && position1 !== position2) {
                 console.log(`⚓ Hookshot #${i + 1}: Swapping ${position1} ↔ ${position2}`);
                 
+                // Generate unique swap ID for tracking
+                const swapId = `hookshot_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`;
+                
                 // Send swap data to guest for animation sync
                 const swapData = {
                     targetSide: targetSide,
@@ -151,10 +154,16 @@ class CrusaderArtifactsHandler {
                     position2: position2,
                     hookshotNumber: i + 1,
                     totalHookshots: hookshotCount,
-                    attackerSide: attackerSide
+                    attackerSide: attackerSide,
+                    swapId: swapId // NEW: Add unique ID
                 };
                 
                 this.battleManager.sendBattleUpdate('crusader_hookshot_swap', swapData);
+                
+                // NEW: Wait for guest acknowledgment at higher speeds
+                if (this.battleManager.battleSpeed > 1) {
+                    await this.battleManager.waitForGuestAcknowledgment('hookshot_swap_' + swapId, 300);
+                }
                 
                 // Perform the swap with animation
                 await this.performHookshotSwap(targetSide, position1, position2);
@@ -167,12 +176,24 @@ class CrusaderArtifactsHandler {
                     targetSide === 'player' ? 'error' : 'success'
                 );
                 
-                // Delay between multiple swaps
+                // Speed-aware delay between swaps
+                const swapDelay = this.getSwapDelay();
                 if (i < hookshotCount - 1) {
-                    await this.battleManager.delay(500);
+                    await this.battleManager.delay(swapDelay);
                 }
             }
         }
+    }
+
+    getSwapDelay() {
+        const baseDelay = 500;
+        const speedMultiplier = this.battleManager.battleSpeed || 1;
+        
+        // At higher speeds, ensure minimum visual time for swaps
+        const minDelay = 300; // Minimum delay even at max speed
+        const adjustedDelay = Math.max(minDelay, baseDelay / speedMultiplier);
+        
+        return adjustedDelay;
     }
 
     // Perform the actual hero swap with animation
@@ -200,7 +221,7 @@ class CrusaderArtifactsHandler {
         hero1.position = position2;
         hero2.position = position1;
         
-        // ===== NEW: SWAP IN FORMATION DATA FOR PERSISTENCE =====
+        // ===== SWAP IN FORMATION DATA FOR PERSISTENCE =====
         const formation = side === 'player' ? 
             this.battleManager.playerFormation : 
             this.battleManager.opponentFormation;
@@ -211,6 +232,25 @@ class CrusaderArtifactsHandler {
         formation[position2] = tempFormationData;
         
         console.log(`⚓ Updated formation - ${position1} now has ${formation[position1]?.name}, ${position2} now has ${formation[position2]?.name}`);
+        
+        // ===== ALSO UPDATE FORMATION MANAGER =====
+        if (this.battleManager.heroSelection && this.battleManager.heroSelection.formationManager) {
+            const formationManager = this.battleManager.heroSelection.formationManager;
+            if (side === 'player') {
+                const managerFormation = formationManager.getBattleFormation();
+                const temp = managerFormation[position1];
+                managerFormation[position1] = managerFormation[position2];
+                managerFormation[position2] = temp;
+                formationManager.battleFormation = managerFormation;
+            } else {
+                const managerFormation = formationManager.getOpponentBattleFormation();
+                const temp = managerFormation[position1];
+                managerFormation[position1] = managerFormation[position2];
+                managerFormation[position2] = temp;
+                formationManager.opponentBattleFormation = managerFormation;
+            }
+            console.log(`⚓ HOST: Updated FormationManager for ${side} side`);
+        }
         
         // ===== ALSO UPDATE ABILITIES, SPELLBOOKS, CREATURES, AND EQUIPMENT DATA =====
         // These are stored separately and need to be swapped too
@@ -270,6 +310,13 @@ class CrusaderArtifactsHandler {
                 this.battleManager.opponentEquips[position1] = this.battleManager.opponentEquips[position2];
                 this.battleManager.opponentEquips[position2] = tempEquips;
             }
+        }
+        
+        // ===== SWAP RESISTANCE STACKS =====
+        // Swap resistance stacks so they follow the heroes
+        if (this.battleManager.resistanceManager) {
+            this.battleManager.resistanceManager.swapResistanceStacks(side, position1, position2);
+            console.log(`⚓ Swapped resistance stacks between ${position1} and ${position2}`);
         }
         
         // ===== SWAP VISUAL ELEMENTS =====
@@ -488,15 +535,50 @@ class CrusaderArtifactsHandler {
             return;
         }
 
-        // Clone the inner content
-        const content1 = slot1.innerHTML;
-        const content2 = slot2.innerHTML;
-        
-        // Swap the content
-        slot1.innerHTML = content2;
-        slot2.innerHTML = content1;
-        
-        console.log(`⚓ Swapped visual content between ${position1} and ${position2}`);
+        // NEW: Use element-based swapping instead of innerHTML
+        try {
+            // Create temporary container
+            const tempContainer = document.createElement('div');
+            tempContainer.style.display = 'none';
+            document.body.appendChild(tempContainer);
+            
+            // Store references to all children
+            const slot1Children = Array.from(slot1.children);
+            const slot2Children = Array.from(slot2.children);
+            
+            // Move slot1 children to temp
+            slot1Children.forEach(child => tempContainer.appendChild(child));
+            
+            // Move slot2 children to slot1
+            slot2Children.forEach(child => slot1.appendChild(child));
+            
+            // Move temp children to slot2
+            Array.from(tempContainer.children).forEach(child => slot2.appendChild(child));
+            
+            // Clean up temp container
+            tempContainer.remove();
+            
+            // Add visual feedback
+            slot1.classList.add('hero-swapped');
+            slot2.classList.add('hero-swapped');
+            
+            // Remove visual feedback after brief delay
+            setTimeout(() => {
+                slot1.classList.remove('hero-swapped');
+                slot2.classList.remove('hero-swapped');
+            }, 400);
+            
+            console.log(`⚓ Enhanced visual swap completed between ${position1} and ${position2}`);
+            
+        } catch (error) {
+            console.error('❌ Error in enhanced visual swap, falling back to innerHTML method:', error);
+            
+            // Fallback to original method
+            const content1 = slot1.innerHTML;
+            const content2 = slot2.innerHTML;
+            slot1.innerHTML = content2;
+            slot2.innerHTML = content1;
+        }
     }
 
     // Get hero element helper
@@ -519,16 +601,16 @@ class CrusaderArtifactsHandler {
             );
         }
         
-        // Perform the swap on guest side
-        this.performGuestHookshotSwap(targetSide, position1, position2, attackerSide);
+        // Perform the swap on guest side with swap data for acknowledgment
+        this.performGuestHookshotSwap(targetSide, position1, position2, attackerSide, data);
     }
 
     // Perform hookshot swap on guest side
-    async performGuestHookshotSwap(side, position1, position2, attackerSide) {
+    async performGuestHookshotSwap(side, position1, position2, attackerSide, swapData) {
         // Convert absolute side to local side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const targetIsMyPlayer = (side === 'player' && this.battleManager.isHost) || 
-                                 (side === 'opponent' && !this.battleManager.isHost);
+                                (side === 'opponent' && !this.battleManager.isHost);
         const localSide = targetIsMyPlayer ? 'player' : 'opponent';
         
         // Get hero references
@@ -540,6 +622,10 @@ class CrusaderArtifactsHandler {
         
         if (!hero1 || !hero2) {
             console.error(`⚓ GUEST: Cannot swap - missing heroes at ${position1} or ${position2}`);
+            // Send acknowledgment even on error
+            if (swapData && swapData.swapId) {
+                this.battleManager.sendAcknowledgment('hookshot_swap_' + swapData.swapId);
+            }
             return;
         }
 
@@ -552,7 +638,7 @@ class CrusaderArtifactsHandler {
         // Animate the chain effect
         await this.animateHookshotChains(localSide, position1, position2);
         
-        // Swap heroes in the data model
+        // ===== SWAP HEROES IN DATA MODEL =====
         heroes[position1] = hero2;
         heroes[position2] = hero1;
         
@@ -560,8 +646,34 @@ class CrusaderArtifactsHandler {
         hero1.position = position2;
         hero2.position = position1;
         
-        // Swap visual elements
-        this.swapHeroVisuals(localSide, position1, position2);
+        // ===== NEW: UPDATE FORMATION MANAGER ON GUEST SIDE =====
+        if (this.battleManager.heroSelection && this.battleManager.heroSelection.formationManager) {
+            const formationManager = this.battleManager.heroSelection.formationManager;
+            if (localSide === 'player') {
+                const formation = formationManager.getBattleFormation();
+                const temp = formation[position1];
+                formation[position1] = formation[position2];
+                formation[position2] = temp;
+                formationManager.battleFormation = formation;
+            } else {
+                const formation = formationManager.getOpponentBattleFormation();
+                const temp = formation[position1];
+                formation[position1] = formation[position2];
+                formation[position2] = temp;
+                formationManager.opponentBattleFormation = formation;
+            }
+            console.log(`⚓ GUEST: Updated FormationManager for ${localSide} side`);
+        }
+        
+        // ===== ENHANCED VISUAL SWAPPING =====
+        await this.swapHeroVisuals(localSide, position1, position2);
+        
+        // ===== SWAP RESISTANCE STACKS ON GUEST SIDE =====
+        // Use local swap to avoid triggering network messages
+        if (this.battleManager.resistanceManager) {
+            this.battleManager.resistanceManager.swapResistanceStacksLocal(localSide, position1, position2);
+            console.log(`⚓ GUEST: Swapped resistance stacks between ${position1} and ${position2}`);
+        }
         
         // Update displays
         this.battleManager.updateHeroHealthBar(localSide, position1, hero2.currentHp, hero2.maxHp);
@@ -577,6 +689,11 @@ class CrusaderArtifactsHandler {
         if (this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position1, hero2.necromancyStacks);
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position2, hero1.necromancyStacks);
+        }
+        
+        // NEW: Send acknowledgment when swap is complete
+        if (swapData && swapData.swapId) {
+            this.battleManager.sendAcknowledgment('hookshot_swap_' + swapData.swapId);
         }
         
         console.log(`⚓ GUEST: Swapped ${hero1.name} to ${position2} and ${hero2.name} to ${position1}`);
@@ -2068,7 +2185,7 @@ class CrusaderArtifactsHandler {
     // Get a random different crusader artifact (existing functionality)
     getRandomDifferentCrusaderArtifact(currentArtifact) {
         const otherArtifacts = CRUSADERS_ARTIFACTS.filter(artifact => artifact !== currentArtifact);
-        const randomIndex = Math.floor(Math.random() * otherArtifacts.length);
+        const randomIndex = this.battleManager.getRandomInt(0, otherArtifacts.length - 1);
         return otherArtifacts[randomIndex];
     }
 

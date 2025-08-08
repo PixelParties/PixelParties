@@ -61,6 +61,8 @@ export class BattleManager {
 
         //CREATURE STUFF
         this.jigglesManager = null;
+        this.skeletonArcherManager = null;
+        this.skeletonNecromancerManager = null;
 
         // Attack effects
         this.attackEffectsManager = null;
@@ -1070,7 +1072,12 @@ export class BattleManager {
         const oldHp = creature.currentHp;
         const wasAlive = creature.alive;
         creature.currentHp = Math.max(0, creature.currentHp - damage);
-        creature.alive = creature.currentHp > 0;
+        const willDie = creature.currentHp <= 0;
+        
+        // IMPORTANT: Set creature as dead BEFORE attempting revival
+        if (willDie) {
+            creature.alive = false;
+        }
         
         if (!this.totalDamageDealt[hero.absoluteSide]) {
             this.totalDamageDealt[hero.absoluteSide] = 0;
@@ -1087,12 +1094,35 @@ export class BattleManager {
         const damageSource = arguments[1]?.source || 'attack';
         this.animationManager.createDamageNumberOnCreature(side, position, creatureIndex, damage, creature.maxHp, damageSource);
         
-        if (!creature.alive && wasAlive) {
-            // If we have an attacker and it's a spell kill, record with visual feedback
-            if (attacker && source === 'spell') {
+        // If creature died, record kill and trigger death effects BEFORE attempting revival
+        if (willDie && wasAlive) {
+            // 1. ALWAYS record the kill when creature HP drops to 0
+            if (attacker) {
                 recordKillWithVisualFeedback(this, attacker, creature, 'creature');
+                this.addCombatLog(`⚔️ ${attacker.name} has slain ${creature.name}!`, 
+                                attacker.side === 'player' ? 'success' : 'error');
             }
-            this.handleCreatureDeath(hero, creature, creatureIndex, side, position);
+            
+            // 2. TODO: Trigger "when this dies" effects here
+            // This is where future death effects would be processed
+            this.triggerCreatureDeathEffects(creature, hero, attacker, context);
+            
+            // 3. THEN attempt necromancy revival
+            let revived = false;
+            if (this.necromancyManager) {
+                revived = this.necromancyManager.attemptNecromancyRevival(
+                    creature, hero, creatureIndex, side, position
+                );
+            }
+            
+            // 4. If not revived, continue with normal death handling
+            if (!revived) {
+                this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
+            } else {
+                // Creature was revived - update the health display to show revival
+                this.updateCreatureHealthBar(side, position, creatureIndex, creature.currentHp, creature.maxHp);
+                this.addCombatLog(`💀✨ ${creature.name} rises again, but the kill still counts!`, 'info');
+            }
         }
         
         this.sendBattleUpdate('creature_damage_applied', {
@@ -1103,13 +1133,84 @@ export class BattleManager {
             oldHp: oldHp,
             newHp: creature.currentHp,
             maxHp: creature.maxHp,
-            died: !creature.alive,
+            died: willDie, // This represents whether the creature "died" (HP reached 0), not final alive state
+            revivedByNecromancy: willDie && creature.alive, // NEW: Flag if revived
             creatureName: creature.name
         });
         
         this.saveBattleStateToPersistence().catch(error => {
             console.error('Error saving state after creature damage:', error);
         });
+    }
+
+    async triggerCreatureDeathEffects(creature, heroOwner, attacker, context) {
+        // SKELETON ARCHER DEATH SALVO
+        if (creature.name === 'SkeletonArcher' && this.skeletonArcherManager) {
+            console.log(`💀🏹 Triggering Skeleton Archer death salvo for ${creature.name}`);
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death salvo (10 arrows at random targets)
+            this.skeletonArcherManager.executeDeathSalvo(creature, heroOwner, position, side);
+        }
+        
+        // SKELETON NECROMANCER HERO REVIVAL DEATH EFFECT
+        if (creature.name === 'SkeletonNecromancer' && this.skeletonNecromancerManager) {
+            console.log(`💀✨ Triggering Skeleton Necromancer hero revival death effect for ${creature.name}`);
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the hero revival death effect
+            await this.skeletonNecromancerManager.executeHeroRevivalDeath(creature, heroOwner, position, side);
+        }
+        
+        // TODO: This is where other future death effects will be implemented
+        // For example:
+        // - Other creature death rattle effects
+        // - Triggered abilities
+        // - Equipment effects that trigger on creature death
+        
+        console.log(`🔥 Death effects triggered for ${creature.name}`);
+        
+        // Example of how future death effects might work:
+        // if (creature.hasDeathEffect) {
+        //     creature.triggerDeathEffect(this, heroOwner, attacker, context);
+        // }
+        
+        // Check equipment for death-triggered effects
+        // if (heroOwner.equipment) {
+        //     heroOwner.equipment.forEach(item => {
+        //         if (item.triggersOnCreatureDeath) {
+        //             item.triggerEffect(this, creature, heroOwner, attacker);
+        //         }
+        //     });
+        // }
+    }
+
+    handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position) {
+        // Clear all status effects from the creature when it dies
+        if (this.statusEffectsManager) {
+            this.statusEffectsManager.clearAllStatusEffects(creature);
+        }
+
+        this.addCombatLog(`☠️ ${creature.name} has been defeated!`, 'error');
+        
+        const creatureElement = document.querySelector(
+            `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
+        );
+        
+        if (creatureElement) {
+            creatureElement.classList.add('defeated');
+            const sprite = creatureElement.querySelector('.creature-sprite');
+            if (sprite) {
+                sprite.style.filter = 'grayscale(100%)';
+                sprite.style.opacity = '0.5';
+            }
+        }
     }
 
     // Update creature health bar
@@ -1141,37 +1242,9 @@ export class BattleManager {
 
     // Handle creature death
     handleCreatureDeath(hero, creature, creatureIndex, side, position) {
-        // Clear all status effects from the creature when it dies
-        if (this.statusEffectsManager) {
-            this.statusEffectsManager.clearAllStatusEffects(creature);
-        }
-
-        // Attempt necromancy revival
-        if (this.necromancyManager && this.isAuthoritative) {
-            const revived = this.necromancyManager.attemptNecromancyRevival(
-                creature, hero, creatureIndex, side, position
-            );
-            
-            if (revived) {
-                // Creature was revived, skip the death handling
-                return;
-            }
-        }
-
-        this.addCombatLog(`☠️ ${creature.name} has been defeated!`, 'error');
-        
-        const creatureElement = document.querySelector(
-            `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
-        );
-        
-        if (creatureElement) {
-            creatureElement.classList.add('defeated');
-            const sprite = creatureElement.querySelector('.creature-sprite');
-            if (sprite) {
-                sprite.style.filter = 'grayscale(100%)';
-                sprite.style.opacity = '0.5';
-            }
-        }
+        // This method is now only called for creatures that were not revived
+        // (The revival attempt happens in authoritative_applyDamageToCreature)
+        this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
     }
 
     // Apply damage to target
@@ -1350,6 +1423,26 @@ export class BattleManager {
     guest_handleNecromancyRevival(data) {
         if (this.necromancyManager) {
             this.necromancyManager.handleGuestNecromancyRevival(data);
+        }
+    }
+
+
+
+
+    // Guest Creature handlers
+    guest_handleSkeletonArcherProjectileAttack(data) {
+        if (this.skeletonArcherManager) {
+            this.skeletonArcherManager.handleGuestProjectileAttack(data);
+        }
+    }
+    guest_handleSkeletonNecromancerRevival(data) {
+        if (this.skeletonNecromancerManager) {
+            this.skeletonNecromancerManager.handleGuestRevival(data);
+        }
+    }
+    guest_handleSkeletonNecromancerHeroRevivalDeath(data) {
+        if (this.skeletonNecromancerManager) {
+            this.skeletonNecromancerManager.handleGuestHeroRevivalDeath(data);
         }
     }
 
@@ -2157,11 +2250,28 @@ export class BattleManager {
             this.statusEffectsManager.clearAllBattleStatusEffects();
         }
         
+
+        // CREATURE CLEANUPS
+
         // Cleanup Jiggles effects
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
         }
+        // Cleanup Skeleton Archer manager
+        if (this.skeletonArcherManager) {
+            this.skeletonArcherManager.cleanup();
+            this.skeletonArcherManager = null;
+        }
+
+        // Cleanup Skeleton Necromancer manager
+        if (this.skeletonNecromancerManager) {
+            this.skeletonNecromancerManager.cleanup();
+            this.skeletonNecromancerManager = null;
+        }
         
+
+
+
         if (this.roomManager && this.roomManager.getRoomRef()) {
             try {
                 const gameDataRef = this.roomManager.getRoomRef().child('game_data');
@@ -2553,6 +2663,11 @@ export class BattleManager {
             this.jigglesManager.cleanup();
             this.jigglesManager = null;
         }
+        if (this.skeletonNecromancerManager) {
+            this.skeletonNecromancerManager.cleanup();
+            this.skeletonNecromancerManager = null;
+        }
+
 
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.reset();

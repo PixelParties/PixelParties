@@ -36,10 +36,42 @@ export class BattleFlowManager {
         bm.necromancyManager.initializeNecromancyStacks();
         bm.necromancyManager.initializeNecromancyStackDisplays();
         
-        // Initialize Jiggles manager
-        const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
-        bm.jigglesManager = new JigglesCreature(bm);
-        
+        // CREATURES - Initialize creature managers with better error handling
+        try {
+            // Initialize Jiggles manager
+            const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
+            bm.jigglesManager = new JigglesCreature(bm);
+            console.log('✅ Jiggles manager initialized');
+
+            // Initialize Skeleton Archer manager
+            const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
+            bm.skeletonArcherManager = new SkeletonArcherCreature(bm);
+            console.log('✅ Skeleton Archer manager initialized');
+
+            // Initialize Skeleton Necromancer manager
+            const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
+            bm.skeletonNecromancerManager = new SkeletonNecromancerCreature(bm);
+            console.log('✅ Skeleton Necromancer manager initialized');
+            
+            // Verify managers are properly set
+            if (!bm.jigglesManager) {
+                console.error('❌ CRITICAL: Jiggles manager failed to initialize!');
+            }
+            if (!bm.skeletonArcherManager) {
+                console.error('❌ CRITICAL: Skeleton Archer manager failed to initialize!');
+            }
+            if (!bm.skeletonNecromancerManager) {
+                console.error('❌ CRITICAL: Skeleton Necromancer manager failed to initialize!');
+            }
+            
+        } catch (error) {
+            console.error('❌ CRITICAL: Error initializing creature managers:', error);
+            // Initialize fallback null managers to prevent undefined errors
+            if (!bm.jigglesManager) bm.jigglesManager = null;
+            if (!bm.skeletonArcherManager) bm.skeletonArcherManager = null;
+            if (!bm.skeletonNecromancerManager) bm.skeletonNecromancerManager = null;
+        }
+
         // Ensure randomness is initialized before battle starts
         if (bm.isAuthoritative && !bm.randomnessInitialized) {
             bm.initializeRandomness();
@@ -350,33 +382,105 @@ export class BattleFlowManager {
         }
         
         // ============================================
-        // EXISTING ACTOR ACTION LOGIC
+        // EXISTING ACTOR ACTION LOGIC - FIXED WITH SAFETY CHECKS
         // ============================================
         
         const actions = [];
-        let hasJigglesAttacks = false;
+        let hasSpecialAttacks = false;
         let hasHeroActions = false;
         
-        // Collect all creature actions (including Jiggles special attacks)
+        // Collect all creature actions (including Jiggles, SkeletonArcher, and SkeletonNecromancer special attacks)
         if (playerActor && playerActor.type === 'creature') {
-            const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
-            if (JigglesCreature.isJiggles(playerActor.name)) {
-                // Don't await yet - add to actions array
-                actions.push(bm.jigglesManager.executeSpecialAttack(playerActor, position));
-                hasJigglesAttacks = true;
-            } else {
+            try {
+                // Import creature classes with error handling
+                const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
+                const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
+                const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
+
+                if (!bm.skeletonNecromancerManager) {
+                    console.error('❌ CRITICAL: Skeleton Necromancer manager failed to initialize!');
+                } else if (typeof bm.skeletonNecromancerManager.executeHeroRevivalDeath !== 'function') {
+                    console.error('❌ CRITICAL: Skeleton Necromancer manager missing executeHeroRevivalDeath method!');
+                }
+                
+                if (JigglesCreature.isJiggles(playerActor.name)) {
+                    if (bm.jigglesManager) {
+                        actions.push(bm.jigglesManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: JigglesManager not available for', playerActor.name);
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+                    }
+                } else if (SkeletonArcherCreature.isSkeletonArcher(playerActor.name)) {
+                    if (bm.skeletonArcherManager) {
+                        actions.push(bm.skeletonArcherManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: SkeletonArcherManager not available for', playerActor.name);
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+                    }
+                } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(playerActor.name)) {
+                    if (bm.skeletonNecromancerManager) {
+                        actions.push(bm.skeletonNecromancerManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: SkeletonNecromancerManager not available for', playerActor.name);
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+                    }
+                } else {
+                    actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                    bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+                }
+            } catch (error) {
+                console.error('❌ Error importing creature classes:', error);
                 actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                 bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
             }
         }
-        
+
         if (opponentActor && opponentActor.type === 'creature') {
-            const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
-            if (JigglesCreature.isJiggles(opponentActor.name)) {
-                // Don't await yet - add to actions array
-                actions.push(bm.jigglesManager.executeSpecialAttack(opponentActor, position));
-                hasJigglesAttacks = true;
-            } else {
+            try {
+                // Import creature classes with error handling
+                const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
+                const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
+                const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
+                
+                if (JigglesCreature.isJiggles(opponentActor.name)) {
+                    if (bm.jigglesManager) {
+                        actions.push(bm.jigglesManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: JigglesManager not available for', opponentActor.name);
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else if (SkeletonArcherCreature.isSkeletonArcher(opponentActor.name)) {
+                    if (bm.skeletonArcherManager) {
+                        actions.push(bm.skeletonArcherManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: SkeletonArcherManager not available for', opponentActor.name);
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(opponentActor.name)) {
+                    if (bm.skeletonNecromancerManager) {
+                        actions.push(bm.skeletonNecromancerManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: SkeletonNecromancerManager not available for', opponentActor.name);
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else {
+                    actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                    bm.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error importing creature classes:', error);
                 actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
                 bm.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
             }
@@ -388,8 +492,8 @@ export class BattleFlowManager {
             hasHeroActions = true;
         }
         
-        // If we have both Jiggles attacks and hero actions, start them simultaneously
-        if (hasJigglesAttacks && hasHeroActions) {            
+        // If we have both special attacks and hero actions, start them simultaneously
+        if (hasSpecialAttacks && hasHeroActions) {            
             // Start hero actions without awaiting
             const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;
             const opponentHeroAction = opponentActor && opponentActor.type === 'hero' ? opponentActor : null;
@@ -399,7 +503,7 @@ export class BattleFlowManager {
             // Add hero actions to the actions array
             actions.push(heroActionPromise);
             
-            // Wait for all actions (Jiggles + heroes) to complete simultaneously
+            // Wait for all actions (special attacks + heroes) to complete simultaneously
             await Promise.all(actions);
             
             // Check if battle ended after all actions
@@ -407,16 +511,16 @@ export class BattleFlowManager {
                 return;
             }
         } 
-        // If we only have Jiggles attacks (no heroes), execute them and check battle end
-        else if (hasJigglesAttacks) {
+        // If we only have special attacks (no heroes), execute them and check battle end
+        else if (hasSpecialAttacks) {
             await Promise.all(actions);
             
-            // Check if battle ended after Jiggles attacks
+            // Check if battle ended after special attacks
             if (this.checkBattleEnd()) {
                 return;
             }
         }
-        // If we only have hero actions (no Jiggles), execute them normally
+        // If we only have hero actions (no special attacks), execute them normally
         else if (hasHeroActions) {
             // Final check before hero actions
             if (this.checkBattleEnd()) {

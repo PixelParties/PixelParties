@@ -151,6 +151,127 @@ export class BattleCombatManager {
         return createHeroTarget(aliveTargets[0], aliveTargets[0].position);
     }
 
+    // Find target ignoring creatures (heroes only)
+    authoritative_findTargetIgnoringCreatures(attackerPosition, attackerSide) {
+        if (!this.battleManager.isAuthoritative) return null;
+
+        const targets = attackerSide === 'player' ? 
+            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+        
+        // Helper function to create hero target
+        const createHeroTarget = (hero, heroPosition) => {
+            if (!hero || !hero.alive) return null;
+            
+            return {
+                type: 'hero',
+                hero: hero,
+                position: heroPosition,
+                side: attackerSide === 'player' ? 'opponent' : 'player'
+            };
+        };
+
+        // Helper function to get hero target for any position (ignoring creatures)
+        const getHeroOnlyTargetForPosition = (heroPosition) => {
+            const hero = targets[heroPosition];
+            if (!hero || !hero.alive) return null;
+            
+            // Only target the hero (skip creatures entirely)
+            return createHeroTarget(hero, heroPosition);
+        };
+
+        // Get all alive targets for fallback
+        const aliveTargets = Object.values(targets).filter(hero => hero && hero.alive);
+        if (aliveTargets.length === 0) return null;
+
+        // Primary targeting: try same position first
+        const primaryTarget = getHeroOnlyTargetForPosition(attackerPosition);
+        if (primaryTarget) return primaryTarget;
+
+        // Alternative targeting with same priority logic as original
+        switch (attackerPosition) {
+            case 'left':
+                // Try center first, then right
+                const leftToCenterTarget = getHeroOnlyTargetForPosition('center');
+                if (leftToCenterTarget) return leftToCenterTarget;
+                
+                const leftToRightTarget = getHeroOnlyTargetForPosition('right');
+                if (leftToRightTarget) return leftToRightTarget;
+                break;
+                
+            case 'center':
+                // Random target selection
+                const randomTargetHero = this.battleManager.getRandomChoice(aliveTargets);
+                if (randomTargetHero) {
+                    const randomTarget = getHeroOnlyTargetForPosition(randomTargetHero.position);
+                    if (randomTarget) return randomTarget;
+                }
+                break;
+                
+            case 'right':
+                // Try center first, then left
+                const rightToCenterTarget = getHeroOnlyTargetForPosition('center');
+                if (rightToCenterTarget) return rightToCenterTarget;
+                
+                const rightToLeftTarget = getHeroOnlyTargetForPosition('left');
+                if (rightToLeftTarget) return rightToLeftTarget;
+                break;
+        }
+        
+        // Last resort - find any alive hero
+        for (const hero of aliveTargets) {
+            const lastResortTarget = getHeroOnlyTargetForPosition(hero.position);
+            if (lastResortTarget) return lastResortTarget;
+        }
+        
+        return null;
+    }
+
+    // Find a completely random target (for death effects, etc.)
+    authoritative_findRandomTarget(attackerSide) {
+        if (!this.battleManager.isAuthoritative) return null;
+
+        const targets = attackerSide === 'player' ? 
+            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+        
+        // Collect all possible targets (heroes and creatures)
+        const allTargets = [];
+        
+        Object.keys(targets).forEach(position => {
+            const hero = targets[position];
+            if (hero && hero.alive) {
+                // Add hero as potential target
+                allTargets.push({
+                    type: 'hero',
+                    hero: hero,
+                    position: position,
+                    side: attackerSide === 'player' ? 'opponent' : 'player'
+                });
+                
+                // Add living creatures as potential targets
+                if (hero.creatures) {
+                    hero.creatures.forEach((creature, index) => {
+                        if (creature.alive) {
+                            allTargets.push({
+                                type: 'creature',
+                                hero: hero,
+                                creature: creature,
+                                creatureIndex: index,
+                                position: position,
+                                side: attackerSide === 'player' ? 'opponent' : 'player'
+                            });
+                        }
+                    });
+                }
+            }
+        });
+        
+        if (allTargets.length === 0) return null;
+        
+        // Return completely random target using deterministic randomness
+        const randomIndex = this.battleManager.getRandomInt(0, allTargets.length - 1);
+        return allTargets[randomIndex];
+    }
+
     // Calculate damage for a hero
     calculateDamage(hero, canAct) {
         if (!canAct) return 0;
@@ -396,7 +517,7 @@ export class BattleCombatManager {
         if (attack.target.type === 'creature') {
             const wasAlive = attack.target.creature.alive;
             
-            // Apply damage to creature
+            // Apply damage to creature - this now handles kill tracking and necromancy revival internally
             this.battleManager.authoritative_applyDamageToCreature({
                 hero: attack.target.hero,
                 creature: attack.target.creature,
@@ -404,25 +525,11 @@ export class BattleCombatManager {
                 damage: attack.damage,
                 position: attack.target.position,
                 side: attack.target.side
+            }, {
+                source: 'attack', // Specify this was from an attack
+                attacker: attack.hero // Pass the attacker for kill tracking
             });
-            
-    
-            if (!this.battleManager) {
-                console.error('❌ CRITICAL: No battleManager reference in combat manager!');
-                return;
-            }
-            
-            if (!this.battleManager.killTracker) {
-                console.error('❌ CRITICAL: No killTracker in battleManager!');
-                return;
-            }
-            
-            // Check if creature died from this attack
-            if (wasAlive && !attack.target.creature.alive && this.battleManager.isAuthoritative) {
-                // Use the Wanted Poster module's visual feedback function
-                recordKillWithVisualFeedback(this.battleManager, attack.hero, attack.target.creature, 'creature');
-            }
-            
+                        
             // Process attack effects for creature targets
             if (this.battleManager.attackEffectsManager) {
                 this.battleManager.attackEffectsManager.processAttackEffects(

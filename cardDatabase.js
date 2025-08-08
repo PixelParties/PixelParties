@@ -203,7 +203,7 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 120
+        hp: 80
     },
     'LootThePrincess': {
         name: 'LootThePrincess',
@@ -1061,7 +1061,7 @@ const CARD_DATABASE = {
         name: 'TheStormblade',
         image: './Cards/All/TheStormblade.png',
         cardType: 'Artifact',
-        cost: 14,
+        cost: 0,
         action: false,
         spellSchool: null,
         subtype: 'Equip'

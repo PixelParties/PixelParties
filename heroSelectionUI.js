@@ -276,10 +276,14 @@ export class HeroSelectionUI {
             hoverEvents = `onmouseenter="window.showCharacterPreview(${character.id})"`;
         }
 
-        // Nicolas click handler for formation heroes
-        let nicolasClickEvents = '';
-        if (isDraggable && slotPosition && character.name === 'Nicolas') {
-            nicolasClickEvents = `onclick="window.handleNicolasClick(event, '${slotPosition}', '${character.name}')"`;
+        // Hero click handler for formation heroes
+        let heroClickEvents = '';
+        if (isDraggable && slotPosition) {
+            if (character.name === 'Nicolas') {
+                heroClickEvents = `onclick="window.handleNicolasClick(event, '${slotPosition}', '${character.name}')"`;
+            } else if (character.name === 'Vacarn') {
+                heroClickEvents = `onclick="window.handleVacarnClick(event, '${slotPosition}', '${character.name}')"`;
+            }
         }
         
         // Only show character name if NOT in team building (no ability zones)
@@ -302,7 +306,7 @@ export class HeroSelectionUI {
                         class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''}"
                         ${tooltipEvents}
                         ${dragEvents}
-                        ${nicolasClickEvents}
+                        ${heroClickEvents}
                         onerror="this.src='./Cards/Characters/placeholder.png'">
                 </div>
                 ${showCharacterName ? `<div class="character-name">${character.name}</div>` : ''}
@@ -1432,6 +1436,18 @@ function handleNicolasClick(event, heroPosition, heroName) {
     // Show Nicolas dialog
     window.heroSelection.nicolasEffectManager.showNicolasDialog(window.heroSelection, heroPosition);
 }
+function handleVacarnClick(event, heroPosition, heroName) {
+    event.stopPropagation();
+    
+    if (heroName !== 'Vacarn' || !window.heroSelection?.vacarnEffectManager) {
+        return;
+    }
+    
+    console.log(`💀 Vacarn clicked at position ${heroPosition}`);
+    
+    // Start bury mode
+    window.heroSelection.vacarnEffectManager.startBuryMode(heroPosition, window.heroSelection);
+}
 
 // Attach to window
 if (typeof window !== 'undefined') {
@@ -1442,6 +1458,7 @@ if (typeof window !== 'undefined') {
     window.cleanupAllAbilityTooltips = cleanupAllAbilityTooltips;
     window.onAbilityClick = onAbilityClick;
     window.handleNicolasClick = handleNicolasClick;
+    window.handleVacarnClick = handleVacarnClick;
     
     // Creature drag and drop functions
     window.onCreatureDragStart = onCreatureDragStart;

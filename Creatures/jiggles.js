@@ -6,7 +6,7 @@ export class JigglesCreature {
         this.activeTethers = new Set(); // Track active tethers for cleanup
         
         // Jiggles stats
-        this.DAMAGE_PER_TARGET = 100;
+        this.DAMAGE_PER_TARGET = 80;
         this.MAX_TARGETS = 2;
         this.TETHER_DURATION = 1000; // 1 second
         
@@ -209,13 +209,13 @@ export class JigglesCreature {
         
         // First, try to select from high priority targets
         if (highPriority.length > 0) {
-            const shuffledHigh = [...highPriority].sort(() => Math.random() - 0.5);
+            const shuffledHigh = this.battleManager.shuffleArray(highPriority);
             selected.push(...shuffledHigh.slice(0, maxTargets));
         }
         
         // Fill remaining slots with normal priority targets
         if (selected.length < maxTargets && normalPriority.length > 0) {
-            const shuffledNormal = [...normalPriority].sort(() => Math.random() - 0.5);
+            const shuffledNormal = this.battleManager.shuffleArray(normalPriority);
             const remaining = maxTargets - selected.length;
             selected.push(...shuffledNormal.slice(0, remaining));
         }
@@ -223,7 +223,7 @@ export class JigglesCreature {
         // If we still don't have enough, just take any remaining targets
         if (selected.length < maxTargets) {
             const remaining = availableTargets.filter(t => !selected.includes(t));
-            const shuffledRemaining = remaining.sort(() => Math.random() - 0.5);
+            const shuffledRemaining = this.battleManager.shuffleArray(remaining);
             selected.push(...shuffledRemaining.slice(0, maxTargets - selected.length));
         }
 

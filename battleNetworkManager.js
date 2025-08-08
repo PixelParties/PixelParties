@@ -13,6 +13,12 @@ export class BattleNetworkManager {
         this.connectionListener = null;
         this.reconnectionHandshakeTimeout = null;
         this.tabWasHidden = false;
+
+        this.swapMessageQueue = [];
+        this.isProcessingSwaps = false;
+        this.lastSwapProcessTime = 0;
+        this.minSwapInterval = 300;
+        this.maxQueueSize = 20; 
         
         // Acknowledgment system
         this.pendingAcks = {};
@@ -21,6 +27,107 @@ export class BattleNetworkManager {
         
         this.setupTabVisibilityListener();
     }
+
+    // ============================================
+    // SWAP HANDLING
+    // ============================================
+    
+    queueSwapMessage(messageType, data) {
+        // Prevent queue overflow
+        if (this.swapMessageQueue.length >= this.maxQueueSize) {
+            console.warn('⚠️ Swap message queue is full, dropping oldest message');
+            this.swapMessageQueue.shift();
+        }
+        
+        this.swapMessageQueue.push({ 
+            type: messageType, 
+            data, 
+            timestamp: Date.now(),
+            id: data.swapId || `swap_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
+        });
+        
+        console.log(`📋 Queued ${messageType} (Queue size: ${this.swapMessageQueue.length})`);
+        this.processSwapQueue();
+    }
+
+    async processSwapQueue() {
+        if (this.isProcessingSwaps || this.swapMessageQueue.length === 0) {
+            return;
+        }
+
+        this.isProcessingSwaps = true;
+        console.log(`🔄 Processing ${this.swapMessageQueue.length} queued swap messages...`);
+
+        while (this.swapMessageQueue.length > 0) {
+            const message = this.swapMessageQueue.shift();
+            const now = Date.now();
+            
+            // Ensure minimum interval between swaps for visual clarity
+            const timeSinceLastSwap = now - this.lastSwapProcessTime;
+            if (timeSinceLastSwap < this.minSwapInterval) {
+                const waitTime = this.minSwapInterval - timeSinceLastSwap;
+                console.log(`⏱️ Waiting ${waitTime}ms before next swap to prevent visual overlap`);
+                await this.battleManager.delay(waitTime);
+            }
+
+            // Process the swap message
+            console.log(`🎬 Processing ${message.type} (ID: ${message.id})`);
+            await this.handleSwapMessage(message);
+            this.lastSwapProcessTime = Date.now();
+            
+            // Small delay between messages for stability
+            await this.battleManager.delay(50);
+        }
+
+        this.isProcessingSwaps = false;
+        console.log('✅ All swap messages processed');
+    }
+
+    async handleSwapMessage(message) {
+        const bm = this.battleManager;
+        
+        try {
+            switch (message.type) {
+                case 'crusader_hookshot_swap':
+                    if (bm.crusaderArtifactsHandler) {
+                        await bm.crusaderArtifactsHandler.handleGuestHookshotSwap(message.data);
+                    }
+                    break;
+                    
+                case 'stormblade_wind_swap':
+                    if (bm.attackEffectsManager && bm.attackEffectsManager.stormbladeEffect) {
+                        await bm.attackEffectsManager.stormbladeEffect.handleGuestWindSwap(message.data);
+                    }
+                    break;
+                    
+                default:
+                    console.warn(`Unknown swap message type: ${message.type}`);
+            }
+        } catch (error) {
+            console.error(`❌ Error processing ${message.type}:`, error);
+        }
+    }
+
+    clearSwapQueue() {
+        this.swapMessageQueue = [];
+        this.isProcessingSwaps = false;
+        this.lastSwapProcessTime = 0;
+        console.log('🧹 Swap message queue cleared');
+    }
+
+    getSwapQueueStatus() {
+        return {
+            queueLength: this.swapMessageQueue.length,
+            isProcessing: this.isProcessingSwaps,
+            lastProcessTime: this.lastSwapProcessTime,
+            nextMessages: this.swapMessageQueue.slice(0, 3).map(m => ({
+                type: m.type,
+                id: m.id,
+                timestamp: m.timestamp
+            }))
+        };
+    }
+
 
     // ============================================
     // CONNECTION MONITORING
@@ -404,6 +511,13 @@ export class BattleNetworkManager {
         // Guest message processing
         const { type, data } = message;
         
+        // NEW: Queue swap messages for sequential processing
+        if (type === 'crusader_hookshot_swap' || type === 'stormblade_wind_swap') {
+            this.queueSwapMessage(type, data);
+            return;
+        }
+        
+        // Handle all other message types normally
         switch (type) {
             case 'turn_start':
                 this.guest_handleTurnStart(data);
@@ -471,6 +585,29 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'skeleton_archer_projectile_attack':
+                if (bm.skeletonArcherManager) {
+                    bm.skeletonArcherManager.handleGuestProjectileAttack(data);
+                }
+                break;
+
+            case 'skeleton_archer_death_salvo':
+                if (bm.skeletonArcherManager) {
+                    bm.skeletonArcherManager.handleGuestDeathSalvo(data);
+                }
+                break;
+
+            case 'skeleton_necromancer_revival':
+                bm.guest_handleSkeletonNecromancerRevival(data);
+                break;
+
+            // NEW: Handle Skeleton Necromancer hero revival death effect
+            case 'skeleton_necromancer_hero_revival_death':
+                if (bm.skeletonNecromancerManager) {
+                    bm.skeletonNecromancerManager.handleGuestHeroRevivalDeath(data);
+                }
+                break;
+
             case 'blade_frost_triggered':
                 bm.guest_handleBladeFrostTriggered(data);
                 break;
@@ -521,6 +658,18 @@ export class BattleNetworkManager {
 
             case 'stormblade_wind_swap':
                 bm.guest_handleStormbladeWindSwap(data);
+                break;
+                
+            case 'resistance_used':
+                if (bm.resistanceManager) {
+                    bm.resistanceManager.handleGuestResistanceUsed(data);
+                }
+                break;
+
+            case 'resistance_stacks_swapped':
+                if (bm.resistanceManager) {
+                    bm.resistanceManager.handleGuestResistanceSwapped(data);
+                }
                 break;
         }
     }
@@ -576,7 +725,7 @@ export class BattleNetworkManager {
 
     guest_handleCreatureDamageApplied(data) {
         const bm = this.battleManager;
-        const { heroAbsoluteSide, heroPosition, creatureIndex, damage, oldHp, newHp, maxHp, died, creatureName } = data;
+        const { heroAbsoluteSide, heroPosition, creatureIndex, damage, oldHp, newHp, maxHp, died, revivedByNecromancy, creatureName } = data;
         
         const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
         const heroLocalSide = (heroAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
@@ -588,18 +737,59 @@ export class BattleNetworkManager {
         if (localHero && localHero.creatures[creatureIndex]) {
             const creature = localHero.creatures[creatureIndex];
             creature.currentHp = newHp;
-            creature.alive = !died;
             
-            bm.addCombatLog(
-                `💔 ${creatureName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
-                heroLocalSide === 'player' ? 'error' : 'success'
-            );
+            // Handle death and revival status
+            if (died) {
+                if (revivedByNecromancy) {
+                    // Creature died but was revived
+                    creature.alive = true;
+                    bm.addCombatLog(
+                        `💔 ${creatureName} takes ${damage} damage and dies! (${oldHp} → ${newHp} HP)`,
+                        heroLocalSide === 'player' ? 'error' : 'success'
+                    );
+                    bm.addCombatLog(
+                        `💀✨ But ${creatureName} is revived by Necromancy!`,
+                        'info'
+                    );
+                } else {
+                    // Creature died and stayed dead
+                    creature.alive = false;
+                    bm.addCombatLog(
+                        `💔 ${creatureName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
+                        heroLocalSide === 'player' ? 'error' : 'success'
+                    );
+                }
+            } else {
+                // Creature survived
+                creature.alive = true;
+                bm.addCombatLog(
+                    `💔 ${creatureName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
+                    heroLocalSide === 'player' ? 'error' : 'success'
+                );
+            }
 
             bm.updateCreatureHealthBar(heroLocalSide, heroPosition, creatureIndex, newHp, maxHp);
             bm.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, creatureIndex, damage, creature.maxHp, 'attack');
             
-            if (died && oldHp > 0) {
+            // Handle visual death state (only if creature stayed dead)
+            if (died && !revivedByNecromancy && oldHp > 0) {
                 bm.handleCreatureDeath(localHero, creature, creatureIndex, heroLocalSide, heroPosition);
+            }
+            
+            // If creature was revived, make sure visual state reflects being alive
+            if (died && revivedByNecromancy) {
+                const creatureElement = document.querySelector(
+                    `.${heroLocalSide}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
+                );
+                
+                if (creatureElement) {
+                    creatureElement.classList.remove('defeated');
+                    const sprite = creatureElement.querySelector('.creature-sprite');
+                    if (sprite) {
+                        sprite.style.filter = '';
+                        sprite.style.opacity = '';
+                    }
+                }
             }
         }
     }
@@ -770,6 +960,52 @@ export class BattleNetworkManager {
         this.totalPauseTime = 0;
         this.connectionLatency = 100;
         this.tabWasHidden = false;
+        
+        this.clearSwapQueue();
+    }
+}
+
+// CSS enhancements for visual feedback
+const ENHANCED_SWAP_STYLES = `
+.hero-swapped {
+    animation: heroSwapFlash 0.5s ease-out !important;
+    position: relative;
+}
+
+@keyframes heroSwapFlash {
+    0% { 
+        box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 
+                    0 0 40px rgba(255, 215, 0, 0.4);
+        transform: scale(1.05);
+    }
+    100% { 
+        box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+        transform: scale(1);
+    }
+}
+
+/* Prevent multiple swap animations from overlapping */
+.hero-swapped.hero-swapped {
+    animation-duration: 0.3s !important;
+}
+
+/* Add subtle glow during swaps to indicate processing */
+.battle-hero-slot.processing-swap {
+    box-shadow: 0 0 10px rgba(135, 206, 250, 0.5);
+    transition: box-shadow 0.2s ease;
+}
+`;
+
+export function injectEnhancedSwapStyles() {
+    if (!document.getElementById('enhancedSwapStyles')) {
+        const style = document.createElement('style');
+        style.id = 'enhancedSwapStyles';
+        style.textContent = ENHANCED_SWAP_STYLES;
+        document.head.appendChild(style);
     }
 }
 

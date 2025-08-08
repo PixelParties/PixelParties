@@ -107,7 +107,7 @@ export class TheSunSwordEffect {
             ray.innerHTML = '☀️';
             
             const angle = (360 / rayCount) * i;
-            const distance = 40 + Math.random() * 20;
+            const distance = 40 + this.battleManager.getRandomFloat(0, 20); // Use deterministic randomness
             
             ray.style.cssText = `
                 position: absolute;

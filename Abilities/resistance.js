@@ -230,6 +230,105 @@ export class ResistanceManager {
         });
     }
 
+    // Swap resistance stacks when heroes change positions
+    swapResistanceStacks(side, position1, position2) {
+        const key1 = this.getHeroKey(side, position1);
+        const key2 = this.getHeroKey(side, position2);
+        
+        const stacks1 = this.resistanceStacks[key1] || 0;
+        const stacks2 = this.resistanceStacks[key2] || 0;
+        
+        // Swap the stacks
+        this.resistanceStacks[key1] = stacks2;
+        this.resistanceStacks[key2] = stacks1;
+        
+        // Update heroes' custom stats to match
+        const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+        
+        if (heroes[position1]) {
+            heroes[position1].customStats.resistanceStacks = stacks2;
+        }
+        if (heroes[position2]) {
+            heroes[position2].customStats.resistanceStacks = stacks1;
+        }
+        
+        console.log(`🛡️ Swapped resistance stacks: ${position1}(${stacks1}→${stacks2}) ↔ ${position2}(${stacks2}→${stacks1})`);
+        
+        // Send network update if authoritative
+        if (this.battleManager.isAuthoritative) {
+            this.battleManager.sendBattleUpdate('resistance_stacks_swapped', {
+                side: side,
+                position1: position1,
+                position2: position2,
+                stacks1: stacks2, // New stacks for position1
+                stacks2: stacks1, // New stacks for position2
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    // Swap resistance stacks locally without network sync (for guest-side operations)
+    swapResistanceStacksLocal(side, position1, position2) {
+        const key1 = this.getHeroKey(side, position1);
+        const key2 = this.getHeroKey(side, position2);
+        
+        const stacks1 = this.resistanceStacks[key1] || 0;
+        const stacks2 = this.resistanceStacks[key2] || 0;
+        
+        // Swap the stacks
+        this.resistanceStacks[key1] = stacks2;
+        this.resistanceStacks[key2] = stacks1;
+        
+        // Update heroes' custom stats to match
+        const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+        
+        if (heroes[position1]) {
+            heroes[position1].customStats.resistanceStacks = stacks2;
+        }
+        if (heroes[position2]) {
+            heroes[position2].customStats.resistanceStacks = stacks1;
+        }
+        
+        console.log(`🛡️ Local swap resistance stacks: ${position1}(${stacks1}→${stacks2}) ↔ ${position2}(${stacks2}→${stacks1})`);
+    }
+
+    // Handle guest-side resistance stack swapping
+    handleGuestResistanceSwapped(data) {
+        const { side, position1, position2, stacks1, stacks2 } = data;
+        
+        // Convert to local side if needed
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        let localSide = side;
+        
+        // If this is about the opponent's side, convert to local perspective
+        if ((side === 'player' && !this.battleManager.isHost) || 
+            (side === 'opponent' && this.battleManager.isHost)) {
+            localSide = 'opponent';
+        } else if ((side === 'player' && this.battleManager.isHost) || 
+                (side === 'opponent' && !this.battleManager.isHost)) {
+            localSide = 'player';
+        }
+        
+        const key1 = this.getHeroKey(localSide, position1);
+        const key2 = this.getHeroKey(localSide, position2);
+        
+        // Update resistance stacks
+        this.resistanceStacks[key1] = stacks1;
+        this.resistanceStacks[key2] = stacks2;
+        
+        // Update heroes' custom stats
+        const heroes = localSide === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+        
+        if (heroes[position1]) {
+            heroes[position1].customStats.resistanceStacks = stacks1;
+        }
+        if (heroes[position2]) {
+            heroes[position2].customStats.resistanceStacks = stacks2;
+        }
+        
+        console.log(`🛡️ GUEST: Resistance stacks swapped for ${localSide} side: ${position1}(${stacks1}) ↔ ${position2}(${stacks2})`);
+    }
+
     // ============================================
     // CLEANUP
     // ============================================

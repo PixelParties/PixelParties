@@ -304,7 +304,7 @@ export class NecromancyManager {
             `🧙 ${necromancyHero.name} has ${necromancyHero.getNecromancyStacks()} Necromancy stacks remaining`,
             'info'
         );
-        
+                
         // ENHANCED: Trigger revival animations (non-blocking)
         this.animateNecromancyRevival(side, position, creatureIndex, creature);
         
@@ -326,7 +326,6 @@ export class NecromancyManager {
                 heroAbsoluteSide: heroOwner.absoluteSide
             }
         });
-        
         return true;
     }
 

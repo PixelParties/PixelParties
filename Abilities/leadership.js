@@ -1,4 +1,4 @@
-// leadership.js - Leadership Ability Implementation
+// leadership.js - Leadership Ability Implementation - FIXED VERSION
 
 export const leadershipAbility = {
     // Track which heroes have used Leadership this turn
@@ -87,46 +87,21 @@ export const leadershipAbility = {
             return;
         }
         
-        // Show initial prompt
-        //this.showLeadershipPrompt(heroPosition, stackCount, hand);
-        window.leadershipAbility.startLeadershipMode(heroPosition, stackCount);
+        // Start Leadership mode directly
+        this.startLeadershipMode(heroPosition, stackCount);
     },
     
-    // Show the initial Leadership prompt
-    showLeadershipPrompt(heroPosition, level, hand) {
-        // Create prompt overlay
-        const promptOverlay = document.createElement('div');
-        promptOverlay.className = 'leadership-prompt-overlay';
-        promptOverlay.innerHTML = `
-            <div class="leadership-prompt-container">
-                <h3>⚔️ Leadership Ability</h3>
-                <p>Shuffle up to <strong>${level}</strong> card${level > 1 ? 's' : ''} back into your deck to draw that many.</p>
-                <div class="leadership-prompt-buttons">
-                    <button class="btn btn-primary" onclick="window.leadershipAbility.startLeadershipMode('${heroPosition}', ${level})">
-                        Continue
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.leadershipAbility.closePrompt()">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(promptOverlay);
-        this.leadershipMode.overlay = promptOverlay;
-    },
-    
-    // Close the prompt
-    closePrompt() {
-        if (this.leadershipMode.overlay) {
-            this.leadershipMode.overlay.remove();
-            this.leadershipMode.overlay = null;
-        }
-    },
-    
-    // Start Leadership selection mode
+    // Start Leadership selection mode with improved initialization
     startLeadershipMode(heroPosition, maxCards) {
-        this.closePrompt();
+        console.log(`Leadership: Starting Leadership mode for hero ${heroPosition}, max cards: ${maxCards}`);
+        
+        // Ensure we have valid hand cards before proceeding
+        const handCards = document.querySelectorAll('.hand-card');
+        if (handCards.length === 0) {
+            console.error('Leadership: No hand cards found, cannot start Leadership mode');
+            this.showError('No cards available to select!');
+            return false;
+        }
         
         // Initialize Leadership mode state
         this.leadershipMode = {
@@ -138,14 +113,22 @@ export const leadershipAbility = {
             originalHandState: null
         };
         
-        // Create Leadership mode UI
+        // Create Leadership mode UI first
         this.createLeadershipModeUI();
         
-        // Add click handlers to hand cards
+        // Add click handlers to hand cards with improved reliability
         this.enableCardSelection();
         
-        // Update UI state
-        this.updateLeadershipUI();
+        // Add a verification check after a short delay
+        setTimeout(() => {
+            if (!this.checkLeadershipModeState()) {
+                console.warn('Leadership: Mode initialization may have failed, attempting recovery...');
+                this.enableCardSelection(); // Try again
+            }
+        }, 200);
+        
+        console.log('Leadership: Mode started successfully');
+        return true;
     },
     
     // Create the Leadership mode UI overlay
@@ -165,6 +148,9 @@ export const leadershipAbility = {
                     <button class="btn btn-secondary" onclick="window.leadershipAbility.cancelLeadershipMode()">
                         Cancel
                     </button>
+                    <button class="btn btn-warning btn-sm" onclick="window.leadershipAbility.refreshLeadershipSelection()" style="font-size: 12px;">
+                        Refresh
+                    </button>
                 </div>
                 <div class="leadership-mode-hand-indicator">
                     <span class="arrow-down">↓</span>
@@ -181,28 +167,74 @@ export const leadershipAbility = {
         document.body.classList.add('leadership-mode-active');
     },
     
-    // Enable card selection in hand
+    // Enable card selection in hand with improved reliability
     enableCardSelection() {
-        const handCards = document.querySelectorAll('.hand-card');
-        
-        handCards.forEach((card, index) => {
-            // Store original onclick
-            card.dataset.originalOnclick = card.getAttribute('onclick');
+        // Add a small delay to ensure DOM is fully ready
+        setTimeout(() => {
+            const handCards = document.querySelectorAll('.hand-card');
+            console.log(`Leadership: Found ${handCards.length} hand cards`);
             
-            // Replace with leadership selection handler
-            card.setAttribute('onclick', `window.leadershipAbility.toggleCardSelection(${index})`);
+            if (handCards.length === 0) {
+                console.warn('Leadership: No hand cards found, retrying...');
+                // Retry after a longer delay
+                setTimeout(() => {
+                    this.enableCardSelection();
+                }, 500);
+                return;
+            }
             
-            // Add leadership mode class
-            card.classList.add('leadership-selectable');
-        });
+            handCards.forEach((card, index) => {
+                try {
+                    // Store original onclick and other important attributes
+                    card.dataset.originalOnclick = card.getAttribute('onclick') || '';
+                    card.dataset.originalCursor = card.style.cursor || '';
+                    card.dataset.originalPointerEvents = card.style.pointerEvents || '';
+                    
+                    // Force enable the card for Leadership selection
+                    card.style.pointerEvents = 'auto';
+                    card.style.cursor = 'pointer';
+                    
+                    // Replace with leadership selection handler
+                    card.setAttribute('onclick', `window.leadershipAbility.toggleCardSelection(${index})`);
+                    
+                    // Add leadership mode class
+                    card.classList.add('leadership-selectable');
+                    
+                    console.log(`Leadership: Enabled card ${index} (${card.dataset.cardName})`);
+                } catch (error) {
+                    console.error(`Leadership: Failed to enable card ${index}:`, error);
+                }
+            });
+            
+            // Force update the UI after enabling selection
+            this.updateLeadershipUI();
+            
+        }, 100); // Small delay to ensure DOM is ready
     },
     
-    // Toggle card selection
+    // Enhanced toggle card selection with better error handling
     toggleCardSelection(cardIndex) {
-        const handCards = document.querySelectorAll('.hand-card');
-        const card = handCards[cardIndex];
+        console.log(`Leadership: Toggle selection for card ${cardIndex}`);
         
-        if (!card) return;
+        const handCards = document.querySelectorAll('.hand-card');
+        
+        if (cardIndex < 0 || cardIndex >= handCards.length) {
+            console.error(`Leadership: Invalid card index ${cardIndex}, have ${handCards.length} cards`);
+            return;
+        }
+        
+        const card = handCards[cardIndex];
+        if (!card) {
+            console.error(`Leadership: Card at index ${cardIndex} not found`);
+            return;
+        }
+        
+        // Ensure the card is still selectable
+        if (!card.classList.contains('leadership-selectable')) {
+            console.warn(`Leadership: Card ${cardIndex} is no longer selectable, re-enabling...`);
+            this.enableCardSelection();
+            return;
+        }
         
         const isSelected = this.leadershipMode.selectedCards.includes(cardIndex);
         
@@ -211,12 +243,16 @@ export const leadershipAbility = {
             const idx = this.leadershipMode.selectedCards.indexOf(cardIndex);
             this.leadershipMode.selectedCards.splice(idx, 1);
             card.classList.remove('leadership-selected');
+            console.log(`Leadership: Deselected card ${cardIndex}`);
         } else {
             // Check if we can select more cards
             if (this.leadershipMode.selectedCards.length < this.leadershipMode.maxCards) {
                 // Select card
                 this.leadershipMode.selectedCards.push(cardIndex);
                 card.classList.add('leadership-selected');
+                console.log(`Leadership: Selected card ${cardIndex}`);
+            } else {
+                console.log(`Leadership: Maximum cards already selected (${this.leadershipMode.maxCards})`);
             }
         }
         
@@ -309,8 +345,10 @@ export const leadershipAbility = {
         this.endLeadershipMode();
     },
     
-    // End Leadership mode and clean up
+    // Enhanced end Leadership mode with better cleanup
     endLeadershipMode() {
+        console.log('Leadership: Ending Leadership mode');
+        
         // Remove overlay
         if (this.leadershipMode.overlay) {
             this.leadershipMode.overlay.remove();
@@ -319,18 +357,34 @@ export const leadershipAbility = {
         // Remove body class
         document.body.classList.remove('leadership-mode-active');
         
-        // Restore hand card handlers
+        // Restore hand card handlers with better error handling
         const handCards = document.querySelectorAll('.hand-card');
-        handCards.forEach(card => {
-            // Restore original onclick
-            const originalOnclick = card.dataset.originalOnclick;
-            if (originalOnclick) {
-                card.setAttribute('onclick', originalOnclick);
+        handCards.forEach((card, index) => {
+            try {
+                // Restore original onclick
+                const originalOnclick = card.dataset.originalOnclick;
+                if (originalOnclick && originalOnclick !== '') {
+                    card.setAttribute('onclick', originalOnclick);
+                } else {
+                    card.removeAttribute('onclick');
+                }
+                
+                // Restore original styling
+                card.style.cursor = card.dataset.originalCursor || '';
+                card.style.pointerEvents = card.dataset.originalPointerEvents || '';
+                
+                // Clean up datasets
                 delete card.dataset.originalOnclick;
+                delete card.dataset.originalCursor;
+                delete card.dataset.originalPointerEvents;
+                
+                // Remove leadership classes
+                card.classList.remove('leadership-selectable', 'leadership-selected', 'leadership-disabled');
+                
+                console.log(`Leadership: Restored card ${index}`);
+            } catch (error) {
+                console.error(`Leadership: Failed to restore card ${index}:`, error);
             }
-            
-            // Remove leadership classes
-            card.classList.remove('leadership-selectable', 'leadership-selected', 'leadership-disabled');
         });
         
         // Reset state
@@ -342,6 +396,97 @@ export const leadershipAbility = {
             overlay: null,
             originalHandState: null
         };
+        
+        console.log('Leadership: Mode ended successfully');
+    },
+    
+    // Add a method to check if Leadership mode is properly initialized
+    checkLeadershipModeState() {
+        if (!this.leadershipMode.active) {
+            console.warn('Leadership: Mode is not active');
+            return false;
+        }
+        
+        const handCards = document.querySelectorAll('.hand-card');
+        const selectableCards = document.querySelectorAll('.hand-card.leadership-selectable');
+        
+        if (handCards.length === 0) {
+            console.error('Leadership: No hand cards found');
+            return false;
+        }
+        
+        if (selectableCards.length !== handCards.length) {
+            console.warn(`Leadership: Only ${selectableCards.length}/${handCards.length} cards are selectable`);
+            // Try to re-enable selection
+            this.enableCardSelection();
+            return false;
+        }
+        
+        return true;
+    },
+    
+    // Debug method to help identify Leadership selection issues
+    debugLeadershipState() {
+        console.log('=== Leadership Debug Info ===');
+        console.log('Leadership mode active:', this.leadershipMode.active);
+        console.log('Selected cards:', this.leadershipMode.selectedCards);
+        console.log('Max cards:', this.leadershipMode.maxCards);
+        
+        const handCards = document.querySelectorAll('.hand-card');
+        console.log('Total hand cards:', handCards.length);
+        
+        const selectableCards = document.querySelectorAll('.hand-card.leadership-selectable');
+        console.log('Selectable cards:', selectableCards.length);
+        
+        const selectedCards = document.querySelectorAll('.hand-card.leadership-selected');
+        console.log('Currently selected cards:', selectedCards.length);
+        
+        // Check each card's state
+        handCards.forEach((card, index) => {
+            const cardName = card.dataset.cardName || 'unknown';
+            const isSelectable = card.classList.contains('leadership-selectable');
+            const isSelected = card.classList.contains('leadership-selected');
+            const isDisabled = card.classList.contains('leadership-disabled');
+            const onclick = card.getAttribute('onclick');
+            const pointerEvents = window.getComputedStyle(card).pointerEvents;
+            const cursor = window.getComputedStyle(card).cursor;
+            
+            console.log(`Card ${index} (${cardName}):`, {
+                selectable: isSelectable,
+                selected: isSelected,
+                disabled: isDisabled,
+                onclick: onclick ? onclick.substring(0, 50) + '...' : 'none',
+                pointerEvents: pointerEvents,
+                cursor: cursor
+            });
+        });
+        
+        console.log('=== End Leadership Debug ===');
+    },
+    
+    // Method to force refresh Leadership selection (can be called manually for debugging)
+    refreshLeadershipSelection() {
+        if (!this.leadershipMode.active) {
+            console.log('Leadership: Mode not active, cannot refresh');
+            return false;
+        }
+        
+        console.log('Leadership: Forcing refresh of card selection...');
+        
+        // Clear existing selection state
+        const handCards = document.querySelectorAll('.hand-card');
+        handCards.forEach(card => {
+            card.classList.remove('leadership-selectable', 'leadership-selected', 'leadership-disabled');
+        });
+        
+        // Re-enable selection
+        this.enableCardSelection();
+        
+        // Update UI
+        this.updateLeadershipUI();
+        
+        console.log('Leadership: Selection refreshed');
+        return true;
     },
     
     // Show error message
@@ -410,7 +555,7 @@ if (typeof window !== 'undefined') {
     window.leadershipAbility = leadershipAbility;
 }
 
-// Add CSS for Leadership mode
+// Enhanced CSS for Leadership mode with fixes for disabled cards
 if (typeof document !== 'undefined' && !document.getElementById('leadershipStyles')) {
     const style = document.createElement('style');
     style.id = 'leadershipStyles';
@@ -460,14 +605,14 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             justify-content: center;
         }
         
-        /* Leadership mode overlay */
+        /* Enhanced Leadership mode overlay */
         .leadership-mode-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             background: rgba(0, 0, 0, 0.9);
-            z-index: 900;
+            z-index: 1500; /* Higher than other overlays */
             padding: 20px;
             animation: slideDown 0.3s ease-out;
         }
@@ -499,6 +644,7 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             display: flex;
             gap: 15px;
             justify-content: center;
+            flex-wrap: wrap;
         }
         
         .leadership-mode-hand-indicator {
@@ -517,20 +663,50 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             animation: bounce 1s ease-in-out infinite;
         }
         
-        /* Hand card states during Leadership mode */
+        /* ENHANCED: Override all card restrictions during Leadership mode */
         body.leadership-mode-active .hand-card {
             transition: all 0.3s ease;
+            pointer-events: auto !important; /* Force enable clicks */
         }
         
+        body.leadership-mode-active .hand-card.no-actions-available,
+        body.leadership-mode-active .hand-card.exclusive-hand-disabled,
+        body.leadership-mode-active .hand-card[data-unaffordable="true"] {
+            /* Override restrictions during Leadership mode */
+            cursor: pointer !important;
+            opacity: 0.7 !important; /* Still show they're normally disabled, but allow selection */
+            filter: grayscale(50%) !important;
+        }
+        
+        /* Make selectable cards clearly clickable */
         .hand-card.leadership-selectable {
             cursor: pointer !important;
             border: 2px solid transparent;
+            position: relative;
+        }
+        
+        .hand-card.leadership-selectable::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            pointer-events: none;
+            transition: all 0.2s ease;
         }
         
         .hand-card.leadership-selectable:hover {
             border-color: #667eea !important;
             transform: translateY(-15px) scale(1.05) !important;
             box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5) !important;
+        }
+        
+        .hand-card.leadership-selectable:hover::before {
+            border-color: rgba(102, 126, 234, 0.6);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.4);
         }
         
         .hand-card.leadership-selected {
@@ -555,11 +731,12 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             font-size: 20px;
             font-weight: bold;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            z-index: 10;
         }
         
         .hand-card.leadership-disabled {
-            opacity: 0.5 !important;
-            filter: grayscale(50%) !important;
+            opacity: 0.4 !important;
+            filter: grayscale(70%) !important;
             cursor: not-allowed !important;
             transform: scale(0.95) !important;
         }
@@ -568,6 +745,12 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             border-color: transparent !important;
             transform: scale(0.95) !important;
             box-shadow: none !important;
+        }
+        
+        /* Fix for cards that are normally restricted but should be selectable in Leadership mode */
+        body.leadership-mode-active .hand-card.leadership-selectable.no-actions-available:hover::before,
+        body.leadership-mode-active .hand-card.leadership-selectable.exclusive-hand-disabled:hover::before {
+            content: none; /* Remove the "Can't use that" message during Leadership mode */
         }
         
         /* Animations */

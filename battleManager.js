@@ -63,6 +63,7 @@ export class BattleManager {
         this.jigglesManager = null;
         this.skeletonArcherManager = null;
         this.skeletonNecromancerManager = null;
+        this.skeletonDeathKnightManager = null;
 
         // Attack effects
         this.attackEffectsManager = null;
@@ -1167,6 +1168,18 @@ export class BattleManager {
             // Execute the hero revival death effect
             await this.skeletonNecromancerManager.executeHeroRevivalDeath(creature, heroOwner, position, side);
         }
+
+        // SKELETON DEATH KNIGHT DEATH SLASH STORM
+        if (creature.name === 'SkeletonDeathKnight' && this.skeletonDeathKnightManager) {
+            console.log(`💀⚔️ Triggering Skeleton Death Knight death slash storm for ${creature.name}`);
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death slash storm (slash all enemies simultaneously)
+            await this.skeletonDeathKnightManager.executeDeathSlashStorm(creature, heroOwner, position, side);
+        }
         
         // TODO: This is where other future death effects will be implemented
         // For example:
@@ -1443,6 +1456,11 @@ export class BattleManager {
     guest_handleSkeletonNecromancerHeroRevivalDeath(data) {
         if (this.skeletonNecromancerManager) {
             this.skeletonNecromancerManager.handleGuestHeroRevivalDeath(data);
+        }
+    }
+    guest_handleSkeletonDeathKnightDarkSlash(data) {
+        if (this.skeletonDeathKnightManager) {
+            this.skeletonDeathKnightManager.handleGuestDarkSlash(data);
         }
     }
 
@@ -2269,6 +2287,11 @@ export class BattleManager {
             this.skeletonNecromancerManager = null;
         }
         
+        // Cleanup Skeleton Death Knight manager
+        if (this.skeletonDeathKnightManager) {
+            this.skeletonDeathKnightManager.cleanup();
+            this.skeletonDeathKnightManager = null;
+        }
 
 
 
@@ -2666,6 +2689,10 @@ export class BattleManager {
         if (this.skeletonNecromancerManager) {
             this.skeletonNecromancerManager.cleanup();
             this.skeletonNecromancerManager = null;
+        }
+        if (this.skeletonDeathKnightManager) {
+            this.skeletonDeathKnightManager.cleanup();
+            this.skeletonDeathKnightManager = null;
         }
 
 

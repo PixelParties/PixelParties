@@ -434,6 +434,15 @@ export class VacarnEffectManager {
             return;
         }
 
+        // Get hero card position
+        const heroRect = heroCard.getBoundingClientRect();
+        
+        // Skip animation if hero card is not properly positioned (e.g., during reward screen)
+        if (heroRect.width === 0 || heroRect.height === 0 || heroRect.top === 0 || heroRect.left === 0) {
+            console.log(`Vacarn: Skipping animation - hero card not properly positioned during reward screen`);
+            return;
+        }
+
         // Create necromancy animation overlay
         const animationOverlay = document.createElement('div');
         animationOverlay.className = 'necromancy-animation-overlay';
@@ -446,7 +455,6 @@ export class VacarnEffectManager {
         `;
 
         // Position overlay over the hero card
-        const heroRect = heroCard.getBoundingClientRect();
         animationOverlay.style.cssText = `
             position: fixed;
             top: ${heroRect.top}px;

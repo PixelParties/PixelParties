@@ -52,6 +52,11 @@ export class BattleFlowManager {
             const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
             bm.skeletonNecromancerManager = new SkeletonNecromancerCreature(bm);
             console.log('✅ Skeleton Necromancer manager initialized');
+
+            // Initialize Skeleton Death Knight manager
+            const SkeletonDeathKnightCreature = (await import('./Creatures/skeletonDeathKnight.js')).default;
+            bm.skeletonDeathKnightManager = new SkeletonDeathKnightCreature(bm);
+            console.log('✅ Skeleton Death Knight manager initialized');
             
             // Verify managers are properly set
             if (!bm.jigglesManager) {
@@ -63,6 +68,9 @@ export class BattleFlowManager {
             if (!bm.skeletonNecromancerManager) {
                 console.error('❌ CRITICAL: Skeleton Necromancer manager failed to initialize!');
             }
+            if (!bm.skeletonDeathKnightManager) {
+                console.error('❌ CRITICAL: Skeleton Death Knight manager failed to initialize!');
+            }
             
         } catch (error) {
             console.error('❌ CRITICAL: Error initializing creature managers:', error);
@@ -70,6 +78,7 @@ export class BattleFlowManager {
             if (!bm.jigglesManager) bm.jigglesManager = null;
             if (!bm.skeletonArcherManager) bm.skeletonArcherManager = null;
             if (!bm.skeletonNecromancerManager) bm.skeletonNecromancerManager = null;
+            if (!bm.skeletonDeathKnightManager) bm.skeletonDeathKnightManager = null;
         }
 
         // Ensure randomness is initialized before battle starts
@@ -396,6 +405,7 @@ export class BattleFlowManager {
                 const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
                 const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
                 const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
+                const SkeletonDeathKnightCreature = (await import('./Creatures/skeletonDeathKnight.js')).default;
 
                 if (!bm.skeletonNecromancerManager) {
                     console.error('❌ CRITICAL: Skeleton Necromancer manager failed to initialize!');
@@ -427,6 +437,15 @@ export class BattleFlowManager {
                         hasSpecialAttacks = true;
                     } else {
                         console.error('❌ CRITICAL: SkeletonNecromancerManager not available for', playerActor.name);
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+                    }
+                } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(playerActor.name)) {
+                    if (bm.skeletonDeathKnightManager) {
+                        actions.push(bm.skeletonDeathKnightManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('❌ CRITICAL: SkeletonDeathKnightManager not available for', playerActor.name);
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                         bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
                     }

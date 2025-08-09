@@ -601,12 +601,26 @@ export class BattleNetworkManager {
                 bm.guest_handleSkeletonNecromancerRevival(data);
                 break;
 
-            // NEW: Handle Skeleton Necromancer hero revival death effect
             case 'skeleton_necromancer_hero_revival_death':
                 if (bm.skeletonNecromancerManager) {
                     bm.skeletonNecromancerManager.handleGuestHeroRevivalDeath(data);
                 }
                 break;
+
+            case 'skeleton_death_knight_dark_slash':
+                if (bm.skeletonDeathKnightManager) {
+                    bm.skeletonDeathKnightManager.handleGuestDarkSlash(data);
+                }
+                break;
+
+            case 'skeleton_death_knight_slash_storm':
+                if (bm.skeletonDeathKnightManager) {
+                    bm.skeletonDeathKnightManager.handleGuestDeathSlashStorm(data);
+                }
+                break;
+
+
+
 
             case 'blade_frost_triggered':
                 bm.guest_handleBladeFrostTriggered(data);

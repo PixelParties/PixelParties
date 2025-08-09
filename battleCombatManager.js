@@ -575,6 +575,9 @@ export class BattleCombatManager {
                     battleManagerInstance: this.battleManager.constructor.name
                 });
                 recordKillWithVisualFeedback(this.battleManager, attacker, defender, 'hero');
+                
+                // Check for SkeletonMage reactions to ally death
+                this.battleManager.checkForSkeletonMageReactions(defender, defender.side, 'hero');
             }
 
             // Process attack effects for hero targets (after damage is applied)

@@ -1217,6 +1217,15 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: null,
         subtype: null
+    },
+    'Toughness': {
+        name: 'Toughness',
+        image: './Cards/All/Toughness.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
     }
 };
 

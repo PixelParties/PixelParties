@@ -1,42 +1,42 @@
-// ./Creatures/skeletonDeathKnight.js - Skeleton Death Knight Creature Dark Slash Attack Module
+// ./Creatures/burningSkeleton.js - Burning Skeleton Creature Fire Slash Attack Module
 
-export class SkeletonDeathKnightCreature {
+export class BurningSkeletonCreature {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.activeSlashEffects = new Set(); // Track active slash effects for cleanup
         
-        // Skeleton Death Knight stats
-        this.SLASH_DAMAGE = 10;
+        // Burning Skeleton stats
+        this.SLASH_DAMAGE = 30;
         this.SLASH_ANIMATION_TIME = 800; // 0.8 second slash animation
-        this.SILENCED_STACKS = 1;
+        this.BURNED_STACKS = 1;
         
         // Inject CSS styles
-        this.injectSkeletonDeathKnightStyles();
+        this.injectBurningSkeletonStyles();
         
-        console.log('⚔️ Skeleton Death Knight Creature module initialized');
+        console.log('🔥 Burning Skeleton Creature module initialized');
     }
 
-    // Check if a creature is Skeleton Death Knight
-    static isSkeletonDeathKnight(creatureName) {
-        return creatureName === 'SkeletonDeathKnight';
+    // Check if a creature is Burning Skeleton
+    static isBurningSkeleton(creatureName) {
+        return creatureName === 'BurningSkeleton';
     }
 
-    // Execute Skeleton Death Knight special attack with dark slash
-    async executeSpecialAttack(deathKnightActor, position) {
+    // Execute Burning Skeleton special attack with fire slash
+    async executeSpecialAttack(burningSkeletonActor, position) {
         if (!this.battleManager.isAuthoritative) return;
 
-        const deathKnightCreature = deathKnightActor.data;
-        const deathKnightHero = deathKnightActor.hero;
-        const attackerSide = deathKnightHero.side;
+        const burningSkeletonCreature = burningSkeletonActor.data;
+        const burningSkeletonHero = burningSkeletonActor.hero;
+        const attackerSide = burningSkeletonHero.side;
         
-        // Safety check: ensure Skeleton Death Knight is still alive
-        if (!deathKnightCreature.alive || deathKnightCreature.currentHp <= 0) {
-            console.log(`Skeleton Death Knight is dead, cannot execute special attack`);
+        // Safety check: ensure Burning Skeleton is still alive
+        if (!burningSkeletonCreature.alive || burningSkeletonCreature.currentHp <= 0) {
+            console.log(`Burning Skeleton is dead, cannot execute special attack`);
             return;
         }
         
         this.battleManager.addCombatLog(
-            `⚔️ ${deathKnightCreature.name} raises its dark blade, preparing a deadly strike!`, 
+            `🔥 ${burningSkeletonCreature.name} ignites its blade, preparing a blazing strike!`, 
             attackerSide === 'player' ? 'success' : 'error'
         );
 
@@ -48,7 +48,7 @@ export class SkeletonDeathKnightCreature {
         
         if (!target) {
             this.battleManager.addCombatLog(
-                `💨 ${deathKnightCreature.name} finds no targets for its dark slash!`, 
+                `💨 ${burningSkeletonCreature.name} finds no targets for its fire slash!`, 
                 'info'
             );
             return;
@@ -57,28 +57,28 @@ export class SkeletonDeathKnightCreature {
         // Log target acquisition
         const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
         this.battleManager.addCombatLog(
-            `🎯 ${deathKnightCreature.name} targets ${targetName} with a dark slash!`, 
+            `🎯 ${burningSkeletonCreature.name} targets ${targetName} with a blazing slash!`, 
             attackerSide === 'player' ? 'success' : 'error'
         );
 
         // Send synchronization data to guest BEFORE starting host animation
-        this.sendDarkSlashUpdate(deathKnightActor, target, position);
+        this.sendFireSlashUpdate(burningSkeletonActor, target, position);
 
         // Short delay to ensure guest receives the message
         await this.battleManager.delay(50);
 
-        // Execute dark slash attack with visual effects
-        await this.executeDarkSlashAttack(deathKnightActor, target, position);
+        // Execute fire slash attack with visual effects
+        await this.executeFireSlashAttack(burningSkeletonActor, target, position);
     }
 
-    // Execute the dark slash attack with visual effects (host side)
-    async executeDarkSlashAttack(deathKnightActor, target, position) {
-        const attackerSide = deathKnightActor.hero.side;
-        const deathKnightElement = this.getDeathKnightElement(attackerSide, position, deathKnightActor.index);
+    // Execute the fire slash attack with visual effects (host side)
+    async executeFireSlashAttack(burningSkeletonActor, target, position) {
+        const attackerSide = burningSkeletonActor.hero.side;
+        const burningSkeletonElement = this.getBurningSkeletonElement(attackerSide, position, burningSkeletonActor.index);
         const targetElement = this.getTargetElement(target);
         
-        if (!deathKnightElement) {
-            console.error('Skeleton Death Knight element not found, cannot create slash');
+        if (!burningSkeletonElement) {
+            console.error('Burning Skeleton element not found, cannot create slash');
             return;
         }
 
@@ -87,10 +87,10 @@ export class SkeletonDeathKnightCreature {
             return;
         }
         
-        // Create and execute dark slash animation
-        const slashEffect = this.createDarkSlashEffect(deathKnightElement, targetElement);
+        // Create and execute fire slash animation
+        const slashEffect = this.createFireSlashEffect(burningSkeletonElement, targetElement);
         if (!slashEffect) {
-            console.error('Failed to create dark slash effect');
+            console.error('Failed to create fire slash effect');
             return;
         }
 
@@ -103,13 +103,13 @@ export class SkeletonDeathKnightCreature {
         await this.battleManager.delay(adjustedAnimationTime * 0.2); // 20% of animation time
         
         // Apply damage when slash hits (only host applies actual damage)
-        this.applyDarkSlashDamage(target, deathKnightActor.data);
+        this.applyFireSlashDamage(target, burningSkeletonActor.data); // ✅ Pass the creature
         
-        // Apply silenced status effect
-        this.applyDarkSlashSilence(target);
+        // Apply burned status effect
+        this.applyFireSlashBurn(target);
         
         // Add impact effect
-        this.createDarkImpactEffect(targetElement);
+        this.createFireImpactEffect(targetElement);
         
         // Wait for the rest of the slash animation to complete
         await this.battleManager.delay(adjustedAnimationTime * 0.8);
@@ -118,19 +118,19 @@ export class SkeletonDeathKnightCreature {
         this.removeSlashEffect(slashEffect);
 
         this.battleManager.addCombatLog(
-            `💥 The dark slash appears and strikes true, dealing ${this.SLASH_DAMAGE} damage and silencing the target!`, 
+            `💥 The blazing slash appears and strikes true, dealing ${this.SLASH_DAMAGE} damage and setting the target ablaze!`, 
             'info'
         );
     }
 
-    // Get the DOM element for Skeleton Death Knight creature
-    getDeathKnightElement(side, heroPosition, creatureIndex) {
+    // Get the DOM element for Burning Skeleton creature
+    getBurningSkeletonElement(side, heroPosition, creatureIndex) {
         return document.querySelector(
             `.${side}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
         );
     }
 
-    // Get the DOM element for a target (reused from SkeletonArcher)
+    // Get the DOM element for a target (reused from SkeletonDeathKnight)
     getTargetElement(target) {
         if (!target || !target.side || !target.position) {
             console.warn('Invalid target data:', target);
@@ -162,8 +162,8 @@ export class SkeletonDeathKnightCreature {
         return element;
     }
 
-    // Create dark purple slash effect
-    createDarkSlashEffect(fromElement, toElement) {
+    // Create fiery orange/red slash effect
+    createFireSlashEffect(fromElement, toElement) {
         if (!fromElement || !toElement) {
             console.warn('Cannot create slash effect: missing elements', { fromElement: !!fromElement, toElement: !!toElement });
             return null;
@@ -199,9 +199,9 @@ export class SkeletonDeathKnightCreature {
             const angleVariation = (Math.random() - 0.5) * 60; // ±30 degrees
             const slashAngle = baseAngle + angleVariation;
 
-            // Create the dark slash effect element at target location
+            // Create the fire slash effect element at target location
             const slashEffect = document.createElement('div');
-            slashEffect.className = 'skeleton-death-knight-slash';
+            slashEffect.className = 'burning-skeleton-slash';
             
             // Calculate speed-adjusted animation time for CSS
             const adjustedAnimationTime = this.battleManager.getSpeedAdjustedDelay(this.SLASH_ANIMATION_TIME);
@@ -214,9 +214,9 @@ export class SkeletonDeathKnightCreature {
                 height: 8px;
                 background: linear-gradient(90deg, 
                     transparent 0%, 
-                    rgba(75, 0, 130, 0.9) 20%, 
-                    rgba(138, 43, 226, 1) 50%, 
-                    rgba(75, 0, 130, 0.9) 80%, 
+                    rgba(255, 140, 0, 0.9) 20%, 
+                    rgba(255, 69, 0, 1) 50%, 
+                    rgba(255, 140, 0, 0.9) 80%, 
                     transparent 100%);
                 transform-origin: 50% 50%;
                 transform: translate(-50%, -50%) rotate(${slashAngle}deg);
@@ -224,31 +224,31 @@ export class SkeletonDeathKnightCreature {
                 pointer-events: none;
                 border-radius: 4px;
                 box-shadow: 
-                    0 0 15px rgba(138, 43, 226, 0.8),
-                    0 0 30px rgba(75, 0, 130, 0.6),
+                    0 0 15px rgba(255, 69, 0, 0.8),
+                    0 0 30px rgba(255, 140, 0, 0.6),
                     inset 0 2px 0 rgba(255, 255, 255, 0.3);
-                animation: darkSlashStrike ${adjustedAnimationTime}ms ease-out forwards;
+                animation: fireSlashStrike ${adjustedAnimationTime}ms ease-out forwards;
                 --slash-angle: ${slashAngle}deg;
             `;
 
-            // Add dark energy effects
-            const darkEnergyTrail = document.createElement('div');
-            darkEnergyTrail.className = 'dark-energy-trail';
-            darkEnergyTrail.style.cssText = `
+            // Add fire energy effects
+            const fireEnergyTrail = document.createElement('div');
+            fireEnergyTrail.className = 'fire-energy-trail';
+            fireEnergyTrail.style.cssText = `
                 position: absolute;
                 top: -4px;
                 left: 0;
                 right: 0;
                 height: 16px;
                 background: radial-gradient(ellipse, 
-                    rgba(75, 0, 130, 0.6) 0%, 
-                    rgba(138, 43, 226, 0.4) 50%, 
+                    rgba(255, 69, 0, 0.6) 0%, 
+                    rgba(255, 140, 0, 0.4) 50%, 
                     transparent 100%);
                 border-radius: 8px;
-                animation: darkEnergyPulse ${adjustedAnimationTime}ms ease-in-out infinite;
+                animation: fireEnergyPulse ${adjustedAnimationTime}ms ease-in-out infinite;
             `;
             
-            slashEffect.appendChild(darkEnergyTrail);
+            slashEffect.appendChild(fireEnergyTrail);
 
             // Add slash blade highlight
             const bladeHighlight = document.createElement('div');
@@ -273,17 +273,17 @@ export class SkeletonDeathKnightCreature {
             
             document.body.appendChild(slashEffect);
             
-            console.log(`Created dark slash at target: ${slashAngle.toFixed(1)}°, animation time: ${adjustedAnimationTime}ms`);
+            console.log(`Created fire slash at target: ${slashAngle.toFixed(1)}°, animation time: ${adjustedAnimationTime}ms`);
             return slashEffect;
             
         } catch (error) {
-            console.error('Error creating dark slash effect:', error);
+            console.error('Error creating fire slash effect:', error);
             return null;
         }
     }
 
-    // Create dark impact effect at target location
-    createDarkImpactEffect(targetElement) {
+    // Create fire impact effect at target location
+    createFireImpactEffect(targetElement) {
         if (!targetElement) return;
 
         const rect = targetElement.getBoundingClientRect();
@@ -294,7 +294,7 @@ export class SkeletonDeathKnightCreature {
         this.createTargetSlashMark(targetElement, centerX, centerY);
 
         const impact = document.createElement('div');
-        impact.className = 'dark-slash-impact-effect';
+        impact.className = 'fire-slash-impact-effect';
         impact.style.cssText = `
             position: fixed;
             left: ${centerX}px;
@@ -302,24 +302,24 @@ export class SkeletonDeathKnightCreature {
             width: 60px;
             height: 60px;
             background: radial-gradient(circle, 
-                rgba(138, 43, 226, 0.9) 0%, 
-                rgba(75, 0, 130, 0.7) 40%, 
-                rgba(25, 25, 112, 0.5) 70%, 
+                rgba(255, 69, 0, 0.9) 0%, 
+                rgba(255, 140, 0, 0.7) 40%, 
+                rgba(255, 215, 0, 0.5) 70%, 
                 transparent 100%);
             border-radius: 50%;
             transform: translate(-50%, -50%);
             z-index: 1600;
             pointer-events: none;
-            animation: darkSlashImpact 0.6s ease-out forwards;
+            animation: fireSlashImpact 0.6s ease-out forwards;
             box-shadow: 
-                0 0 20px rgba(138, 43, 226, 0.8),
-                0 0 40px rgba(75, 0, 130, 0.6);
+                0 0 20px rgba(255, 69, 0, 0.8),
+                0 0 40px rgba(255, 140, 0, 0.6);
         `;
 
         // Add impact particles
         for (let i = 0; i < 12; i++) {
             const particle = document.createElement('div');
-            particle.className = 'dark-impact-particle';
+            particle.className = 'fire-impact-particle';
             const angle = (i * 30) * (Math.PI / 180);
             const distance = 35 + Math.random() * 25;
             const particleX = Math.cos(angle) * distance;
@@ -331,13 +331,13 @@ export class SkeletonDeathKnightCreature {
                 top: 50%;
                 width: 5px;
                 height: 5px;
-                background: rgba(138, 43, 226, 0.9);
+                background: rgba(255, 69, 0, 0.9);
                 border-radius: 50%;
                 transform: translate(-50%, -50%);
-                animation: darkParticleExplosion 0.8s ease-out forwards;
+                animation: fireParticleExplosion 0.8s ease-out forwards;
                 --particle-x: ${particleX}px;
                 --particle-y: ${particleY}px;
-                box-shadow: 0 0 8px rgba(138, 43, 226, 0.8);
+                box-shadow: 0 0 8px rgba(255, 69, 0, 0.8);
             `;
             
             impact.appendChild(particle);
@@ -353,7 +353,7 @@ export class SkeletonDeathKnightCreature {
         }, 800);
     }
 
-    // Create prominent slash mark on the target
+    // Create prominent fiery slash mark on the target
     createTargetSlashMark(targetElement, centerX, centerY) {
         if (!targetElement) return;
 
@@ -375,7 +375,7 @@ export class SkeletonDeathKnightCreature {
             background: linear-gradient(90deg, 
                 transparent 0%, 
                 rgba(255, 255, 255, 0.9) 5%, 
-                rgba(138, 43, 226, 1) 50%, 
+                rgba(255, 69, 0, 1) 50%, 
                 rgba(255, 255, 255, 0.9) 95%, 
                 transparent 100%);
             transform: translate(-50%, -50%) rotate(${slashAngle}deg);
@@ -383,8 +383,8 @@ export class SkeletonDeathKnightCreature {
             pointer-events: none;
             border-radius: 3px;
             box-shadow: 
-                0 0 15px rgba(138, 43, 226, 1),
-                0 0 30px rgba(75, 0, 130, 0.8),
+                0 0 15px rgba(255, 69, 0, 1),
+                0 0 30px rgba(255, 140, 0, 0.8),
                 inset 0 1px 0 rgba(255, 255, 255, 0.6),
                 inset 0 -1px 0 rgba(0, 0, 0, 0.4);
             animation: targetSlashAppear 0.4s ease-out forwards;
@@ -401,8 +401,8 @@ export class SkeletonDeathKnightCreature {
             width: 100px;
             height: 22px;
             background: radial-gradient(ellipse, 
-                rgba(138, 43, 226, 0.6) 0%, 
-                rgba(75, 0, 130, 0.4) 50%, 
+                rgba(255, 69, 0, 0.6) 0%, 
+                rgba(255, 140, 0, 0.4) 50%, 
                 transparent 100%);
             border-radius: 50%;
             animation: targetSlashGlow 0.4s ease-out forwards;
@@ -422,7 +422,7 @@ export class SkeletonDeathKnightCreature {
             background: linear-gradient(90deg, 
                 transparent 0%, 
                 rgba(255, 255, 255, 0.7) 10%, 
-                rgba(138, 43, 226, 0.8) 50%, 
+                rgba(255, 69, 0, 0.8) 50%, 
                 rgba(255, 255, 255, 0.7) 90%, 
                 transparent 100%);
             transform: rotate(90deg);
@@ -430,7 +430,7 @@ export class SkeletonDeathKnightCreature {
             border-radius: 2px;
             animation: targetCrossSlashAppear 0.5s ease-out 0.1s forwards;
             opacity: 0;
-            box-shadow: 0 0 10px rgba(138, 43, 226, 0.8);
+            box-shadow: 0 0 10px rgba(255, 69, 0, 0.8);
         `;
         
         slashMark.appendChild(crossSlash);
@@ -453,8 +453,8 @@ export class SkeletonDeathKnightCreature {
         }
     }
 
-    // Apply Skeleton Death Knight damage to target
-    applyDarkSlashDamage(target, attackingDeathKnight = null) {
+    // Apply Burning Skeleton damage to target - ✅ FIXED: Now accepts attacking creature
+    applyFireSlashDamage(target, attackingBurningSkeleton = null) {
         const damage = this.SLASH_DAMAGE;
         
         if (target.type === 'hero') {
@@ -464,8 +464,8 @@ export class SkeletonDeathKnightCreature {
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
             }, {
-                source: 'spell', // Death Knight's dark slash is magical
-                attacker: attackingDeathKnight // ✅ Pass the attacking creature
+                source: 'spell', // Burning Skeleton's fire slash is magical
+                attacker: attackingBurningSkeleton // ✅ Pass the attacking creature
             });
         } else if (target.type === 'creature') {
             this.battleManager.authoritative_applyDamageToCreature({
@@ -476,45 +476,45 @@ export class SkeletonDeathKnightCreature {
                 position: target.position,
                 side: target.side
             }, {
-                source: 'spell', // Death Knight's dark slash is magical
-                attacker: attackingDeathKnight // ✅ Pass the attacking creature
+                source: 'spell', // Burning Skeleton's fire slash is magical
+                attacker: attackingBurningSkeleton // ✅ Pass the attacking creature
             });
         }
     }
 
-    // Apply silenced status effect to target
-    applyDarkSlashSilence(target) {
+    // Apply burned status effect to target
+    applyFireSlashBurn(target) {
         if (!this.battleManager.statusEffectsManager) return;
 
         const targetData = target.type === 'creature' ? target.creature : target.hero;
         
-        // Apply 1 stack of Silenced
+        // Apply 1 stack of Burned
         const success = this.battleManager.statusEffectsManager.applyStatusEffect(
             targetData, 
-            'silenced', 
-            this.SILENCED_STACKS
+            'burned', 
+            this.BURNED_STACKS
         );
 
         if (success) {
             const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
             this.battleManager.addCombatLog(
-                `🔇 ${targetName} is silenced by the dark magic!`,
+                `🔥 ${targetName} is set ablaze by the burning magic!`,
                 target.side === 'player' ? 'error' : 'success'
             );
         }
     }
 
-    // Send dark slash attack data to guest for synchronization
-    sendDarkSlashUpdate(deathKnightActor, target, position) {
-        const attackerSide = deathKnightActor.hero.side;
+    // Send fire slash attack data to guest for synchronization
+    sendFireSlashUpdate(burningSkeletonActor, target, position) {
+        const attackerSide = burningSkeletonActor.hero.side;
         
-        this.battleManager.sendBattleUpdate('skeleton_death_knight_dark_slash', {
-            deathKnightData: {
+        this.battleManager.sendBattleUpdate('burning_skeleton_fire_slash', {
+            burningSkeletonData: {
                 side: attackerSide,
                 position: position,
-                creatureIndex: deathKnightActor.index,
-                name: deathKnightActor.data.name,
-                absoluteSide: deathKnightActor.hero.absoluteSide
+                creatureIndex: burningSkeletonActor.index,
+                name: burningSkeletonActor.data.name,
+                absoluteSide: burningSkeletonActor.hero.absoluteSide
             },
             target: {
                 type: target.type,
@@ -526,37 +526,37 @@ export class SkeletonDeathKnightCreature {
                 creatureName: target.creature ? target.creature.name : null
             },
             damage: this.SLASH_DAMAGE,
-            silencedStacks: this.SILENCED_STACKS,
+            burnedStacks: this.BURNED_STACKS,
             animationTime: this.SLASH_ANIMATION_TIME
         });
     }
 
-    // Handle Skeleton Death Knight dark slash on guest side
-    handleGuestDarkSlash(data) {
-        const { deathKnightData, target, damage, silencedStacks, animationTime } = data;
+    // Handle Burning Skeleton fire slash on guest side
+    handleGuestFireSlash(data) {
+        const { burningSkeletonData, target, damage, burnedStacks, animationTime } = data;
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
-        const deathKnightLocalSide = (deathKnightData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const burningSkeletonLocalSide = (burningSkeletonData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         
         this.battleManager.addCombatLog(
-            `⚔️ ${deathKnightData.name} unleashes a dark slash!`, 
-            deathKnightLocalSide === 'player' ? 'success' : 'error'
+            `🔥 ${burningSkeletonData.name} unleashes a blazing slash!`, 
+            burningSkeletonLocalSide === 'player' ? 'success' : 'error'
         );
 
         // Start guest animation immediately
-        this.createGuestDarkSlash(deathKnightData, target, animationTime, myAbsoluteSide);
+        this.createGuestFireSlash(burningSkeletonData, target, animationTime, myAbsoluteSide);
     }
 
-    // Create dark slash on guest side
-    async createGuestDarkSlash(deathKnightData, targetData, animationTime, myAbsoluteSide) {
-        const deathKnightLocalSide = (deathKnightData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
-        const deathKnightElement = this.getDeathKnightElement(
-            deathKnightLocalSide,
-            deathKnightData.position,
-            deathKnightData.creatureIndex
+    // Create fire slash on guest side
+    async createGuestFireSlash(burningSkeletonData, targetData, animationTime, myAbsoluteSide) {
+        const burningSkeletonLocalSide = (burningSkeletonData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const burningSkeletonElement = this.getBurningSkeletonElement(
+            burningSkeletonLocalSide,
+            burningSkeletonData.position,
+            burningSkeletonData.creatureIndex
         );
 
-        if (!deathKnightElement) {
-            console.warn('Skeleton Death Knight element not found on guest side');
+        if (!burningSkeletonElement) {
+            console.warn('Burning Skeleton element not found on guest side');
             return;
         }
 
@@ -581,7 +581,7 @@ export class SkeletonDeathKnightCreature {
         }
 
         if (targetElement) {
-            const slashEffect = this.createDarkSlashEffect(deathKnightElement, targetElement);
+            const slashEffect = this.createFireSlashEffect(burningSkeletonElement, targetElement);
             if (slashEffect) {
                 this.activeSlashEffects.add(slashEffect);
             }
@@ -592,7 +592,7 @@ export class SkeletonDeathKnightCreature {
             // Wait for slash to appear, then show impact
             await this.battleManager.delay(adjustedAnimationTime * 0.2);
             
-            this.createDarkImpactEffect(targetElement);
+            this.createFireImpactEffect(targetElement);
             
             // Wait for the rest of the animation
             await this.battleManager.delay(adjustedAnimationTime * 0.8);
@@ -602,7 +602,7 @@ export class SkeletonDeathKnightCreature {
             // Log damage for target (but don't apply actual damage - host handles that)
             const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
             this.battleManager.addCombatLog(
-                `🎯 ${targetName} is struck by the dark slash for ${this.SLASH_DAMAGE} damage and silenced!`,
+                `🎯 ${targetName} is struck by the blazing slash for ${this.SLASH_DAMAGE} damage and set ablaze!`,
                 targetLocalSide === 'player' ? 'error' : 'success'
             );
         } else {
@@ -611,45 +611,45 @@ export class SkeletonDeathKnightCreature {
     }
 
     // ============================================
-    // DEATH SLASH STORM EFFECT
+    // DEATH FLAME STORM EFFECT
     // ============================================
 
-    // Execute death slash storm when Skeleton Death Knight dies (slash all enemies simultaneously)
-    async executeDeathSlashStorm(dyingDeathKnight, heroOwner, position, side) {
+    // Execute death flame storm when Burning Skeleton dies (slash all enemies simultaneously)
+    async executeDeathFlameStorm(dyingBurningSkeleton, heroOwner, position, side) {
         if (!this.battleManager.isAuthoritative) return;
 
-        const deathKnightCreature = dyingDeathKnight;
-        const deathKnightSide = side;
+        const burningSkeletonCreature = dyingBurningSkeleton;
+        const burningSkeletonSide = side;
         
         this.battleManager.addCombatLog(
-            `💀⚔️ ${deathKnightCreature.name} unleashes a final devastating slash storm as it dies!`, 
-            deathKnightSide === 'player' ? 'info' : 'info'
+            `💀🔥 ${burningSkeletonCreature.name} erupts in a final blazing inferno as it dies!`, 
+            burningSkeletonSide === 'player' ? 'info' : 'info'
         );
 
         // Find all enemy targets
-        const allEnemyTargets = this.findAllEnemyTargets(deathKnightSide);
+        const allEnemyTargets = this.findAllEnemyTargets(burningSkeletonSide);
         
         if (allEnemyTargets.length === 0) {
             this.battleManager.addCombatLog(
-                `💨 ${deathKnightCreature.name}'s death slash storm finds no enemies!`, 
+                `💨 ${burningSkeletonCreature.name}'s death flame storm finds no enemies!`, 
                 'info'
             );
             return;
         }
 
         this.battleManager.addCombatLog(
-            `🎯 Death slash storm targets ${allEnemyTargets.length} enemies simultaneously!`, 
+            `🎯 Death flame storm targets ${allEnemyTargets.length} enemies simultaneously!`, 
             'warning'
         );
 
-        // Send death slash storm data to guest for synchronization
-        this.sendDeathSlashStormUpdate(deathKnightCreature, heroOwner, position, deathKnightSide, allEnemyTargets);
+        // Send death flame storm data to guest for synchronization
+        this.sendDeathFlameStormUpdate(burningSkeletonCreature, heroOwner, position, burningSkeletonSide, allEnemyTargets);
 
         // Short delay to ensure guest receives the message
         await this.battleManager.delay(100);
 
-        // Execute the death slash storm
-        await this.executeDeathSlashStormAttack(deathKnightCreature, heroOwner, position, deathKnightSide, allEnemyTargets);
+        // Execute the death flame storm
+        await this.executeDeathFlameStormAttack(burningSkeletonCreature, heroOwner, position, burningSkeletonSide, allEnemyTargets);
     }
 
     // Find all enemy targets (heroes and creatures)
@@ -691,17 +691,17 @@ export class SkeletonDeathKnightCreature {
         return allTargets;
     }
 
-    // Execute the death slash storm attack (simultaneous slashes to all enemies)
-    async executeDeathSlashStormAttack(deathKnightCreature, heroOwner, position, deathKnightSide, allTargets) {
-        // Get the death knight element (even though it's dead, we need it for slash origins)
-        const deathKnightElement = this.getDeathKnightElement(
-            deathKnightSide, 
+    // Execute the death flame storm attack (simultaneous slashes to all enemies)
+    async executeDeathFlameStormAttack(burningSkeletonCreature, heroOwner, position, burningSkeletonSide, allTargets) {
+        // Get the burning skeleton element (even though it's dead, we need it for slash origins)
+        const burningSkeletonElement = this.getBurningSkeletonElement(
+            burningSkeletonSide, 
             position, 
-            heroOwner.creatures.indexOf(deathKnightCreature)
+            heroOwner.creatures.indexOf(burningSkeletonCreature)
         );
         
-        if (!deathKnightElement) {
-            console.error('Skeleton Death Knight element not found for death slash storm');
+        if (!burningSkeletonElement) {
+            console.error('Burning Skeleton element not found for death flame storm');
             return;
         }
 
@@ -712,12 +712,12 @@ export class SkeletonDeathKnightCreature {
             const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
             
             this.battleManager.addCombatLog(
-                `⚔️ Death slash seeks ${targetName}!`, 
+                `🔥 Death flame seeks ${targetName}!`, 
                 'warning'
             );
 
-            // Create slash effect (don't await - let them all execute simultaneously)
-            slashPromises.push(this.executeDeathSlash(deathKnightElement, target, index, deathKnightCreature));
+            // Create slash effect and pass the attacking creature - ✅ FIXED
+            slashPromises.push(this.executeDeathFlame(burningSkeletonElement, target, index, burningSkeletonCreature));
         });
 
         // Wait for all slashes to complete
@@ -725,24 +725,24 @@ export class SkeletonDeathKnightCreature {
 
         // Add final message after all slashes complete
         this.battleManager.addCombatLog(
-            `💥 ${deathKnightCreature.name}'s death slash storm complete! ${allTargets.length} enemies struck!`, 
+            `💥 ${burningSkeletonCreature.name}'s death flame storm complete! ${allTargets.length} enemies burned!`, 
             'info'
         );
     }
 
-    // Execute a single death slash
-    async executeDeathSlash(deathKnightElement, target, slashIndex) {
+    // Execute a single death flame - ✅ FIXED: Now accepts attacking creature
+    async executeDeathFlame(burningSkeletonElement, target, slashIndex, attackingCreature = null) {
         const targetElement = this.getTargetElement(target);
         
         if (!targetElement) {
-            console.error(`Target element not found for death slash ${slashIndex + 1}`);
+            console.error(`Target element not found for death flame ${slashIndex + 1}`);
             return;
         }
         
-        // Create and execute dark slash animation
-        const slashEffect = this.createDarkSlashEffect(deathKnightElement, targetElement);
+        // Create and execute fire slash animation
+        const slashEffect = this.createFireSlashEffect(burningSkeletonElement, targetElement);
         if (!slashEffect) {
-            console.error(`Failed to create death slash ${slashIndex + 1}`);
+            console.error(`Failed to create death flame ${slashIndex + 1}`);
             return;
         }
 
@@ -754,14 +754,14 @@ export class SkeletonDeathKnightCreature {
         // Wait for slash to appear
         await this.battleManager.delay(adjustedAnimationTime * 0.2);
         
-        // Apply damage when slash hits (only host applies actual damage)
-        this.applyDarkSlashDamage(target, attackingCreature);
+        // Apply damage when slash hits and pass the attacking creature - ✅ FIXED
+        this.applyFireSlashDamage(target, attackingCreature);
         
-        // Apply silenced status effect
-        this.applyDarkSlashSilence(target);
+        // Apply burned status effect
+        this.applyFireSlashBurn(target);
         
         // Add impact effect
-        this.createDarkImpactEffect(targetElement);
+        this.createFireImpactEffect(targetElement);
         
         // Wait for the rest of the animation
         await this.battleManager.delay(adjustedAnimationTime * 0.8);
@@ -772,13 +772,13 @@ export class SkeletonDeathKnightCreature {
         // Log the hit
         const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
         this.battleManager.addCombatLog(
-            `💥 Death slash strikes ${targetName} for ${this.SLASH_DAMAGE} damage and applies Silenced!`, 
+            `💥 Death flame strikes ${targetName} for ${this.SLASH_DAMAGE} damage and applies Burned!`, 
             'warning'
         );
     }
 
-    // Send death slash storm data to guest for synchronization
-    sendDeathSlashStormUpdate(deathKnightCreature, heroOwner, position, deathKnightSide, allTargets) {
+    // Send death flame storm data to guest for synchronization
+    sendDeathFlameStormUpdate(burningSkeletonCreature, heroOwner, position, burningSkeletonSide, allTargets) {
         // Convert targets to sync-friendly format
         const targetsData = allTargets.map(target => ({
             type: target.type,
@@ -789,52 +789,52 @@ export class SkeletonDeathKnightCreature {
             creatureName: target.creature ? target.creature.name : null
         }));
 
-        this.battleManager.sendBattleUpdate('skeleton_death_knight_slash_storm', {
-            deathKnightData: {
-                side: deathKnightSide,
+        this.battleManager.sendBattleUpdate('burning_skeleton_flame_storm', {
+            burningSkeletonData: {
+                side: burningSkeletonSide,
                 position: position,
-                creatureIndex: heroOwner.creatures.indexOf(deathKnightCreature),
-                name: deathKnightCreature.name,
+                creatureIndex: heroOwner.creatures.indexOf(burningSkeletonCreature),
+                name: burningSkeletonCreature.name,
                 absoluteSide: heroOwner.absoluteSide
             },
             targets: targetsData,
             damage: this.SLASH_DAMAGE,
-            silencedStacks: this.SILENCED_STACKS,
+            burnedStacks: this.BURNED_STACKS,
             animationTime: this.SLASH_ANIMATION_TIME
         });
     }
 
-    // Handle death slash storm on guest side
-    async handleGuestDeathSlashStorm(data) {
-        const { deathKnightData, targets, damage, silencedStacks, animationTime } = data;
+    // Handle death flame storm on guest side
+    async handleGuestDeathFlameStorm(data) {
+        const { burningSkeletonData, targets, damage, burnedStacks, animationTime } = data;
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
-        const deathKnightLocalSide = (deathKnightData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const burningSkeletonLocalSide = (burningSkeletonData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         
         this.battleManager.addCombatLog(
-            `💀⚔️ ${deathKnightData.name} unleashes a final devastating slash storm as it dies!`, 
+            `💀🔥 ${burningSkeletonData.name} erupts in a final blazing inferno as it dies!`, 
             'info'
         );
 
         this.battleManager.addCombatLog(
-            `🎯 Death slash storm targets ${targets.length} enemies simultaneously!`, 
+            `🎯 Death flame storm targets ${targets.length} enemies simultaneously!`, 
             'warning'
         );
 
-        // Start guest slash storm animation
-        await this.createGuestDeathSlashStorm(deathKnightData, targets, animationTime, myAbsoluteSide);
+        // Start guest flame storm animation
+        await this.createGuestDeathFlameStorm(burningSkeletonData, targets, animationTime, myAbsoluteSide);
     }
 
-    // Create death slash storm on guest side
-    async createGuestDeathSlashStorm(deathKnightData, targetsData, animationTime, myAbsoluteSide) {
-        const deathKnightLocalSide = (deathKnightData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
-        const deathKnightElement = this.getDeathKnightElement(
-            deathKnightLocalSide,
-            deathKnightData.position,
-            deathKnightData.creatureIndex
+    // Create death flame storm on guest side
+    async createGuestDeathFlameStorm(burningSkeletonData, targetsData, animationTime, myAbsoluteSide) {
+        const burningSkeletonLocalSide = (burningSkeletonData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const burningSkeletonElement = this.getBurningSkeletonElement(
+            burningSkeletonLocalSide,
+            burningSkeletonData.position,
+            burningSkeletonData.creatureIndex
         );
 
-        if (!deathKnightElement) {
-            console.warn('Skeleton Death Knight element not found on guest side for death slash storm');
+        if (!burningSkeletonElement) {
+            console.warn('Burning Skeleton element not found on guest side for death flame storm');
             return;
         }
 
@@ -845,32 +845,32 @@ export class SkeletonDeathKnightCreature {
             const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
             
             this.battleManager.addCombatLog(
-                `⚔️ Death slash seeks ${targetName}!`, 
+                `🔥 Death flame seeks ${targetName}!`, 
                 'warning'
             );
 
             // Create slash effect (don't await - let them all execute simultaneously)
-            slashPromises.push(this.executeGuestDeathSlash(deathKnightElement, targetData, index, animationTime, myAbsoluteSide));
+            slashPromises.push(this.executeGuestDeathFlame(burningSkeletonElement, targetData, index, animationTime, myAbsoluteSide));
         });
 
         // Wait for all slashes to complete
         await Promise.all(slashPromises);
 
         this.battleManager.addCombatLog(
-            `💥 ${deathKnightData.name}'s death slash storm complete! ${targetsData.length} enemies struck!`, 
+            `💥 ${burningSkeletonData.name}'s death flame storm complete! ${targetsData.length} enemies burned!`, 
             'info'
         );
     }
 
-    // Execute a single death slash on guest side
-    async executeGuestDeathSlash(deathKnightElement, targetData, slashIndex, animationTime, myAbsoluteSide) {
+    // Execute a single death flame on guest side
+    async executeGuestDeathFlame(burningSkeletonElement, targetData, slashIndex, animationTime, myAbsoluteSide) {
         const targetElement = this.findTargetElementForGuest(targetData, myAbsoluteSide);
         
         if (!targetElement) {
             return;
         }
 
-        const slashEffect = this.createDarkSlashEffect(deathKnightElement, targetElement);
+        const slashEffect = this.createFireSlashEffect(burningSkeletonElement, targetElement);
         if (slashEffect) {
             this.activeSlashEffects.add(slashEffect);
             
@@ -880,7 +880,7 @@ export class SkeletonDeathKnightCreature {
             // Wait for slash to appear, then show impact
             await this.battleManager.delay(adjustedAnimationTime * 0.2);
             
-            this.createDarkImpactEffect(targetElement);
+            this.createFireImpactEffect(targetElement);
             
             // Wait for the rest of the animation
             await this.battleManager.delay(adjustedAnimationTime * 0.8);
@@ -890,7 +890,7 @@ export class SkeletonDeathKnightCreature {
             // Log damage (but don't apply - host handles that)
             const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
             this.battleManager.addCombatLog(
-                `💥 Death slash strikes ${targetName} for ${this.SLASH_DAMAGE} damage and applies Silenced!`, 
+                `💥 Death flame strikes ${targetName} for ${this.SLASH_DAMAGE} damage and applies Burned!`, 
                 'warning'
             );
         }
@@ -917,7 +917,7 @@ export class SkeletonDeathKnightCreature {
 
     // Clean up all active slash effects (called on battle end/reset)
     cleanup() {
-        console.log(`Cleaning up ${this.activeSlashEffects.size} active Skeleton Death Knight slash effects`);
+        console.log(`Cleaning up ${this.activeSlashEffects.size} active Burning Skeleton slash effects`);
         
         this.activeSlashEffects.forEach(slashEffect => {
             try {
@@ -933,7 +933,7 @@ export class SkeletonDeathKnightCreature {
 
         // Also remove any orphaned slash elements
         try {
-            const orphanedSlashes = document.querySelectorAll('.skeleton-death-knight-slash');
+            const orphanedSlashes = document.querySelectorAll('.burning-skeleton-slash');
             orphanedSlashes.forEach(slashEffect => {
                 if (slashEffect.parentNode) {
                     slashEffect.remove();
@@ -941,30 +941,30 @@ export class SkeletonDeathKnightCreature {
             });
             
             if (orphanedSlashes.length > 0) {
-                console.log(`Cleaned up ${orphanedSlashes.length} orphaned Skeleton Death Knight slash effects`);
+                console.log(`Cleaned up ${orphanedSlashes.length} orphaned Burning Skeleton slash effects`);
             }
         } catch (error) {
             console.warn('Error cleaning up orphaned slash effects:', error);
         }
     }
 
-    // Inject CSS styles for Skeleton Death Knight effects
-    injectSkeletonDeathKnightStyles() {
-        if (document.getElementById('skeletonDeathKnightCreatureStyles')) {
+    // Inject CSS styles for Burning Skeleton effects
+    injectBurningSkeletonStyles() {
+        if (document.getElementById('burningSkeletonCreatureStyles')) {
             return; // Already injected
         }
 
         const style = document.createElement('style');
-        style.id = 'skeletonDeathKnightCreatureStyles';
+        style.id = 'burningSkeletonCreatureStyles';
         style.textContent = `
-            /* Skeleton Death Knight Dark Slash Effects */
-            .skeleton-death-knight-slash {
+            /* Burning Skeleton Fire Slash Effects */
+            .burning-skeleton-slash {
                 border-radius: 4px;
                 position: relative;
                 overflow: visible;
             }
 
-            .dark-energy-trail {
+            .fire-energy-trail {
                 filter: blur(1px);
             }
 
@@ -972,7 +972,7 @@ export class SkeletonDeathKnightCreature {
                 mix-blend-mode: overlay;
             }
 
-            @keyframes darkSlashStrike {
+            @keyframes fireSlashStrike {
                 0% { 
                     opacity: 0;
                     transform: translate(-50%, -50%) rotate(var(--slash-angle, 45deg)) scale(0.8);
@@ -991,7 +991,7 @@ export class SkeletonDeathKnightCreature {
                 }
             }
 
-            @keyframes darkEnergyPulse {
+            @keyframes fireEnergyPulse {
                 0%, 100% { 
                     opacity: 0.6;
                     transform: scaleY(0.8);
@@ -1017,7 +1017,7 @@ export class SkeletonDeathKnightCreature {
                 }
             }
 
-            @keyframes darkSlashImpact {
+            @keyframes fireSlashImpact {
                 0% { 
                     opacity: 1;
                     transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
@@ -1036,7 +1036,7 @@ export class SkeletonDeathKnightCreature {
                 }
             }
 
-            @keyframes darkParticleExplosion {
+            @keyframes fireParticleExplosion {
                 0% {
                     opacity: 1;
                     transform: translate(-50%, -50%) scale(1);
@@ -1103,25 +1103,25 @@ export class SkeletonDeathKnightCreature {
 
             /* Enhanced slash mark effects */
             .target-slash-mark {
-                filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.8));
+                filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
             }
 
             .target-slash-glow {
                 filter: blur(2px);
             }
 
-            /* Enhanced creature glow when Skeleton Death Knight is preparing to attack */
-            .creature-icon.death-knight-charging .creature-sprite {
-                filter: brightness(1.8) drop-shadow(0 0 15px rgba(138, 43, 226, 0.9));
-                animation: deathKnightChargeGlow 1s ease-in-out infinite alternate;
+            /* Enhanced creature glow when Burning Skeleton is preparing to attack */
+            .creature-icon.burning-skeleton-charging .creature-sprite {
+                filter: brightness(1.8) drop-shadow(0 0 15px rgba(255, 69, 0, 0.9));
+                animation: burningSkeletonChargeGlow 1s ease-in-out infinite alternate;
             }
 
-            @keyframes deathKnightChargeGlow {
+            @keyframes burningSkeletonChargeGlow {
                 0% { 
-                    filter: brightness(1.8) drop-shadow(0 0 15px rgba(138, 43, 226, 0.9));
+                    filter: brightness(1.8) drop-shadow(0 0 15px rgba(255, 69, 0, 0.9));
                 }
                 100% { 
-                    filter: brightness(2.2) drop-shadow(0 0 25px rgba(75, 0, 130, 1));
+                    filter: brightness(2.2) drop-shadow(0 0 25px rgba(255, 140, 0, 1));
                 }
             }
         `;
@@ -1131,30 +1131,30 @@ export class SkeletonDeathKnightCreature {
 }
 
 // Static helper methods
-export const SkeletonDeathKnightHelpers = {
-    // Check if any creature in a list is Skeleton Death Knight
-    hasSkeletonDeathKnightInList(creatures) {
-        return creatures.some(creature => SkeletonDeathKnightCreature.isSkeletonDeathKnight(creature.name));
+export const BurningSkeletonHelpers = {
+    // Check if any creature in a list is Burning Skeleton
+    hasBurningSkeletonInList(creatures) {
+        return creatures.some(creature => BurningSkeletonCreature.isBurningSkeleton(creature.name));
     },
 
-    // Get all Skeleton Death Knight creatures from a list
-    getSkeletonDeathKnightFromList(creatures) {
-        return creatures.filter(creature => SkeletonDeathKnightCreature.isSkeletonDeathKnight(creature.name));
+    // Get all Burning Skeleton creatures from a list
+    getBurningSkeletonFromList(creatures) {
+        return creatures.filter(creature => BurningSkeletonCreature.isBurningSkeleton(creature.name));
     },
 
-    // Add charging visual effect to Skeleton Death Knight
+    // Add charging visual effect to Burning Skeleton
     addChargingEffect(creatureElement) {
         if (creatureElement) {
-            creatureElement.classList.add('death-knight-charging');
+            creatureElement.classList.add('burning-skeleton-charging');
         }
     },
 
-    // Remove charging visual effect from Skeleton Death Knight
+    // Remove charging visual effect from Burning Skeleton
     removeChargingEffect(creatureElement) {
         if (creatureElement) {
-            creatureElement.classList.remove('death-knight-charging');
+            creatureElement.classList.remove('burning-skeleton-charging');
         }
     }
 };
 
-export default SkeletonDeathKnightCreature;
+export default BurningSkeletonCreature;

@@ -619,6 +619,44 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'burning_skeleton_fire_slash':
+                if (bm.burningSkeletonManager) {
+                    bm.burningSkeletonManager.handleGuestFireSlash(data);
+                }
+                break;
+
+            case 'burning_skeleton_flame_storm':
+                if (bm.burningSkeletonManager) {
+                    bm.burningSkeletonManager.handleGuestDeathFlameStorm(data);
+                }
+                break;
+            
+            case 'skeleton_reaper_scythe_reap':
+                if (bm.skeletonReaperManager) {
+                    bm.skeletonReaperManager.handleGuestScytheReap(data);
+                }
+                break;
+
+            case 'skeleton_reaper_death_slash_storm':
+                if (bm.skeletonReaperManager) {
+                    bm.skeletonReaperManager.handleGuestDeathSlashStorm(data);
+                }
+                break;
+
+            case 'skeleton_bard_inspiration':
+                bm.guest_handleSkeletonBardInspiration(data);
+                break;
+
+            case 'skeleton_bard_death_inspiration':
+                bm.guest_handleSkeletonBardDeathInspiration(data);
+                break;
+
+            case 'skeleton_mage_lightning_bolt':
+                if (bm.skeletonMageManager) {
+                    bm.skeletonMageManager.handleGuestLightningBolt(data);
+                }
+                break;
+
 
 
 

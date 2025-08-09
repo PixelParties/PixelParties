@@ -272,7 +272,7 @@ export class NecromancyManager {
         requestAnimationFrame(updateCounter);
     }
 
-    // Attempt to revive a creature using necromancy - ENHANCED WITH VISUALS
+    // Attempt to revive a creature using necromancy - ENHANCED WITH VISUALS AND BACK PLACEMENT
     attemptNecromancyRevival(creature, heroOwner, creatureIndex, side, position) {
         if (!this.battleManager.isAuthoritative) return false;
         
@@ -294,6 +294,32 @@ export class NecromancyManager {
         creature.currentHp = creature.maxHp;
         creature.alive = true;
         
+        // Console log: Array before changes
+        console.log(`🔍 NECROMANCY REVIVAL - Array BEFORE changes for ${heroOwner.name}:`, 
+            heroOwner.creatures.map((c, i) => `${i}: ${c.name} (${c.alive ? 'alive' : 'dead'})`));
+        
+        // UPDATED: Move revived creature to END of creatures array
+        let finalCreatureIndex = creatureIndex;
+        const currentIndex = heroOwner.creatures.indexOf(creature);
+        
+        if (currentIndex !== -1 && currentIndex !== heroOwner.creatures.length - 1) {
+            // Remove from current position
+            heroOwner.creatures.splice(currentIndex, 1);
+            // Add to end (back of formation)
+            heroOwner.creatures.push(creature);
+            finalCreatureIndex = heroOwner.creatures.length - 1;
+            
+            this.battleManager.addCombatLog(
+                `💀⬇️ ${creature.name} rises and moves to the back of the formation!`,
+                'info'
+            );
+        }
+        
+        // Console log: Array after changes
+        console.log(`🔍 NECROMANCY REVIVAL - Array AFTER changes for ${heroOwner.name}:`, 
+            heroOwner.creatures.map((c, i) => `${i}: ${c.name} (${c.alive ? 'alive' : 'dead'})`));
+        console.log(`🎯 Final creature index: ${finalCreatureIndex}`);
+        
         // Add combat log messages
         this.battleManager.addCombatLog(
             `💀✨ ${necromancyHero.name} uses Necromancy to revive ${creature.name}!`,
@@ -305,16 +331,19 @@ export class NecromancyManager {
             'info'
         );
                 
-        // ENHANCED: Trigger revival animations (non-blocking)
-        this.animateNecromancyRevival(side, position, creatureIndex, creature);
+        // ENHANCED: Trigger revival animations (non-blocking) - use new index
+        this.animateNecromancyRevival(side, position, finalCreatureIndex, creature);
         
-        // Update health bar with revival animation
-        this.updateCreatureHealthBarWithRevival(side, position, creatureIndex, creature.currentHp, creature.maxHp, true);
+        // Update health bar with revival animation - use new index
+        this.updateCreatureHealthBarWithRevival(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp, true);
+        
+        // CRITICAL: Re-render creatures visually to reflect new array order
+        this.rerenderCreaturesVisually(side, position, heroOwner);
         
         // Update necromancy stack display
         this.updateNecromancyStackDisplay(side, necromancyHero.position, necromancyHero.getNecromancyStacks());
         
-        // Send update to opponent
+        // Send update to opponent - include both old and new indices for robust guest handling
         this.battleManager.sendBattleUpdate('necromancy_revival', {
             revivingHeroAbsoluteSide: necromancyHero.absoluteSide,
             revivingHeroPosition: necromancyHero.position,
@@ -322,11 +351,57 @@ export class NecromancyManager {
             revivedCreature: {
                 name: creature.name,
                 heroPosition: position,
-                creatureIndex: creatureIndex,
+                creatureIndex: finalCreatureIndex,        // New index after move (now last position)
+                originalIndex: creatureIndex,            // Original index for guest to find creature
                 heroAbsoluteSide: heroOwner.absoluteSide
             }
         });
         return true;
+    }
+
+    // NEW: Re-render creatures visually to reflect array order changes
+    rerenderCreaturesVisually(side, position, heroOwner) {
+        const heroSlot = document.querySelector(`.${side}-slot.${position}-slot`);
+        if (!heroSlot) return;
+        
+        // Remove existing creatures display
+        const existingCreatures = heroSlot.querySelector('.battle-hero-creatures');
+        if (existingCreatures) {
+            existingCreatures.remove();
+        }
+        
+        // Re-create creatures HTML in new order
+        if (heroOwner.creatures && heroOwner.creatures.length > 0) {
+            const creaturesHTML = this.battleManager.battleScreen.createCreaturesHTML(
+                heroOwner.creatures, 
+                side, 
+                position
+            );
+            heroSlot.insertAdjacentHTML('beforeend', creaturesHTML);
+            
+            // Update necromancy displays after re-render
+            this.updateNecromancyDisplayForHeroWithCreatures(side, position, heroOwner);
+            
+            // Re-apply any status effects or visual states
+            heroOwner.creatures.forEach((creature, index) => {
+                if (!creature.alive) {
+                    // Re-apply defeated visual state
+                    const creatureElement = heroSlot.querySelector(
+                        `.creature-icon[data-creature-index="${index}"]`
+                    );
+                    if (creatureElement) {
+                        creatureElement.classList.add('defeated');
+                        const sprite = creatureElement.querySelector('.creature-sprite');
+                        if (sprite) {
+                            sprite.style.filter = 'grayscale(100%)';
+                            sprite.style.opacity = '0.5';
+                        }
+                    }
+                }
+            });
+            
+            console.log(`✅ Creatures visually re-rendered for ${side} ${position} after necromancy revival`);
+        }
     }
 
     // Update necromancy stack display for a hero
@@ -388,7 +463,7 @@ export class NecromancyManager {
         });
     }
 
-    // Handle necromancy revival update for guest - ENHANCED WITH VISUALS
+    // Handle necromancy revival update for guest - ENHANCED WITH VISUALS AND REORDERING
     handleGuestNecromancyRevival(data) {
         const { revivingHeroAbsoluteSide, revivingHeroPosition, remainingStacks, revivedCreature } = data;
         
@@ -421,25 +496,61 @@ export class NecromancyManager {
             ? this.battleManager.playerHeroes[revivedCreature.heroPosition]
             : this.battleManager.opponentHeroes[revivedCreature.heroPosition];
         
-        if (revivedHero && revivedHero.creatures[revivedCreature.creatureIndex]) {
-            const creature = revivedHero.creatures[revivedCreature.creatureIndex];
-            creature.currentHp = creature.maxHp;
-            creature.alive = true;
+        if (revivedHero) {
+            // Find the creature - try by original index first, then by name as fallback
+            let creature = revivedHero.creatures[revivedCreature.originalIndex];
             
-            // ENHANCED: Trigger revival animations on guest side
-            this.animateNecromancyRevival(revivedHeroLocalSide, revivedCreature.heroPosition, revivedCreature.creatureIndex, creature);
+            // If not found at original index, search by name and dead status
+            if (!creature || creature.name !== revivedCreature.name) {
+                creature = revivedHero.creatures.find(c => 
+                    c.name === revivedCreature.name && !c.alive
+                );
+            }
             
-            // Update health bar with revival animation
-            this.updateCreatureHealthBarWithRevival(
-                revivedHeroLocalSide, 
-                revivedCreature.heroPosition, 
-                revivedCreature.creatureIndex, 
-                creature.currentHp, 
-                creature.maxHp, 
-                true // This is a revival
-            );
-            
-            this.battleManager.addCombatLog(`⚡ ${creature.name} rises from the dead!`, 'success');
+            if (creature) {
+                // Console log: Array before changes (GUEST SIDE)
+                console.log(`🔍 GUEST NECROMANCY REVIVAL - Array BEFORE changes for ${revivedHero.name}:`, 
+                    revivedHero.creatures.map((c, i) => `${i}: ${c.name} (${c.alive ? 'alive' : 'dead'})`));
+                
+                creature.currentHp = creature.maxHp;
+                creature.alive = true;
+                
+                // GUEST: Also move creature to back of array on guest side
+                const currentIndex = revivedHero.creatures.indexOf(creature);
+                if (currentIndex !== -1 && currentIndex !== revivedHero.creatures.length - 1) {
+                    // Remove from current position
+                    revivedHero.creatures.splice(currentIndex, 1);
+                    // Add to end (back of formation)
+                    revivedHero.creatures.push(creature);
+                }
+                
+                // Console log: Array after changes (GUEST SIDE)
+                console.log(`🔍 GUEST NECROMANCY REVIVAL - Array AFTER changes for ${revivedHero.name}:`, 
+                    revivedHero.creatures.map((c, i) => `${i}: ${c.name} (${c.alive ? 'alive' : 'dead'})`));
+                
+                const finalIndex = revivedHero.creatures.length - 1;
+                console.log(`🎯 GUEST Final creature index: ${finalIndex}`);
+                
+                // GUEST: Re-render creatures visually to match host
+                this.rerenderCreaturesVisually(revivedHeroLocalSide, revivedCreature.heroPosition, revivedHero);
+                
+                // ENHANCED: Trigger revival animations on guest side (using final index)
+                this.animateNecromancyRevival(revivedHeroLocalSide, revivedCreature.heroPosition, finalIndex, creature);
+                
+                // Update health bar with revival animation (using final index)
+                this.updateCreatureHealthBarWithRevival(
+                    revivedHeroLocalSide, 
+                    revivedCreature.heroPosition, 
+                    finalIndex, 
+                    creature.currentHp, 
+                    creature.maxHp, 
+                    true // This is a revival
+                );
+                
+                this.battleManager.addCombatLog(`⚡ ${creature.name} rises from the dead!`, 'success');
+            } else {
+                console.error(`Failed to find creature ${revivedCreature.name} for revival on guest side`);
+            }
         }
     }
 

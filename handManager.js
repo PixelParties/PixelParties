@@ -18,6 +18,39 @@ export class HandManager {
             draggedElement: null,
             originalHand: [] // Backup of original hand order
         };
+
+        // ===== TEST HELPER FLAGS =====
+        // Set to false to disable test functionality completely
+        this.ENABLE_TEST_HELPERS = true;
+        // Set to false if you only want to disable the auto-add feature
+        this.AUTO_ADD_TEST_CARD = true;
+        // The test card to add
+        this.TEST_CARD_NAME = 'SkeletonMage';
+    }
+
+    // ===== TEST HELPER FUNCTION =====
+    // This function adds a test card to the hand for testing purposes
+    // Easy to remove - just delete this function and the call in drawInitialHand()
+    addTestCardToHand() {
+        if (!this.ENABLE_TEST_HELPERS || !this.AUTO_ADD_TEST_CARD) {
+            return false;
+        }
+
+        // Check if we have room in hand
+        if (this.hand.length >= this.maxHandSize) {
+            console.warn('❌ TEST: Cannot add test card - hand is full');
+            return false;
+        }
+
+        // Add the test card
+        const success = this.addCardToHand(this.TEST_CARD_NAME);
+        if (success) {
+            console.log(`🧪 TEST: Added "${this.TEST_CARD_NAME}" to hand for testing`);
+            return true;
+        } else {
+            console.warn(`❌ TEST: Failed to add "${this.TEST_CARD_NAME}" to hand`);
+            return false;
+        }
     }
 
     // === ENHANCED DRAG & DROP EVENT HANDLERS ===
@@ -320,9 +353,16 @@ export class HandManager {
         return drawnCards;
     }
 
+    // ===== MODIFIED: Add test helper call =====
     drawInitialHand() {
         this.clearHand();
-        return this.drawCards(5);
+        const drawnCards = this.drawCards(5);
+        
+        // ===== TEST HELPER: Add test card after initial hand is drawn =====
+        // TO REMOVE: Simply delete this line and the addTestCardToHand() function above
+        this.addTestCardToHand();
+        
+        return drawnCards;
     }
 
     addCardToHand(cardName) {
@@ -511,6 +551,13 @@ export class HandManager {
                 clickableClass = ' clickable';
             }
 
+            // ===== TEST HELPER: Add visual indicator for test cards =====
+            let testCardIndicator = '';
+            if (this.ENABLE_TEST_HELPERS && cardName === this.TEST_CARD_NAME) {
+                testCardIndicator = '<div class="test-card-indicator">🧪</div>';
+                cardClasses += ' test-card';
+            }
+
             handHTML += `
                 <div class="${cardClasses}${clickableClass}" 
                     data-card-index="${index}" 
@@ -531,6 +578,7 @@ export class HandManager {
                         class="hand-card-image"
                         onerror="this.src='./Cards/placeholder.png'">
                     ${requiresAction ? '<div class="action-indicator">⚡</div>' : ''}
+                    ${testCardIndicator}
                 </div>
             `;
         });
@@ -1143,6 +1191,35 @@ actionIndicatorStyle.textContent = `
         z-index: 10;
         animation: actionPulse 2s ease-in-out infinite;
     }
+    
+    /* ===== TEST HELPER STYLES ===== */
+    .hand-card.test-card {
+        border: 2px solid #28a745 !important;
+        box-shadow: 0 0 15px rgba(40, 167, 69, 0.6) !important;
+    }
+    
+    .test-card-indicator {
+        position: absolute;
+        top: -8px;
+        left: -8px;
+        font-size: 20px;
+        background: rgba(40, 167, 69, 0.9);
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+        z-index: 15;
+        animation: testCardPulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes testCardPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    /* ===== END TEST HELPER STYLES ===== */
     
     .hand-card.no-actions-available {
         opacity: 0.6;

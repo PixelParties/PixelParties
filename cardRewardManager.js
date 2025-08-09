@@ -2575,7 +2575,6 @@ export class CardRewardManager {
         return rewardHeroes;
     }
 
-    // NEW: Updated generateRewardCards method with duplicate support and new logic
     generateRewardCards(count = 3) {
         const allCards = getAllAbilityCards();
         
@@ -2587,85 +2586,87 @@ export class CardRewardManager {
         
         console.log('Current deck cards:', currentDeckCardNames);
         
-        // Separate cards into categories
-        const cardsInDeck = allCards.filter(card => currentDeckCardNames.includes(card.name));
-        const cardsNotInDeck = allCards.filter(card => !currentDeckCardNames.includes(card.name));
+        // Separate cards by type and whether they're in deck
+        const abilityCards = allCards.filter(card => card.cardType === 'Ability');
+        const spellCards = allCards.filter(card => card.cardType === 'Spell');
+        const otherCards = allCards.filter(card => 
+            card.cardType !== 'Ability' && 
+            card.cardType !== 'Spell' && 
+            card.cardType !== 'hero'
+        ); // Artifacts, Potions, etc.
         
-        const abilitiesInDeck = cardsInDeck.filter(card => card.cardType === 'Ability');
-        const nonAbilitiesInDeck = cardsInDeck.filter(card => card.cardType !== 'Ability');
-        const abilitiesNotInDeck = cardsNotInDeck.filter(card => card.cardType === 'Ability');
-        const nonAbilitiesNotInDeck = cardsNotInDeck.filter(card => card.cardType !== 'Ability');
+        const abilityCardsInDeck = abilityCards.filter(card => currentDeckCardNames.includes(card.name));
+        const abilityCardsNotInDeck = abilityCards.filter(card => !currentDeckCardNames.includes(card.name));
         
-        console.log(`Cards in deck: ${cardsInDeck.length}, abilities: ${abilitiesInDeck.length}, non-abilities: ${nonAbilitiesInDeck.length}`);
-        console.log(`Cards not in deck: ${cardsNotInDeck.length}, abilities: ${abilitiesNotInDeck.length}, non-abilities: ${nonAbilitiesNotInDeck.length}`);
+        const spellCardsInDeck = spellCards.filter(card => currentDeckCardNames.includes(card.name));
+        const spellCardsNotInDeck = spellCards.filter(card => !currentDeckCardNames.includes(card.name));
+        
+        const otherCardsInDeck = otherCards.filter(card => currentDeckCardNames.includes(card.name));
+        const otherCardsNotInDeck = otherCards.filter(card => !currentDeckCardNames.includes(card.name));
+        
+        console.log(`Available cards - Abilities: ${abilityCards.length} (${abilityCardsInDeck.length} in deck), Spells: ${spellCards.length} (${spellCardsInDeck.length} in deck), Others: ${otherCards.length} (${otherCardsInDeck.length} in deck)`);
         
         const rewardCards = [];
         
-        for (let i = 0; i < count; i++) {
-            let selectedCard = null;
-            
-            // Step 1: 2/3 chance for existing card, 1/3 for new card
-            const useExistingCard = Math.random() < (2/3);
-            
-            if (useExistingCard && cardsInDeck.length > 0) {
-                // Step 2: 1/3 chance for Ability if available
-                const useAbility = Math.random() < (1/3);
-                
-                if (useAbility && abilitiesInDeck.length > 0) {
-                    // Pick random ability from deck
-                    const randomIndex = Math.floor(Math.random() * abilitiesInDeck.length);
-                    selectedCard = abilitiesInDeck[randomIndex];
-                    console.log(`Selected existing ability: ${selectedCard.name}`);
-                } else if (nonAbilitiesInDeck.length > 0) {
-                    // Pick random non-ability from deck
-                    const randomIndex = Math.floor(Math.random() * nonAbilitiesInDeck.length);
-                    selectedCard = nonAbilitiesInDeck[randomIndex];
-                    console.log(`Selected existing non-ability: ${selectedCard.name}`);
-                } else if (cardsInDeck.length > 0) {
-                    // Fallback: pick any card from deck
-                    const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
-                    selectedCard = cardsInDeck[randomIndex];
-                    console.log(`Selected existing card (fallback): ${selectedCard.name}`);
-                }
-            }
-            
-            // If we haven't selected a card yet, or if we need a new card
-            if (!selectedCard) {
-                if (cardsNotInDeck.length > 0) {
-                    // Step 2: 1/3 chance for Ability if available
-                    const useAbility = Math.random() < (1/3);
-                    
-                    if (useAbility && abilitiesNotInDeck.length > 0) {
-                        // Pick random ability not in deck
-                        const randomIndex = Math.floor(Math.random() * abilitiesNotInDeck.length);
-                        selectedCard = abilitiesNotInDeck[randomIndex];
-                        console.log(`Selected new ability: ${selectedCard.name}`);
-                    } else if (nonAbilitiesNotInDeck.length > 0) {
-                        // Pick random non-ability not in deck
-                        const randomIndex = Math.floor(Math.random() * nonAbilitiesNotInDeck.length);
-                        selectedCard = nonAbilitiesNotInDeck[randomIndex];
-                        console.log(`Selected new non-ability: ${selectedCard.name}`);
-                    } else {
-                        // Fallback: pick any card not in deck
-                        const randomIndex = Math.floor(Math.random() * cardsNotInDeck.length);
-                        selectedCard = cardsNotInDeck[randomIndex];
-                        console.log(`Selected new card (fallback): ${selectedCard.name}`);
-                    }
-                } else {
-                    // Ultimate fallback: pick any card
-                    const randomIndex = Math.floor(Math.random() * allCards.length);
-                    selectedCard = allCards[randomIndex];
-                    console.log(`Selected any card (ultimate fallback): ${selectedCard.name}`);
-                }
-            }
-            
-            if (selectedCard) {
-                rewardCards.push(selectedCard);
+        // First card: Always an Ability
+        const firstCard = this.selectCardByType(abilityCardsInDeck, abilityCardsNotInDeck, 'Ability');
+        if (firstCard) {
+            rewardCards.push(firstCard);
+            console.log(`First reward (Ability): ${firstCard.name}`);
+        }
+        
+        // Second card: Always a Spell
+        const secondCard = this.selectCardByType(spellCardsInDeck, spellCardsNotInDeck, 'Spell');
+        if (secondCard) {
+            rewardCards.push(secondCard);
+            console.log(`Second reward (Spell): ${secondCard.name}`);
+        }
+        
+        // Third card: Anything except Ability, Spell, or Hero (so Artifacts, Potions, etc.)
+        const thirdCard = this.selectCardByType(otherCardsInDeck, otherCardsNotInDeck, 'Other');
+        if (thirdCard) {
+            rewardCards.push(thirdCard);
+            console.log(`Third reward (${thirdCard.cardType}): ${thirdCard.name}`);
+        }
+        
+        // Fallback: if we don't have enough cards, fill with random available cards
+        while (rewardCards.length < count && allCards.length > 0) {
+            const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
+            if (!rewardCards.some(card => card.name === randomCard.name)) {
+                rewardCards.push(randomCard);
+                console.log(`Fallback reward: ${randomCard.name}`);
             }
         }
         
-        console.log('Generated reward cards with new logic:', rewardCards.map(c => c.name));
+        console.log('Generated reward cards with new specific ratios:', rewardCards.map(c => `${c.name} (${c.cardType})`));
         return rewardCards;
+    }
+
+    // Helper method to select card based on 1/3 existing, 2/3 new ratio
+    selectCardByType(cardsInDeck, cardsNotInDeck, typeName) {
+        // 1/3 chance for existing card, 2/3 chance for new card
+        const useExistingCard = Math.random() < (1/3);
+        
+        let selectedCard = null;
+        
+        if (useExistingCard && cardsInDeck.length > 0) {
+            // Pick random card from deck
+            const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
+            selectedCard = cardsInDeck[randomIndex];
+            console.log(`Selected existing ${typeName}: ${selectedCard.name}`);
+        } else if (cardsNotInDeck.length > 0) {
+            // Pick random card not in deck
+            const randomIndex = Math.floor(Math.random() * cardsNotInDeck.length);
+            selectedCard = cardsNotInDeck[randomIndex];
+            console.log(`Selected new ${typeName}: ${selectedCard.name}`);
+        } else if (cardsInDeck.length > 0) {
+            // Fallback: pick from existing cards if no new cards available
+            const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
+            selectedCard = cardsInDeck[randomIndex];
+            console.log(`Selected existing ${typeName} (fallback): ${selectedCard.name}`);
+        }
+        
+        return selectedCard;
     }
 
     generateFallbackRewards(allCards, count) {

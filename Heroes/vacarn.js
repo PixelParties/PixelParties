@@ -1,4 +1,4 @@
-// vacarn.js - Fixed Vacarn Hero Effect Management System
+// vacarn.js - Fixed Vacarn Hero Effect Management System with Delayed Messages
 
 export class VacarnEffectManager {
     constructor() {
@@ -20,6 +20,10 @@ export class VacarnEffectManager {
         
         // Add restoration flag to prevent interference
         this.isRestoring = false;
+        
+        // NEW: Delayed message system
+        this.delayedMessages = [];
+        this.messagePollingInterval = null;
     }
 
     // Check if Vacarn effect can be used
@@ -277,8 +281,9 @@ export class VacarnEffectManager {
             // Mark Vacarn effect as used this turn
             this.vacarnUsedThisTurn = true;
 
-            // Show success message
-            this.showVacarnSuccess(`Buried ${this.formatCardName(validCreature.name)}! It will rise next turn.`);
+            // Show success message using new system
+            const creatureName = this.formatCardName(validCreature.name);
+            this.showVacarnMessage(`Buried ${creatureName}! It will rise next turn.`);
 
             // Update displays
             heroSelection.updateHandDisplay();
@@ -371,9 +376,9 @@ export class VacarnEffectManager {
         };
     }
 
+    // MODIFIED: Process start of turn with delayed messages
     async processStartOfTurn(heroSelection) {
         const currentTurn = heroSelection.getCurrentTurn();
-
         let anyChanges = false;
 
         // Check each buried creature
@@ -388,8 +393,8 @@ export class VacarnEffectManager {
                 const hero = formation[heroPosition];
                 
                 if (hero && hero.name === 'Vacarn') {
-                    // Animate and raise the creature
-                    await this.animateNecromancyRaise(heroPosition, buriedData.creature);
+                    // Animate and raise the creature (without message)
+                    await this.animateNecromancyRaiseQuiet(heroPosition, buriedData.creature);
                     
                     // Add creature to Vacarn's creatures
                     const success = heroSelection.heroCreatureManager.addCreatureToHero(
@@ -398,8 +403,14 @@ export class VacarnEffectManager {
                     );
                     
                     if (success) {
-                        // Show success message
-                        this.showVacarnSuccess(`Vacarn raised ${this.formatCardName(buriedData.creature.name)} from the grave!`);
+                        // CHANGED: Store message for delayed display instead of showing immediately
+                        this.delayedMessages.push({
+                            message: `Vacarn raised ${this.formatCardName(buriedData.creature.name)} from the grave!`,
+                            timestamp: Date.now()
+                        });
+                        
+                        // Start polling for reward screen if not already polling
+                        this.startRewardScreenPolling();
                         
                         // Update UI
                         heroSelection.updateBattleFormationUI();
@@ -426,15 +437,15 @@ export class VacarnEffectManager {
         }
     }
 
-    // Animate necromancy raise effect
-    async animateNecromancyRaise(heroPosition, creatureData) {
+    // NEW: Quiet version of animateNecromancyRaise (without message)
+    async animateNecromancyRaiseQuiet(heroPosition, creatureData) {
         const heroCard = document.querySelector(`.team-slot[data-position="${heroPosition}"] .character-card`);
         if (!heroCard) {
             console.warn(`Vacarn: Could not find hero card at ${heroPosition} for animation`);
             return;
         }
 
-        // Get hero card position
+        // Get hero card position for validation only
         const heroRect = heroCard.getBoundingClientRect();
         
         // Skip animation if hero card is not properly positioned (e.g., during reward screen)
@@ -443,108 +454,218 @@ export class VacarnEffectManager {
             return;
         }
 
-        // Create necromancy animation overlay
-        const animationOverlay = document.createElement('div');
-        animationOverlay.className = 'necromancy-animation-overlay';
-        animationOverlay.innerHTML = `
-            <div class="necromancy-animation">
-                <div class="necromancy-icon">💀</div>
-                <div class="necromancy-text">Rising...</div>
-                <div class="necromancy-creature">${this.formatCardName(creatureData.name)}</div>
-            </div>
-        `;
-
-        // Position overlay over the hero card
-        animationOverlay.style.cssText = `
-            position: fixed;
-            top: ${heroRect.top}px;
-            left: ${heroRect.left}px;
-            width: ${heroRect.width}px;
-            height: ${heroRect.height}px;
-            z-index: 2000;
-            pointer-events: none;
-        `;
-
-        document.body.appendChild(animationOverlay);
-
-        // Wait for animation to complete
-        await new Promise(resolve => {
-            setTimeout(() => {
-                animationOverlay.remove();
-                resolve();
-            }, 2000); // 2 second animation
-        });
+        // Log the raise without showing message yet
+        const creatureName = this.formatCardName(creatureData.name);
+        console.log(`Vacarn: Quietly raised ${creatureName} from the grave (message delayed for reward screen)`);
+        
+        // Brief delay for any internal processing
+        await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Show Vacarn success message
-    showVacarnSuccess(message) {
-        const successDiv = document.createElement('div');
-        successDiv.className = 'vacarn-effect-success';
-        successDiv.innerHTML = `
-            <div class="success-content">
-                <span class="success-icon">💀</span>
-                <span class="success-text">${message}</span>
-            </div>
-        `;
+    // NEW: Start polling for reward screen
+    startRewardScreenPolling() {
+        // Don't start multiple polling intervals
+        if (this.messagePollingInterval) {
+            return;
+        }
         
-        successDiv.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: linear-gradient(135deg, #6f42c1 0%, #495057 100%);
-            color: white;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 10001;
-            box-shadow: 0 8px 25px rgba(111, 66, 193, 0.4);
-            animation: vacarnSuccessBounce 0.6s ease-out;
-            text-align: center;
-        `;
+        console.log('Vacarn: Starting reward screen polling for delayed messages...');
         
-        document.body.appendChild(successDiv);
+        this.messagePollingInterval = setInterval(() => {
+            this.checkForRewardScreen();
+        }, 250); // Check every 250ms
         
+        // Safety timeout to stop polling after 30 seconds
         setTimeout(() => {
-            successDiv.style.animation = 'vacarnSuccessFade 0.4s ease-out forwards';
-            setTimeout(() => successDiv.remove(), 400);
-        }, 2500);
+            if (this.messagePollingInterval) {
+                console.log('Vacarn: Stopping reward screen polling due to timeout');
+                this.stopRewardScreenPolling();
+                // Show messages anyway if timeout reached
+                this.showDelayedMessages();
+            }
+        }, 30000);
     }
 
-    // Show Vacarn error message
+    // NEW: Check if reward screen is visible
+    checkForRewardScreen() {
+        // Check for the card reward overlay that's created by cardRewardManager
+        const rewardOverlay = document.getElementById('cardRewardOverlay');
+        
+        if (rewardOverlay && rewardOverlay.style.display !== 'none') {
+            console.log('Vacarn: Reward screen detected, showing delayed messages...');
+            
+            // Stop polling
+            this.stopRewardScreenPolling();
+            
+            // Show all delayed messages with a slight delay to ensure reward UI is fully rendered
+            setTimeout(() => {
+                this.showDelayedMessages();
+            }, 500);
+        }
+    }
+
+    // NEW: Stop polling
+    stopRewardScreenPolling() {
+        if (this.messagePollingInterval) {
+            clearInterval(this.messagePollingInterval);
+            this.messagePollingInterval = null;
+            console.log('Vacarn: Stopped reward screen polling');
+        }
+    }
+
+    // NEW: Show all delayed messages
+    showDelayedMessages() {
+        if (this.delayedMessages.length === 0) {
+            return;
+        }
+        
+        console.log(`Vacarn: Showing ${this.delayedMessages.length} delayed message(s)`);
+        
+        // Show each message with a delay between them if multiple
+        this.delayedMessages.forEach((messageData, index) => {
+            setTimeout(() => {
+                this.showVacarnMessage(messageData.message);
+            }, index * 1000); // 1 second delay between multiple messages
+        });
+        
+        // Clear the delayed messages
+        this.delayedMessages = [];
+    }
+
+    // Animate necromancy raise effect (LEGACY - keeping for compatibility)
+    async animateNecromancyRaise(heroPosition, creatureData) {
+        const heroCard = document.querySelector(`.team-slot[data-position="${heroPosition}"] .character-card`);
+        if (!heroCard) {
+            console.warn(`Vacarn: Could not find hero card at ${heroPosition} for animation`);
+            return;
+        }
+
+        // Get hero card position for validation only
+        const heroRect = heroCard.getBoundingClientRect();
+        
+        // Skip animation if hero card is not properly positioned (e.g., during reward screen)
+        if (heroRect.width === 0 || heroRect.height === 0 || heroRect.top === 0 || heroRect.left === 0) {
+            console.log(`Vacarn: Skipping animation - hero card not properly positioned during reward screen`);
+            return;
+        }
+
+        // Show message using new system
+        const creatureName = this.formatCardName(creatureData.name);
+        this.showVacarnMessage(`Vacarn raised ${creatureName} from the grave!`);
+        
+        // Wait 2 seconds (matches new message duration)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // Show Vacarn success message (NEW SYSTEM)
+    showVacarnMessage(message) {
+        // Remove any existing Vacarn messages first
+        const existingMessage = document.getElementById('vacarnMessage');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+        
+        // Create the message element
+        const messageDiv = document.createElement('div');
+        messageDiv.id = 'vacarnMessage';
+        messageDiv.textContent = message;
+        
+        // Apply direct styles for immediate, fixed positioning
+        messageDiv.style.position = 'fixed';
+        messageDiv.style.top = '50%';
+        messageDiv.style.left = '50%';
+        messageDiv.style.width = 'auto';
+        messageDiv.style.maxWidth = '700px';
+        messageDiv.style.padding = '24px 32px';
+        messageDiv.style.background = '#4caf50'; // Green background
+        messageDiv.style.color = 'white';
+        messageDiv.style.fontSize = '24px';
+        messageDiv.style.fontWeight = 'bold';
+        messageDiv.style.textAlign = 'center';
+        messageDiv.style.borderRadius = '12px';
+        messageDiv.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)';
+        messageDiv.style.zIndex = '10000';
+        messageDiv.style.transform = 'translate(-50%, -50%) scale(0.7)'; // Start small
+        messageDiv.style.opacity = '0'; // Start invisible
+        messageDiv.style.pointerEvents = 'none';
+        messageDiv.style.transition = 'all 0.3s ease-out';
+        
+        // Add to page
+        document.body.appendChild(messageDiv);
+        
+        // Animate in with pop-up effect
+        requestAnimationFrame(() => {
+            messageDiv.style.opacity = '1';
+            messageDiv.style.transform = 'translate(-50%, -50%) scale(1)';
+        });
+        
+        // Fade out and remove after 2 seconds
+        setTimeout(() => {
+            if (messageDiv && messageDiv.parentNode) {
+                messageDiv.style.opacity = '0';
+                messageDiv.style.transform = 'translate(-50%, -50%) scale(0.9)';
+                setTimeout(() => {
+                    if (messageDiv.parentNode) {
+                        messageDiv.remove();
+                    }
+                }, 300);
+            }
+        }, 2000);
+    }
+
+    // Show Vacarn error message (UPDATED SYSTEM)
     showVacarnError(message) {
+        // Remove any existing error messages first
+        const existingError = document.getElementById('vacarnError');
+        if (existingError) {
+            existingError.remove();
+        }
+        
+        // Create the error element
         const errorDiv = document.createElement('div');
-        errorDiv.className = 'vacarn-effect-error';
-        errorDiv.innerHTML = `
-            <div class="error-content">
-                <span class="error-icon">⚠️</span>
-                <span class="error-text">${message}</span>
-            </div>
-        `;
+        errorDiv.id = 'vacarnError';
+        errorDiv.textContent = message;
         
-        errorDiv.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(244, 67, 54, 0.95);
-            color: white;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 10001;
-            box-shadow: 0 8px 25px rgba(244, 67, 54, 0.4);
-            animation: vacarnErrorShake 0.5s ease-out;
-            text-align: center;
-        `;
+        // Apply direct styles for immediate, fixed positioning
+        errorDiv.style.position = 'fixed';
+        errorDiv.style.top = '50%';
+        errorDiv.style.left = '50%';
+        errorDiv.style.width = 'auto';
+        errorDiv.style.maxWidth = '700px';
+        errorDiv.style.padding = '24px 32px';
+        errorDiv.style.background = '#f44336'; // Red background
+        errorDiv.style.color = 'white';
+        errorDiv.style.fontSize = '24px';
+        errorDiv.style.fontWeight = 'bold';
+        errorDiv.style.textAlign = 'center';
+        errorDiv.style.borderRadius = '12px';
+        errorDiv.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)';
+        errorDiv.style.zIndex = '10000';
+        errorDiv.style.transform = 'translate(-50%, -50%) scale(0.7)'; // Start small
+        errorDiv.style.opacity = '0'; // Start invisible
+        errorDiv.style.pointerEvents = 'none';
+        errorDiv.style.transition = 'all 0.3s ease-out';
         
+        // Add to page
         document.body.appendChild(errorDiv);
         
+        // Animate in with pop-up effect
+        requestAnimationFrame(() => {
+            errorDiv.style.opacity = '1';
+            errorDiv.style.transform = 'translate(-50%, -50%) scale(1)';
+        });
+        
+        // Fade out and remove after 2 seconds
         setTimeout(() => {
-            errorDiv.style.animation = 'vacarnErrorFade 0.3s ease-out forwards';
-            setTimeout(() => errorDiv.remove(), 300);
+            if (errorDiv && errorDiv.parentNode) {
+                errorDiv.style.opacity = '0';
+                errorDiv.style.transform = 'translate(-50%, -50%) scale(0.9)';
+                setTimeout(() => {
+                    if (errorDiv.parentNode) {
+                        errorDiv.remove();
+                    }
+                }, 300);
+            }
         }, 2000);
     }
 
@@ -566,16 +687,19 @@ export class VacarnEffectManager {
         this.vacarnUsedThisTurn = false;
     }
 
+    // MODIFIED: Export state including delayed messages
     exportVacarnState() {
         const state = {
             vacarnUsedThisTurn: this.vacarnUsedThisTurn,
             buriedCreatures: { ...this.buriedCreatures },
+            delayedMessages: [...this.delayedMessages], // Include delayed messages
             timestamp: Date.now()
         };
         
         return state;
     }
 
+    // MODIFIED: Import state including delayed messages
     importVacarnState(stateData) {
         if (!stateData || typeof stateData !== 'object') {
             console.error('💀 VACARN IMPORT: Invalid Vacarn state data provided');
@@ -598,8 +722,21 @@ export class VacarnEffectManager {
                 
                 // Log details of each buried creature
                 Object.entries(this.buriedCreatures).forEach(([position, data]) => {
+                    console.log(`💀 VACARN IMPORT: Restored buried creature at ${position}:`, data.creature.name);
                 });
             }
+
+            // NEW: Restore delayed messages
+            if (stateData.delayedMessages && Array.isArray(stateData.delayedMessages)) {
+                this.delayedMessages = [...stateData.delayedMessages];
+                
+                // If we have delayed messages, start polling for reward screen
+                if (this.delayedMessages.length > 0) {
+                    console.log(`💀 VACARN IMPORT: Restored ${this.delayedMessages.length} delayed message(s), starting polling`);
+                    this.startRewardScreenPolling();
+                }
+            }
+            
             return true;
 
         } finally {
@@ -610,7 +747,7 @@ export class VacarnEffectManager {
         }
     }
 
-    // Reset all state (for new game)
+    // MODIFIED: Reset all state (for new game) including delayed messages
     reset() {
         this.vacarnUsedThisTurn = false;
         this.buriedCreatures = {};
@@ -622,6 +759,10 @@ export class VacarnEffectManager {
             overlay: null
         };
         this.isRestoring = false;
+        
+        // NEW: Clean up delayed message system
+        this.stopRewardScreenPolling();
+        this.delayedMessages = [];
     }
 
     // Get current state for debugging
@@ -630,7 +771,9 @@ export class VacarnEffectManager {
             vacarnUsedThisTurn: this.vacarnUsedThisTurn,
             buriedCreatures: { ...this.buriedCreatures },
             buryModeActive: this.buryMode.active,
-            isRestoring: this.isRestoring
+            isRestoring: this.isRestoring,
+            delayedMessages: [...this.delayedMessages], // Include delayed messages in debug info
+            pollingActive: this.messagePollingInterval !== null
         };
     }
 

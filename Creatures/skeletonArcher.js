@@ -102,7 +102,7 @@ export class SkeletonArcherCreature {
         await this.battleManager.delay(adjustedTravelTime);
         
         // Apply damage when projectile hits (only host applies actual damage)
-        this.applyArcherDamage(target);
+        this.applyArcherDamage(target, archerActor.data); 
         
         // Add impact effect
         this.createImpactEffect(targetElement);
@@ -122,7 +122,7 @@ export class SkeletonArcherCreature {
     // DEATH SALVO EFFECT
     // ============================================
 
-    // Execute death salvo when Skeleton Archer dies (10 arrows at random targets)
+    // Execute death salvo when Skeleton Archer dies (5 arrows at random targets)
     async executeDeathSalvo(dyingArcher, heroOwner, position, side) {
         if (!this.battleManager.isAuthoritative) return;
 
@@ -140,13 +140,13 @@ export class SkeletonArcherCreature {
         // Short delay to ensure guest receives the message
         await this.battleManager.delay(100);
 
-        // Execute the death salvo with 10 arrows
+        // Execute the death salvo with 5 arrows
         await this.executeDeathSalvoAttack(archerCreature, heroOwner, position, archerSide);
     }
 
-    // Execute the death salvo attack (10 arrows with delays)
+    // Execute the death salvo attack (5 arrows with delays)
     async executeDeathSalvoAttack(archerCreature, heroOwner, position, archerSide) {
-        const SALVO_ARROW_COUNT = 10;
+        const SALVO_ARROW_COUNT = 5;
         const ARROW_DELAY = 150; // 150ms between each arrow
         
         // Get the archer element (even though it's dead, we need it for projectile origin)
@@ -174,7 +174,7 @@ export class SkeletonArcherCreature {
             );
 
             // Fire this arrow (don't await - let them fly simultaneously with staggered starts)
-            this.fireSalvoArrow(archerElement, target, i + 1);
+            this.fireSalvoArrow(archerElement, target, i + 1, archerCreature);
             
             // Small delay before firing the next arrow
             if (i < SALVO_ARROW_COUNT - 1) {
@@ -214,7 +214,7 @@ export class SkeletonArcherCreature {
         await this.battleManager.delay(adjustedTravelTime);
         
         // Apply damage when projectile hits (only host applies actual damage)
-        this.applyArcherDamage(target);
+        this.applyArcherDamage(target, attackingArcher);
         
         // Add impact effect
         this.createImpactEffect(targetElement);
@@ -605,7 +605,7 @@ export class SkeletonArcherCreature {
     }
 
     // Apply Skeleton Archer damage to target
-    applyArcherDamage(target) {
+    applyArcherDamage(target, attackingArcher = null) {
         const damage = this.PROJECTILE_DAMAGE;
         
         if (target.type === 'hero') {
@@ -614,6 +614,9 @@ export class SkeletonArcherCreature {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
+            }, {
+                source: 'attack', // Skeleton Archer's arrow is a physical attack
+                attacker: attackingArcher // ✅ Pass the attacking creature
             });
         } else if (target.type === 'creature') {
             this.battleManager.authoritative_applyDamageToCreature({
@@ -623,6 +626,9 @@ export class SkeletonArcherCreature {
                 damage: damage,
                 position: target.position,
                 side: target.side
+            }, {
+                source: 'attack', // Skeleton Archer's arrow is a physical attack
+                attacker: attackingArcher // ✅ Pass the attacking creature
             });
         }
     }

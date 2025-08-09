@@ -109,17 +109,17 @@ export class Hero {
         }
     }
     
-    // NEW: Get current necromancy stacks
+    // Get current necromancy stacks
     getNecromancyStacks() {
         return this.necromancyStacks;
     }
     
-    // NEW: Get maximum necromancy stacks (for display)
+    // Get maximum necromancy stacks (for display)
     getMaxNecromancyStacks() {
         return this.maxNecromancyStacks;
     }
     
-    // NEW: Consume a necromancy stack
+    // Consume a necromancy stack
     consumeNecromancyStack() {
         if (this.necromancyStacks > 0) {
             this.necromancyStacks--;
@@ -129,15 +129,37 @@ export class Hero {
         return false;
     }
     
-    // NEW: Check if hero has necromancy stacks available
+    // Check if hero has necromancy stacks available
     hasNecromancyStacks() {
         return this.necromancyStacks > 0;
     }
     
-    // NEW: Set necromancy stacks (for restoration)
+    // Set necromancy stacks (for restoration)
     setNecromancyStacks(stacks) {
         this.necromancyStacks = Math.max(0, stacks);
         console.log(`${this.name} necromancy stacks set to ${this.necromancyStacks}`);
+    }
+
+    getToughnessHpBonus() {
+        if (!this.hasAbility('Toughness')) {
+            return 0;
+        }
+        
+        const toughnessLevel = this.getAbilityStackCount('Toughness');
+        return toughnessLevel * 200; // +200 HP per Toughness level
+    }
+
+    applyToughnessHpBonus() {
+        const hpBonus = this.getToughnessHpBonus();
+        if (hpBonus > 0) {
+            // Increase both max HP and current HP
+            this.maxHp += hpBonus;
+            this.currentHp += hpBonus;
+            
+            console.log(`${this.name} gains +${hpBonus} HP from Toughness ability (Level ${this.getAbilityStackCount('Toughness')})`);
+            return hpBonus;
+        }
+        return 0;
     }
     
     // Set spellbook from HeroSpellbookManager data

@@ -64,7 +64,8 @@ export class BattleManager {
         this.skeletonArcherManager = null;
         this.skeletonNecromancerManager = null;
         this.skeletonDeathKnightManager = null;
-
+        this.skeletonReaperManager = null;
+        
         // Attack effects
         this.attackEffectsManager = null;
         
@@ -445,7 +446,7 @@ export class BattleManager {
     }
 
     // Initialize heroes for a specific side
-    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide) {  // Added equipment parameter
+    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide) {
         ['left', 'center', 'right'].forEach(position => {
             const heroData = formation[position];
             if (heroData) {
@@ -453,6 +454,9 @@ export class BattleManager {
                 
                 if (abilities && abilities[position]) {
                     hero.setAbilities(abilities[position]);
+                    
+                    // NEW: Apply Toughness HP bonus after abilities are set
+                    hero.applyToughnessHpBonus();
                 }
                 
                 if (spellbooks && spellbooks[position]) {
@@ -469,7 +473,7 @@ export class BattleManager {
                         let hpMultiplier = 1.0;
                         if (hero.hasAbility('SummoningMagic')) {
                             const summoningMagicLevel = hero.getAbilityStackCount('SummoningMagic');
-                            hpMultiplier = 1 + (0.5 * summoningMagicLevel); // +50% per level
+                            hpMultiplier = 1 + (0.25 * summoningMagicLevel); // +25% per level
                         }
                         
                         const finalHp = Math.floor(baseHp * hpMultiplier);
@@ -796,6 +800,30 @@ export class BattleManager {
         return this.flowManager.authoritative_processTurnForPosition(position);
     }
 
+    checkForSkeletonMageReactions(deadUnit, deadUnitSide, deadUnitType) {
+        if (!this.isAuthoritative || !this.skeletonMageManager) return;
+        
+        // Find all living SkeletonMages on the same side as the dead unit
+        const alliedHeroes = deadUnitSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+        
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = alliedHeroes[position];
+            if (hero && hero.alive && hero.creatures) {
+                hero.creatures.forEach((creature, index) => {
+                    if (creature.alive && 
+                        creature.name === 'SkeletonMage' && 
+                        creature !== deadUnit) {
+                        // This SkeletonMage should react to the allied death
+                        console.log(`⚡ ${creature.name} reacting to ally death: ${deadUnit.name || 'hero'}`);
+                        this.skeletonMageManager.executeAllyDeathReaction(
+                            creature, hero, position, deadUnitSide, deadUnit
+                        );
+                    }
+                });
+            }
+        });
+    }
+
     // Force clear any stuck pause overlays
     clearStuckPauseOverlay() {
         const pauseOverlay = document.getElementById('battlePauseOverlay');
@@ -1103,10 +1131,11 @@ export class BattleManager {
                 this.addCombatLog(`⚔️ ${attacker.name} has slain ${creature.name}!`, 
                                 attacker.side === 'player' ? 'success' : 'error');
             }
+
             
-            // 2. TODO: Trigger "when this dies" effects here
-            // This is where future death effects would be processed
+            // 2. Trigger "when this dies" effects here
             this.triggerCreatureDeathEffects(creature, hero, attacker, context);
+            this.checkForSkeletonMageReactions(creature, hero.side, 'creature');
             
             // 3. THEN attempt necromancy revival
             let revived = false;
@@ -1180,28 +1209,62 @@ export class BattleManager {
             // Execute the death slash storm (slash all enemies simultaneously)
             await this.skeletonDeathKnightManager.executeDeathSlashStorm(creature, heroOwner, position, side);
         }
+
+        // BURNING SKELETON DEATH FLAME STORM
+        if (creature.name === 'BurningSkeleton' && this.burningSkeletonManager) {
+            console.log(`💀🔥 Triggering Burning Skeleton death flame storm for ${creature.name}`);
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death flame storm (fire slashes all enemies simultaneously)
+            await this.burningSkeletonManager.executeDeathFlameStorm(creature, heroOwner, position, side);
+        }
         
-        // TODO: This is where other future death effects will be implemented
-        // For example:
-        // - Other creature death rattle effects
-        // - Triggered abilities
-        // - Equipment effects that trigger on creature death
-        
-        console.log(`🔥 Death effects triggered for ${creature.name}`);
-        
-        // Example of how future death effects might work:
-        // if (creature.hasDeathEffect) {
-        //     creature.triggerDeathEffect(this, heroOwner, attacker, context);
-        // }
-        
-        // Check equipment for death-triggered effects
-        // if (heroOwner.equipment) {
-        //     heroOwner.equipment.forEach(item => {
-        //         if (item.triggersOnCreatureDeath) {
-        //             item.triggerEffect(this, creature, heroOwner, attacker);
-        //         }
-        //     });
-        // }
+        // SKELETON REAPER DEATH SLASH STORM
+        if (creature.name === 'SkeletonReaper' && this.skeletonReaperManager) {
+            console.log(`💀🔪 Triggering Skeleton Reaper death slash storm for ${creature.name}`);
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death slash storm (wide arching slashes across all enemies)
+            await this.skeletonReaperManager.executeDeathSlashStorm(creature, heroOwner, position, side);
+        }
+
+        // SKELETON BARD DEATH INSPIRATION
+        if (creature.name === 'SkeletonBard' && this.skeletonBardManager) {
+            console.log(`💀🎵 Triggering Skeleton Bard death inspiration for ${creature.name}`);
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death inspiration (inspire up to 2 creatures)
+            await this.skeletonBardManager.executeDeathInspiration(creature, heroOwner, position, side);
+        }
+
+        // SKELETON MAGE REVENGE ICE DEATH EFFECT
+        if (creature.name === 'SkeletonMage' && this.skeletonMageManager) {
+            console.log(`💀❄️ Triggering Skeleton Mage revenge ice for ${creature.name}`);
+            
+            // Check if there's an attacker and they're still alive
+            if (attacker && attacker.alive) {
+                // Get the side and position for the death effect
+                const side = heroOwner.side;
+                const position = heroOwner.position;
+                
+                // Execute the revenge ice (ice projectile at the attacker)
+                await this.skeletonMageManager.executeRevengeIce(creature, heroOwner, position, side, attacker);
+            } else {
+                this.addCombatLog(
+                    `💀❄️ ${creature.name}'s dying spirit finds no living target for revenge!`, 
+                    'info'
+                );
+            }
+        }
     }
 
     handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position) {
@@ -1463,6 +1526,33 @@ export class BattleManager {
             this.skeletonDeathKnightManager.handleGuestDarkSlash(data);
         }
     }
+    guest_handleBurningSkeletonFireSlash(data) {
+        if (this.burningSkeletonManager) {
+            this.burningSkeletonManager.handleGuestFireSlash(data);
+        }
+    }
+    guest_handleBurningSkeletonFlameStorm(data) {
+        if (this.burningSkeletonManager) {
+            this.burningSkeletonManager.handleGuestDeathFlameStorm(data);
+        }
+    }
+    guest_handleSkeletonReaperScytheReap(data) {
+        if (this.skeletonReaperManager) {
+            this.skeletonReaperManager.handleGuestScytheReap(data);
+        }
+    }
+    guest_handleSkeletonBardInspiration(data) {
+        if (this.skeletonBardManager) {
+            this.skeletonBardManager.handleGuestInspiration(data);
+        }
+    }
+
+    guest_handleSkeletonBardDeathInspiration(data) {
+        if (this.skeletonBardManager) {
+            this.skeletonBardManager.handleGuestDeathInspiration(data);
+        }
+    }
+
 
 
     // GUEST: Handle combined turn execution
@@ -2271,26 +2361,32 @@ export class BattleManager {
 
         // CREATURE CLEANUPS
 
-        // Cleanup Jiggles effects
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
         }
-        // Cleanup Skeleton Archer manager
         if (this.skeletonArcherManager) {
             this.skeletonArcherManager.cleanup();
             this.skeletonArcherManager = null;
         }
-
-        // Cleanup Skeleton Necromancer manager
         if (this.skeletonNecromancerManager) {
             this.skeletonNecromancerManager.cleanup();
             this.skeletonNecromancerManager = null;
         }
-        
-        // Cleanup Skeleton Death Knight manager
-        if (this.skeletonDeathKnightManager) {
+                if (this.skeletonDeathKnightManager) {
             this.skeletonDeathKnightManager.cleanup();
             this.skeletonDeathKnightManager = null;
+        }
+        if (this.skeletonReaperManager) {
+            this.skeletonReaperManager.cleanup();
+            this.skeletonReaperManager = null;
+        }
+        if (this.skeletonBardManager) {
+            this.skeletonBardManager.cleanup();
+            this.skeletonBardManager = null;
+        }
+        if (this.skeletonMageManager) {
+            this.skeletonMageManager.cleanup();
+            this.skeletonMageManager = null;
         }
 
 
@@ -2610,6 +2706,39 @@ export class BattleManager {
         }
     }
 
+    logToughnessHpBonuses() {
+        let bonusesApplied = false;
+        
+        // Check player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            const playerHero = this.playerHeroes[position];
+            if (playerHero && playerHero.hasAbility('Toughness')) {
+                const toughnessLevel = playerHero.getAbilityStackCount('Toughness');
+                const hpBonus = toughnessLevel * 200;
+                this.addCombatLog(
+                    `🛡️ ${playerHero.name} gains +${hpBonus} HP from Toughness level ${toughnessLevel}!`, 
+                    'success'
+                );
+                bonusesApplied = true;
+            }
+            
+            const opponentHero = this.opponentHeroes[position];
+            if (opponentHero && opponentHero.hasAbility('Toughness')) {
+                const toughnessLevel = opponentHero.getAbilityStackCount('Toughness');
+                const hpBonus = toughnessLevel * 200;
+                this.addCombatLog(
+                    `🛡️ Opponent's ${opponentHero.name} gains +${hpBonus} HP from Toughness level ${toughnessLevel}!`, 
+                    'error'
+                );
+                bonusesApplied = true;
+            }
+        });
+        
+        if (bonusesApplied) {
+            this.addCombatLog('💪 Toughness ability fortifies the heroes!', 'info');
+        }
+    }
+
     // Force refresh battle state
     forceRefreshBattleState() {
         this.initializeHeroes();
@@ -2694,6 +2823,23 @@ export class BattleManager {
             this.skeletonDeathKnightManager.cleanup();
             this.skeletonDeathKnightManager = null;
         }
+        if (this.burningSkeletonManager) {
+            this.burningSkeletonManager.cleanup();
+            this.burningSkeletonManager = null;
+        }
+        if (this.skeletonReaperManager) {
+            this.skeletonReaperManager.cleanup();
+            this.skeletonReaperManager = null;
+        }
+        if (this.skeletonBardManager) {
+            this.skeletonBardManager.cleanup();
+            this.skeletonBardManager = null;
+        }
+        if (this.skeletonMageManager) {
+            this.skeletonMageManager.cleanup();
+            this.skeletonMageManager = null;
+        }
+
 
 
         if (this.crusaderArtifactsHandler) {

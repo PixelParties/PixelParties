@@ -132,7 +132,7 @@ export class JigglesCreature {
         // Apply damage only to valid targets while tethers are visible
         // NOTE: Only the host (authoritative) applies actual damage
         for (const target of validTargets) {
-            this.applyJigglesDamage(target);
+            this.applyJigglesDamage(target, jigglesActor.data); 
         }
 
         // Keep tethers visible for the specified duration
@@ -231,7 +231,7 @@ export class JigglesCreature {
     }
 
     // Apply Jiggles damage to a target
-    applyJigglesDamage(target) {
+    applyJigglesDamage(target, attackingJiggles = null) {
         const damage = this.DAMAGE_PER_TARGET;
         
         if (target.type === 'hero') {
@@ -240,6 +240,9 @@ export class JigglesCreature {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
+            }, {
+                source: 'spell', // Jiggles' energy attack is magical
+                attacker: attackingJiggles // ✅ Pass the attacking creature
             });
         } else if (target.type === 'creature') {
             this.battleManager.authoritative_applyDamageToCreature({
@@ -249,6 +252,9 @@ export class JigglesCreature {
                 damage: damage,
                 position: target.position,
                 side: target.side
+            }, {
+                source: 'spell', // Jiggles' energy attack is magical
+                attacker: attackingJiggles // ✅ Pass the attacking creature
             });
         }
     }

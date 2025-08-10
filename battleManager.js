@@ -9,6 +9,7 @@ import { BattleSpellSystem } from './battleSpellSystem.js';
 import StatusEffectsManager from './statusEffects.js';
 import AttackEffectsManager from './attackEffects.js';
 import { killTracker } from './killTracker.js';
+import { getCheckpointSystem } from './checkpointSystem.js';
 
 import { BattleRandomnessManager } from './battleRandomnessManager.js';
 import { BattleAnimationManager } from './battleAnimationManager.js';
@@ -295,6 +296,11 @@ export class BattleManager {
         this.onBattleEnd = onBattleEnd;
         this.roomManager = roomManager;
         this.isAuthoritative = isHost;
+    
+    
+        this.checkpointSystem = getCheckpointSystem();
+        this.checkpointSystem.init(this, roomManager, isHost);
+
         
         this.speedManager.init(this, isHost);
 
@@ -454,8 +460,6 @@ export class BattleManager {
                 
                 if (abilities && abilities[position]) {
                     hero.setAbilities(abilities[position]);
-                    
-                    // NEW: Apply Toughness HP bonus after abilities are set
                     hero.applyToughnessHpBonus();
                 }
                 
@@ -463,17 +467,16 @@ export class BattleManager {
                     hero.setSpellbook(spellbooks[position]);
                 }
                 
-                // Add creatures with health (with SummoningMagic bonus)
+                // Add creatures with health
                 if (creatures && creatures[position]) {
                     const creaturesWithHealth = creatures[position].map(creature => {
                         const creatureInfo = getCardInfo(creature.name);
                         const baseHp = creatureInfo?.hp || 10;
                         
-                        // Calculate SummoningMagic bonus
                         let hpMultiplier = 1.0;
                         if (hero.hasAbility('SummoningMagic')) {
                             const summoningMagicLevel = hero.getAbilityStackCount('SummoningMagic');
-                            hpMultiplier = 1 + (0.25 * summoningMagicLevel); // +25% per level
+                            hpMultiplier = 1 + (0.25 * summoningMagicLevel);
                         }
                         
                         const finalHp = Math.floor(baseHp * hpMultiplier);
@@ -488,15 +491,29 @@ export class BattleManager {
                         };
                     });
                     hero.setCreatures(creaturesWithHealth);
-
-                    // Initialize necromancy stacks for each hero
                     hero.initializeNecromancyStacks();
                 }
                 
-                // ADD EQUIPMENT TO HERO
-                if (equipment && equipment[position]) {
-                    hero.setEquipment(equipment[position]);
-                    console.log(`⚔️ Set ${equipment[position].length} equipment items for ${side} ${position} hero`);
+                // FIXED: Robust equipment handling with fallbacks
+                try {
+                    // Try manager-level equipment first (for initial battle setup)
+                    if (equipment && equipment[position] && Array.isArray(equipment[position])) {
+                        hero.setEquipment(equipment[position]);
+                        console.log(`⚔️ Set ${equipment[position].length} equipment items for ${side} ${position} hero from manager`);
+                    }
+                    // If hero already has equipment (e.g., from checkpoint restoration), prefer that
+                    else if (hero.equipment && hero.equipment.length > 0) {
+                        console.log(`⚔️ Hero ${side} ${position} already has ${hero.equipment.length} equipment items from restoration`);
+                    }
+                    // Fallback to empty equipment
+                    else {
+                        hero.setEquipment([]);
+                        console.log(`⚔️ Initialized empty equipment for ${side} ${position} hero`);
+                    }
+                } catch (error) {
+                    console.error(`❌ Error setting equipment for ${side} ${position}:`, error);
+                    // Emergency fallback
+                    hero.equipment = [];
                 }
                 
                 heroesObj[position] = hero;
@@ -504,11 +521,17 @@ export class BattleManager {
                 this.resetHeroVisualState(side, position);
                 this.updateHeroHealthBar(side, position, hero.currentHp, hero.maxHp);
                 this.updateHeroAttackDisplay(side, position, hero);
-                
-                // Update creature visuals
                 this.updateCreatureVisuals(side, position, hero.creatures);
             }
         });
+        
+        // CRITICAL: Clear manager-level equipment references to prevent future conflicts
+        if (side === 'player') {
+            this.playerEquips = {};
+        } else {
+            this.opponentEquips = {};
+        }
+        console.log(`📋 Cleared ${side} manager-level equipment references`);
     }
 
     // Update creature visuals to show health
@@ -1118,10 +1141,10 @@ export class BattleManager {
             side === 'player' ? 'error' : 'success'
         );
         
-        // Update creature health display
-        this.updateCreatureHealthBar(side, position, creatureIndex, creature.currentHp, creature.maxHp);
-        const damageSource = arguments[1]?.source || 'attack';
-        this.animationManager.createDamageNumberOnCreature(side, position, creatureIndex, damage, creature.maxHp, damageSource);
+        // Track necromancy revival status and final creature index
+        let finalCreatureIndex = creatureIndex;
+        let revivedByNecromancy = false;
+        let necromancyArrayManipulation = null;
         
         // If creature died, record kill and trigger death effects BEFORE attempting revival
         if (willDie && wasAlive) {
@@ -1132,42 +1155,66 @@ export class BattleManager {
                                 attacker.side === 'player' ? 'success' : 'error');
             }
 
-            
             // 2. Trigger "when this dies" effects here
             this.triggerCreatureDeathEffects(creature, hero, attacker, context);
             this.checkForSkeletonMageReactions(creature, hero.side, 'creature');
             
             // 3. THEN attempt necromancy revival
-            let revived = false;
             if (this.necromancyManager) {
-                revived = this.necromancyManager.attemptNecromancyRevival(
+                const revivalResult = this.necromancyManager.attemptNecromancyRevival(
                     creature, hero, creatureIndex, side, position
                 );
-            }
-            
-            // 4. If not revived, continue with normal death handling
-            if (!revived) {
-                this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
+                
+                if (revivalResult) {
+                    revivedByNecromancy = true;
+                    
+                    // Get the new creature index after revival (creature moved to end)
+                    finalCreatureIndex = hero.creatures.indexOf(creature);
+                    
+                    // Create array manipulation instructions for guest
+                    necromancyArrayManipulation = {
+                        originalIndex: creatureIndex,
+                        moveToEnd: true,
+                        newIndex: finalCreatureIndex
+                    };
+                    
+                    // Update creature health display with the NEW index
+                    this.updateCreatureHealthBar(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp);
+                    this.addCombatLog(`💀✨ ${creature.name} rises again, but the kill still counts!`, 'info');
+                } else {
+                    // Creature was not revived, continue with normal death handling
+                    this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
+                }
             } else {
-                // Creature was revived - update the health display to show revival
-                this.updateCreatureHealthBar(side, position, creatureIndex, creature.currentHp, creature.maxHp);
-                this.addCombatLog(`💀✨ ${creature.name} rises again, but the kill still counts!`, 'info');
+                // No necromancy manager, continue with normal death handling
+                this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
             }
+        } else {
+            // Creature survived, update health bar with original index
+            this.updateCreatureHealthBar(side, position, creatureIndex, creature.currentHp, creature.maxHp);
         }
         
+        // Create damage number animation at the correct index
+        const damageSource = context?.source || 'attack';
+        this.animationManager.createDamageNumberOnCreature(side, position, finalCreatureIndex, damage, creature.maxHp, damageSource);
+        
+        // Send battle update with array manipulation instructions for perfect guest sync
         this.sendBattleUpdate('creature_damage_applied', {
             heroAbsoluteSide: hero.absoluteSide,
             heroPosition: position,
-            creatureIndex: creatureIndex,
+            creatureIndex: creatureIndex,               // Original index where damage was applied
             damage: damage,
             oldHp: oldHp,
             newHp: creature.currentHp,
             maxHp: creature.maxHp,
-            died: willDie, // This represents whether the creature "died" (HP reached 0), not final alive state
-            revivedByNecromancy: willDie && creature.alive, // NEW: Flag if revived
-            creatureName: creature.name
+            died: willDie,
+            revivedByNecromancy: revivedByNecromancy,
+            creatureName: creature.name,
+            // Include array manipulation instructions for guest to perform identical operations
+            necromancyArrayManipulation: necromancyArrayManipulation
         });
         
+        // Save the updated battle state to persistence (includes the reordered creatures array)
         this.saveBattleStateToPersistence().catch(error => {
             console.error('Error saving state after creature damage:', error);
         });
@@ -1281,12 +1328,97 @@ export class BattleManager {
         
         if (creatureElement) {
             creatureElement.classList.add('defeated');
+            
+            // Apply defeated visual state to sprite
             const sprite = creatureElement.querySelector('.creature-sprite');
             if (sprite) {
                 sprite.style.filter = 'grayscale(100%)';
                 sprite.style.opacity = '0.5';
             }
+            
+            // FIXED: Remove health bar and HP text when defeated (same as updateCreatureVisuals)
+            const healthBar = creatureElement.querySelector('.creature-health-bar');
+            const hpText = creatureElement.querySelector('.creature-hp-text');
+            if (healthBar) {
+                healthBar.remove();
+                console.log(`🩸 Removed health bar for defeated ${creature.name}`);
+            }
+            if (hpText) {
+                hpText.remove();
+                console.log(`🩸 Removed HP text for defeated ${creature.name}`);
+            }
         }
+    }
+
+    refreshAllCreatureVisuals() {
+        console.log('🩸 Refreshing all creature visual states...');
+        
+        ['left', 'center', 'right'].forEach(position => {
+            // Update player creature visuals
+            if (this.playerHeroes[position] && this.playerHeroes[position].creatures) {
+                const hero = this.playerHeroes[position];
+                this.updateCreatureVisuals('player', position, hero.creatures);
+                
+                // Log defeated creatures for debugging
+                const defeatedCreatures = hero.creatures.filter(c => !c.alive);
+                if (defeatedCreatures.length > 0) {
+                    console.log(`💀 Player ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
+                            defeatedCreatures.map(c => c.name));
+                }
+            }
+            
+            // Update opponent creature visuals
+            if (this.opponentHeroes[position] && this.opponentHeroes[position].creatures) {
+                const hero = this.opponentHeroes[position];
+                this.updateCreatureVisuals('opponent', position, hero.creatures);
+                
+                // Log defeated creatures for debugging
+                const defeatedCreatures = hero.creatures.filter(c => !c.alive);
+                if (defeatedCreatures.length > 0) {
+                    console.log(`💀 Opponent ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
+                            defeatedCreatures.map(c => c.name));
+                }
+            }
+        });
+        
+        console.log('✅ All creature visual states refreshed');
+    }
+
+    renderCreaturesAfterInit() {
+        ['left', 'center', 'right'].forEach(position => {
+            ['player', 'opponent'].forEach(side => {
+                const heroInstance = side === 'player' 
+                    ? this.playerHeroes[position]
+                    : this.opponentHeroes[position];
+                
+                if (heroInstance && heroInstance.creatures && heroInstance.creatures.length > 0) {
+                    const heroSlot = document.querySelector(`.${side}-slot.${position}-slot`);
+                    if (heroSlot) {
+                        // Remove existing creatures if any
+                        const existingCreatures = heroSlot.querySelector('.battle-hero-creatures');
+                        if (existingCreatures) {
+                            existingCreatures.remove();
+                        }
+                        
+                        // Add new creatures HTML
+                        const creaturesHTML = this.battleScreen.createCreaturesHTML(heroInstance.creatures, side, position);
+                        heroSlot.insertAdjacentHTML('beforeend', creaturesHTML);
+                        
+                        // Update necromancy displays
+                        if (this.necromancyManager) {
+                            this.necromancyManager.updateNecromancyDisplayForHeroWithCreatures(
+                                side, position, heroInstance
+                            );
+                        }
+                    }
+                }
+            });
+        });
+        
+        // FIXED: Call the refresh helper to ensure proper visual states
+        setTimeout(() => {
+            this.refreshAllCreatureVisuals();
+        }, 100);
     }
 
     // Update creature health bar
@@ -2004,6 +2136,11 @@ export class BattleManager {
 
     // Handle battle end
     async handleBattleEnd() {
+        // Create final checkpoint before cleanup
+        if (this.isAuthoritative && this.checkpointSystem) {
+            await this.checkpointSystem.createBattleCheckpoint('battle_end');
+        }
+
         this.battleActive = false;
         
         if (this.isAuthoritative) {
@@ -2175,6 +2312,12 @@ export class BattleManager {
             
             // Re-render creatures after restoration
             this.renderCreaturesAfterInit();
+            
+            // FIXED: Explicitly refresh creature visuals to ensure defeated creatures have no health bars
+            setTimeout(() => {
+                this.refreshAllCreatureVisuals();
+                console.log('🩸 Final battle state: All creature visual states properly applied');
+            }, 200);
             
             // Initialize and update necromancy displays
             if (this.necromancyManager) {
@@ -2357,6 +2500,16 @@ export class BattleManager {
         if (this.statusEffectsManager) {
             this.statusEffectsManager.clearAllBattleStatusEffects();
         }
+
+        
+        // ===== CLEANUP BOULDERS AFTER BATTLE =====
+        try {
+            const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
+            const bouldersRemoved = BoulderInABottlePotion.cleanupBouldersAfterBattle(this);
+            
+        } catch (error) {
+            console.error('❌ Error cleaning up Boulders after battle:', error);
+        }
         
 
         // CREATURE CLEANUPS
@@ -2410,13 +2563,13 @@ export class BattleManager {
                     await gameDataRef.update(updates);
                 }
                 
-                // UPDATED: Don't clear gamePhase here - it should stay as 'Reward'
+                // Don't clear gamePhase here - it should stay as 'Reward'
                 await this.roomManager.getRoomRef().child('gameState').update({
                     battleStarted: false,
                     battleActive: false,
                     lastBattleStateUpdate: null,
                     battleCleanupCompleted: Date.now()
-                    // NOTE: gamePhase stays as 'Reward'
+                    // gamePhase stays as 'Reward'
                 });
                 
                 console.log('✅ Battle cleanup completed, gamePhase preserved for rewards');

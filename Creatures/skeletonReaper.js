@@ -194,9 +194,9 @@ export class SkeletonReaperCreature {
         // Wait for all slashes to complete
         await Promise.all(slashPromises);
 
-        // Apply damage to all targets simultaneously
+        // Apply damage to all targets simultaneously - FIXED: Pass attacking reaper
         targets.forEach(target => {
-            this.applyDeathSlashDamage(target);
+            this.applyDeathSlashDamage(target, reaperCreature);
         });
 
         // Add final message
@@ -376,7 +376,7 @@ export class SkeletonReaperCreature {
     }
 
     // Apply death slash damage to target
-    applyDeathSlashDamage(target) {
+    applyDeathSlashDamage(target, attackingReaper = null) {
         const damage = this.DEATH_SLASH_DAMAGE;
         
         if (target.type === 'hero') {
@@ -385,6 +385,9 @@ export class SkeletonReaperCreature {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
+            }, {
+                source: 'spell', // Death slash is magical
+                attacker: attackingReaper // ✅ Pass the attacking reaper
             });
         } else if (target.type === 'creature') {
             this.battleManager.authoritative_applyDamageToCreature({
@@ -394,6 +397,9 @@ export class SkeletonReaperCreature {
                 damage: damage,
                 position: target.position,
                 side: target.side
+            }, {
+                source: 'spell', // Death slash is magical
+                attacker: attackingReaper
             });
         }
     }

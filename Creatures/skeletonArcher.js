@@ -157,7 +157,7 @@ export class SkeletonArcherCreature {
             return;
         }
 
-        // Fire 10 arrows in rapid succession
+        // Fire 5 arrows in rapid succession
         for (let i = 0; i < SALVO_ARROW_COUNT; i++) {
             // Find a random target for this arrow
             const target = this.battleManager.combatManager.authoritative_findRandomTarget(archerSide);
@@ -169,11 +169,12 @@ export class SkeletonArcherCreature {
 
             const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
             this.battleManager.addCombatLog(
-                `🎯 Death arrow ${i + 1}/10 seeks ${targetName}!`, 
+                `🎯 Death arrow ${i + 1}/${SALVO_ARROW_COUNT} seeks ${targetName}!`, 
                 'warning'
             );
 
             // Fire this arrow (don't await - let them fly simultaneously with staggered starts)
+            // FIXED: Pass the attacking archer creature
             this.fireSalvoArrow(archerElement, target, i + 1, archerCreature);
             
             // Small delay before firing the next arrow
@@ -190,7 +191,7 @@ export class SkeletonArcherCreature {
     }
 
     // Fire a single salvo arrow
-    async fireSalvoArrow(archerElement, target, arrowNumber) {
+    async fireSalvoArrow(archerElement, target, arrowNumber, attackingArcher) {
         const targetElement = this.getTargetElement(target);
         
         if (!targetElement) {
@@ -213,7 +214,7 @@ export class SkeletonArcherCreature {
         // Wait for projectile to reach target
         await this.battleManager.delay(adjustedTravelTime);
         
-        // Apply damage when projectile hits (only host applies actual damage)
+        // Apply damage when projectile hits (only host applies actual damage) - FIXED: Use attackingArcher
         this.applyArcherDamage(target, attackingArcher);
         
         // Add impact effect

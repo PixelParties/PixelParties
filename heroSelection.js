@@ -22,6 +22,7 @@ import { leadershipAbility } from './Abilities/leadership.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
 import { VacarnEffectManager } from './Heroes/vacarn.js';
+import { SemiEffectManager } from './Heroes/semi.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 
@@ -73,6 +74,8 @@ export class HeroSelection {
 
         this.nicolasEffectManager = new NicolasEffectManager();
         this.vacarnEffectManager = new VacarnEffectManager();
+        this.semiEffectManager = new SemiEffectManager();
+
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
 
@@ -747,13 +750,20 @@ export class HeroSelection {
                     console.log(`💾 Host saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
                 }
 
-                // Save Nicolas effect state for host
+
+                // Save Hero effect states for host
                 if (this.nicolasEffectManager) {
                     gameState.hostNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
                 if (this.vacarnEffectManager) {
                     gameState.hostVacarnState = sanitizeForFirebase(this.vacarnEffectManager.exportVacarnState());
                 }
+                if (this.semiEffectManager) {
+                    gameState.hostSemiState = sanitizeForFirebase(this.semiEffectManager.exportSemiState());
+                }
+
+
+
 
                 // Save delayed artifact effects for host
                 if (this.delayedArtifactEffects) {
@@ -835,15 +845,21 @@ export class HeroSelection {
                     console.log(`💾 Guest saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
                 }
 
-                // Save Nicolas effect state for guest
+
+
+                // Save Hero effect states for guest
                 if (this.nicolasEffectManager) {
                     gameState.guestNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
-
-                // Save Vacarn effect state for guest
                 if (this.vacarnEffectManager) {
                     gameState.guestVacarnState = sanitizeForFirebase(this.vacarnEffectManager.exportVacarnState());
                 }
+                if (this.semiEffectManager) {
+                    gameState.guestSemiState = sanitizeForFirebase(this.semiEffectManager.exportSemiState());
+                }
+
+
+
 
                 // Save delayed artifact effects for guest
                 if (this.delayedArtifactEffects) {
@@ -905,7 +921,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -944,14 +960,14 @@ export class HeroSelection {
             console.log('📝 No potion data found - initialized fresh for new game');
         }
 
-        // Restore Nicolas effect state
+
+        // Restore Hero effect states
         if (nicolasData && this.nicolasEffectManager) {
             const nicolasRestored = this.nicolasEffectManager.importNicolasState(nicolasData);
             if (nicolasRestored) {
                 console.log('✅ Nicolas effect state restored successfully');
             }
         } else {
-            // Initialize Nicolas state if no saved data
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.reset();
                 console.log('📝 No Nicolas data found - initialized fresh state');
@@ -967,6 +983,21 @@ export class HeroSelection {
                 this.vacarnEffectManager.reset();
             }
         }
+        if (semiData && this.semiEffectManager) {
+            const semiRestored = this.semiEffectManager.importSemiState(semiData);
+            if (semiRestored) {
+                console.log('✅ Semi effect state restored successfully');
+            }
+        } else {
+            // Initialize Semi state if no saved data
+            if (this.semiEffectManager) {
+                this.semiEffectManager.reset();
+                console.log('📝 No Semi data found - initialized fresh state');
+            }
+        }
+
+
+
 
         // ===== Restore delayed artifact effects =====
         if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
@@ -2492,11 +2523,26 @@ export class HeroSelection {
             return success;
         }
 
-        // Not a creature, handle as regular spell
         const learnCheck = this.canHeroLearnSpell(targetSlot, spellCardName);
 
         if (!learnCheck.canLearn) {
-            // Show error message
+            // NEW: Check if this is Semi's gold learning case
+            if (learnCheck.isSemiGoldLearning) {
+                this.handManager.endHandCardDrag();
+                
+                // Show Semi's gold learning dialog
+                const dialogShown = this.semiEffectManager.showSemiGoldLearningDialog(
+                    this, targetSlot, spellCardName, cardIndex
+                );
+                
+                if (!dialogShown) {
+                    this.showSpellDropResult(targetSlot, 'Failed to show Semi dialog', false);
+                }
+                
+                return dialogShown;
+            }
+            
+            // Show error message for normal failure
             this.handManager.endHandCardDrag();
             this.showSpellDropResult(targetSlot, learnCheck.reason, false);
             return false;
@@ -2647,12 +2693,15 @@ export class HeroSelection {
             console.log('🧪 PotionHandler completely reset for new game');
         }
 
-        // Reset Nicolas effect manager
+        // Reset Hero effect managers
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.reset();
         }
         if (this.vacarnEffectManager) {
             this.vacarnEffectManager.reset();
+        }
+        if (this.semiEffectManager) {
+            this.semiEffectManager.reset();
         }
         
         // Reset crusader artifacts handler
@@ -2861,6 +2910,25 @@ export class HeroSelection {
 
         // Check 4: Compare levels
         if (totalSpellSchoolLevel < spellLevel) {
+            // NEW: Check if Semi can use gold learning
+            if (hero.name === 'Semi') {
+                const semiCheck = this.semiEffectManager.canUseSemiGoldLearning(this, heroPosition, spellCardName);
+                if (semiCheck.canUse) {
+                    return { 
+                        canLearn: false, 
+                        reason: `Semi can learn this for ${semiCheck.goldCost} Gold`,
+                        isSemiGoldLearning: true,
+                        semiData: semiCheck,
+                        heroName: hero.name
+                    };
+                } else if (semiCheck.goldCost && semiCheck.playerGold !== undefined) {
+                    return { 
+                        canLearn: false, 
+                        reason: `Semi needs ${semiCheck.goldCost} Gold to learn this (have ${semiCheck.playerGold})`
+                    };
+                }
+            }
+            
             const formattedSpellSchool = this.formatCardName(spellSchool);
             const formattedSpellName = this.formatCardName(spellCardName);
             

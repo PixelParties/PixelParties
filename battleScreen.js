@@ -1,7 +1,7 @@
 // battleScreen.js - Battle Screen Module with BattleLog Integration and Ability Synchronization
 
 import BattleManager from './battleManager.js';
-import { BattleLog } from './battleLog.js'; // NEW: Import BattleLog
+import { BattleLog } from './battleLog.js';
 import { getCardInfo } from './cardDatabase.js';
 
 export class BattleScreen {
@@ -42,12 +42,12 @@ export class BattleScreen {
 
     // Initialize battle screen with abilities
     init(isHost, playerFormation, opponentFormation, gameDataSender, roomManager, 
-        lifeManager, goldManager, turnTracker, roomManagerForPersistence = null,
-        playerAbilities = null, opponentAbilities = null,
-        playerSpellbooks = null, opponentSpellbooks = null,
-        actionManager = null,
-        playerCreatures = null, opponentCreatures = null,
-        playerEquips = null, opponentEquips = null) {
+    lifeManager, goldManager, turnTracker, roomManagerForPersistence = null,
+    playerAbilities = null, opponentAbilities = null,
+    playerSpellbooks = null, opponentSpellbooks = null,
+    actionManager = null,
+    playerCreatures = null, opponentCreatures = null,
+    playerEquips = null, opponentEquips = null) {
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -162,9 +162,11 @@ export class BattleScreen {
                 const latestPlayerAbilities = this.getLatestPlayerAbilities();
                 const latestPlayerSpellbooks = this.getLatestPlayerSpellbooks();
                 const latestPlayerCreatures = this.getLatestPlayerCreatures();
+                const latestPlayerEquipment = this.getLatestPlayerEquipment(); 
                 
                 // Update battle manager with latest player data
-                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures);
+                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment);
+
                 
                 // Start the synchronized battle
                 this.battleManager.startBattle();
@@ -178,6 +180,7 @@ export class BattleScreen {
                         hostAbilities: latestPlayerAbilities,
                         hostSpellbooks: latestPlayerSpellbooks,
                         hostCreatures: latestPlayerCreatures,
+                        hostEquipment: latestPlayerEquipment, // 🔥 NEW: Include equipment
                         hostFormation: this.playerFormation
                     });
                 }
@@ -251,25 +254,49 @@ export class BattleScreen {
         return this.playerCreatures;
     }
 
+    // Helper method to get current player equipment
+    getLatestPlayerEquipment() {
+        if (window.heroSelection && window.heroSelection.heroEquipmentManager) {
+            const equipmentManager = window.heroSelection.heroEquipmentManager;
+            const latestEquipment = {};
+            
+            // Get equipment for each position
+            ['left', 'center', 'right'].forEach(position => {
+                const heroEquipment = equipmentManager.getHeroEquipment(position);
+                if (heroEquipment && this.hasHeroAtPosition(position)) {
+                    latestEquipment[position] = heroEquipment;
+                }
+            });
+            
+            console.log('⚔️ Retrieved latest player equipment:', latestEquipment);
+            return latestEquipment;
+        }
+        
+        console.warn('⚠️ Could not retrieve latest equipment, using cached version');
+        return this.playerEquips;
+    }
+
     // Helper method to check if there's a hero at a position
     hasHeroAtPosition(position) {
         return this.playerFormation && this.playerFormation[position] && this.playerFormation[position] !== null;
     }
 
     // Helper method to update battle manager with latest player data
-    updateBattleManagerPlayerData(abilities, spellbooks, creatures) {
+    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment) {
         if (this.battleManager) {
             // Update stored data
             this.playerAbilities = abilities;
             this.playerSpellbooks = spellbooks;
             this.playerCreatures = creatures;
+            this.playerEquips = equipment;
             
             // Update battle manager references
             this.battleManager.playerAbilities = abilities;
             this.battleManager.playerSpellbooks = spellbooks;
             this.battleManager.playerCreatures = creatures;
+            this.battleManager.playerEquips = equipment;
             
-            console.log('🔄 Updated battle manager with latest player data');
+            console.log('🔄 Updated battle manager with latest player data including equipment');
         }
     }
 
@@ -299,6 +326,13 @@ export class BattleScreen {
                 console.log('✅ Synced opponent creatures from host');
             }
             
+            // Sync host's equipment as our opponent data
+            if (data.hostEquipment) {
+                this.opponentEquips = data.hostEquipment;
+                this.battleManager.opponentEquips = data.hostEquipment;
+                console.log('✅ Synced opponent equipment from host');
+            }
+            
             // Sync host's formation as our opponent data
             if (data.hostFormation) {
                 this.opponentFormation = data.hostFormation;
@@ -306,10 +340,11 @@ export class BattleScreen {
                 console.log('✅ Synced opponent formation from host');
             }
             
-            // 🔥 NEW: Send guest abilities back to host
+            // Send guest data back to host (including equipment)
             const latestGuestAbilities = this.getLatestPlayerAbilities();
             const latestGuestSpellbooks = this.getLatestPlayerSpellbooks();
             const latestGuestCreatures = this.getLatestPlayerCreatures();
+            const latestGuestEquipment = this.getLatestPlayerEquipment();
             
             if (this.gameDataSender) {
                 this.gameDataSender('battle_data', {
@@ -318,14 +353,16 @@ export class BattleScreen {
                         guestAbilities: latestGuestAbilities,
                         guestSpellbooks: latestGuestSpellbooks,
                         guestCreatures: latestGuestCreatures,
+                        guestEquipment: latestGuestEquipment,
                         timestamp: Date.now()
                     }
                 });
-                console.log('📤 Guest sent abilities back to host for tooltip sync');
+                console.log('📤 Guest sent abilities AND equipment back to host for tooltip sync');
             }
             
             // Re-initialize opponent heroes with synced data to ensure everything is up to date
-            if (this.battleManager.opponentAbilities || this.battleManager.opponentSpellbooks || this.battleManager.opponentCreatures) {
+            if (this.battleManager.opponentAbilities || this.battleManager.opponentSpellbooks || 
+                this.battleManager.opponentCreatures || this.battleManager.opponentEquips) {
                 console.log('🔄 Re-initializing opponent heroes with synced data...');
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
@@ -390,8 +427,16 @@ export class BattleScreen {
                 this.battleManager.opponentCreatures = data.guestCreatures;
             }
             
-            // CRITICAL: Re-initialize opponent heroes with synced data (just like guest does)
-            if (this.battleManager && (data.guestAbilities || data.guestSpellbooks || data.guestCreatures)) {
+            // Handle guest equipment sync
+            if (data.guestEquipment) {
+                this.opponentEquips = data.guestEquipment;
+                this.battleManager.opponentEquips = data.guestEquipment;
+                console.log('✅ HOST: Synced guest equipment as opponent data');
+            }
+            
+            // Re-initialize opponent heroes with synced data (just like guest does)
+            if (this.battleManager && (data.guestAbilities || data.guestSpellbooks || 
+                                    data.guestCreatures || data.guestEquipment)) { // 🔥 UPDATED condition
                 console.log('🔄 HOST: Re-initializing opponent heroes with guest data...');
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
@@ -400,11 +445,11 @@ export class BattleScreen {
                     this.battleManager.opponentAbilities,
                     this.battleManager.opponentSpellbooks,
                     this.battleManager.opponentCreatures,
-                    this.battleManager.opponentEquips,
+                    this.battleManager.opponentEquips, // 🔥 NOW INCLUDES EQUIPMENT
                     'guest' // Guest is the opponent for host
                 );
                 
-                console.log('✅ HOST: Guest abilities synced and heroes re-initialized');
+                console.log('✅ HOST: Guest abilities AND equipment synced and heroes re-initialized');
             }
         }
     }
@@ -789,19 +834,62 @@ export class BattleScreen {
         
         // Calculate ability bonuses
         let abilityBonus = 0;
-        if (abilities) {
-            // Calculate attack bonus from abilities
-            abilityBonus = this.calculateAbilityAttackBonus(abilities);
-        }
-        
-        // Format bonus display
-        let bonusDisplay = '';
         let attackContainerClass = '';
-        if (abilityBonus > 0) {
-            bonusDisplay = `<span class="attack-bonus" style="color: #4caf50; display: inline;">+${abilityBonus}</span>`;
-            attackContainerClass = 'attack-buffed';
-        } else {
-            // Include hidden span for later updates
+        let bonusDisplay = '';
+        
+        try {
+            if (abilities) {
+                abilityBonus = this.calculateAbilityAttackBonus(abilities);
+            }
+            
+            // Special case for Toras with robust equipment handling
+            if (hero.name === 'Toras') {
+                try {
+                    // Get equipment from battle manager hero instance using Hero class methods
+                    let equipmentCount = 0;
+                    if (this.battleManager) {
+                        const heroInstance = side === 'player' 
+                            ? this.battleManager.playerHeroes[position]
+                            : this.battleManager.opponentHeroes[position];
+                        
+                        if (heroInstance && typeof heroInstance.getEquipment === 'function') {
+                            const heroEquipment = heroInstance.getEquipment();
+                            
+                            // Count unique equipment using Hero class data
+                            const uniqueEquipmentNames = new Set();
+                            heroEquipment.forEach(item => {
+                                const itemName = item.name || item.cardName;
+                                if (itemName) {
+                                    uniqueEquipmentNames.add(itemName);
+                                }
+                            });
+                            
+                            equipmentCount = uniqueEquipmentNames.size;
+                        }
+                    }
+                    
+                    if (equipmentCount > 0) {
+                        const equipmentBonus = equipmentCount * 10;
+                        abilityBonus += equipmentBonus;
+                        console.log(`⚔️ Toras ${side} ${position} equipment bonus: +${equipmentBonus} ATK from ${equipmentCount} unique items`);
+                    }
+                } catch (equipmentError) {
+                    console.error(`❌ Error processing Toras equipment for ${side} ${position}:`, equipmentError);
+                    // Continue without equipment bonus - this is non-critical for display
+                }
+            }
+            
+            // Format bonus display
+            if (abilityBonus > 0) {
+                bonusDisplay = `<span class="attack-bonus" style="color: #4caf50; display: inline;">+${abilityBonus}</span>`;
+                attackContainerClass = 'attack-buffed';
+            } else {
+                bonusDisplay = `<span class="attack-bonus" style="display: none;"></span>`;
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error calculating bonuses for ${side} ${position}:`, error);
+            // Fallback to basic display
             bonusDisplay = `<span class="attack-bonus" style="display: none;"></span>`;
         }
 
@@ -1232,25 +1320,32 @@ export class BattleScreen {
         
         // Format equipment for display
         let equipmentHTML = '';
-        if (equipment.length > 0) {
-            equipmentHTML = '<div class="equipment-list">';
+        try {
+            const equipment = hero.getEquipment ? hero.getEquipment() : [];
             
-            equipment.forEach(item => {
-                const itemName = item.name || item.cardName || 'Unknown Item';
-                const itemCost = item.cost !== undefined ? item.cost : 0;
+            if (equipment.length > 0) {
+                equipmentHTML = '<div class="equipment-list">';
                 
-                equipmentHTML += `
-                    <div class="equipment-item">
-                        <span class="equipment-icon">⚔️</span>
-                        <span class="equipment-name">${this.formatCardName(itemName)}</span>
-                        ${itemCost > 0 ? `<span class="equipment-cost">${itemCost}💰</span>` : ''}
-                    </div>
-                `;
-            });
-            
-            equipmentHTML += '</div>';
-        } else {
-            equipmentHTML = '<div style="color: #999;">No equipment</div>';
+                equipment.forEach(item => {
+                    const itemName = item.name || item.cardName || 'Unknown Item';
+                    const itemCost = item.cost !== undefined ? item.cost : 0;
+                    
+                    equipmentHTML += `
+                        <div class="equipment-item">
+                            <span class="equipment-icon">⚔️</span>
+                            <span class="equipment-name">${this.formatCardName(itemName)}</span>
+                            ${itemCost > 0 ? `<span class="equipment-cost">${itemCost}💰</span>` : ''}
+                        </div>
+                    `;
+                });
+                
+                equipmentHTML += '</div>';
+            } else {
+                equipmentHTML = '<div style="color: #999;">No equipment</div>';
+            }
+        } catch (error) {
+            console.error(`❌ Error getting equipment for tooltip ${side} ${position}:`, error);
+            equipmentHTML = '<div style="color: #999;">Equipment data unavailable</div>';
         }
         
         tooltip.innerHTML = `

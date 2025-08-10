@@ -68,7 +68,7 @@ export class BattleFlowManager {
             bm.skeletonReaperManager = new SkeletonReaperCreature(bm);
             console.log('✅ Skeleton Reaper manager initialized');
 
-            //Initialize Skeleton Bard manager
+            // Initialize Skeleton Bard manager
             const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
             bm.skeletonBardManager = new SkeletonBardCreature(bm);
             console.log('✅ Skeleton Bard manager initialized');
@@ -77,9 +77,6 @@ export class BattleFlowManager {
             const SkeletonMageCreature = (await import('./Creatures/skeletonMage.js')).default;
             bm.skeletonMageManager = new SkeletonMageCreature(bm);
             console.log('✅ Skeleton Mage manager initialized');
-
-
-
 
             // Verify managers are properly set
             if (!bm.jigglesManager) {
@@ -134,6 +131,21 @@ export class BattleFlowManager {
         
         bm.logTorasEquipmentBonuses();
         
+        // ============================================
+        // CHECKPOINT #1: After battle initialization
+        // ============================================
+        if (bm.isAuthoritative && bm.checkpointSystem) {
+            try {
+                await bm.checkpointSystem.createBattleCheckpoint('battle_start');
+                bm.addCombatLog('📍 Initial battle state saved', 'system');
+            } catch (error) {
+                console.error('Failed to create battle_start checkpoint:', error);
+            }
+        }
+        
+        // ============================================
+        // Apply start-of-battle effects
+        // ============================================
         if (bm.isAuthoritative) {
             try {
                 console.log('🧪 Applying potion effects from both players at battle start...');
@@ -151,6 +163,16 @@ export class BattleFlowManager {
                 }
                 console.log('✅ All potion effects applied successfully');
 
+                if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
+                    bm.battleScreen.renderCreaturesAfterInit();
+                    console.log('🪨 Re-rendered creatures after potion effects applied');
+                }
+
+                // Also update necromancy displays if boulders were added
+                if (bm.necromancyManager) {
+                    bm.necromancyManager.initializeNecromancyStackDisplays();
+                }
+
                 // Apply delayed artifact effects from both players (like Poisoned Meat)
                 console.log('🥩 Applying delayed artifact effects from both players at battle start...');
                 const delayedEffects = await bm.getBothPlayersDelayedEffects();
@@ -166,14 +188,29 @@ export class BattleFlowManager {
                 }
                 
                 console.log('✅ All start of battle effects applied successfully');
+                
+                // ============================================
+                // CHECKPOINT #2: After all start-of-battle effects
+                // ============================================
+                if (bm.checkpointSystem) {
+                    try {
+                        await bm.checkpointSystem.createBattleCheckpoint('effects_complete');
+                        bm.addCombatLog('📍 Post-effects battle state saved', 'system');
+                    } catch (error) {
+                        console.error('Failed to create effects_complete checkpoint:', error);
+                    }
+                }
+                
             } catch (error) {
                 console.error('❌ Error applying battle start effects:', error);
                 bm.addCombatLog('⚠️ Some battle start effects failed to apply', 'warning');
             }
         }
         
+        // Save battle state to persistence (legacy system - still works as fallback)
         await bm.saveBattleStateToPersistence();
         
+        // Start the battle loop
         if (bm.isAuthoritative) {
             if (!bm.opponentConnected) {
                 bm.pauseBattle('Opponent not connected at battle start');
@@ -208,8 +245,10 @@ export class BattleFlowManager {
             
             bm.sendBattleUpdate('turn_start', { turn: bm.currentTurn });
             
+            // Save at turn start (legacy system)
             await bm.saveBattleStateToPersistence();
             
+            // Process all positions for this turn
             for (const position of ['left', 'center', 'right']) {
                 if (!bm.battleActive || this.checkBattleEnd()) break;
                 
@@ -223,8 +262,22 @@ export class BattleFlowManager {
                 }
                 
                 await this.authoritative_processTurnForPosition(position);
+                
+                // Save after each position (legacy system)
                 await bm.saveBattleStateToPersistence();
                 await bm.delay(15);
+            }
+            
+            // ============================================
+            // CHECKPOINT: At end of turn
+            // ============================================
+            if (bm.checkpointSystem) {
+                try {
+                    await bm.checkpointSystem.createBattleCheckpoint('turn_end');
+                    console.log(`📍 Turn ${bm.currentTurn} checkpoint saved`);
+                } catch (error) {
+                    console.error(`Failed to create turn_end checkpoint for turn ${bm.currentTurn}:`, error);
+                }
             }
             
             await bm.delay(10);
@@ -445,6 +498,7 @@ export class BattleFlowManager {
                 const BurningSkeletonCreature = (await import('./Creatures/burningSkeleton.js')).default;
                 const SkeletonReaperCreature = (await import('./Creatures/skeletonReaper.js')).default;
                 const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
+                const BoulderCreature = (await import('./Creatures/boulder.js')).default;
 
 
                 if (!bm.skeletonNecromancerManager) {
@@ -516,6 +570,12 @@ export class BattleFlowManager {
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                         bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
                     }
+                } else if (BoulderCreature.isBoulder(playerActor.name)) {
+                    if (!bm.boulderManager) {
+                        bm.boulderManager = new BoulderCreature(bm);
+                    }
+                    actions.push(bm.boulderManager.executeSpecialAttack(playerActor, position));
+                    hasSpecialAttacks = true;
                 } else {
                     actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                     bm.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');

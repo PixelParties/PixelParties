@@ -717,6 +717,7 @@ export class SkeletonDeathKnightCreature {
             );
 
             // Create slash effect (don't await - let them all execute simultaneously)
+            // FIXED: Pass the attacking death knight creature
             slashPromises.push(this.executeDeathSlash(deathKnightElement, target, index, deathKnightCreature));
         });
 
@@ -731,7 +732,7 @@ export class SkeletonDeathKnightCreature {
     }
 
     // Execute a single death slash
-    async executeDeathSlash(deathKnightElement, target, slashIndex) {
+    async executeDeathSlash(deathKnightElement, target, slashIndex, attackingDeathKnight) {
         const targetElement = this.getTargetElement(target);
         
         if (!targetElement) {
@@ -754,8 +755,8 @@ export class SkeletonDeathKnightCreature {
         // Wait for slash to appear
         await this.battleManager.delay(adjustedAnimationTime * 0.2);
         
-        // Apply damage when slash hits (only host applies actual damage)
-        this.applyDarkSlashDamage(target, attackingCreature);
+        // Apply damage when slash hits (only host applies actual damage) - FIXED: Use attackingDeathKnight
+        this.applyDarkSlashDamage(target, attackingDeathKnight);
         
         // Apply silenced status effect
         this.applyDarkSlashSilence(target);

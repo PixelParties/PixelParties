@@ -218,7 +218,8 @@ export class ReconnectionManager {
                     gameState.hostPotionState,
                     gameState.hostNicolasState,
                     gameState.hostVacarnState,
-                    gameState.hostDelayedArtifactEffects 
+                    gameState.hostDelayedArtifactEffects,
+                    gameState.hostSemiState  
                 );
                 
             } else if (!this.isHost && gameState.guestSelected) {
@@ -249,7 +250,8 @@ export class ReconnectionManager {
                     gameState.guestPotionState,
                     gameState.guestNicolasState,
                     gameState.guestVacarnState,
-                    gameState.guestDelayedArtifactEffects
+                    gameState.guestDelayedArtifactEffects,
+                    gameState.guestSemiState  
                 );
             }
 
@@ -323,20 +325,55 @@ export class ReconnectionManager {
 
         // Restore equipment - always restore them
         if (this.isHost && gameState.hostEquipmentState) {
-            const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.hostEquipmentState);
-            if (equipmentRestored) {
-                console.log('✅ Host equipment state restored during reconnection');
+            // Only restore if NOT during battle reconnection (to avoid conflicts with checkpoint)
+            const isBattleReconnection = gameState.gamePhase === 'Battle' && gameState.battleActive;
+            
+            if (!isBattleReconnection && this.heroSelection.heroEquipmentManager) {
+                try {
+                    const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.hostEquipmentState);
+                    if (equipmentRestored) {
+                        console.log('✅ Host equipment state restored during formation reconnection');
+                    }
+                } catch (error) {
+                    console.error('❌ Error restoring host equipment:', error);
+                    // Initialize empty equipment state as fallback
+                    if (this.heroSelection.heroEquipmentManager) {
+                        this.heroSelection.heroEquipmentManager.heroEquipment = {
+                            left: [], center: [], right: []
+                        };
+                    }
+                }
+            } else {
+                console.log('📋 Skipping manager-level equipment restoration during battle reconnection');
             }
         } else if (!this.isHost && gameState.guestEquipmentState) {
-            const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.guestEquipmentState);
-            if (equipmentRestored) {
-                console.log('✅ Guest equipment state restored during reconnection');
+            // Only restore if NOT during battle reconnection (to avoid conflicts with checkpoint)
+            const isBattleReconnection = gameState.gamePhase === 'Battle' && gameState.battleActive;
+            
+            if (!isBattleReconnection && this.heroSelection.heroEquipmentManager) {
+                try {
+                    const equipmentRestored = this.heroSelection.heroEquipmentManager.importEquipmentState(gameState.guestEquipmentState);
+                    if (equipmentRestored) {
+                        console.log('✅ Guest equipment state restored during formation reconnection');
+                    }
+                } catch (error) {
+                    console.error('❌ Error restoring guest equipment:', error);
+                    // Initialize empty equipment state as fallback
+                    if (this.heroSelection.heroEquipmentManager) {
+                        this.heroSelection.heroEquipmentManager.heroEquipment = {
+                            left: [], center: [], right: []
+                        };
+                    }
+                }
+            } else {
+                console.log('📋 Skipping manager-level equipment restoration during battle reconnection');
             }
         } else {
-            // Initialize equipment state if no saved data
-            if (this.heroSelection.heroEquipmentManager) {
+            // Initialize equipment state if no saved data and not battle reconnection
+            const isBattleReconnection = gameState.gamePhase === 'Battle' && gameState.battleActive;
+            if (!isBattleReconnection && this.heroSelection.heroEquipmentManager) {
                 this.heroSelection.heroEquipmentManager.reset();
-                console.log('📝 No equipment data found during reconnection - initialized fresh state');
+                console.log('📝 No equipment data found during formation reconnection - initialized fresh state');
             }
         }
 
@@ -402,7 +439,7 @@ export class ReconnectionManager {
             }
         }
 
-        // Restore Nicolas effect state
+        // Restore Hero effect states
         if (this.isHost && gameState.hostNicolasState) {
             if (this.heroSelection.nicolasEffectManager) {
                 const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.hostNicolasState);
@@ -425,7 +462,6 @@ export class ReconnectionManager {
             }
         }
 
-        // ===== NEW: RESTORE VACARN EFFECT STATE =====
         if (this.isHost && gameState.hostVacarnState) {
             if (this.heroSelection.vacarnEffectManager) {
                 const vacarnRestored = this.heroSelection.vacarnEffectManager.importVacarnState(gameState.hostVacarnState);
@@ -469,6 +505,27 @@ export class ReconnectionManager {
             if (this.heroSelection.vacarnEffectManager) {
                 this.heroSelection.vacarnEffectManager.reset();
                 console.log('📝 No Vacarn data found during reconnection - initialized fresh state');
+            }
+        }
+        if (this.isHost && gameState.hostSemiState) {
+            if (this.heroSelection.semiEffectManager) {
+                const semiRestored = this.heroSelection.semiEffectManager.importSemiState(gameState.hostSemiState);
+                if (semiRestored) {
+                    console.log('✅ Host Semi effect state restored during reconnection');
+                }
+            }
+        } else if (!this.isHost && gameState.guestSemiState) {
+            if (this.heroSelection.semiEffectManager) {
+                const semiRestored = this.heroSelection.semiEffectManager.importSemiState(gameState.guestSemiState);
+                if (semiRestored) {
+                    console.log('✅ Guest Semi effect state restored during reconnection');
+                }
+            }
+        } else {
+            // Initialize Semi state if no saved data
+            if (this.heroSelection.semiEffectManager) {
+                this.heroSelection.semiEffectManager.reset();
+                console.log('📝 No Semi data found during reconnection - initialized fresh state');
             }
         }
 
@@ -518,8 +575,11 @@ export class ReconnectionManager {
 
     // Handle battle reconnection
     async handleBattleReconnection(gameState) {
+        console.log('🔄 Starting battle reconnection process...');
+        
         // Verify we have both characters selected before attempting battle reconnection
         if (!this.heroSelection.selectedCharacter || !this.heroSelection.opponentSelectedCharacter) {
+            console.warn('⚠️ Missing character selections, falling back to formation reconnection');
             return await this.handleFormationReconnection(gameState);
         }
 
@@ -527,32 +587,22 @@ export class ReconnectionManager {
         const currentBattleState = await this.checkCurrentBattleState();
         
         if (currentBattleState.battleEnded) {
+            console.log('📋 Battle has ended, redirecting to reward reconnection');
             // Update the game state to reflect the current reality
             const updatedGameState = { ...gameState, gamePhase: 'Reward' };
             return await this.handleRewardReconnection(updatedGameState);
         }
         
         if (!currentBattleState.battleActive) {
+            console.log('⚠️ Battle not active, checking for alternatives...');
             // Check if there are pending rewards
             const hasPendingRewards = await this.checkForPendingRewards();
             if (hasPendingRewards) {
+                console.log('🎁 Found pending rewards, redirecting to reward reconnection');
                 const updatedGameState = { ...gameState, gamePhase: 'Reward' };
                 return await this.handleRewardReconnection(updatedGameState);
             } else {
-                await this.setGamePhase('Formation');
-                return await this.handleFormationReconnection(gameState);
-            }
-        }
-
-        // Validate battle state exists
-        const battleStateExists = await this.checkBattleStateExists();
-        if (!battleStateExists) {
-            // Battle might have ended - check for rewards
-            const hasPendingRewards = await this.checkForPendingRewards();
-            if (hasPendingRewards) {
-                const updatedGameState = { ...gameState, gamePhase: 'Reward' };
-                return await this.handleRewardReconnection(updatedGameState);
-            } else {
+                console.log('🏠 No battle or rewards, returning to formation');
                 await this.setGamePhase('Formation');
                 return await this.handleFormationReconnection(gameState);
             }
@@ -560,79 +610,357 @@ export class ReconnectionManager {
         
         // Set reconnection in progress
         this.reconnectionInProgress = true;
+        console.log('🎮 Battle is active, proceeding with battle reconnection');
 
-        // Load battle state to get current formations (including any swaps)
-        const savedBattleState = await this.checkBattleStateExists() ? 
-            await this.getBattleStateFromFirebase() : null;
-
-        if (savedBattleState) {
-            // Update FormationManager with the current battle formations (post-swaps)
-            const myAbsoluteSide = this.isHost ? 'host' : 'guest';
-            const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
-            
-            const myCurrentFormation = savedBattleState[`${myAbsoluteSide}Formation`];
-            const opponentCurrentFormation = savedBattleState[`${opponentAbsoluteSide}Formation`];
-            
-            if (myCurrentFormation && opponentCurrentFormation) {
-                this.heroSelection.formationManager.importFormationState({
-                    battleFormation: myCurrentFormation,
-                    opponentBattleFormation: this.heroSelection.formationManager.alignOpponentFormation(opponentCurrentFormation)
-                }, this.isHost);
-                
-                console.log('⚓ Updated FormationManager with post-swap formations for battle reconnection');
+        // Signal to host that we might be desynced
+        if (this.heroSelection && this.heroSelection.battleScreen && this.heroSelection.battleScreen.battleManager) {
+            const battleManager = this.heroSelection.battleScreen.battleManager;
+            if (battleManager.networkManager) {
+                battleManager.networkManager.signalDesyncToHost();
             }
         }
 
-        // Initialize battle screen immediately
+        // ============================================
+        // STEP 1: Pre-load checkpoint to restore formations
+        // ============================================
+        console.log('📍 Pre-loading checkpoint to restore formations...');
+        
+        let checkpointLoaded = false;
+        let checkpointSystem = null;
+        let checkpoint = null;
+        
+        try {
+            const { getCheckpointSystem } = await import('./checkpointSystem.js');
+            checkpointSystem = getCheckpointSystem();
+            
+            // Initialize checkpoint system with minimal setup
+            checkpointSystem.init(null, this.roomManager, this.isHost);
+            
+            // Load the checkpoint
+            checkpoint = await checkpointSystem.loadCheckpoint();
+            
+            if (checkpoint && checkpoint.formations) {
+                console.log('✅ Checkpoint loaded, restoring formations to FormationManager');
+                
+                // Restore formations to FormationManager BEFORE creating battle screen
+                if (this.heroSelection.formationManager) {
+                    // Determine which formations belong to us based on host/guest status
+                    const myFormation = this.isHost ? checkpoint.formations.player : checkpoint.formations.opponent;
+                    const theirFormation = this.isHost ? checkpoint.formations.opponent : checkpoint.formations.player;
+                    
+                    // Restore our formation
+                    if (myFormation) {
+                        this.heroSelection.formationManager.battleFormation = myFormation;
+                        console.log('📋 Restored player formation:', Object.keys(myFormation));
+                    }
+                    
+                    // Restore opponent formation (need to align it properly)
+                    if (theirFormation) {
+                        // Opponent formation needs to be flipped for display
+                        const alignedOpponent = this.heroSelection.formationManager.alignOpponentFormation(theirFormation);
+                        this.heroSelection.formationManager.opponentBattleFormation = alignedOpponent;
+                        console.log('📋 Restored opponent formation:', Object.keys(alignedOpponent));
+                    }
+                    
+                    checkpointLoaded = true;
+                }
+                
+                // Also restore abilities, spellbooks, creatures, and equipment to heroSelection managers
+                if (checkpoint.abilities) {
+                    const myAbilities = this.isHost ? checkpoint.abilities.player : checkpoint.abilities.opponent;
+                    if (myAbilities && this.heroSelection.heroAbilitiesManager) {
+                        this.heroSelection.heroAbilitiesManager.heroAbilities = myAbilities;
+                        console.log('📋 Restored abilities data');
+                    }
+                }
+                
+                if (checkpoint.spellbooks) {
+                    const mySpellbooks = this.isHost ? checkpoint.spellbooks.player : checkpoint.spellbooks.opponent;
+                    if (mySpellbooks && this.heroSelection.heroSpellbookManager) {
+                        this.heroSelection.heroSpellbookManager.heroSpellbooks = mySpellbooks;
+                        console.log('📋 Restored spellbooks data');
+                    }
+                }
+                
+                if (checkpoint.creatures) {
+                    const myCreatures = this.isHost ? checkpoint.creatures.player : checkpoint.creatures.opponent;
+                    if (myCreatures && this.heroSelection.heroCreatureManager) {
+                        this.heroSelection.heroCreatureManager.heroCreatures = myCreatures;
+                        console.log('📋 Restored creatures data');
+                    }
+                }
+                
+                if (checkpoint.equipment) {
+                    // Equipment will be restored at hero level during full checkpoint restoration
+                    console.log('📋 Skipping manager-level equipment restoration - will be handled at hero level');
+                }
+            } else {
+                console.warn('⚠️ No checkpoint available for pre-loading formations');
+            }
+        } catch (error) {
+            console.warn('⚠️ Could not pre-load checkpoint:', error);
+        }
+
+        // ============================================
+        // STEP 2: Fallback formation restoration from gameState
+        // ============================================
+        if (!checkpointLoaded) {
+            console.log('📦 Attempting to restore formations from gameState...');
+            
+            // Try to restore from gameState as fallback
+            const myFormation = this.isHost ? gameState.hostBattleFormation : gameState.guestBattleFormation;
+            const theirFormation = this.isHost ? gameState.guestBattleFormation : gameState.hostBattleFormation;
+            
+            if (myFormation && this.heroSelection.formationManager) {
+                this.heroSelection.formationManager.battleFormation = myFormation;
+                console.log('📋 Restored player formation from gameState');
+            }
+            
+            if (theirFormation && this.heroSelection.formationManager) {
+                const alignedOpponent = this.heroSelection.formationManager.alignOpponentFormation(theirFormation);
+                this.heroSelection.formationManager.opponentBattleFormation = alignedOpponent;
+                console.log('📋 Restored opponent formation from gameState');
+            }
+        }
+
+        // ============================================
+        // STEP 3: Initialize Battle Screen with restored formations
+        // ============================================
+        console.log('📺 Initializing battle screen with restored formations...');
+        
+        // Now initialize battle screen - it will use the restored formations
         const battleInitialized = this.heroSelection.initBattleScreen();
         if (!battleInitialized) {
-            return false;
+            console.error('❌ Failed to initialize battle screen');
+            await this.setGamePhase('Formation');
+            return await this.handleFormationReconnection(gameState);
         }
         
-        // Show battle arena immediately  
+        // Show battle arena - should now display heroes properly
         this.showBattleArena();
+        console.log('✅ Battle arena displayed with heroes');
 
         // Initialize speed control UI after showing battle arena
         if (this.heroSelection.battleScreen) {
             const speedUISuccess = this.heroSelection.battleScreen.initializeSpeedControlUI();
             if (!speedUISuccess) {
                 console.warn('⚠️ Could not initialize speed controls during reconnection');
-                // Add fallback message to battle center
                 const battleCenter = document.getElementById('battleCenter');
                 if (battleCenter) {
                     battleCenter.innerHTML = `
                         <div class="speed-control-error">
                             <p>⚠️ Speed controls unavailable (reconnection)</p>
-                            <p style="font-size: 12px; color: #aaa;">Host: ${this.isHost}, BM: ${!!(this.heroSelection.battleScreen?.battleManager)}, SM: ${!!(this.heroSelection.battleScreen?.battleManager?.speedManager)}</p>
+                            <p style="font-size: 12px; color: #aaa;">Reconnecting...</p>
                         </div>
                     `;
                 }
             }
         }
+
+        // ============================================
+        // STEP 4: Complete checkpoint restoration
+        // ============================================
+        if (checkpoint && checkpointSystem) {
+            console.log('📍 Completing full checkpoint restoration...');
+            
+            try {
+                // Re-initialize checkpoint system with the actual battle manager
+                if (this.heroSelection.battleScreen && this.heroSelection.battleScreen.battleManager) {
+                    checkpointSystem.init(
+                        this.heroSelection.battleScreen.battleManager,
+                        this.roomManager,
+                        this.isHost
+                    );
+                    
+                    // Set checkpoint system reference in battle manager
+                    this.heroSelection.battleScreen.battleManager.checkpointSystem = checkpointSystem;
+                    
+                    // Restore from the already loaded checkpoint
+                    const restored = await checkpointSystem.restoreFromCheckpoint(checkpoint);
+                    
+                    if (restored) {
+                        console.log('✅ Battle fully restored from checkpoint!');
+                        
+                        // Add success message to combat log
+                        this.addCombatLog('✅ Battle state restored from checkpoint!', 'success');
+                        
+                        const checkpointInfo = checkpointSystem.getCheckpointInfo();
+                        if (checkpointInfo) {
+                            this.addCombatLog(
+                                `📍 Resumed from Turn ${checkpointInfo.turn} (${checkpointInfo.type})`, 
+                                'info'
+                            );
+                        }
+                        
+                        // Sync abilities for tooltip display
+                        if (this.heroSelection.battleScreen.syncAbilitiesFromBattleManager) {
+                            this.heroSelection.battleScreen.syncAbilitiesFromBattleManager();
+                            console.log('🔄 Abilities synchronized for display');
+                        }
+                        
+                        // Handle host-specific reconnection tasks
+                        if (this.isHost && this.heroSelection.battleScreen.battleManager.isAuthoritative) {
+                            await this.handleHostCheckpointReconnection(this.heroSelection.battleScreen.battleManager);
+                        }
+                        
+                        // Transition to IN_BATTLE state
+                        this.heroSelection.stateMachine.transitionTo(
+                            this.heroSelection.stateMachine.states.IN_BATTLE,
+                            { source: 'checkpoint_restoration', restored: true }
+                        );
+                        
+                        this.completeReconnection();
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error during full checkpoint restoration:', error);
+            }
+        }
+
+        // ============================================
+        // STEP 5: Fallback to legacy Firebase restoration
+        // ============================================
+        console.log('📦 Attempting legacy Firebase restoration...');
         
-        // Handle reconnection using Firebase persistence
         const reconnectionSuccess = await this.handleFirebaseBattleReconnection(gameState);
         
         if (reconnectionSuccess) {
-            // Transition to IN_BATTLE state on successful reconnection
+            console.log('✅ Battle restored via legacy system');
+            
+            // Transition to IN_BATTLE state
             this.heroSelection.stateMachine.transitionTo(
                 this.heroSelection.stateMachine.states.IN_BATTLE,
-                { source: 'battle_reconnection', restored: true }
+                { source: 'legacy_restoration', restored: true }
             );
             
             this.completeReconnection();
             return true;
-        } else {
-            await this.setGamePhase('Formation');
-            
-            // Transition back to team building on failure
-            this.heroSelection.stateMachine.transitionTo(
-                this.heroSelection.stateMachine.states.TEAM_BUILDING,
-                { source: 'battle_reconnection_failed' }
-            );
-            
-            return false;
         }
+
+        // ============================================
+        // STEP 6: Final fallback - Restart battle
+        // ============================================
+        console.log('⚠️ All restoration methods failed, attempting battle restart...');
+        
+        const battleManager = this.heroSelection.battleScreen?.battleManager;
+        if (battleManager) {
+            try {
+                // Clear any corrupted state
+                battleManager.forceRefreshBattleState();
+                
+                // Clear checkpoints and persistence
+                if (checkpointSystem) {
+                    await checkpointSystem.clearCheckpoint();
+                }
+                if (battleManager.persistenceManager) {
+                    await battleManager.persistenceManager.clearBattleState();
+                }
+                
+                // Mark battle as restarted
+                await this.roomManager.getRoomRef().update({
+                    battleRestarted: true,
+                    battleRestartedAt: Date.now(),
+                    gamePhase: 'Battle',
+                    gamePhaseUpdated: Date.now(),
+                    battleActive: true,
+                    battleStarted: true,
+                    battlePaused: false
+                });
+                
+                this.addCombatLog('🔄 Battle restarting with fresh state...', 'warning');
+                
+                // Transition to IN_BATTLE state
+                this.heroSelection.stateMachine.transitionTo(
+                    this.heroSelection.stateMachine.states.IN_BATTLE,
+                    { source: 'battle_restart', fresh: true }
+                );
+                
+                // Start battle after delay
+                setTimeout(() => {
+                    this.heroSelection.battleScreen.startBattle();
+                }, this.getSpeedAdjustedDelay(1000));
+                
+                this.completeReconnection();
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Failed to restart battle:', error);
+            }
+        }
+
+        // ============================================
+        // STEP 7: Complete failure - Return to formation
+        // ============================================
+        console.error('❌ All battle reconnection attempts failed');
+        
+        await this.setGamePhase('Formation');
+        
+        // Transition back to team building
+        this.heroSelection.stateMachine.transitionTo(
+            this.heroSelection.stateMachine.states.TEAM_BUILDING,
+            { source: 'battle_reconnection_failed' }
+        );
+        
+        this.reconnectionInProgress = false;
+        return false;
+    }
+
+    // Helper method for host-specific checkpoint reconnection tasks
+    async handleHostCheckpointReconnection(battleManager) {
+        console.log('🎯 Host: Handling post-checkpoint reconnection tasks');
+        
+        // Check if battle was paused
+        if (battleManager.battlePaused) {
+            console.log('⏸️ Battle was paused, checking opponent status...');
+            
+            // Re-check opponent connection status
+            const roomRef = this.roomManager.getRoomRef();
+            if (roomRef) {
+                try {
+                    const snapshot = await roomRef.once('value');
+                    const room = snapshot.val();
+                    
+                    if (room && room.guestOnline) {
+                        console.log('✅ Guest is online, resuming battle');
+                        await battleManager.resumeBattle('Host reconnected, guest is online');
+                        
+                        // Resume battle loop if needed
+                        if (battleManager.battleActive && !battleManager.checkBattleEnd()) {
+                            setTimeout(() => {
+                                console.log('▶️ Resuming battle loop');
+                                battleManager.flowManager.authoritative_battleLoop();
+                            }, 1000);
+                        }
+                    } else {
+                        console.log('⏸️ Guest is offline - battle remains paused');
+                        this.addCombatLog('⏸️ Waiting for opponent to reconnect...', 'warning');
+                    }
+                } catch (error) {
+                    console.error('Error checking guest status:', error);
+                }
+            }
+        } else {
+            // Battle wasn't paused - check if we need to resume the loop
+            if (battleManager.battleActive && !battleManager.checkBattleEnd()) {
+                console.log('▶️ Battle active, resuming battle loop');
+                
+                console.log('🔄 Resyncing guest to current host state...');
+                const resyncSuccess = await battleManager.networkManager.resyncGuest();
+                if (resyncSuccess) {
+                    console.log('✅ Guest resynchronized successfully');
+                } else {
+                    console.warn('⚠️ Guest resync failed, but continuing battle');
+                }
+
+                setTimeout(() => {
+                    battleManager.flowManager.authoritative_battleLoop();
+                }, 1000);
+            }
+        }
+        
+        // Mark host as reconnected
+        await this.markPlayerReconnected();
     }
 
     // Check the current battle state to see if battle has ended

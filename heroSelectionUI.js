@@ -732,28 +732,45 @@ function onTeamSlotDragOver(event, position) {
             if (!existingTooltip) {
                 // Check if hero can learn the spell
                 const learnCheck = window.heroSelection.canHeroLearnSpell(position, cardName);
-                
+
                 // Set visual state
                 if (learnCheck.canLearn) {
+                    slot.classList.add('spell-drop-ready');
+                    slot.classList.remove('spell-drop-invalid');
+                } else if (learnCheck.isSemiGoldLearning) {
+                    // Special case for Semi gold learning
                     slot.classList.add('spell-drop-ready');
                     slot.classList.remove('spell-drop-invalid');
                 } else {
                     slot.classList.add('spell-drop-invalid');
                     slot.classList.remove('spell-drop-ready');
                 }
-                
+
                 // Create tooltip
                 const tooltip = document.createElement('div');
-                tooltip.className = `spell-drop-tooltip ${learnCheck.canLearn ? 'can-learn' : 'cannot-learn'}`;
-                
+                let tooltipClass = 'spell-drop-tooltip';
+                let tooltipMessage = '';
+
+                if (learnCheck.canLearn) {
+                    tooltipClass += ' can-learn';
+                    tooltipMessage = `${learnCheck.heroName} can learn ${window.heroSelection.formatCardName(cardName)}!`;
+                } else if (learnCheck.isSemiGoldLearning) {
+                    // Special styling for Semi gold learning
+                    tooltipClass += ' semi-gold-learn';
+                    tooltipMessage = learnCheck.reason; // Already formatted in canHeroLearnSpell
+                } else {
+                    tooltipClass += ' cannot-learn';
+                    tooltipMessage = learnCheck.reason;
+                }
+
+                tooltip.className = tooltipClass;
+
                 // Add long-text class if needed
-                if (learnCheck.reason && learnCheck.reason.length > 30) {
+                if (tooltipMessage.length > 30) {
                     tooltip.className += ' long-text';
                 }
-                
-                tooltip.textContent = learnCheck.canLearn ? 
-                    `${learnCheck.heroName} can learn ${window.heroSelection.formatCardName(cardName)}!` : 
-                    learnCheck.reason;
+
+                tooltip.textContent = tooltipMessage;
                 
                 // Set initial style for positioning
                 tooltip.style.cssText = `
@@ -808,6 +825,10 @@ function onTeamSlotDragOver(event, position) {
                 if (learnCheck.canLearn) {
                     slot.classList.add('spell-drop-ready');
                     slot.classList.remove('spell-drop-invalid');
+                } else if (learnCheck.isSemiGoldLearning) {
+                    // Special case for Semi gold learning
+                    slot.classList.add('spell-drop-ready');
+                    slot.classList.remove('spell-drop-invalid');
                 } else {
                     slot.classList.add('spell-drop-invalid');
                     slot.classList.remove('spell-drop-ready');
@@ -817,7 +838,6 @@ function onTeamSlotDragOver(event, position) {
                 currentTooltip = existingTooltip;
                 currentTooltipSlot = slot;
             }
-            
             return;
         }
 
@@ -1621,6 +1641,19 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
         @keyframes fadeIn {
             from { opacity: 0; transform: translateX(-50%) translateY(10px); }
             to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .spell-drop-tooltip.cannot-learn {
+            background: linear-gradient(135deg, #dc3545 0%, #e63946 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .spell-drop-tooltip.semi-gold-learn {
+            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 15px rgba(74, 144, 226, 0.4);
         }
     `;
     document.head.appendChild(style);

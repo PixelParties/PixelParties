@@ -367,9 +367,16 @@ export class BattleNetworkManager {
 
     handleGuestReconnecting() {
         this.guestReconnecting = true;
+        const bm = this.battleManager;
+        bm.addCombatLog('⚠️ Guest reconnecting - checking for desync...', 'warning');
+
+        // Pause battle immediately when guest starts reconnecting
+        if (bm.battleActive && !this.battlePaused) {
+            this.pauseBattle('Guest reconnecting - preventing desync');
+        }
+
         console.log('🔄 HOST: Guest is reconnecting...');
         
-        const bm = this.battleManager;
         bm.addCombatLog('🔄 Opponent is reconnecting...', 'info');
         
         // Set a timeout for reconnection handshake
@@ -391,9 +398,18 @@ export class BattleNetworkManager {
         }
         
         // Add a small delay to ensure guest is fully ready
-        setTimeout(() => {
+        setTimeout(async () => {
             if (this.opponentConnected && !bm.checkBattleEnd()) {
-                this.resumeBattle('Guest reconnected and ready');
+                console.log('🔄 HOST: Resyncing guest after reconnection...');
+                const resyncSuccess = await this.resyncGuest();
+                
+                if (resyncSuccess) {
+                    console.log('✅ HOST: Guest resync completed, resuming battle');
+                    // Battle resumes automatically in resyncGuest if successful
+                } else {
+                    console.warn('⚠️ HOST: Guest resync failed, but resuming anyway');
+                    this.resumeBattle('Guest reconnected (resync failed but attempting to continue)');
+                }
             }
         }, this.getSpeedAdjustedDelay(500));
     }
@@ -557,6 +573,14 @@ export class BattleNetworkManager {
                 
             case 'battle_resumed':
                 this.guest_handleBattleResumed(data);
+                break;
+                
+            case 'resync_battle_state':
+                this.guest_handleResyncBattleState(data);
+                break;
+                
+            case 'guest_desync_signal':
+                this.guest_handleDesyncSignal(data);
                 break;
 
             case 'actor_action':
@@ -826,6 +850,24 @@ export class BattleNetworkManager {
             // Handle visual death state (only if creature stayed dead)
             if (died && !revivedByNecromancy && oldHp > 0) {
                 bm.handleCreatureDeath(localHero, creature, creatureIndex, heroLocalSide, heroPosition);
+                
+                // FIXED: Immediately hide health bar and HP text for defeated creature
+                const creatureElement = document.querySelector(
+                    `.${heroLocalSide}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
+                );
+                
+                if (creatureElement) {
+                    const healthBar = creatureElement.querySelector('.creature-health-bar');
+                    const hpText = creatureElement.querySelector('.creature-hp-text');
+                    if (healthBar) {
+                        healthBar.remove();
+                        console.log(`🩸 GUEST: Removed health bar for defeated ${creatureName}`);
+                    }
+                    if (hpText) {
+                        hpText.remove();
+                        console.log(`🩸 GUEST: Removed HP text for defeated ${creatureName}`);
+                    }
+                }
             }
             
             // If creature was revived, make sure visual state reflects being alive
@@ -841,6 +883,13 @@ export class BattleNetworkManager {
                         sprite.style.filter = '';
                         sprite.style.opacity = '';
                     }
+                    
+                    // FIXED: Ensure revived creatures have their health bars restored
+                    // Call updateCreatureVisuals to recreate health bar if needed
+                    setTimeout(() => {
+                        bm.updateCreatureVisuals(heroLocalSide, heroPosition, localHero.creatures);
+                        console.log(`💀✨ GUEST: Restored health bar for revived ${creatureName}`);
+                    }, 100);
                 }
             }
         }
@@ -931,6 +980,276 @@ export class BattleNetworkManager {
             setTimeout(() => {
                 bm.battleScreen.showCardRewardsAndReturn(myResult);
             }, 0);
+        }
+    }
+
+    
+
+    // ============================================
+    // RESYNC AFTER DC
+    // ============================================
+
+    /**
+     * HOST: Resynchronize guest to match host's current battle state
+     * Called after host reconnects or when guest signals desync
+     * @returns {boolean} Success status
+     */
+    async resyncGuest() {
+        const bm = this.battleManager;
+        
+        if (!bm.isAuthoritative) {
+            console.error('❌ Only host can initiate guest resync');
+            return false;
+        }
+        
+        if (!this.opponentConnected) {
+            console.log('⚠️ Cannot resync - guest not connected');
+            return false;
+        }
+        
+        console.log('🔄 HOST: Starting guest resynchronization...');
+        
+        try {
+            // 1. Pause battle simulation during sync
+            const wasPaused = this.battlePaused;
+            if (!wasPaused) {
+                bm.addCombatLog('⏸️ Pausing battle for guest synchronization...', 'system');
+                this.pauseBattle('Guest resynchronization in progress');
+            }
+            
+            // 2. Capture complete current battle state (like checkpoint but for right now)
+            const currentState = this.captureCurrentBattleState();
+            if (!currentState) {
+                console.error('❌ Failed to capture current battle state for resync');
+                return false;
+            }
+            
+            bm.addCombatLog('📡 Sending current battle state to guest...', 'system');
+            
+            // 3. Send complete state to guest
+            this.sendBattleData('resync_battle_state', {
+                battleState: currentState,
+                resyncId: `resync_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                timestamp: Date.now(),
+                hostTurn: bm.currentTurn,
+                message: 'Host requesting guest resynchronization'
+            });
+            
+            // 4. Wait for guest acknowledgment (longer timeout for full state restore)
+            console.log('⏳ HOST: Waiting for guest to acknowledge resync...');
+            const ackReceived = await this.waitForGuestAcknowledgment('resync_complete', 10000); // 10 second timeout
+            
+            if (!ackReceived) {
+                console.error('❌ Guest failed to acknowledge resynchronization');
+                bm.addCombatLog('❌ Guest resync failed - no acknowledgment received', 'error');
+                
+                // Resume battle anyway if it wasn't originally paused
+                if (!wasPaused && this.opponentConnected) {
+                    this.resumeBattle('Resync failed but guest appears connected');
+                }
+                return false;
+            }
+            
+            // 5. Resync successful
+            console.log('✅ HOST: Guest resynchronization completed successfully');
+            bm.addCombatLog('✅ Guest successfully resynchronized to current battle state', 'success');
+            
+            // 6. Resume battle if it wasn't originally paused
+            if (!wasPaused && this.opponentConnected) {
+                setTimeout(() => {
+                    this.resumeBattle('Guest resynchronization completed');
+                }, 500); // Small delay to ensure guest is fully ready
+            }
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Error during guest resynchronization:', error);
+            bm.addCombatLog('❌ Guest resync failed due to error', 'error');
+            return false;
+        }
+    }
+
+    /**
+     * HOST: Capture current battle state for guest resync (similar to checkpoint but immediate)
+     * @returns {Object} Complete current battle state
+     */
+    captureCurrentBattleState() {
+        const bm = this.battleManager;
+        
+        try {
+            // Use checkpoint system to capture complete state, but mark it as 'resync'
+            if (bm.checkpointSystem) {
+                const currentCheckpoint = bm.checkpointSystem.createCheckpoint('resync');
+                if (currentCheckpoint) {
+                    console.log('📸 Captured current battle state for guest resync');
+                    return currentCheckpoint;
+                }
+            }
+            
+            console.error('❌ Failed to create resync checkpoint');
+            return null;
+            
+        } catch (error) {
+            console.error('❌ Error capturing current battle state:', error);
+            return null;
+        }
+    }
+
+    /**
+     * GUEST: Handle incoming resync request from host
+     * @param {Object} data - Resync data from host
+     */
+    async guest_handleResyncBattleState(data) {
+        const bm = this.battleManager;
+        
+        if (bm.isAuthoritative) {
+            console.warn('⚠️ Host should not receive resync messages');
+            return;
+        }
+        
+        console.log('🔄 GUEST: Received resync request from host');
+        bm.addCombatLog('🔄 Receiving updated battle state from host...', 'system');
+        
+        try {
+            const { battleState, resyncId, hostTurn, message } = data;
+            
+            if (!battleState) {
+                console.error('❌ GUEST: No battle state in resync message');
+                return;
+            }
+            
+            bm.addCombatLog(`📡 ${message}`, 'info');
+            bm.addCombatLog(`🎯 Syncing to host turn ${hostTurn}...`, 'system');
+            
+            // Apply the complete battle state (like checkpoint restoration)
+            const restored = await this.applyResyncBattleState(battleState);
+            
+            if (restored) {
+                console.log('✅ GUEST: Successfully applied resync battle state');
+                bm.addCombatLog('✅ Battle state synchronized with host!', 'success');
+                
+                // Send acknowledgment to host
+                this.sendAcknowledgment('resync_complete');
+                console.log('📤 GUEST: Sent resync complete acknowledgment to host');
+                
+            } else {
+                console.error('❌ GUEST: Failed to apply resync battle state');
+                bm.addCombatLog('❌ Failed to synchronize with host state', 'error');
+            }
+            
+        } catch (error) {
+            console.error('❌ GUEST: Error handling resync:', error);
+            bm.addCombatLog('❌ Error during resynchronization', 'error');
+        }
+    }
+
+    /**
+     * GUEST: Apply the resync battle state (similar to checkpoint restoration)
+     * @param {Object} battleState - Complete battle state from host
+     * @returns {boolean} Success status
+     */
+    async applyResyncBattleState(battleState) {
+        const bm = this.battleManager;
+        
+        try {
+            // Use checkpoint system to restore the state
+            if (bm.checkpointSystem && battleState) {
+                console.log('🔄 GUEST: Applying resync state via checkpoint system...');
+                
+                // The battleState should be a complete checkpoint
+                const restored = await bm.checkpointSystem.restoreFromCheckpoint(battleState);
+                
+                if (restored) {
+                    console.log('✅ GUEST: Resync state applied successfully');
+                    
+                    // Force update all visuals to match new state
+                    bm.updateAllHeroVisuals();
+                    
+                    // Re-render creatures
+                    if (bm.battleScreen) {
+                        bm.battleScreen.renderCreaturesAfterInit();
+                    }
+                    
+                    // Update necromancy displays
+                    if (bm.necromancyManager) {
+                        bm.necromancyManager.initializeNecromancyStackDisplays();
+                    }
+                    
+                    // Restore visual effects
+                    bm.restoreFireshieldVisuals();
+                    bm.restoreFrostRuneVisuals();
+                    
+                    return true;
+                }
+            }
+            
+            console.error('❌ GUEST: Failed to apply resync state');
+            return false;
+            
+        } catch (error) {
+            console.error('❌ GUEST: Error applying resync state:', error);
+            return false;
+        }
+    }
+
+    /**
+     * GUEST: Signal to host that we are desynced and need resync
+     * Called when guest reconnects or detects desync
+     */
+    signalDesyncToHost() {
+        const bm = this.battleManager;
+        
+        if (bm.isAuthoritative) return; // Only guest can signal desync
+        
+        console.log('📡 GUEST: Signaling desync to host - requesting resynchronization');
+        
+        if (bm.gameDataSender) {
+            bm.gameDataSender('battle_data', {
+                type: 'guest_desync_signal',
+                data: {
+                    timestamp: Date.now(),
+                    guestTurn: bm.currentTurn,
+                    message: 'Guest is desynced and needs resynchronization',
+                    reason: 'reconnection'
+                }
+            });
+        }
+        
+        bm.addCombatLog('📡 Requesting battle state sync from host...', 'system');
+    }
+
+    /**
+     * HOST: Handle guest desync signal
+     * @param {Object} data - Desync signal from guest
+     */
+    async guest_handleDesyncSignal(data) {
+        const bm = this.battleManager;
+        
+        if (!bm.isAuthoritative) {
+            console.warn('⚠️ Guest should not receive desync signals');
+            return;
+        }
+        
+        console.log('⚠️ HOST: Guest reports desync - initiating resynchronization');
+        bm.addCombatLog('⚠️ Guest detected desync - resynchronizing...', 'warning');
+        
+        const { guestTurn, message, reason } = data;
+        
+        if (guestTurn !== bm.currentTurn) {
+            console.log(`🎯 HOST: Turn mismatch detected - Host: ${bm.currentTurn}, Guest: ${guestTurn}`);
+            bm.addCombatLog(`🎯 Turn mismatch: Host(${bm.currentTurn}) vs Guest(${guestTurn})`, 'warning');
+        }
+        
+        bm.addCombatLog(`📡 ${message}`, 'info');
+        
+        // Immediately resync the guest
+        const success = await this.resyncGuest();
+        
+        if (success) {
+            console.log('✅ HOST: Guest desync resolved successfully');
+        } else {
+            console.error('❌ HOST: Failed to resolve guest desync');
         }
     }
 

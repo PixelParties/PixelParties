@@ -32,7 +32,9 @@ export class PotionHandler {
             'LifeSerum',
             'PoisonVial',
             'BottledFlame',
-            'bottledLightning'
+            'bottledLightning',
+            'BoulderInABottle',
+            'SwordInABottle'
         ];
         
         return knownPotions.includes(cardName);
@@ -72,7 +74,7 @@ export class PotionHandler {
                 heroSelection.handManager.removeCardFromHandByIndex(cardIndex);
             }
 
-            // NEW: Add potion effect to active effects list
+            // Add potion effect to active effects list
             this.addPotionEffect(cardName);
 
             // Draw a card from deck
@@ -195,26 +197,69 @@ export class PotionHandler {
         
         let totalEffectsApplied = 0;
         
-        // Apply host's potion effects (targeting opponent/guest heroes)
-        if (hostPotionState && hostPotionState.activePotionEffects && hostPotionState.activePotionEffects.length > 0) {
-            console.log(`🧪 Applying ${hostPotionState.activePotionEffects.length} host potion effects`);
-            const hostEffects = await this.applyPotionEffectsForPlayer(
-                hostPotionState, 
-                'host', 
-                battleManager
-            );
-            totalEffectsApplied += hostEffects;
+        // ===== SPECIAL HANDLING FOR SWORD IN A BOTTLE =====
+        // Extract SwordInABottle effects for simultaneous processing
+        const hostSwordEffects = hostPotionState?.activePotionEffects?.filter(effect => effect.name === 'SwordInABottle') || [];
+        const guestSwordEffects = guestPotionState?.activePotionEffects?.filter(effect => effect.name === 'SwordInABottle') || [];
+        
+        if (hostSwordEffects.length > 0 || guestSwordEffects.length > 0) {
+            console.log(`⚔️ Processing ${hostSwordEffects.length + guestSwordEffects.length} total Sword in a Bottle effects simultaneously`);
+            
+            try {
+                const { SwordInABottlePotion } = await import('./Potions/swordInABottle.js');
+                const swordInABottlePotion = new SwordInABottlePotion();
+                
+                // Use the new simultaneous method
+                const swordEffectsProcessed = await swordInABottlePotion.handleSimultaneousEffects(
+                    hostSwordEffects,
+                    guestSwordEffects,
+                    battleManager
+                );
+                
+                totalEffectsApplied += swordEffectsProcessed;
+                console.log(`✅ Simultaneous Sword in a Bottle processing completed: ${swordEffectsProcessed} effects`);
+                
+            } catch (error) {
+                console.error('❌ Error processing simultaneous Sword in a Bottle effects:', error);
+                // Fall back to individual processing if simultaneous fails
+                if (hostSwordEffects.length > 0) {
+                    const hostEffects = await this.handleSwordInABottleEffects(hostSwordEffects, 'host', battleManager);
+                    totalEffectsApplied += hostEffects;
+                }
+                if (guestSwordEffects.length > 0) {
+                    const guestEffects = await this.handleSwordInABottleEffects(guestSwordEffects, 'guest', battleManager);
+                    totalEffectsApplied += guestEffects;
+                }
+            }
         }
         
-        // Apply guest's potion effects (targeting player/host heroes)  
+        // ===== PROCESS ALL OTHER POTION TYPES NORMALLY =====
+        // Apply host's other potion effects (excluding SwordInABottle)
+        if (hostPotionState && hostPotionState.activePotionEffects && hostPotionState.activePotionEffects.length > 0) {
+            const otherHostEffects = hostPotionState.activePotionEffects.filter(effect => effect.name !== 'SwordInABottle');
+            if (otherHostEffects.length > 0) {
+                console.log(`🧪 Applying ${otherHostEffects.length} other host potion effects`);
+                const hostEffects = await this.applyPotionEffectsForPlayer(
+                    { ...hostPotionState, activePotionEffects: otherHostEffects }, 
+                    'host', 
+                    battleManager
+                );
+                totalEffectsApplied += hostEffects;
+            }
+        }
+        
+        // Apply guest's other potion effects (excluding SwordInABottle)
         if (guestPotionState && guestPotionState.activePotionEffects && guestPotionState.activePotionEffects.length > 0) {
-            console.log(`🧪 Applying ${guestPotionState.activePotionEffects.length} guest potion effects`);
-            const guestEffects = await this.applyPotionEffectsForPlayer(
-                guestPotionState, 
-                'guest', 
-                battleManager
-            );
-            totalEffectsApplied += guestEffects;
+            const otherGuestEffects = guestPotionState.activePotionEffects.filter(effect => effect.name !== 'SwordInABottle');
+            if (otherGuestEffects.length > 0) {
+                console.log(`🧪 Applying ${otherGuestEffects.length} other guest potion effects`);
+                const guestEffects = await this.applyPotionEffectsForPlayer(
+                    { ...guestPotionState, activePotionEffects: otherGuestEffects }, 
+                    'guest', 
+                    battleManager
+                );
+                totalEffectsApplied += guestEffects;
+            }
         }
         
         if (totalEffectsApplied > 0) {
@@ -271,7 +316,13 @@ export class PotionHandler {
 
             case 'PoisonVial':
                 return await this.handlePoisonVialEffects(effects, playerRole, battleManager);
-    
+
+            case 'BoulderInABottle':
+                return await this.handleBoulderInABottleEffects(effects, playerRole, battleManager);
+
+            case 'SwordInABottle':  // <-- INDIVIDUAL FALLBACK PROCESSING
+                return await this.handleSwordInABottleEffects(effects, playerRole, battleManager);
+
             case 'ElixirOfStrength':
                 // TODO: Implement when ElixirOfStrength battle effects are added
                 console.log(`ElixirOfStrength effects not yet implemented for battle`);
@@ -289,7 +340,53 @@ export class PotionHandler {
         }
     }
 
-    // Handle BottledFlame effects by delegating to the BottledFlame module
+    async handleSwordInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the SwordInABottle module
+            const { SwordInABottlePotion } = await import('./Potions/swordInABottle.js');
+            const swordInABottlePotion = new SwordInABottlePotion();
+            
+            // Use the individual player method (fallback)
+            const effectsProcessed = await swordInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ Sword in a Bottle delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating Sword in a Bottle effects for ${playerRole}:`, error);
+            
+            // Fallback: minimal effect logging
+            battleManager.addCombatLog(`⚔️ Sword in a Bottle effects failed to activate properly`, 'error');
+            return effects.length; // Still count as processed to avoid errors
+        }
+    }
+
+    async handleBoulderInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the BoulderInABottle module
+            const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
+            const boulderInABottlePotion = new BoulderInABottlePotion();
+            
+            // Delegate everything to the BoulderInABottle module
+            const effectsProcessed = await boulderInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ BoulderInABottle delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating BoulderInABottle effects for ${playerRole}:`, error);
+            return 0;
+        }
+    }
+
     async handleBottledFlameEffects(effects, playerRole, battleManager) {
         try {
             // Import and use the enhanced BottledFlame module
@@ -328,7 +425,6 @@ export class PotionHandler {
         }
     }
 
-    // Handle BottledLightning effects by delegating to the BottledLightning module
     async handleBottledLightningEffects(effects, playerRole, battleManager) {
         try {
             // Import and use the BottledLightning module
@@ -351,7 +447,6 @@ export class PotionHandler {
         }
     }
 
-    // Handle PoisonVial effects by delegating to the PoisonVial module
     async handlePoisonVialEffects(effects, playerRole, battleManager) {
         try {
             // Import and use the PoisonVial module

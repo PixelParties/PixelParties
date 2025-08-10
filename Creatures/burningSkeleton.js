@@ -716,7 +716,7 @@ export class BurningSkeletonCreature {
                 'warning'
             );
 
-            // Create slash effect and pass the attacking creature - ✅ FIXED
+            // Create slash effect and pass the attacking creature - FIXED
             slashPromises.push(this.executeDeathFlame(burningSkeletonElement, target, index, burningSkeletonCreature));
         });
 
@@ -731,7 +731,7 @@ export class BurningSkeletonCreature {
     }
 
     // Execute a single death flame - ✅ FIXED: Now accepts attacking creature
-    async executeDeathFlame(burningSkeletonElement, target, slashIndex, attackingCreature = null) {
+    async executeDeathFlame(burningSkeletonElement, target, slashIndex, attackingBurningSkeleton) {
         const targetElement = this.getTargetElement(target);
         
         if (!targetElement) {
@@ -754,8 +754,8 @@ export class BurningSkeletonCreature {
         // Wait for slash to appear
         await this.battleManager.delay(adjustedAnimationTime * 0.2);
         
-        // Apply damage when slash hits and pass the attacking creature - ✅ FIXED
-        this.applyFireSlashDamage(target, attackingCreature);
+        // Apply damage when slash hits and pass the attacking creature - FIXED: Use attackingBurningSkeleton
+        this.applyFireSlashDamage(target, attackingBurningSkeleton);
         
         // Apply burned status effect
         this.applyFireSlashBurn(target);

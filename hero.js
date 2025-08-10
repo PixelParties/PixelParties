@@ -225,15 +225,43 @@ export class Hero {
     }
 
     setEquipment(equipment) {
-        if (Array.isArray(equipment)) {
-            this.equipment = [...equipment]; // Deep copy to avoid reference issues
-        } else {
+        try {
+            if (Array.isArray(equipment)) {
+                // Validate and filter equipment items
+                this.equipment = equipment.filter(item => {
+                    if (!item || typeof item !== 'object') {
+                        console.warn(`⚠️ Invalid equipment item for ${this.name}:`, item);
+                        return false;
+                    }
+                    
+                    const itemName = item.name || item.cardName;
+                    if (!itemName || typeof itemName !== 'string') {
+                        console.warn(`⚠️ Equipment item missing name for ${this.name}:`, item);
+                        return false;
+                    }
+                    
+                    return true;
+                }).map(item => ({ ...item })); // Deep copy to avoid reference issues
+                
+                console.log(`✅ Set ${this.equipment.length} valid equipment items for ${this.name}`);
+            } else {
+                if (equipment !== undefined && equipment !== null) {
+                    console.warn(`⚠️ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
+                }
+                this.equipment = [];
+            }
+        } catch (error) {
+            console.error(`❌ Error setting equipment for ${this.name}:`, error);
             this.equipment = [];
         }
     }
 
     // Get equipment for this hero (sorted alphabetically)
     getEquipment() {
+        if (!Array.isArray(this.equipment)) {
+            console.warn(`⚠️ Equipment is not an array for ${this.name}, resetting to empty array`);
+            this.equipment = [];
+        }
         return [...this.equipment].sort((a, b) => {
             const nameA = a.name || a.cardName || '';
             const nameB = b.name || b.cardName || '';

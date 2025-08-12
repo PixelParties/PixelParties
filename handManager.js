@@ -25,7 +25,7 @@ export class HandManager {
         // Set to false if you only want to disable the auto-add feature
         this.AUTO_ADD_TEST_CARD = true;
         // The test card to add
-        this.TEST_CARD_NAME = 'SwordInABottle';
+        this.TEST_CARD_NAME = 'Overheat';
     }
 
     // ===== TEST HELPER FUNCTION =====

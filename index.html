@@ -4,9 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Project Pixel Parties</title>
+    
+    <!-- Preload the custom font for better performance -->
+    <link rel="preload" href="./Fonts/Pixel Intv.otf" as="font" type="font/otf" crossorigin>
+    
+    <!-- Font face declaration -->
+    <style>
+        @font-face {
+            font-family: 'Pixel Intv';
+            src: url('./Fonts/Pixel Intv.otf') format('opentype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        
+        /* Global font application */
+        * {
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        }
+        
+        /* Font loading states */
+        .fonts-loading * {
+            visibility: hidden;
+        }
+        
+        .fonts-loading .loading-spinner,
+        .fonts-loading .selection-spinner,
+        .fonts-loading .waiting-spinner {
+            visibility: visible;
+        }
+        
+        .fonts-loaded * {
+            visibility: visible;
+            transition: opacity 0.3s ease;
+        }
+        
+        /* Ensure good font rendering */
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+    </style>
+    
     <link rel="stylesheet" href="main.css">
 </head>
-<body>
+<body class="fonts-loading">
     <div class="container">
         <h1>Project Pixel Parties</h1>
         <div class="game-subtitle">🃏 Pixel Art Auto Battler 🎯</div>
@@ -95,6 +138,102 @@
     <!-- Firebase SDK -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.22.0/firebase-database-compat.min.js"></script>
+
+    <!-- Enhanced Font Loading Handler -->
+    <script>
+        (function() {
+            'use strict';
+            
+            // Font loading is already handled by CSS classes above
+            // This script provides additional functionality
+            
+            function markFontsAsLoaded() {
+                document.documentElement.classList.remove('fonts-loading');
+                document.documentElement.classList.add('fonts-loaded');
+                document.body.classList.remove('fonts-loading');
+                document.body.classList.add('fonts-loaded');
+                
+                // Dispatch custom event
+                window.dispatchEvent(new CustomEvent('pixelFontsLoaded'));
+                console.log('✅ Pixel Intv font loaded and applied globally');
+            }
+            
+            function checkPixelFontLoaded() {
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => {
+                        if (document.fonts.check('16px "Pixel Intv"')) {
+                            markFontsAsLoaded();
+                        } else {
+                            console.warn('⚠️ Pixel Intv font failed to load, using fallback');
+                            markFontsAsLoaded();
+                        }
+                    }).catch(() => {
+                        console.warn('⚠️ Font loading API failed, using fallback');
+                        markFontsAsLoaded();
+                    });
+                } else {
+                    // Fallback for older browsers
+                    const testElement = document.createElement('div');
+                    testElement.style.cssText = `
+                        font-family: 'Pixel Intv', monospace;
+                        font-size: 16px;
+                        position: absolute;
+                        visibility: hidden;
+                        top: -999px;
+                        white-space: nowrap;
+                    `;
+                    testElement.textContent = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                    document.body.appendChild(testElement);
+                    
+                    const fallbackWidth = testElement.offsetWidth;
+                    testElement.style.fontFamily = 'monospace';
+                    const monospaceWidth = testElement.offsetWidth;
+                    testElement.style.fontFamily = "'Pixel Intv', monospace";
+                    
+                    let attempts = 0;
+                    const maxAttempts = 50;
+                    
+                    const checkInterval = setInterval(() => {
+                        attempts++;
+                        const currentWidth = testElement.offsetWidth;
+                        
+                        if (currentWidth !== monospaceWidth || attempts >= maxAttempts) {
+                            markFontsAsLoaded();
+                            if (testElement.parentNode) {
+                                document.body.removeChild(testElement);
+                            }
+                            clearInterval(checkInterval);
+                            
+                            if (attempts >= maxAttempts) {
+                                console.warn('⚠️ Font loading timeout, proceeding with available fonts');
+                            }
+                        }
+                    }, 100);
+                }
+            }
+            
+            // Initialize font loading detection
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', checkPixelFontLoaded);
+            } else {
+                checkPixelFontLoaded();
+            }
+            
+            // Fallback timeout
+            setTimeout(() => {
+                if (document.body.classList.contains('fonts-loading')) {
+                    console.warn('⚠️ Font loading timeout, forcing content display');
+                    markFontsAsLoaded();
+                }
+            }, 3000);
+            
+            // Global font status checker
+            window.isPixelFontLoaded = function() {
+                return document.documentElement.classList.contains('fonts-loaded');
+            };
+            
+        })();
+    </script>
 
     <!-- Application Modules -->
     <script type="module" src="main.js"></script>

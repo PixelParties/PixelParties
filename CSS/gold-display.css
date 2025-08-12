@@ -1,5 +1,5 @@
 /* ============================================
-   17. GOLD DISPLAY
+   17. GOLD DISPLAY WITH PIXEL FONT
    ============================================ */
 .gold-display-enhanced {
     position: absolute;
@@ -39,25 +39,27 @@
 }
 
 .gold-amount-large .player-gold-number {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 28px;
     font-weight: 900;
     color: #ffffff;
     text-shadow: 
         2px 2px 4px rgba(0, 0, 0, 0.8),
         0 0 10px rgba(255, 193, 7, 0.6);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     transition: var(--transition-medium);
 }
 
 .gold-change-indicator {
     position: absolute;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 28px;
     font-weight: bold;
     z-index: 101;
     pointer-events: none;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
     white-space: nowrap;
+    letter-spacing: 1px;
 }
 
 /* Gold breakdown styles */
@@ -77,6 +79,12 @@
     background: rgba(255, 193, 7, 0.1);
     border-color: rgba(255, 193, 7, 0.4);
     transform: translateX(3px);
+}
+
+.gold-line-item .gold-source,
+.gold-line-item .gold-amount {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .gold-line-item.victory-bonus {
@@ -136,20 +144,26 @@
     align-items: center;
     justify-content: space-between;
     padding: 3px 6px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.8);
     background: rgba(255, 193, 7, 0.05);
     border-radius: 4px;
+    letter-spacing: 0.3px;
 }
 
 .thieving-level {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 0.75rem;
     color: rgba(255, 215, 0, 0.8);
+    letter-spacing: 0.3px;
 }
 
 .thieving-gold {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-weight: 600;
     color: #ffd700;
+    letter-spacing: 0.5px;
 }
 
 /* Gold breakdown scrollable container */
@@ -188,6 +202,12 @@
     margin-bottom: 20px;
     padding-top: 8px;
     border-top: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.gold-breakdown-totals .gold-total-line {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: bold;
+    letter-spacing: 1px;
 }
 
 /* Ensure all child elements still have proper styling within scrollable area */
@@ -263,10 +283,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 3px 6px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.8);
     background: rgba(255, 193, 7, 0.05);
     border-radius: 4px;
+    letter-spacing: 0.3px;
 }
 
 /* Add a subtle fade effect at the bottom of scrollable area when content overflows */
@@ -284,4 +306,90 @@
 /* Hide the fade effect when not scrollable */
 .gold-breakdown-content-scrollable:not([data-scrollable])::after {
     display: none;
+}
+
+/* Gold modal/tooltip text */
+.gold-tooltip,
+.gold-modal {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.gold-tooltip h4,
+.gold-modal h4 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
+}
+
+.gold-tooltip p,
+.gold-modal p {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+/* Gold transaction labels */
+.gold-transaction-type {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Responsive adjustments for gold display */
+@media (max-width: 768px) {
+    .gold-amount-large .player-gold-number {
+        font-size: 24px;
+        letter-spacing: 1px;
+    }
+    
+    .gold-change-indicator {
+        font-size: 24px;
+        letter-spacing: 0.5px;
+    }
+    
+    .thieving-detail-line,
+    .wealth-detail-line {
+        font-size: 0.7rem;
+        letter-spacing: 0.2px;
+    }
+    
+    .thieving-level {
+        font-size: 0.65rem;
+        letter-spacing: 0.2px;
+    }
+    
+    .thieving-gold {
+        letter-spacing: 0.3px;
+    }
+}
+
+@media (max-width: 480px) {
+    .gold-amount-large .player-gold-number {
+        font-size: 20px;
+        letter-spacing: 0.5px;
+    }
+    
+    .gold-change-indicator {
+        font-size: 20px;
+        letter-spacing: 0.3px;
+    }
+    
+    .gold-line-item .gold-source,
+    .gold-line-item .gold-amount {
+        letter-spacing: 0.3px;
+    }
+    
+    .thieving-detail-line,
+    .wealth-detail-line {
+        font-size: 0.65rem;
+        letter-spacing: 0.1px;
+    }
+    
+    .thieving-level {
+        font-size: 0.6rem;
+        letter-spacing: 0.1px;
+    }
+    
+    .gold-transaction-type {
+        letter-spacing: 0.5px;
+    }
 }

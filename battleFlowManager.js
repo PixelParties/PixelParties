@@ -1,5 +1,6 @@
 // battleFlowManager.js - Battle Flow Control Module
 // Handles the main battle flow, turn processing, and actor management
+// UPDATED: Uses pre-calculated Hero stats instead of recalculating
 
 export class BattleFlowManager {
     constructor(battleManager) {
@@ -27,7 +28,7 @@ export class BattleFlowManager {
         // Initialize extensible state
         bm.initializeExtensibleState();
         
-        // Re-initialize heroes to ensure fresh health/state
+        // Re-initialize heroes to ensure fresh health/state (using pre-calculated stats)
         bm.initializeHeroes();
 
         // Initialize necromancy manager and stacks
@@ -124,12 +125,8 @@ export class BattleFlowManager {
             bm.addCombatLog(`🎲 Battle randomness initialized (seed: ${bm.randomnessManager.seed.slice(0, 8)}...)`, 'info');
         }
         
-        bm.logToughnessHpBonuses();
-        
-        // Log any SummoningMagic bonuses applied to creatures
-        bm.logSummoningMagicBonuses();
-        
-        bm.logTorasEquipmentBonuses();
+        // UPDATED: Log pre-calculated hero stats instead of recalculating
+        this.logPreCalculatedHeroStats();
         
         // ============================================
         // CHECKPOINT #1: After battle initialization
@@ -221,6 +218,89 @@ export class BattleFlowManager {
         }
     }
 
+    // UPDATED: Log pre-calculated hero stats instead of manually calculating
+    logPreCalculatedHeroStats() {
+        const bm = this.battleManager;
+        
+        console.log('📊 === HERO STATS SUMMARY (Pre-calculated) ===');
+        
+        // Log player heroes
+        console.log('🏆 PLAYER HEROES:');
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = bm.playerHeroes[position];
+            if (hero && hero.alive) {
+                const currentAttack = hero.getCurrentAttack();
+                const attackBonus = currentAttack - hero.baseAtk;
+                const hpBonus = hero.maxHp - hero.baseMaxHp;
+                
+                console.log(`  ${hero.name} (${position}): ${hero.currentHp}/${hero.maxHp} HP (+${hpBonus}), ${currentAttack} ATK (+${attackBonus})`);
+                
+                // Log ability contributions to bonuses
+                if (hero.hasAbility('Toughness')) {
+                    const toughnessStacks = hero.getAbilityStackCount('Toughness');
+                    console.log(`    🛡️ Toughness: ${toughnessStacks} stacks (+${toughnessStacks * 200} HP)`);
+                }
+                
+                if (hero.hasAbility('Fighting')) {
+                    const fightingStacks = hero.getAbilityStackCount('Fighting');
+                    console.log(`    ⚔️ Fighting: ${fightingStacks} stacks (+${fightingStacks * 10} ATK)`);
+                }
+                
+                // Log Toras equipment bonus if applicable
+                if (hero.name === 'Toras' && hero.equipment && hero.equipment.length > 0) {
+                    const uniqueEquipment = new Set();
+                    hero.equipment.forEach(item => {
+                        const itemName = item.name || item.cardName;
+                        if (itemName) uniqueEquipment.add(itemName);
+                    });
+                    const equipmentBonus = uniqueEquipment.size * 10;
+                    console.log(`    🗡️ Equipment Mastery: ${uniqueEquipment.size} unique items (+${equipmentBonus} ATK)`);
+                }
+                
+                // Log creature stats with SummoningMagic bonuses
+                if (hero.creatures && hero.creatures.length > 0) {
+                    const summoningMagicStacks = hero.getAbilityStackCount('SummoningMagic');
+                    const hpMultiplier = 1 + (0.25 * summoningMagicStacks);
+                    
+                    console.log(`    🐾 Creatures (${hero.creatures.length}):`);
+                    hero.creatures.forEach((creature, index) => {
+                        const status = creature.alive ? '✅' : '💀';
+                        console.log(`      ${index + 1}. ${status} ${creature.name}: ${creature.currentHp}/${creature.maxHp} HP`);
+                    });
+                    
+                    if (summoningMagicStacks > 0) {
+                        console.log(`    🌟 SummoningMagic: ${summoningMagicStacks} stacks (×${hpMultiplier.toFixed(2)} creature HP)`);
+                    }
+                }
+            }
+        });
+        
+        // Log opponent heroes
+        console.log('⚔️ OPPONENT HEROES:');
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = bm.opponentHeroes[position];
+            if (hero && hero.alive) {
+                const currentAttack = hero.getCurrentAttack();
+                const attackBonus = currentAttack - hero.baseAtk;
+                const hpBonus = hero.maxHp - hero.baseMaxHp;
+                
+                console.log(`  ${hero.name} (${position}): ${hero.currentHp}/${hero.maxHp} HP (+${hpBonus}), ${currentAttack} ATK (+${attackBonus})`);
+                
+                // Log creature count
+                if (hero.creatures && hero.creatures.length > 0) {
+                    const aliveCreatures = hero.creatures.filter(c => c.alive).length;
+                    console.log(`    🐾 Creatures: ${aliveCreatures}/${hero.creatures.length} alive`);
+                }
+            }
+        });
+        
+        console.log('📊 === END HERO STATS SUMMARY ===');
+        
+        // Add summary to combat log
+        bm.addCombatLog('📊 Hero stats calculated and ready for battle!', 'info');
+        bm.addCombatLog('⚡ All ability bonuses have been applied!', 'success');
+    }
+
     // Battle loop with connection awareness and persistence
     async authoritative_battleLoop() {
         const bm = this.battleManager;
@@ -244,10 +324,7 @@ export class BattleFlowManager {
             bm.addCombatLog(`📍 Turn ${bm.currentTurn} begins`, 'info');
             
             bm.sendBattleUpdate('turn_start', { turn: bm.currentTurn });
-            
-            // Save at turn start (legacy system)
-            await bm.saveBattleStateToPersistence();
-            
+                        
             // Process all positions for this turn
             for (const position of ['left', 'center', 'right']) {
                 if (!bm.battleActive || this.checkBattleEnd()) break;
@@ -262,14 +339,12 @@ export class BattleFlowManager {
                 }
                 
                 await this.authoritative_processTurnForPosition(position);
-                
-                // Save after each position (legacy system)
-                await bm.saveBattleStateToPersistence();
-                await bm.delay(15);
+            
+                await bm.delay(10);
             }
             
             // ============================================
-            // CHECKPOINT: At end of turn
+            // CHECKPOINT: At end of turn - KEEP THIS!
             // ============================================
             if (bm.checkpointSystem) {
                 try {
@@ -432,11 +507,8 @@ export class BattleFlowManager {
     async executeActorActions(playerActor, opponentActor, position) {
         const bm = this.battleManager;
         
-        // Check if battle ended before executing actions
-        if (this.checkBattleEnd()) {
-            console.log('Battle ended before actor actions, skipping');
-            return;
-        }
+        // REMOVED: Don't skip actions that would end the battle - we need to record the kills!
+        // This was preventing final kills from being recorded when both heroes die
         
         // ============================================
         // REMEMBER ORIGINAL ACTORS FOR STATUS EFFECTS
@@ -708,9 +780,10 @@ export class BattleFlowManager {
         }
         // If we only have hero actions (no special attacks), execute them normally
         else if (hasHeroActions) {
-            // Final check before hero actions
+            // Final check before hero actions - but NOT preventing execution
+            // Just logging that battle might end with these actions
             if (this.checkBattleEnd()) {
-                return;
+                console.log('⚠️ Battle may end with these hero actions - still executing to record kills');
             }
             
             const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;

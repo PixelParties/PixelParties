@@ -1,9 +1,20 @@
 /* ============================================
    10. ROOM BROWSER
    ============================================ */
+
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 .room-browser {
     width: 100%;
     max-width: 600px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .browser-header {
@@ -23,6 +34,8 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
 }
 
 .rooms-list {
@@ -33,6 +46,7 @@
     background: rgba(248, 249, 250, 0.5);
     border-radius: var(--radius-medium);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .loading-rooms,
@@ -42,12 +56,15 @@
     color: #666;
     font-size: 1.1rem;
     font-weight: 600;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .no-rooms-icon {
     font-size: 3rem;
     margin-bottom: 15px;
     opacity: 0.5;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .room-item {
@@ -60,6 +77,7 @@
     transition: var(--transition-medium);
     position: relative;
     overflow: hidden;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .room-item:hover {
@@ -92,15 +110,17 @@
     font-size: 1.1rem;
     font-weight: 700;
     color: #333;
-    font-family: 'Courier New', monospace;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     display: flex;
     align-items: center;
     gap: 8px;
+    letter-spacing: 0.5px;
 }
 
 .lock-icon {
     font-size: 0.9rem;
     color: #ff9800;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .room-status {
@@ -110,6 +130,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .room-status.available {
@@ -141,6 +162,8 @@
     font-weight: 600;
     color: #333;
     border: 1px solid rgba(102, 126, 234, 0.2);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .room-player.empty {

@@ -2,6 +2,16 @@
    Project Pixel Parties - Animations
    ============================================ */
 
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Ensure all animated elements use the pixel font */
 @keyframes shimmer {
     0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(30deg); }
     50% { transform: translateX(100%) translateY(100%) rotate(30deg); }
@@ -330,4 +340,57 @@
         opacity: 0;
         transform: translateX(100%);
     }
+}
+
+/* Apply pixel font to any elements that might have text content during animations */
+[class*="notification"],
+[class*="tooltip"],
+[class*="message"],
+[class*="text"],
+[class*="label"],
+[class*="counter"],
+[class*="display"] {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Ensure animated pseudo-elements also use the pixel font */
+*::before,
+*::after {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Special handling for elements that appear during animations */
+.loading-spinner,
+.selection-spinner,
+.waiting-spinner {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Animated text elements */
+.reward-success-message,
+.hero-reward-selected,
+.success-content,
+.notification-content,
+.notification-text {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+/* Animated counter and display elements */
+.action-counter,
+.current-actions,
+.max-actions,
+.gold-change-indicator,
+.attack-value,
+.attack-bonus {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Animated tooltip and message elements */
+.ability-drop-tooltip,
+.spell-drop-tooltip,
+.turn-limit-message,
+.action-error-tooltip {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }

@@ -1,6 +1,16 @@
 /* ============================================
    21. CREATURE SYSTEM
    ============================================ */
+
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Force complete transparency on ALL creature containers */
 .hero-creatures,
 .battle-hero-creatures,
@@ -32,6 +42,7 @@
     transition: all 0.2s ease;
     position: relative;
     background: rgba(0, 0, 0, 0.1);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Individual creature icon styles */
@@ -46,6 +57,7 @@
     border: none !important;
     box-shadow: none !important;
     outline: none !important;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .creature-icon:hover {
@@ -118,6 +130,7 @@
     z-index: 1000;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     animation: slideInFromTop 0.2s ease-out;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .hero-creatures.creature-drop-invalid::before {
@@ -137,6 +150,7 @@
     z-index: 1000;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     animation: slideInFromTop 0.2s ease-out;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Creature animation speed classes */
@@ -183,6 +197,7 @@
     align-items: center;
     justify-content: center;
     height: 32px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Smooth transitions for creature reordering */
@@ -222,6 +237,7 @@
 [class*="creature"] {
     background-color: transparent !important;
     border-color: transparent !important;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Ensure only the sprite image and health bars are visible */
@@ -231,6 +247,7 @@
     background: initial;
     border: initial;
     box-shadow: initial;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Ensure defeated creatures also have no container styling */
@@ -308,6 +325,7 @@
     z-index: 10;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     pointer-events: none;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Enhanced defeated sprite styling */

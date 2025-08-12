@@ -1,8 +1,24 @@
 /* ============================================
-   3. BASE STYLES & TYPOGRAPHY
+   3. BASE STYLES & TYPOGRAPHY WITH GLOBAL PIXEL FONT
    ============================================ */
+
+/* Font Face Declaration */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('./Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Global font application - applies to ALL elements */
+* {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Body with global font and original styling */
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
     background-attachment: fixed;
     margin: 0;
@@ -10,6 +26,9 @@ body {
     min-height: 100vh;
     overflow-x: hidden;
     position: relative;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 body::before {
@@ -25,6 +44,22 @@ body::before {
         radial-gradient(circle at 40% 40%, rgba(255, 107, 107, 0.05) 0%, transparent 50%);
     pointer-events: none;
     z-index: -1;
+}
+
+/* Font loading states */
+.fonts-loading * {
+    visibility: hidden;
+}
+
+.fonts-loading .loading-spinner,
+.fonts-loading .selection-spinner,
+.fonts-loading .waiting-spinner {
+    visibility: visible; /* Keep spinners visible */
+}
+
+.fonts-loaded * {
+    visibility: visible;
+    transition: opacity 0.3s ease;
 }
 
 /* Body states for drag and drop */
@@ -89,8 +124,9 @@ body.guard-change-active .hero-creatures:has(.creature-empty-placeholder)::after
     white-space: nowrap;
 }
 
-/* Typography */
+/* Typography with Pixel Font */
 h1 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif;
     color: #333;
     margin-bottom: 30px;
     font-size: 2.8rem;
@@ -113,4 +149,253 @@ h1::after {
     right: -40px;
     font-size: 1.5rem;
     animation: float 2s ease-in-out infinite alternate;
+}
+
+h2, h3, h4, h5, h6 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif;
+}
+
+/* Input fields */
+input, textarea, select {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Buttons */
+button, .btn {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* ============================================
+   SPECIFIC ELEMENT FONT ADJUSTMENTS
+   ============================================ */
+
+/* Character cards */
+.character-name {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* Battle arena */
+.battle-hero-name {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+/* Card names */
+.card-name {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Hand card names */
+.hand-card-name {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 0.7rem;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+/* Button text adjustments */
+.btn {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* Menu buttons */
+.menu-buttons button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
+}
+
+/* Input fields */
+.text-input {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+}
+
+/* Gold display */
+.player-gold-number {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 2px;
+}
+
+/* Turn display */
+.turn-text {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* Action display */
+.action-label {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 14px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* Combat log - maintain monospace feel with pixel font */
+.combat-log-area,
+.log-message {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+}
+
+/* Tooltips */
+.large-card-tooltip,
+.ability-drop-tooltip,
+.spell-drop-tooltip,
+.equip-drop-tooltip {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+/* Life and trophy labels */
+.life-label,
+.trophy-label {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+
+/* Room browser */
+.room-browser h2,
+.rooms-list,
+.room-item {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Status messages */
+.status,
+.room-info,
+.connection-details {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Placeholders */
+.card-preview-placeholder,
+.empty-card,
+.slot-placeholder {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+
+/* Modal text */
+.modal-title,
+.surrender-title {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.modal-description,
+.surrender-description {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+/* Hero stats */
+.hero-stat .stat-value,
+.tooltip-sprite-stat .stat-value {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* ============================================
+   PERFORMANCE OPTIMIZATIONS
+   ============================================ */
+
+/* Preload font for better performance */
+body::after {
+    content: '';
+    font-family: 'Pixel Intv';
+    position: absolute;
+    left: -9999px;
+    visibility: hidden;
+}
+
+/* Fallback for font loading failures */
+@supports not (font-display: swap) {
+    * {
+        font-family: 'Courier New', monospace, sans-serif !important;
+    }
+}
+
+/* ============================================
+   RESPONSIVE FONT SCALING
+   ============================================ */
+
+/* Adjust letter spacing for smaller screens */
+@media (max-width: 768px) {
+    .btn {
+        letter-spacing: 1px;
+    }
+    
+    .turn-text {
+        letter-spacing: 1px;
+    }
+    
+    .action-label {
+        letter-spacing: 1px;
+    }
+    
+    .character-name {
+        letter-spacing: 0.5px;
+    }
+    
+    * {
+        font-size: 0.9em;
+    }
+    
+    h1 {
+        font-size: 2.2rem;
+    }
+    
+    .character-name,
+    .battle-hero-name {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .btn {
+        letter-spacing: 0.5px;
+        font-size: 1rem;
+    }
+    
+    .character-name {
+        font-size: 1.1rem;
+        letter-spacing: 0px;
+    }
+    
+    .player-gold-number {
+        font-size: 24px;
+        letter-spacing: 1px;
+    }
+    
+    * {
+        font-size: 0.85em;
+    }
+    
+    h1 {
+        font-size: 1.8rem;
+    }
 }

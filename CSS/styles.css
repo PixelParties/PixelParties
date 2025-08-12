@@ -2,6 +2,20 @@
    Project Pixel Parties - Refactored Stylesheet
    ============================================ */
 
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Global font application */
+* {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
 /* ============================================
    1. CSS CUSTOM PROPERTIES (VARIABLES)
    ============================================ */
@@ -70,6 +84,7 @@
     left: 50%;
     transform: translate(-50%, -50%);
     overflow: hidden;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .container::before {
@@ -99,6 +114,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .game-title {
@@ -113,6 +129,8 @@
     text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
     text-align: center;
     display: none;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: -1px;
 }
 
 .game-subtitle {
@@ -121,6 +139,7 @@
     margin-bottom: 30px;
     font-weight: 500;
     opacity: 0.8;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .game-screen .game-subtitle {
@@ -130,6 +149,7 @@
     padding: 0 40px;
     font-weight: 500;
     text-align: center;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* ============================================
@@ -150,6 +170,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .text-input {
@@ -162,6 +183,7 @@
     background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(5px);
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .text-input:focus {
@@ -191,6 +213,7 @@
     color: #666;
     margin-top: 5px;
     font-style: italic;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* ============================================
@@ -261,8 +284,6 @@
 .gold-breakdown-content-scrollable::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 193, 7, 0.8);
 }
-
-
 
 /* ============================================
    24. ACCESSIBILITY & SPECIAL MODES

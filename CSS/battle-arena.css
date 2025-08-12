@@ -1,5 +1,5 @@
 /* ============================================
-   18. BATTLE ARENA
+   18. BATTLE ARENA WITH PIXEL FONT
    ============================================ */
 .battle-arena {
     position: absolute;
@@ -76,6 +76,7 @@
 }
 
 .battlefield-decoration {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 18px;
     font-weight: bold;
     color: rgba(255, 255, 255, 0.8);
@@ -115,9 +116,11 @@
 }
 
 .empty-text {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 14px;
     font-weight: 600;
     font-style: italic;
+    letter-spacing: 1px;
 }
 
 .battle-hero-card {
@@ -214,6 +217,7 @@
 }
 
 .battle-hero-name {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: white;
     font-size: 16px;
     font-weight: bold;
@@ -221,6 +225,7 @@
     text-align: center;
     margin: 0;
     flex-shrink: 0;
+    letter-spacing: 1px;
 }
 
 .battle-hero-health {
@@ -279,12 +284,14 @@
     display: flex;
     align-items: baseline;
     gap: 2px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 16px;
     font-weight: bold;
     color: #ffffff;
     text-shadow: 
         1px 1px 2px rgba(0, 0, 0, 0.8),
         0 0 5px rgba(255, 107, 107, 0.3);
+    letter-spacing: 1px;
 }
 
 .attack-base {
@@ -292,6 +299,7 @@
 }
 
 .attack-bonus {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 14px;
     font-weight: bold;
     margin-left: 2px;
@@ -299,6 +307,7 @@
         1px 1px 2px rgba(0, 0, 0, 0.8),
         0 0 8px currentColor;
     animation: pulse 1.5s ease-in-out infinite;
+    letter-spacing: 0.5px;
 }
 
 .attack-bonus[style*="color: rgb(76, 175, 80)"] {
@@ -416,11 +425,13 @@
 }
 
 .preview-header h3 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: white;
     font-size: 18px;
     font-weight: bold;
     margin: 0;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    letter-spacing: 1px;
 }
 
 .card-preview-area {
@@ -450,9 +461,11 @@
 }
 
 .preview-placeholder p {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 16px;
     margin: 0;
     font-style: italic;
+    letter-spacing: 0.5px;
 }
 
 .preview-card-display {
@@ -496,18 +509,22 @@
 }
 
 .preview-card-info h4 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: white;
     font-size: 18px;
     font-weight: bold;
     margin: 0 0 5px 0;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    letter-spacing: 1px;
 }
 
 .card-type {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: rgba(255, 255, 255, 0.8);
     font-size: 14px;
     margin: 0;
     font-style: italic;
+    letter-spacing: 0.5px;
 }
 
 .combat-log-section {
@@ -535,11 +552,13 @@
 }
 
 .log-header h3 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: white;
     font-size: 16px;
     font-weight: bold;
     margin: 0;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    letter-spacing: 1px;
 }
 
 .combat-log-area {
@@ -552,11 +571,12 @@
         rgba(0, 0, 0, 0.2) 100%);
     border-radius: var(--radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    line-height: 1.3;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 12px;
+    line-height: 1.4;
     max-height: 100%;
     box-sizing: border-box;
+    letter-spacing: 0.3px;
 }
 
 .log-placeholder {
@@ -566,20 +586,26 @@
 }
 
 .log-placeholder p {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     margin: 5px 0;
     font-style: italic;
+    letter-spacing: 0.5px;
 }
 
 .log-message {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     margin: 2px 0;
     padding: 2px 4px;
     border-radius: 3px;
     color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.3px;
 }
 
 .log-time {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: rgba(255, 255, 255, 0.5);
     font-size: 9px;
+    letter-spacing: 0.2px;
 }
 
 .log-info {
@@ -605,4 +631,69 @@
 .log-controls {
     display: flex;
     gap: 3px;
+}
+
+/* Responsive adjustments for battle arena */
+@media (max-width: 768px) {
+    .battle-hero-name {
+        font-size: 14px;
+        letter-spacing: 0.5px;
+    }
+    
+    .attack-value {
+        font-size: 14px;
+        letter-spacing: 0.5px;
+    }
+    
+    .attack-bonus {
+        font-size: 12px;
+        letter-spacing: 0.3px;
+    }
+    
+    .preview-header h3 {
+        font-size: 16px;
+        letter-spacing: 0.5px;
+    }
+    
+    .log-header h3 {
+        font-size: 14px;
+        letter-spacing: 0.5px;
+    }
+    
+    .combat-log-area {
+        font-size: 11px;
+        letter-spacing: 0.2px;
+    }
+}
+
+@media (max-width: 480px) {
+    .battle-hero-name {
+        font-size: 12px;
+        letter-spacing: 0.3px;
+    }
+    
+    .attack-value {
+        font-size: 12px;
+        letter-spacing: 0.3px;
+    }
+    
+    .attack-bonus {
+        font-size: 10px;
+        letter-spacing: 0.2px;
+    }
+    
+    .battlefield-decoration {
+        font-size: 14px;
+        letter-spacing: 1px;
+    }
+    
+    .empty-text {
+        font-size: 12px;
+        letter-spacing: 0.5px;
+    }
+    
+    .combat-log-area {
+        font-size: 10px;
+        letter-spacing: 0.1px;
+    }
 }

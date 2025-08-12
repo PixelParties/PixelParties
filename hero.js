@@ -1,4 +1,4 @@
-// hero.js - Enhanced Hero Class with Necromancy Stack Management
+// hero.js - Enhanced Hero Class with Pre-calculated Stats from heroSelection
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -11,23 +11,25 @@ export class Hero {
         this.filename = heroData.filename;
         
         // Position and side information
-        this.position = position; // 'left', 'center', 'right'
-        this.side = side; // 'player' or 'opponent' (relative to current player)
-        this.absoluteSide = absoluteSide; // 'host' or 'guest' (absolute role)
+        this.position = position;
+        this.side = side;
+        this.absoluteSide = absoluteSide;
         
-        // Load stats from card database
+        // Load base stats from card database
         const heroInfo = getCardInfo(this.name);
         if (heroInfo && heroInfo.cardType === 'hero') {
-            this.maxHp = heroInfo.hp;
-            this.currentHp = heroInfo.hp;
-            this.atk = heroInfo.atk;
-            this.baseAtk = heroInfo.atk; // Store base attack for modifications
+            this.baseMaxHp = heroInfo.hp;      // Store original base values
+            this.baseAtk = heroInfo.atk;
+            this.maxHp = heroInfo.hp;          // Will be overridden by pre-calculated values
+            this.currentHp = heroInfo.hp;      // Will be adjusted proportionally when maxHp changes
+            this.atk = heroInfo.atk;           // Will be overridden by pre-calculated values
         } else {
             console.error(`Hero info not found for ${this.name}`);
+            this.baseMaxHp = 100;
+            this.baseAtk = 10;
             this.maxHp = 100;
             this.currentHp = 100;
             this.atk = 10;
-            this.baseAtk = 10;
         }
         
         // Combat state
@@ -35,24 +37,24 @@ export class Hero {
         
         // Abilities - structured storage
         this.abilities = {
-            zone1: [],  // Array of ability objects with stacks
+            zone1: [],
             zone2: [],
             zone3: []
         };
-        this.abilityRegistry = new Set(); // Track unique abilities this hero has
+        this.abilityRegistry = new Set();
         
-        // Spellbook - array of spell cards
+        // Spellbook, creatures, equipment
         this.spellbook = [];
-
-        // Creatures - array of creature cards summoned by this hero
         this.creatures = [];
-
-        // Equipment array
         this.equipment = [];
         
-        // NEW: Necromancy stacks tracking
+        // NEW: Permanent stat bonuses from LegendarySwordOfABarbarianKing
+        this.attackBonusses = 0;  // Permanent attack bonuses
+        this.hpBonusses = 0;      // Permanent HP bonuses
+        
+        // Necromancy stacks tracking
         this.necromancyStacks = 0;
-        this.maxNecromancyStacks = 0; // Track initial stacks for display purposes
+        this.maxNecromancyStacks = 0;
         
         // Extensible state for future features
         this.statusEffects = [];
@@ -65,8 +67,49 @@ export class Hero {
         this.lastAction = null;
         this.turnsTaken = 0;
     }
+
+    addPermanentStatBonuses(attackBonus, hpBonus) {
+        this.attackBonusses += attackBonus;
+        this.hpBonusses += hpBonus;
+        console.log(`${this.name}: Added permanent bonuses - ATK +${attackBonus} (total: +${this.attackBonusses}), HP +${hpBonus} (total: +${this.hpBonusses})`);
+    }
     
-    // Set abilities from HeroAbilitiesManager data
+    // Set pre-calculated stats directly from heroSelection
+    setPrecalculatedStats(effectiveStats) {
+        if (!effectiveStats) return;
+        
+        const oldMaxHp = this.maxHp;
+        
+        // Set the pre-calculated values directly
+        this.maxHp = effectiveStats.maxHp;
+        this.atk = effectiveStats.attack;
+        
+        // Adjust current HP proportionally if max HP changed
+        if (oldMaxHp !== this.maxHp && oldMaxHp > 0) {
+            const hpRatio = this.currentHp / oldMaxHp;
+            this.currentHp = Math.floor(this.maxHp * hpRatio);
+            this.currentHp = Math.min(this.currentHp, this.maxHp);
+            
+            console.log(`${this.name}: Stats updated - HP: ${this.currentHp}/${this.maxHp}, ATK: ${this.atk}`);
+        } else if (oldMaxHp === this.maxHp) {
+            // If max HP didn't change, keep current HP as is
+            this.currentHp = Math.min(this.currentHp, this.maxHp);
+        } else {
+            // First time setting stats
+            this.currentHp = this.maxHp;
+        }
+    }
+    
+    // Get ability stack counts (no stat calculation)
+    getToughnessStackCount() {
+        return this.getAbilityStackCount('Toughness');
+    }
+    
+    getFightingStackCount() {
+        return this.getAbilityStackCount('Fighting');
+    }
+    
+    // Set abilities from HeroAbilitiesManager data (no stat calculation)
     setAbilities(abilitiesData) {
         if (!abilitiesData) return;
         
@@ -93,7 +136,7 @@ export class Hero {
             }
         }
         
-        console.log(`${this.name} abilities set:`, this.abilities);
+        console.log(`${this.name} abilities set (stats calculated in heroSelection)`);
     }
     
     // Initialize necromancy stacks based on ability level
@@ -139,95 +182,10 @@ export class Hero {
         this.necromancyStacks = Math.max(0, stacks);
         console.log(`${this.name} necromancy stacks set to ${this.necromancyStacks}`);
     }
-
-    getToughnessHpBonus() {
-        if (!this.hasAbility('Toughness')) {
-            return 0;
-        }
-        
-        const toughnessLevel = this.getAbilityStackCount('Toughness');
-        return toughnessLevel * 200; // +200 HP per Toughness level
-    }
-
-    applyToughnessHpBonus() {
-        const hpBonus = this.getToughnessHpBonus();
-        if (hpBonus > 0) {
-            // Increase both max HP and current HP
-            this.maxHp += hpBonus;
-            this.currentHp += hpBonus;
-            
-            console.log(`${this.name} gains +${hpBonus} HP from Toughness ability (Level ${this.getAbilityStackCount('Toughness')})`);
-            return hpBonus;
-        }
-        return 0;
-    }
     
-    // Set spellbook from HeroSpellbookManager data
-    setSpellbook(spellbookData) {
-        if (!spellbookData || !Array.isArray(spellbookData)) return;
-        
-        // Clear existing spellbook
-        this.spellbook = [];
-        
-        // Copy spells from manager data
-        this.spellbook = spellbookData.map(spell => ({ ...spell }));
-        
-        console.log(`${this.name} spellbook set with ${this.spellbook.length} spells`);
-    }
-    
-    // Add a spell to the spellbook
-    addSpell(spellCard) {
-        if (!spellCard || spellCard.cardType !== 'Spell') {
-            console.error('Invalid spell card provided');
-            return false;
-        }
-        
-        this.spellbook.push({ ...spellCard });
-        console.log(`Added spell ${spellCard.name} to ${this.name}'s spellbook`);
-        return true;
-    }
-    
-    // Remove a spell from the spellbook by index
-    removeSpell(index) {
-        if (index < 0 || index >= this.spellbook.length) {
-            console.error(`Invalid spell index: ${index}`);
-            return null;
-        }
-        
-        const removedSpell = this.spellbook.splice(index, 1)[0];
-        console.log(`Removed spell ${removedSpell.name} from ${this.name}'s spellbook`);
-        return removedSpell;
-    }
-    
-    // Get spell by name
-    getSpell(spellName) {
-        return this.spellbook.find(spell => spell.name === spellName);
-    }
-    
-    // Check if hero has a specific spell
-    hasSpell(spellName) {
-        return this.spellbook.some(spell => spell.name === spellName);
-    }
-    
-    // Get all spells
-    getAllSpells() {
-        return [...this.spellbook];
-    }
-    
-    // Get spell count
-    getSpellCount() {
-        return this.spellbook.length;
-    }
-    
-    // Get spell count for a specific spell
-    getSpecificSpellCount(spellName) {
-        return this.spellbook.filter(spell => spell.name === spellName).length;
-    }
-
     setEquipment(equipment) {
         try {
             if (Array.isArray(equipment)) {
-                // Validate and filter equipment items
                 this.equipment = equipment.filter(item => {
                     if (!item || typeof item !== 'object') {
                         console.warn(`⚠️ Invalid equipment item for ${this.name}:`, item);
@@ -241,7 +199,7 @@ export class Hero {
                     }
                     
                     return true;
-                }).map(item => ({ ...item })); // Deep copy to avoid reference issues
+                }).map(item => ({ ...item }));
                 
                 console.log(`✅ Set ${this.equipment.length} valid equipment items for ${this.name}`);
             } else {
@@ -309,10 +267,7 @@ export class Hero {
     setCreatures(creaturesData) {
         if (!creaturesData || !Array.isArray(creaturesData)) return;
         
-        // Clear existing creatures
         this.creatures = [];
-        
-        // Copy creatures from manager data
         this.creatures = creaturesData.map(creature => ({ ...creature }));
         
         console.log(`${this.name} creatures set with ${this.creatures.length} creatures`);
@@ -350,6 +305,65 @@ export class Hero {
     // Get creature count
     getCreatureCount() {
         return this.creatures.length;
+    }
+    
+    // Set spellbook from HeroSpellbookManager data
+    setSpellbook(spellbookData) {
+        if (!spellbookData || !Array.isArray(spellbookData)) return;
+        
+        this.spellbook = [];
+        this.spellbook = spellbookData.map(spell => ({ ...spell }));
+        
+        console.log(`${this.name} spellbook set with ${this.spellbook.length} spells`);
+    }
+    
+    // Add a spell to the spellbook
+    addSpell(spellCard) {
+        if (!spellCard || spellCard.cardType !== 'Spell') {
+            console.error('Invalid spell card provided');
+            return false;
+        }
+        
+        this.spellbook.push({ ...spellCard });
+        console.log(`Added spell ${spellCard.name} to ${this.name}'s spellbook`);
+        return true;
+    }
+    
+    // Remove a spell from the spellbook by index
+    removeSpell(index) {
+        if (index < 0 || index >= this.spellbook.length) {
+            console.error(`Invalid spell index: ${index}`);
+            return null;
+        }
+        
+        const removedSpell = this.spellbook.splice(index, 1)[0];
+        console.log(`Removed spell ${removedSpell.name} from ${this.name}'s spellbook`);
+        return removedSpell;
+    }
+    
+    // Get spell by name
+    getSpell(spellName) {
+        return this.spellbook.find(spell => spell.name === spellName);
+    }
+    
+    // Check if hero has a specific spell
+    hasSpell(spellName) {
+        return this.spellbook.some(spell => spell.name === spellName);
+    }
+    
+    // Get all spells
+    getAllSpells() {
+        return [...this.spellbook];
+    }
+    
+    // Get spell count
+    getSpellCount() {
+        return this.spellbook.length;
+    }
+    
+    // Get spell count for a specific spell
+    getSpecificSpellCount(spellName) {
+        return this.spellbook.filter(spell => spell.name === spellName).length;
     }
     
     // Get ability by name
@@ -435,37 +449,29 @@ export class Hero {
         };
     }
     
-    // Modify attack
-    modifyAttack(modifier, temporary = false) {
+    // Modify attack (temporary only - permanent changes come from heroSelection)
+    modifyAttack(modifier, temporary = true) {
         if (temporary) {
-            // Temporary modification (for this turn only)
             if (!this.temporaryModifiers.atk) {
                 this.temporaryModifiers.atk = [];
             }
             this.temporaryModifiers.atk.push(modifier);
         } else {
-            // Permanent modification
-            this.atk += modifier;
+            console.warn('Permanent attack modifications must be done in heroSelection, not during battle');
         }
     }
     
-    // Get current attack (including temporary modifiers)
+    // Get current attack (base attack from heroSelection + temporary modifiers)
     getCurrentAttack() {
-        let totalAtk = this.atk;
-        
-        // Apply temporary modifiers
-        if (this.temporaryModifiers.atk) {
-            this.temporaryModifiers.atk.forEach(mod => {
-                totalAtk += mod;
-            });
-        }
-        
-        return Math.max(0, totalAtk); // Ensure non-negative
+        // ★ SIMPLIFIED: Just return the stored attack value (already includes all bonuses)
+        return this.atk;
     }
 
-    // Get attack bonus (difference between current and base)
+    // Get attack bonus (difference between current and original base)
     getAttackBonus() {
-        return this.getCurrentAttack() - this.baseAtk;
+        const current = this.getCurrentAttack();
+        const bonus = current - this.baseAtk;
+        return bonus;
     }
     
     // Clear temporary modifiers (call at end of turn)
@@ -505,24 +511,25 @@ export class Hero {
             side: this.side,
             absoluteSide: this.absoluteSide,
             
-            // Stats
+            // Stats (pre-calculated from heroSelection)
             currentHp: this.currentHp,
             maxHp: this.maxHp,
             atk: this.atk,
+            baseMaxHp: this.baseMaxHp,
             baseAtk: this.baseAtk,
             alive: this.alive,
+            
+            // NEW: Permanent stat bonuses
+            attackBonusses: this.attackBonusses,
+            hpBonusses: this.hpBonusses,
             
             // Abilities
             abilities: this.abilities,
             abilityRegistry: Array.from(this.abilityRegistry),
             
-            // Spellbook
+            // Spellbook, creatures, equipment
             spellbook: this.spellbook.map(spell => ({ ...spell })),
-
-            // Creatures
             creatures: this.creatures.map(creature => ({ ...creature })),
-            
-            // Equipped Artifacts
             equipment: this.equipment.map(item => ({...item})),
             
             // Necromancy stacks
@@ -554,24 +561,29 @@ export class Hero {
             savedState.absoluteSide
         );
         
-        // Restore stats
+        // Restore base stats
+        if (savedState.baseMaxHp !== undefined && savedState.baseAtk !== undefined) {
+            hero.baseMaxHp = savedState.baseMaxHp;
+            hero.baseAtk = savedState.baseAtk;
+        }
+        
+        // Restore current stats (these are the pre-calculated values)
         hero.currentHp = savedState.currentHp;
         hero.maxHp = savedState.maxHp;
         hero.atk = savedState.atk;
-        hero.baseAtk = savedState.baseAtk;
         hero.alive = savedState.alive;
+        
+        // NEW: Restore permanent stat bonuses
+        hero.attackBonusses = savedState.attackBonusses || 0;
+        hero.hpBonusses = savedState.hpBonusses || 0;
         
         // Restore abilities
         hero.abilities = savedState.abilities || { zone1: [], zone2: [], zone3: [] };
         hero.abilityRegistry = new Set(savedState.abilityRegistry || []);
         
-        // Restore spellbook
+        // Restore spellbook, creatures, equipment
         hero.spellbook = savedState.spellbook || [];
-
-        // Restore creatures
         hero.creatures = savedState.creatures || [];
-
-        // Restore equipped Artifacts
         if (savedState.equipment) {
             hero.setEquipment(savedState.equipment);
         }

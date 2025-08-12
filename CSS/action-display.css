@@ -1,12 +1,23 @@
 /* ============================================
    20. ACTION DISPLAY SYSTEM
    ============================================ */
+
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 .team-building-actions {
     margin: 20px 0;
     padding: 15px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 12px;
     border: 1px solid rgba(102, 126, 234, 0.3);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .team-building-actions .action-display-container {
@@ -26,6 +37,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(10px);
     min-width: 180px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .action-display.player-actions {
@@ -48,6 +60,7 @@
 .action-icon {
     font-size: 20px;
     animation: actionPulse 2s ease-in-out infinite;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .action-label {
@@ -56,6 +69,7 @@
     color: #fff;
     text-transform: uppercase;
     letter-spacing: 1px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .action-counter {
@@ -63,12 +77,14 @@
     font-weight: bold;
     text-align: center;
     margin-bottom: 10px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .current-actions {
     color: #ffd700;
     text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
     transition: all 0.3s ease;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .current-actions.action-changed {
@@ -78,6 +94,7 @@
 .max-actions {
     color: rgba(255, 255, 255, 0.6);
     font-size: 20px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .action-orbs {
@@ -110,6 +127,7 @@
 .action-error-tooltip {
     text-align: center;
     animation: actionErrorPulse 0.5s ease-out;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .action-changed {
@@ -129,6 +147,7 @@
     width: auto;
     max-width: 1000px;
     pointer-events: none;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Make child elements interactive while keeping container non-interactive */
@@ -155,6 +174,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(10px);
     min-width: 160px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .resource-display-container .action-display {
@@ -162,6 +182,7 @@
     align-items: center;
     gap: 12px;
     justify-content: space-between;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .resource-display-container .action-header {
@@ -174,6 +195,7 @@
 
 .resource-display-container .action-icon {
     font-size: 18px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .resource-display-container .action-label {
@@ -181,6 +203,8 @@
     font-weight: bold;
     color: #ffd700;
     white-space: nowrap;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
 }
 
 .resource-display-container .action-counter {
@@ -191,11 +215,13 @@
     align-items: center;
     gap: 4px;
     flex-shrink: 0;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .resource-display-container .current-actions {
     color: #ffd700;
     font-size: 20px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 /* Hide the max actions display in resource container */
@@ -245,4 +271,5 @@
     max-width: 180px;
     box-sizing: border-box;
     justify-content: flex-start;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }

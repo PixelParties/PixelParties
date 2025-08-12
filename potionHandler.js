@@ -102,7 +102,6 @@ export class PotionHandler {
                 await heroSelection.autoSave();
             }
 
-            console.log(`Used potion: ${cardName}. Active effects: ${this.activePotionEffects.length}. Available potions: ${this.availablePotions}/${this.maxPotions}`);
             return true;
 
         } catch (error) {
@@ -521,7 +520,6 @@ export class PotionHandler {
             if (this.alchemyBonuses > previousBonuses) {
                 const increase = this.alchemyBonuses - previousBonuses;
                 this.availablePotions += increase;
-                console.log(`Alchemy bonuses increased by ${increase}! Available potions: ${this.availablePotions}/${this.maxPotions}`);
                 
                 // Update display immediately
                 this.updatePotionDisplay();
@@ -534,7 +532,6 @@ export class PotionHandler {
             }
         } else {
             // During reconnection - just recalculate max, don't touch available
-            console.log(`🧪 Alchemy bonuses recalculated: ${this.alchemyBonuses}, Max potions: ${this.maxPotions}, Available preserved: ${this.availablePotions}`);
             
             // Update display
             this.updatePotionDisplay();
@@ -567,7 +564,6 @@ export class PotionHandler {
         
         return `
             <div class="potion-display ${displayClass}" id="potionDisplay">
-                <div class="potion-label">Available Potions</div>
                 <div class="potion-amount">
                     <span class="potion-icon">${potionIcon}</span>
                     <span class="potion-number">${this.availablePotions}</span>

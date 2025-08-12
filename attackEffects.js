@@ -1,7 +1,8 @@
 // attackEffects.js - Centralized Attack Effects Handler
 import { TheMastersSwordEffect } from './Artifacts/theMastersSword.js';
 import { registerTheSunSword } from './Artifacts/theSunSword.js';
-import { registerTheStormblade } from './Artifacts/theStormblade.js'; 
+import { registerTheStormblade } from './Artifacts/theStormblade.js';
+import { skullmaelsGreatswordArtifact } from './Artifacts/skullmaelsGreatsword.js';
 
 export class AttackEffectsManager {
     constructor(battleManager) {
@@ -16,8 +17,11 @@ export class AttackEffectsManager {
         // Equip effect instances
         this.mastersSwordEffect = new TheMastersSwordEffect(this.battleManager);
         this.sunSwordEffect = null;
-        this.stormbladeEffect = null; 
-
+        this.stormbladeEffect = null;
+        this.skullmaelsGreatswordArtifact = skullmaelsGreatswordArtifact;
+        
+        // Flag to prevent multiple skeleton summons per attack
+        this._skeletonSummonedThisAttack = false;
 
         // Register built-in handlers
         this.registerBuiltInHandlers();
@@ -31,6 +35,12 @@ export class AttackEffectsManager {
         this.registerEffectHandler('BladeOfTheFrostbringer', {
             trigger: 'on_attack_hit',
             handler: this.handleBladeOfTheFrostbringer.bind(this)
+        });
+        
+        // Register SkullmaelsGreatsword handler
+        this.registerEffectHandler('SkullmaelsGreatsword', {
+            trigger: 'on_attack_hit',
+            handler: this.handleSkullmaelsGreatsword.bind(this)
         });
         
         // Register Equip item effects
@@ -114,6 +124,9 @@ export class AttackEffectsManager {
     
     // Process all attack effects when an attack lands
     async processAttackEffects(attacker, defender, damage, attackType = 'basic') {
+        // Reset skeleton summon flag at start of each attack
+        this._skeletonSummonedThisAttack = false;
+        
         // Only process effects for living attackers and defenders
         if (!attacker || !attacker.alive || !defender) return;
         
@@ -216,6 +229,41 @@ export class AttackEffectsManager {
                 defenderInfo: this.getDefenderSyncInfo(defender),
                 timestamp: Date.now()
             });
+        }
+    }
+    
+    // Handler for SkullmaelsGreatsword effect
+    async handleSkullmaelsGreatsword(attacker, defender, damage, equipmentItem) {
+        // Only process if we're the authoritative host
+        if (!this.battleManager.isAuthoritative) return;
+        
+        // Check if this specific sword should trigger (20% chance)
+        const triggerChance = 0.20;
+        const roll = this.battleManager.getRandom();
+        
+        if (roll > triggerChance) {
+            return; // This sword didn't trigger
+        }
+        
+        // Check if we've already summoned a skeleton this attack
+        // (Multiple swords can be equipped but only one skeleton summons)
+        if (this._skeletonSummonedThisAttack) {
+            console.log(`⚔️🦴 Additional Greatsword triggered but skeleton already summoned this attack`);
+            return;
+        }
+        
+        // Mark that we're summoning a skeleton for this attack
+        this._skeletonSummonedThisAttack = true;
+        
+        console.log(`⚔️🦴 SkullmaelsGreatsword triggers! Summoning skeleton for ${attacker.name}`);
+        
+        // Execute the skeleton summon
+        if (this.skullmaelsGreatswordArtifact) {
+            // Get a random skeleton and summon it
+            const skeletonCard = this.skullmaelsGreatswordArtifact.getRandomSkeletonCard(this.battleManager);
+            if (skeletonCard) {
+                await this.skullmaelsGreatswordArtifact.executeSkeletonSummon(attacker, this.battleManager);
+            }
         }
     }
     
@@ -490,6 +538,12 @@ export class AttackEffectsManager {
             this.stormbladeEffect.cleanup();
             this.stormbladeEffect = null;
         }
+        
+        if (this.skullmaelsGreatswordArtifact) {
+            this.skullmaelsGreatswordArtifact = null;
+        }
+        
+        this._skeletonSummonedThisAttack = false;
         
         const css = document.getElementById('attackEffectsCSS');
         if (css) css.remove();

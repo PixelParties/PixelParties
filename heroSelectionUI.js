@@ -1,4 +1,4 @@
-// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, and Nicolas Effect
+// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, Nicolas Effect, and Hero Stats Display
 
 export class HeroSelectionUI {
     constructor() {
@@ -240,6 +240,160 @@ export class HeroSelectionUI {
         return canUse.canUse;
     }
 
+    // Helper method to get hero stats for display
+    getHeroStats(slotPosition) {
+        if (!window.heroSelection || !slotPosition) return null;
+        
+        // NEW: Use the enhanced stat calculation that includes ability bonuses
+        const effectiveStats = window.heroSelection.calculateEffectiveHeroStats(slotPosition);
+        if (effectiveStats) {
+            // Log the stat bonuses for debugging if there are any
+            if (effectiveStats.bonuses.hpBonus > 0 || effectiveStats.bonuses.attackBonus > 0) {
+                const formation = window.heroSelection.formationManager?.getBattleFormation();
+                const hero = formation?.[slotPosition];
+                if (hero) {
+                    console.log(`📊 ${hero.name} effective stats: ${effectiveStats.maxHp} HP (+${effectiveStats.bonuses.hpBonus}), ${effectiveStats.attack} ATK (+${effectiveStats.bonuses.attackBonus})`);
+                }
+            }
+            
+            return {
+                currentHp: effectiveStats.currentHp,
+                maxHp: effectiveStats.maxHp,
+                attack: effectiveStats.attack,
+                // NEW: Include bonus information for potential UI enhancements
+                bonuses: effectiveStats.bonuses
+            };
+        }
+        
+        // Fallback to original logic for backward compatibility
+        const formation = window.heroSelection.formationManager?.getBattleFormation();
+        if (!formation || !formation[slotPosition]) return null;
+        
+        const hero = formation[slotPosition];
+        
+        // DEBUG: Log hero data to help troubleshoot
+        console.log(`Getting fallback stats for hero at ${slotPosition}:`, hero);
+        
+        // Check if this is a Hero instance with stats, or just character data
+        if (hero.currentHp !== undefined && hero.maxHp !== undefined && hero.atk !== undefined) {
+            // This is a proper Hero instance
+            let currentAttack = hero.atk;
+            if (typeof hero.getCurrentAttack === 'function') {
+                currentAttack = hero.getCurrentAttack();
+            }
+            
+            const stats = {
+                currentHp: hero.currentHp,
+                maxHp: hero.maxHp,
+                attack: currentAttack
+            };
+            
+            console.log(`Hero stats found:`, stats);
+            return stats;
+        } else {
+            // This might be basic character data, try to get stats from card database
+            const heroInfo = window.heroSelection.getCardInfo ? window.heroSelection.getCardInfo(hero.name) : null;
+            if (heroInfo && heroInfo.cardType === 'hero') {
+                const stats = {
+                    currentHp: heroInfo.hp,
+                    maxHp: heroInfo.hp,
+                    attack: heroInfo.atk
+                };
+                
+                console.log(`Hero stats from database:`, stats);
+                return stats;
+            }
+        }
+        
+        // Fallback - no stats available
+        console.warn(`No stats available for hero at position ${slotPosition}:`, hero);
+        return null;
+    }
+
+    // Create hero stats display HTML
+    createHeroStatsHTML(slotPosition) {
+        const stats = this.getHeroStats(slotPosition);
+        if (!stats) return '';
+        
+        // Determine if stats have bonuses for visual indication
+        const hasHpBonus = stats.bonuses && stats.bonuses.hpBonus > 0;
+        const hasAttackBonus = stats.bonuses && stats.bonuses.attackBonus > 0;
+        
+        // Add bonus classes for visual styling
+        const hpClass = hasHpBonus ? 'hero-stat hero-hp boosted' : 'hero-stat hero-hp';
+        const attackClass = hasAttackBonus ? 'hero-stat hero-attack boosted' : 'hero-stat hero-attack';
+        
+        return `
+            <div class="hero-stats-overlay">
+                <div class="${hpClass}" data-stat="hp" ${hasHpBonus ? `title="Base + ${stats.bonuses.hpBonus} from Toughness"` : ''}>
+                    <span class="stat-value">${stats.currentHp}</span>
+                </div>
+                <div class="${attackClass}" data-stat="attack" ${hasAttackBonus ? `title="Base + ${stats.bonuses.attackBonus} from Fighting"` : ''}>
+                    <span class="stat-value">${stats.attack}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Update hero stats for a specific position (useful for dynamic updates)
+    updateHeroStats(slotPosition) {
+        const heroCard = document.querySelector(`[data-slot-position="${slotPosition}"] .hero-stats-overlay`);
+        if (!heroCard) return;
+        
+        const stats = this.getHeroStats(slotPosition);
+        if (!stats) return;
+        
+        const hpStat = heroCard.querySelector('[data-stat="hp"]');
+        const attackStat = heroCard.querySelector('[data-stat="attack"]');
+        const hpValue = heroCard.querySelector('[data-stat="hp"] .stat-value');
+        const attackValue = heroCard.querySelector('[data-stat="attack"] .stat-value');
+        
+        if (hpValue) hpValue.textContent = stats.currentHp;
+        if (attackValue) attackValue.textContent = stats.attack;
+        
+        // Update bonus styling and tooltips
+        if (hpStat && stats.bonuses) {
+            const hasHpBonus = stats.bonuses.hpBonus > 0;
+            if (hasHpBonus) {
+                hpStat.classList.add('boosted');
+                hpStat.title = `Base + ${stats.bonuses.hpBonus} from Toughness`;
+            } else {
+                hpStat.classList.remove('boosted');
+                hpStat.removeAttribute('title');
+            }
+        }
+        
+        if (attackStat && stats.bonuses) {
+            const hasAttackBonus = stats.bonuses.attackBonus > 0;
+            if (hasAttackBonus) {
+                attackStat.classList.add('boosted');
+                attackStat.title = `Base + ${stats.bonuses.attackBonus} from Fighting`;
+            } else {
+                attackStat.classList.remove('boosted');
+                attackStat.removeAttribute('title');
+            }
+        }
+    }
+
+    // Update all hero stats in the formation
+    updateAllHeroStats() {
+        console.log('🔄 Updating all hero stats with ability bonuses...');
+        
+        ['left', 'center', 'right'].forEach(position => {
+            this.updateHeroStats(position);
+            
+            // Log the updated stats for debugging
+            const stats = this.getHeroStats(position);
+            if (stats && stats.bonuses && (stats.bonuses.hpBonus > 0 || stats.bonuses.attackBonus > 0)) {
+                const formation = window.heroSelection?.formationManager?.getBattleFormation();
+                const hero = formation?.[position];
+                if (hero) {
+                    console.log(`✅ Updated ${hero.name} (${position}): ${stats.maxHp} HP, ${stats.attack} ATK`);
+                }
+            }
+        });
+    }
+
     // Create character card HTML
     createCharacterCardHTML(character, isSelectable = true, isSelected = false, showTooltip = false, isDraggable = false, slotPosition = null, includeAbilityZones = false, heroAbilitiesManager = null) {
         const selectableClass = isSelectable ? 'character-selectable' : '';
@@ -293,6 +447,10 @@ export class HeroSelectionUI {
         const abilityZonesHTML = includeAbilityZones ? 
             this.createAbilityZonesHTML(slotPosition, heroAbilitiesManager) : '';
         
+        // Add hero stats HTML if in team building mode (includeAbilityZones = true)
+        const heroStatsHTML = includeAbilityZones && slotPosition ? 
+            this.createHeroStatsHTML(slotPosition) : '';
+        
         return `
             <div class="character-card ${selectableClass} ${selectedClass} ${draggableClass} ${includeAbilityZones ? 'with-ability-zones' : ''}" 
                 data-character-id="${character.id}"
@@ -308,6 +466,7 @@ export class HeroSelectionUI {
                         ${dragEvents}
                         ${heroClickEvents}
                         onerror="this.src='./Cards/Characters/placeholder.png'">
+                    ${heroStatsHTML}
                 </div>
                 ${showCharacterName ? `<div class="character-name">${character.name}</div>` : ''}
                 ${abilityZonesHTML}
@@ -364,7 +523,6 @@ export class HeroSelectionUI {
             }
         };
         
-        // FIXED: Always create the creatures container, even if empty
         // This ensures drop zones exist for Guard Change mode
         let creaturesHTML = `
             <div class="hero-creatures" 
@@ -583,6 +741,11 @@ export class HeroSelectionUI {
                 ${createTeamSlotFn('center', battleFormation.center)}
                 ${createTeamSlotFn('right', battleFormation.right)}
             `;
+            
+            // Update hero stats after UI refresh
+            setTimeout(() => {
+                this.updateAllHeroStats();
+            }, 50); // Small delay to ensure DOM is updated
         }
     }
 }
@@ -1357,14 +1520,21 @@ window.showHeroSpellbookTooltip = function(position) {
 window.handleHeroHoverEnter = function(position, element) {
     if (!window.heroSelection) return;
     
-    // Show card tooltip
+    // Get hero data
     const hero = window.heroSelection.formationManager.getBattleFormation()[position];
     if (hero) {
+        // Get hero stats
+        const heroStats = window.heroSelection.heroSelectionUI.getHeroStats(position);
+        
+        // Create enhanced card data with stats
         const cardData = {
             imagePath: hero.image,
             displayName: hero.name,
-            cardType: 'character'
+            cardType: 'character',
+            heroStats: heroStats, // Add stats to card data
+            heroPosition: position // Add position for context
         };
+        
         window.showCardTooltip(JSON.stringify(cardData), element);
     }
     
@@ -1450,9 +1620,7 @@ function handleNicolasClick(event, heroPosition, heroName) {
     if (heroName !== 'Nicolas' || !window.heroSelection?.nicolasEffectManager) {
         return;
     }
-    
-    console.log(`🧪 Nicolas clicked at position ${heroPosition}`);
-    
+        
     // Show Nicolas dialog
     window.heroSelection.nicolasEffectManager.showNicolasDialog(window.heroSelection, heroPosition);
 }
@@ -1486,6 +1654,116 @@ if (typeof window !== 'undefined') {
     window.onCreatureContainerDragOver = onCreatureContainerDragOver;
     window.onCreatureContainerDragLeave = onCreatureContainerDragLeave;
     window.onCreatureContainerDrop = onCreatureContainerDrop;
+    
+    // Hero stats update functions
+    window.updateHeroStats = function(slotPosition) {
+        if (window.heroSelection && window.heroSelection.heroSelectionUI) {
+            window.heroSelection.heroSelectionUI.updateHeroStats(slotPosition);
+        }
+    };
+    
+    window.updateAllHeroStats = function() {
+        if (window.heroSelection && window.heroSelection.heroSelectionUI) {
+            window.heroSelection.heroSelectionUI.updateAllHeroStats();
+        }
+    };
+}
+
+// Add CSS styles for hero stats display
+if (typeof document !== 'undefined' && !document.getElementById('heroStatsStyles')) {
+    const style = document.createElement('style');
+    style.id = 'heroStatsStyles';
+    style.textContent = `
+        /* Hero Stats Overlay Container */
+        .hero-stats-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0; /* Hide until font loads */
+            transition: opacity 0.3s ease;
+        }
+
+        /* Show hero stats once font is loaded */
+        .fonts-loaded .hero-stats-overlay {
+            opacity: 1;
+        }
+
+        /* Ensure character image container is positioned relative for stats overlay */
+        .character-image-container {
+            position: relative;
+        }
+
+        /* Individual Hero Stat Elements */
+        .hero-stat {
+            position: absolute;
+            bottom: 2px;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        /* HP Stat - Bottom Left of the IMAGE */
+        .hero-stat[data-stat="hp"] {
+            left: 35px; 
+        }
+
+        /* Attack Stat - Bottom Right of the IMAGE */
+        .hero-stat[data-stat="attack"] {
+            right: 25px; 
+        }
+
+        /* Stat Value Text - Enhanced for proper font loading */
+        .hero-stat .stat-value {
+            font-family: 'Pixel Intv', monospace, sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9); /* Strong shadow for readability */
+            line-height: 1;
+            display: block;
+            /* Ensure font loads properly */
+            font-display: swap;
+        }
+
+        /* Fallback for when fonts don't load */
+        .hero-stat .stat-value {
+            font-variant-numeric: tabular-nums; /* Ensures consistent number spacing */
+        }
+
+        /* Show stats immediately if no font loading detection */
+        .no-font-loading .hero-stats-overlay {
+            opacity: 1;
+        }
+
+        /* Hover Effects */
+        .character-card:hover .hero-stat .stat-value {
+            transform: scale(1.1);
+            transition: transform 0.2s ease;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .hero-stat {
+                bottom: 1px;
+                min-width: 20px;
+            }
+            
+            .hero-stat[data-stat="hp"] {
+                left: 2px;
+            }
+            
+            .hero-stat[data-stat="attack"] {
+                right: 2px;
+            }
+            
+            .hero-stat .stat-value {
+                font-size: 10px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 // Add clickable ability and creature drag styles

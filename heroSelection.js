@@ -84,12 +84,17 @@ export class HeroSelection {
             this.handManager,
             this.formationManager, 
             async () => {
-                // Callback for when ability state changes
-                this.updateBattleFormationUI();
+                // Enhanced callback for when ability state changes
+                this.updateBattleFormationUI(); // This now includes stat updates
                 this.updateHandDisplay();
                 
                 // Update potion bonuses when abilities change
                 this.potionHandler.updateAlchemyBonuses(this);
+                
+                // NEW: Explicitly refresh hero stats when abilities change
+                setTimeout(() => {
+                    this.refreshHeroStats();
+                }, 100);
                 
                 await this.saveGameState();
             }
@@ -138,8 +143,11 @@ export class HeroSelection {
             // Make leadership ability available globally
             window.leadershipAbility = leadershipAbility;
         }
+
+        this.initializeStatUpdateSystem();
+
         
-        // UI state (REMOVED currentPhase - now using state machine)
+        // UI state
         this.stateInitialized = false;
         
         // Character card mappings
@@ -204,6 +212,64 @@ export class HeroSelection {
         return this.loadCharacters();
     }
 
+    calculateEffectiveHeroStats(heroPosition) {
+        const formation = this.formationManager.getBattleFormation();
+        const hero = formation[heroPosition];
+        if (!hero) return null;
+        
+        // Get base stats from card database
+        const heroInfo = this.getCardInfo(hero.name);
+        if (!heroInfo || heroInfo.cardType !== 'hero') return null;
+        
+        // Get ability stack counts directly from the abilities manager
+        const toughnessStacks = this.heroAbilitiesManager.getAbilityStackCountForPosition(heroPosition, 'Toughness');
+        const fightingStacks = this.heroAbilitiesManager.getAbilityStackCountForPosition(heroPosition, 'Fighting');
+        
+        // Check for Toras equipment bonus
+        let equipmentAttackBonus = 0;
+        if (hero.name === 'Toras') {
+            const equipment = this.heroEquipmentManager.getHeroEquipment(heroPosition);
+            const equipmentCount = equipment ? equipment.length : 0;
+            equipmentAttackBonus = equipmentCount * 10; // +10 Attack per equipment for Toras
+        }
+        
+        // Get permanent bonuses from LegendarySwordOfABarbarianKing
+        let permanentAttackBonus = 0;
+        let permanentHpBonus = 0;
+        
+        // If hero object has permanent bonuses, use them
+        if (hero.attackBonusses !== undefined) {
+            permanentAttackBonus = hero.attackBonusses;
+        }
+        if (hero.hpBonusses !== undefined) {
+            permanentHpBonus = hero.hpBonusses;
+        }
+        
+        // Calculate final stats with all bonuses
+        const hpBonus = toughnessStacks * 200;
+        const fightingAttackBonus = fightingStacks * 10;
+        const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + permanentAttackBonus;
+        const totalHpBonus = hpBonus + permanentHpBonus;
+        
+        return {
+            maxHp: heroInfo.hp + totalHpBonus,
+            currentHp: heroInfo.hp + totalHpBonus,
+            attack: heroInfo.atk + totalAttackBonus,
+            bonuses: {
+                toughnessStacks,
+                fightingStacks,
+                hpBonus,
+                attackBonus: fightingAttackBonus,
+                equipmentCount: hero.name === 'Toras' ? (this.heroEquipmentManager.getHeroEquipment(heroPosition)?.length || 0) : 0,
+                equipmentAttackBonus,
+                permanentAttackBonus,  
+                permanentHpBonus,      
+                totalAttackBonus,
+                totalHpBonus           
+            }
+        };
+    }
+
     // Sync actions with opponent:
     syncActionsWithOpponent() {
         if (this.gameDataSender) {
@@ -237,7 +303,16 @@ export class HeroSelection {
         
         this.handManager.endHandCardDrag = function() {
             document.body.classList.remove('dragging-ability');
-            return originalEndDrag();
+            const result = originalEndDrag();
+            
+            // NEW: Trigger stat refresh after drag operations
+            if (window.heroSelection) {
+                setTimeout(() => {
+                    window.heroSelection.refreshHeroStats();
+                }, 100);
+            }
+            
+            return result;
         };
     }
 
@@ -404,14 +479,11 @@ export class HeroSelection {
         if (this.potionHandler) {
             this.potionHandler.updateAlchemyBonuses(this);
             this.potionHandler.resetPotionsForTurn();
-
-            console.log('🧪 Alchemy bonuses recalculated for new turn based on current heroes');
         }
         
         // Reset Leadership usage and ability attachment tracking for new turn
         if (this.heroAbilitiesManager) {
             this.heroAbilitiesManager.resetTurnBasedTracking();
-            console.log('✨ Leadership usage and ability tracking reset for new turn');
         }
         
         // Reset Nicolas effect usage for new turn
@@ -1054,6 +1126,8 @@ export class HeroSelection {
         
         // Initialize life manager with turn tracker after restoration
         this.initializeLifeManagerWithTurnTracker();
+
+        setTimeout(() => this.refreshHeroStats(), 200);
     }
 
     // Enhanced start character selection process
@@ -1202,9 +1276,8 @@ export class HeroSelection {
             // Initialize hero with starting abilities in center position
             this.heroAbilitiesManager.updateHeroPlacement('center', heroInfo);
             
-            // ✅ FIX: Immediately update potion bonuses after hero placement
+            // Immediately update potion bonuses after hero placement
             this.potionHandler.updateAlchemyBonuses(this);
-            console.log('🧪 Updated potion bonuses after character selection');
         }
 
         // Initialize life manager with turn tracker for team building phase
@@ -1578,9 +1651,7 @@ export class HeroSelection {
             // ===== CLEAR POTION EFFECTS WHEN RETURNING TO FORMATION =====
             if (this.potionHandler) {
                 try {
-                    console.log('🧪 Clearing potion effects when returning to formation...');
                     this.potionHandler.clearPotionEffects();
-                    console.log('✅ Potion effects cleared during formation return');
                 } catch (error) {
                     console.error('❌ Error clearing potion effects during formation return:', error);
                 }
@@ -1974,6 +2045,16 @@ export class HeroSelection {
             return false;
         }
         
+        // NEW: Calculate effective stats for all player heroes
+        const playerEffectiveStats = {};
+        ['left', 'center', 'right'].forEach(position => {
+            const stats = this.calculateEffectiveHeroStats(position);
+            if (stats) {
+                playerEffectiveStats[position] = stats;
+                console.log(`📊 Calculated effective stats for ${position}: HP ${stats.maxHp}, ATK ${stats.attack}`);
+            }
+        });
+        
         // Get player abilities
         const playerAbilities = {
             left: this.heroAbilitiesManager.getHeroAbilities('left'),
@@ -1989,21 +2070,33 @@ export class HeroSelection {
                 // Count total abilities and Fighting specifically
                 let totalAbilities = 0;
                 let fightingCount = 0;
+                let toughnessCount = 0;
                 
                 ['zone1', 'zone2', 'zone3'].forEach(zone => {
                     if (abilities[zone] && Array.isArray(abilities[zone])) {
                         totalAbilities += abilities[zone].length;
                         const fightingInZone = abilities[zone].filter(a => a && a.name === 'Fighting').length;
+                        const toughnessInZone = abilities[zone].filter(a => a && a.name === 'Toughness').length;
                         fightingCount += fightingInZone;
+                        toughnessCount += toughnessInZone;
                     }
                 });
                 
                 if (totalAbilities > 0) {
                     totalPlayerAbilities += totalAbilities;
                 }
+                
+                // Log stat-affecting abilities
+                if (fightingCount > 0 || toughnessCount > 0) {
+                    const formation = this.formationManager.getBattleFormation();
+                    const hero = formation[position];
+                    if (hero) {
+                        console.log(`⚔️ ${hero.name} has ${fightingCount} Fighting (+${fightingCount * 10} ATK) and ${toughnessCount} Toughness (+${toughnessCount * 200} HP)`);
+                    }
+                }
             }
         });
-                
+                    
         // Get opponent abilities (from stored data if available)
         let opponentAbilities = null;
         if (this.opponentAbilitiesData) {
@@ -2016,11 +2109,13 @@ export class HeroSelection {
                     const abilities = opponentAbilities[position];
                     if (abilities) {
                         let fightingCount = 0;
+                        let toughnessCount = 0;
                         let totalAbilities = 0;
                         ['zone1', 'zone2', 'zone3'].forEach(zone => {
                             if (abilities[zone] && Array.isArray(abilities[zone])) {
                                 totalAbilities += abilities[zone].length;
                                 fightingCount += abilities[zone].filter(a => a && a.name === 'Fighting').length;
+                                toughnessCount += abilities[zone].filter(a => a && a.name === 'Toughness').length;
                             }
                         });
                         if (totalAbilities > 0) {
@@ -2116,8 +2211,11 @@ export class HeroSelection {
                 playerCreatures,      
                 opponentCreatures,
                 playerEquipment,
-                opponentEquipment      
+                opponentEquipment,
+                playerEffectiveStats       
             );
+            
+            console.log('✅ Battle screen initialized with stat-enhanced Hero instances');
             return true;
             
         } catch (error) {
@@ -2639,6 +2737,31 @@ export class HeroSelection {
             this.formationManager.getBattleFormation(),
             (position, character) => this.createTeamSlotHTML(position, character)
         );
+        
+        // Update hero stats after UI refresh with short delay to ensure DOM is ready
+        setTimeout(() => {
+            this.refreshHeroStats();
+        }, 50);
+    }
+
+    refreshHeroStats() {
+        if (this.heroSelectionUI && typeof this.heroSelectionUI.updateAllHeroStats === 'function') {
+            this.heroSelectionUI.updateAllHeroStats();
+        }
+        
+        // Also log current stat bonuses for debugging
+        ['left', 'center', 'right'].forEach(position => {
+            const stats = this.calculateEffectiveHeroStats(position);
+            if (stats && (stats.bonuses.toughnessStacks > 0 || stats.bonuses.fightingStacks > 0)) {
+                const formation = this.formationManager.getBattleFormation();
+                const hero = formation[position];
+                if (hero) {
+                    console.log(`📊 ${hero.name} (${position}): ` +
+                            `HP ${stats.maxHp} (+${stats.bonuses.hpBonus}), ` +
+                            `ATK ${stats.attack} (+${stats.bonuses.attackBonus})`);
+                }
+            }
+        });
     }
 
     // Create team slot HTML (delegating to UI manager)
@@ -2690,7 +2813,6 @@ export class HeroSelection {
         // ===== RESET POTION HANDLER FOR NEW GAME =====
         if (this.potionHandler) {
             this.potionHandler.resetForNewGame(); 
-            console.log('🧪 PotionHandler completely reset for new game');
         }
 
         // Reset Hero effect managers
@@ -2795,7 +2917,8 @@ export class HeroSelection {
         
         // Create potion display
         const potionDisplay = window.potionHandler ? window.potionHandler.createPotionDisplay() : '';
-
+        setTimeout(() => this.refreshHeroStats(), 200);
+        
         return `
             ${lifeDisplay}
             <div class="team-building-container">
@@ -3022,6 +3145,45 @@ export class HeroSelection {
             feedback.remove();
         }, 2000);
     }
+
+    initializeStatUpdateSystem() {
+        // Set up global stat update functions for use by ability manager
+        if (typeof window !== 'undefined') {
+            // Global stat update function for specific positions
+            window.updateHeroStats = (slotPosition) => {
+                if (this.heroSelectionUI && typeof this.heroSelectionUI.updateHeroStats === 'function') {
+                    this.heroSelectionUI.updateHeroStats(slotPosition);
+                }
+            };
+            
+            // Global stat update function for all positions  
+            window.updateAllHeroStats = () => {
+                if (this.heroSelectionUI && typeof this.heroSelectionUI.updateAllHeroStats === 'function') {
+                    this.heroSelectionUI.updateAllHeroStats();
+                }
+            };
+            
+            console.log('✅ Stat update system initialized');
+        }
+    }
+
+    syncStatsForBattleTransition() {
+        console.log('🔄 Syncing stats for battle transition...');
+        
+        // For each hero position, log the effective stats
+        ['left', 'center', 'right'].forEach(position => {
+            const stats = this.calculateEffectiveHeroStats(position);
+            if (stats) {
+                const formation = this.formationManager.getBattleFormation();
+                const hero = formation[position];
+                if (hero) {
+                    console.log(`⚔️ ${hero.name} entering battle: ` +
+                            `${stats.maxHp} HP, ${stats.attack} ATK ` +
+                            `(+${stats.bonuses.hpBonus} HP, +${stats.bonuses.attackBonus} ATK from abilities)`);
+                }
+            }
+        });
+    }
 }
 
 // Global drag and drop functions (Hero formation only - hand drag/drop is now in HandManager)
@@ -3141,6 +3303,7 @@ function selectCharacterCard(characterId) {
         const success = window.heroSelection.selectCharacter(characterId);
         if (success) {
             window.updateHeroSelectionUI();
+            window.heroSelection.refreshHeroStats(); 
         }
     }
 }

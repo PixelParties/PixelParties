@@ -54,13 +54,37 @@ export class CardPreviewManager {
             tooltipContainer.style.zIndex = '3000';
         }
 
-        const cardHTML = `
-            <div class="large-card-tooltip">
-                <img src="${cardData.imagePath}" 
-                    alt="${cardData.displayName}" 
-                    class="large-card-image"
-                    style="transform: scale(1.5); transform-origin: center;"
-                    onerror="this.src='./Cards/placeholder.png'">
+        // Check if this is a character card with stats
+        const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
+        
+        // Build the card HTML with sprite-positioned stats
+        let cardHTML = `
+            <div class="large-card-tooltip ${isCharacterWithStats ? 'character-with-stats' : ''}">
+                <div class="tooltip-image-container">
+                    <img src="${cardData.imagePath}" 
+                        alt="${cardData.displayName}" 
+                        class="large-card-image"
+                        style="transform: scale(1.5); transform-origin: center;"
+                        onerror="this.src='./Cards/placeholder.png'">
+        `;
+        
+        // Add hero stats positioned on the sprite if available
+        if (isCharacterWithStats) {
+            const stats = cardData.heroStats;
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat hp-stat">
+                            <span class="stat-value">${stats.currentHp}</span>
+                        </div>
+                        <div class="tooltip-sprite-stat attack-stat">
+                            <span class="stat-value">${stats.attack}</span>
+                        </div>
+                    </div>
+            `;
+        }
+        
+        cardHTML += `
+                </div>
                 <div class="card-tooltip-name">${cardData.displayName}</div>
             </div>
         `;
@@ -94,12 +118,36 @@ export class CardPreviewManager {
             return;
         }
         
-        const cardHTML = `
-            <div class="large-card-tooltip">
-                <img src="${cardData.imagePath}" 
-                    alt="${cardData.displayName}" 
-                    class="large-card-image"
-                    onerror="this.src='./Cards/placeholder.png'">
+        // Check if this is a character card with stats
+        const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
+        
+        // Build the card HTML with sprite-positioned stats
+        let cardHTML = `
+            <div class="large-card-tooltip ${isCharacterWithStats ? 'character-with-stats' : ''}">
+                <div class="tooltip-image-container">
+                    <img src="${cardData.imagePath}" 
+                        alt="${cardData.displayName}" 
+                        class="large-card-image"
+                        onerror="this.src='./Cards/placeholder.png'">
+        `;
+        
+        // Add hero stats positioned on the sprite if available
+        if (isCharacterWithStats) {
+            const stats = cardData.heroStats;
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat hp-stat">
+                            <span class="stat-value">${stats.currentHp}</span>
+                        </div>
+                        <div class="tooltip-sprite-stat attack-stat">
+                            <span class="stat-value">${stats.attack}</span>
+                        </div>
+                    </div>
+            `;
+        }
+        
+        cardHTML += `
+                </div>
                 <div class="card-tooltip-name">${cardData.displayName}</div>
             </div>
         `;
@@ -121,7 +169,7 @@ export class CardPreviewManager {
     }
 
     // Show preview in dedicated reward screen area with stable layout
-    showRewardScreenPreview(cardData) {
+     showRewardScreenPreview(cardData) {
         const previewArea = document.getElementById('rewardCardPreview');
         if (!previewArea) {
             console.warn('Reward card preview area not found!');

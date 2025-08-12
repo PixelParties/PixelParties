@@ -1,6 +1,16 @@
 /* ============================================
    9. PLAYERS LIST & READY STATUS
    ============================================ */
+
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 .players-list {
     margin-top: 25px;
     padding: 20px;
@@ -9,6 +19,7 @@
     border-radius: 16px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .players-list h3 {
@@ -19,6 +30,8 @@
     align-items: center;
     gap: 10px;
     font-weight: 700;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
 }
 
 .player-item {
@@ -33,6 +46,8 @@
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.5);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .player-status {
@@ -61,6 +76,8 @@
     color: #667eea;
     font-weight: 700;
     border: 1px solid rgba(102, 126, 234, 0.2);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .ready-status {
@@ -70,6 +87,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .ready-status.ready {

@@ -1,4 +1,5 @@
 // battleScreen.js - Battle Screen Module with BattleLog Integration and Ability Synchronization
+// UPDATED: Uses pre-calculated Hero stats instead of recalculating
 
 import BattleManager from './battleManager.js';
 import { BattleLog } from './battleLog.js';
@@ -17,7 +18,7 @@ export class BattleScreen {
         this.playerAbilities = null;
         this.opponentAbilities = null;
         
-        // NEW: Initialize BattleLog instance
+        // Initialize BattleLog instance
         this.battleLog = new BattleLog('combatLog', 100);
         
         // Initialize battle manager with synchronization support
@@ -47,7 +48,8 @@ export class BattleScreen {
     playerSpellbooks = null, opponentSpellbooks = null,
     actionManager = null,
     playerCreatures = null, opponentCreatures = null,
-    playerEquips = null, opponentEquips = null) {
+    playerEquips = null, opponentEquips = null,
+    playerEffectiveStats = null) { 
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -84,30 +86,9 @@ export class BattleScreen {
             playerCreatures, 
             opponentCreatures,
             playerEquips,
-            opponentEquips
+            opponentEquips,
+            playerEffectiveStats 
         );
-    }
-
-    // Calculate ability attack bonus for a hero
-    calculateAbilityAttackBonus(abilities) {
-        if (!abilities) return 0;
-        
-        let bonus = 0;
-        
-        // Check all zones for abilities that grant attack bonuses
-        ['zone1', 'zone2', 'zone3'].forEach(zone => {
-            if (abilities[zone] && Array.isArray(abilities[zone])) {
-                abilities[zone].forEach(ability => {
-                    // Each ability instance adds its bonus
-                    if (ability.name === 'Fighting') {
-                        bonus += 10; // +10 attack per Fighting
-                    }
-                    // Add more ability checks here as needed
-                });
-            }
-        });
-        
-        return bonus;
     }
 
     // Show battle arena
@@ -162,25 +143,29 @@ export class BattleScreen {
                 const latestPlayerAbilities = this.getLatestPlayerAbilities();
                 const latestPlayerSpellbooks = this.getLatestPlayerSpellbooks();
                 const latestPlayerCreatures = this.getLatestPlayerCreatures();
-                const latestPlayerEquipment = this.getLatestPlayerEquipment(); 
-                
+                const latestPlayerEquipment = this.getLatestPlayerEquipment();
+                const latestPlayerEffectiveStats = this.getLatestPlayerEffectiveStats();
+
                 // Update battle manager with latest player data
                 this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment);
 
-                
+                // Also update effective stats
+                this.playerEffectiveStats = latestPlayerEffectiveStats;
+                this.battleManager.playerEffectiveStats = latestPlayerEffectiveStats;
+
                 // Start the synchronized battle
                 this.battleManager.startBattle();
-                
+
                 // Notify guest to start with current ability state
                 if (this.gameDataSender) {
                     this.gameDataSender('battle_start', {
                         timestamp: Date.now(),
                         synchronized: true,
-                        // Sync current player state to guest (becomes their opponent data)
                         hostAbilities: latestPlayerAbilities,
                         hostSpellbooks: latestPlayerSpellbooks,
                         hostCreatures: latestPlayerCreatures,
-                        hostEquipment: latestPlayerEquipment, // 🔥 NEW: Include equipment
+                        hostEquipment: latestPlayerEquipment,
+                        hostEffectiveStats: latestPlayerEffectiveStats, // ← NOW CURRENT!
                         hostFormation: this.playerFormation
                     });
                 }
@@ -276,6 +261,29 @@ export class BattleScreen {
         return this.playerEquips;
     }
 
+    getLatestPlayerEffectiveStats() {
+        if (!window.heroSelection) {
+            console.warn('⚠️ HeroSelection not available for stats');
+            return {};
+        }
+        
+        const effectiveStats = {};
+        
+        // Get current effective stats for each position (already calculated!)
+        ['left', 'center', 'right'].forEach(position => {
+            if (this.hasHeroAtPosition(position)) {
+                const stats = window.heroSelection.calculateEffectiveHeroStats(position);
+                if (stats) {
+                    effectiveStats[position] = stats;
+                    console.log(`📊 Retrieved effective stats for ${position}: HP ${stats.maxHp}, ATK ${stats.attack}`);
+                }
+            }
+        });
+        
+        console.log('✅ All player effective stats retrieved (pre-calculated, ready for battle)');
+        return effectiveStats;
+    }
+
     // Helper method to check if there's a hero at a position
     hasHeroAtPosition(position) {
         return this.playerFormation && this.playerFormation[position] && this.playerFormation[position] !== null;
@@ -303,66 +311,72 @@ export class BattleScreen {
     // Updated receiveBattleStart method to handle ability synchronization
     receiveBattleStart(data) {
         if (!this.isHost && this.battleManager) {
-            console.log('🎯 Guest receiving battle start with host data:', data);
+            console.log('🎯 Guest receiving battle start with host data');
             
-            // Sync host's abilities as our opponent data
+            // Sync all host data as opponent data
             if (data.hostAbilities) {
                 this.opponentAbilities = data.hostAbilities;
                 this.battleManager.opponentAbilities = data.hostAbilities;
                 console.log('✅ Synced opponent abilities from host');
             }
             
-            // Sync host's spellbooks as our opponent data
             if (data.hostSpellbooks) {
                 this.opponentSpellbooks = data.hostSpellbooks;
                 this.battleManager.opponentSpellbooks = data.hostSpellbooks;
                 console.log('✅ Synced opponent spellbooks from host');
             }
             
-            // Sync host's creatures as our opponent data
             if (data.hostCreatures) {
                 this.opponentCreatures = data.hostCreatures;
                 this.battleManager.opponentCreatures = data.hostCreatures;
                 console.log('✅ Synced opponent creatures from host');
             }
             
-            // Sync host's equipment as our opponent data
             if (data.hostEquipment) {
                 this.opponentEquips = data.hostEquipment;
                 this.battleManager.opponentEquips = data.hostEquipment;
                 console.log('✅ Synced opponent equipment from host');
             }
             
-            // Sync host's formation as our opponent data
+            // ★ SIMPLIFIED: Just store the effective stats - no calculation needed!
+            if (data.hostEffectiveStats) {
+                this.opponentEffectiveStats = data.hostEffectiveStats;
+                this.battleManager.opponentEffectiveStats = data.hostEffectiveStats;
+                console.log('✅ Synced opponent effective stats from host (pre-calculated, ready to use)');
+            }
+            
             if (data.hostFormation) {
                 this.opponentFormation = data.hostFormation;
                 this.battleManager.opponentFormation = data.hostFormation;
                 console.log('✅ Synced opponent formation from host');
             }
             
-            // Send guest data back to host (including equipment)
-            const latestGuestAbilities = this.getLatestPlayerAbilities();
-            const latestGuestSpellbooks = this.getLatestPlayerSpellbooks();
-            const latestGuestCreatures = this.getLatestPlayerCreatures();
-            const latestGuestEquipment = this.getLatestPlayerEquipment();
-            
+            // Send our pre-calculated data back to host
+            console.log('📤 Sending guest data back to host...');
+            const guestStats = this.getLatestPlayerEffectiveStats();
+            const guestAbilities = this.getLatestPlayerAbilities();
+            const guestSpellbooks = this.getLatestPlayerSpellbooks();
+            const guestCreatures = this.getLatestPlayerCreatures();
+            const guestEquipment = this.getLatestPlayerEquipment();
+
             if (this.gameDataSender) {
                 this.gameDataSender('battle_data', {
                     type: 'guest_abilities_sync',
                     data: {
-                        guestAbilities: latestGuestAbilities,
-                        guestSpellbooks: latestGuestSpellbooks,
-                        guestCreatures: latestGuestCreatures,
-                        guestEquipment: latestGuestEquipment,
+                        guestAbilities,
+                        guestSpellbooks,
+                        guestCreatures,
+                        guestEquipment,
+                        guestEffectiveStats: guestStats, // ★ Send pre-calculated stats
                         timestamp: Date.now()
                     }
                 });
-                console.log('📤 Guest sent abilities AND equipment back to host for tooltip sync');
             }
             
-            // Re-initialize opponent heroes with synced data to ensure everything is up to date
+            // Re-initialize opponent heroes with synced data
             if (this.battleManager.opponentAbilities || this.battleManager.opponentSpellbooks || 
-                this.battleManager.opponentCreatures || this.battleManager.opponentEquips) {
+                this.battleManager.opponentCreatures || this.battleManager.opponentEquips ||
+                this.battleManager.opponentEffectiveStats) {
                 console.log('🔄 Re-initializing opponent heroes with synced data...');
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
@@ -372,19 +386,20 @@ export class BattleScreen {
                     this.battleManager.opponentSpellbooks,
                     this.battleManager.opponentCreatures,
                     this.battleManager.opponentEquips,
-                    'host' // Host is always the opponent for guest
+                    'host',
+                    this.battleManager.opponentEffectiveStats // ★ Pass pre-calculated stats
                 );
             }
             
-            // NECROMANCY FIX: Initialize necromancy displays for guest
+            // Initialize necromancy displays
             if (this.battleManager.necromancyManager) {
                 this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
             }
             
-            // Initialize speed control UI for guest
+            // Initialize speed control UI
             this.initializeSpeedControlUI();
             
-            // Start the battle
+            // Start battle with all data ready
             this.battleManager.startBattle();
         }
     }
@@ -411,7 +426,7 @@ export class BattleScreen {
 
     receiveGuestAbilitiesSync(data) {
         if (this.isHost) {
-            // Update all opponent data, not just abilities
+            // Update all opponent data
             if (data.guestAbilities) {
                 this.opponentAbilities = data.guestAbilities;
                 this.battleManager.opponentAbilities = data.guestAbilities;
@@ -427,16 +442,20 @@ export class BattleScreen {
                 this.battleManager.opponentCreatures = data.guestCreatures;
             }
             
-            // Handle guest equipment sync
             if (data.guestEquipment) {
                 this.opponentEquips = data.guestEquipment;
                 this.battleManager.opponentEquips = data.guestEquipment;
-                console.log('✅ HOST: Synced guest equipment as opponent data');
+            }
+
+            // ★ SIMPLIFIED: Just store the effective stats
+            if (data.guestEffectiveStats) {
+                this.opponentEffectiveStats = data.guestEffectiveStats;
+                this.battleManager.opponentEffectiveStats = data.guestEffectiveStats;
+                console.log('✅ HOST: Stored guest effective stats as opponent data');
             }
             
-            // Re-initialize opponent heroes with synced data (just like guest does)
-            if (this.battleManager && (data.guestAbilities || data.guestSpellbooks || 
-                                    data.guestCreatures || data.guestEquipment)) { // 🔥 UPDATED condition
+            // Re-initialize opponent heroes with all synced data
+            if (this.battleManager) {
                 console.log('🔄 HOST: Re-initializing opponent heroes with guest data...');
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
@@ -445,11 +464,12 @@ export class BattleScreen {
                     this.battleManager.opponentAbilities,
                     this.battleManager.opponentSpellbooks,
                     this.battleManager.opponentCreatures,
-                    this.battleManager.opponentEquips, // 🔥 NOW INCLUDES EQUIPMENT
-                    'guest' // Guest is the opponent for host
+                    this.battleManager.opponentEquips,
+                    'guest',
+                    this.battleManager.opponentEffectiveStats // ★ Pass pre-calculated stats
                 );
                 
-                console.log('✅ HOST: Guest abilities AND equipment synced and heroes re-initialized');
+                console.log('✅ HOST: All opponent data synced and heroes initialized');
             }
         }
     }
@@ -629,7 +649,7 @@ export class BattleScreen {
         battleArena.innerHTML = battleHTML;
         battleArena.style.display = 'block';
         
-        // NEW: Initialize BattleLog after DOM is ready
+        // Initialize BattleLog after DOM is ready
         setTimeout(() => {
             const logInitialized = this.battleLog.init();
             if (logInitialized) {
@@ -794,7 +814,7 @@ export class BattleScreen {
         }, 150);
     }
 
-    // Create individual battle hero slot with enhanced styling and ability indicators
+    // UPDATED: Create individual battle hero slot using pre-calculated hero stats
     createBattleHeroSlot(hero, side, position) {
         if (!hero) {
             return `
@@ -815,81 +835,55 @@ export class BattleScreen {
         };
         const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
         
-        // Get hero's actual stats from card database
-        const heroInfo = getCardInfo(hero.name);
-        let baseAttack = 10; // fallback
-        let maxHp = 100; // fallback
-        if (heroInfo && heroInfo.cardType === 'hero') {
-            baseAttack = heroInfo.atk;
-            maxHp = heroInfo.hp;
-        }
-        
-        // Get abilities for this hero
-        let abilities = null;
-        if (side === 'player' && this.playerAbilities) {
-            abilities = this.playerAbilities[position];
-        } else if (side === 'opponent' && this.opponentAbilities) {
-            abilities = this.opponentAbilities[position];
-        }
-        
-        // Calculate ability bonuses
-        let abilityBonus = 0;
+        // SIMPLIFIED: Use pre-calculated stats from Hero objects
+        let displayAttack = 10; // fallback
+        let attackBonus = 0;
         let attackContainerClass = '';
         let bonusDisplay = '';
         
         try {
-            if (abilities) {
-                abilityBonus = this.calculateAbilityAttackBonus(abilities);
-            }
-            
-            // Special case for Toras with robust equipment handling
-            if (hero.name === 'Toras') {
-                try {
-                    // Get equipment from battle manager hero instance using Hero class methods
-                    let equipmentCount = 0;
-                    if (this.battleManager) {
-                        const heroInstance = side === 'player' 
-                            ? this.battleManager.playerHeroes[position]
-                            : this.battleManager.opponentHeroes[position];
-                        
-                        if (heroInstance && typeof heroInstance.getEquipment === 'function') {
-                            const heroEquipment = heroInstance.getEquipment();
-                            
-                            // Count unique equipment using Hero class data
-                            const uniqueEquipmentNames = new Set();
-                            heroEquipment.forEach(item => {
-                                const itemName = item.name || item.cardName;
-                                if (itemName) {
-                                    uniqueEquipmentNames.add(itemName);
-                                }
-                            });
-                            
-                            equipmentCount = uniqueEquipmentNames.size;
-                        }
-                    }
+            // Get the actual hero instance from battle manager to read pre-calculated stats
+            if (this.battleManager) {
+                const heroInstance = side === 'player' 
+                    ? this.battleManager.playerHeroes[position]
+                    : this.battleManager.opponentHeroes[position];
+                
+                if (heroInstance) {
+                    // Use the hero's current attack value (already includes all bonuses)
+                    displayAttack = heroInstance.getCurrentAttack();
+                    attackBonus = displayAttack - heroInstance.baseAtk;
                     
-                    if (equipmentCount > 0) {
-                        const equipmentBonus = equipmentCount * 10;
-                        abilityBonus += equipmentBonus;
-                        console.log(`⚔️ Toras ${side} ${position} equipment bonus: +${equipmentBonus} ATK from ${equipmentCount} unique items`);
+                    console.log(`📊 ${side} ${position} ${heroInstance.name}: Base ${heroInstance.baseAtk} + Bonuses ${attackBonus} = Total ${displayAttack}`);
+                } else {
+                    // Fallback: Get base stats from card database
+                    const heroInfo = getCardInfo(hero.name);
+                    if (heroInfo && heroInfo.cardType === 'hero') {
+                        displayAttack = heroInfo.atk;
                     }
-                } catch (equipmentError) {
-                    console.error(`❌ Error processing Toras equipment for ${side} ${position}:`, equipmentError);
-                    // Continue without equipment bonus - this is non-critical for display
+                }
+            } else {
+                // Fallback: Get base stats from card database
+                const heroInfo = getCardInfo(hero.name);
+                if (heroInfo && heroInfo.cardType === 'hero') {
+                    displayAttack = heroInfo.atk;
                 }
             }
             
             // Format bonus display
-            if (abilityBonus > 0) {
-                bonusDisplay = `<span class="attack-bonus" style="color: #4caf50; display: inline;">+${abilityBonus}</span>`;
+            if (attackBonus > 0) {
+                bonusDisplay = `<span class="attack-bonus" style="color: #4caf50; display: inline;">+${attackBonus}</span>`;
                 attackContainerClass = 'attack-buffed';
             } else {
                 bonusDisplay = `<span class="attack-bonus" style="display: none;"></span>`;
             }
             
         } catch (error) {
-            console.error(`❌ Error calculating bonuses for ${side} ${position}:`, error);
+            console.error(`❌ Error getting hero stats for ${side} ${position}:`, error);
             // Fallback to basic display
+            const heroInfo = getCardInfo(hero.name);
+            if (heroInfo && heroInfo.cardType === 'hero') {
+                displayAttack = heroInfo.atk;
+            }
             bonusDisplay = `<span class="attack-bonus" style="display: none;"></span>`;
         }
 
@@ -927,7 +921,7 @@ export class BattleScreen {
                         <div class="battle-hero-attack ${attackContainerClass}">
                             <div class="attack-icon">⚔️</div>
                             <div class="attack-value">
-                                <span class="attack-base">${baseAttack}</span>
+                                <span class="attack-base">${displayAttack - attackBonus}</span>
                                 ${bonusDisplay}
                             </div>
                         </div>

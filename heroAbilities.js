@@ -1,4 +1,4 @@
-// heroAbilities.js - Hero Ability Zones Management Module with Turn-Based Attachment Limits and Leadership Tracking
+// heroAbilities.js - Hero Ability Zones Management Module with Turn-Based Attachment Limits, Leadership Tracking, and Stat Bonus System
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -50,7 +50,7 @@ export class HeroAbilitiesManager {
         this.formationManager = null;
         this.onStateChange = null; // Callback for when state changes
         
-        console.log('HeroAbilitiesManager initialized with turn-based attachment limits and Leadership tracking');
+        console.log('HeroAbilitiesManager initialized with turn-based attachment limits, Leadership tracking, and stat bonus system');
     }
 
     // Initialize with references to other managers
@@ -372,7 +372,7 @@ export class HeroAbilitiesManager {
 
     // === CORE LOGIC ===
 
-    // Process drop on hero (leftmost free zone or increment existing)
+    // MODIFIED: Enhanced processHeroDrop with immediate stat feedback
     async processHeroDrop(cardName, cardIndex, heroPosition) {
         // Get ability info
         const abilityInfo = getCardInfo(cardName);
@@ -387,6 +387,10 @@ export class HeroAbilitiesManager {
             if (existingZone) {
                 // Increment the existing ability
                 this.addAbilityToZone(heroPosition, existingZone, abilityInfo, true);
+                
+                // NEW: Immediate stat update for increment
+                this.triggerStatUpdateForAbility(heroPosition, cardName, 'added');
+                
                 return { 
                     success: true, 
                     message: `Incremented ${cardName} in ${heroPosition} hero's zone ${existingZone}` 
@@ -405,6 +409,13 @@ export class HeroAbilitiesManager {
                 // Add to leftmost free zone
                 const success = this.addAbilityToZone(heroPosition, freeZone, abilityInfo);
                 if (success) {
+                    // NEW: Log the stat impact for immediate feedback
+                    if (cardName === 'Toughness') {
+                        console.log(`💪 ${heroPosition} hero gains +200 HP from Toughness!`);
+                    } else if (cardName === 'Fighting') {
+                        console.log(`⚔️ ${heroPosition} hero gains +10 Attack from Fighting!`);
+                    }
+                    
                     return { 
                         success: true, 
                         message: `Added ${cardName} to ${heroPosition} hero's zone ${freeZone}` 
@@ -538,7 +549,7 @@ export class HeroAbilitiesManager {
         return !this.heroAbilityRegistry[heroPosition].has(abilityName);
     }
     
-    // Add ability to a specific zone
+    // MODIFIED: Enhanced addAbilityToZone to trigger stat updates
     addAbilityToZone(heroPosition, zoneNumber, ability, bypassUniqueCheck = false) {
         const zoneName = `zone${zoneNumber}`;
         
@@ -564,10 +575,14 @@ export class HeroAbilitiesManager {
         this.heroAbilityRegistry[heroPosition].add(ability.name);
         
         console.log(`Added ${ability.name} to ${heroPosition} hero's ${zoneName}`);
+        
+        // NEW: Trigger stat update if this is a stat-affecting ability
+        this.triggerStatUpdateForAbility(heroPosition, ability.name, 'added');
+        
         return true;
     }
     
-    // Remove ability from a zone
+    // MODIFIED: Enhanced removeAbilityFromZone to trigger stat updates
     removeAbilityFromZone(heroPosition, zoneNumber, abilityIndex) {
         const zoneName = `zone${zoneNumber}`;
         
@@ -592,7 +607,33 @@ export class HeroAbilitiesManager {
         }
         
         console.log(`Removed ${removedAbility.name} from ${heroPosition} hero's ${zoneName}`);
+        
+        // NEW: Trigger stat update if this was a stat-affecting ability
+        this.triggerStatUpdateForAbility(heroPosition, removedAbility.name, 'removed');
+        
         return removedAbility;
+    }
+    
+    // NEW: Trigger stat updates when stat-affecting abilities change
+    triggerStatUpdateForAbility(heroPosition, abilityName, action) {
+        // Check if this is a stat-affecting ability
+        const isStatAffecting = abilityName === 'Toughness' || abilityName === 'Fighting';
+        
+        if (isStatAffecting) {
+            console.log(`📊 ${action} ${abilityName} ${action === 'added' ? 'to' : 'from'} ${heroPosition} hero - triggering stat update`);
+            
+            // Trigger UI update with delay to ensure DOM is ready
+            setTimeout(() => {
+                if (window.heroSelection && window.heroSelection.refreshHeroStats) {
+                    window.heroSelection.refreshHeroStats();
+                }
+                
+                // Also trigger a specific stat update for this position
+                if (window.updateHeroStats) {
+                    window.updateHeroStats(heroPosition);
+                }
+            }, 50);
+        }
     }
     
     // Check if hero still has a specific ability after removal
@@ -609,11 +650,25 @@ export class HeroAbilitiesManager {
         return false;
     }
     
-    // Move all abilities when heroes swap positions
+    // MODIFIED: Enhanced moveHeroAbilities to preserve stat bonuses
     moveHeroAbilities(fromPosition, toPosition) {
         // ENSURE both positions have valid zone structures
         this.ensureValidZoneStructure(fromPosition);
         this.ensureValidZoneStructure(toPosition);
+        
+        // Log stat-affecting abilities being moved
+        const fromAbilities = this.heroAbilityZones[fromPosition];
+        const toAbilities = this.heroAbilityZones[toPosition];
+        
+        let fromStatAbilities = this.countStatAbilities(fromAbilities);
+        let toStatAbilities = this.countStatAbilities(toAbilities);
+        
+        if (fromStatAbilities.toughness > 0 || fromStatAbilities.fighting > 0) {
+            console.log(`📊 Moving abilities from ${fromPosition}: ${fromStatAbilities.toughness} Toughness, ${fromStatAbilities.fighting} Fighting`);
+        }
+        if (toStatAbilities.toughness > 0 || toStatAbilities.fighting > 0) {
+            console.log(`📊 Moving abilities to ${toPosition}: ${toStatAbilities.toughness} Toughness, ${toStatAbilities.fighting} Fighting`);
+        }
         
         // Swap ability zones
         const tempZones = this.heroAbilityZones[fromPosition];
@@ -640,10 +695,47 @@ export class HeroAbilitiesManager {
         // Validate structures after swap
         this.ensureValidZoneStructure(fromPosition);
         this.ensureValidZoneStructure(toPosition);
+        
+        // NEW: Trigger stat updates for both positions after move
+        setTimeout(() => {
+            if (window.heroSelection && window.heroSelection.refreshHeroStats) {
+                window.heroSelection.refreshHeroStats();
+            }
+        }, 50);
     }
     
-    // Clear abilities when hero is removed from position
+    // NEW: Helper method to count stat-affecting abilities
+    countStatAbilities(abilities) {
+        let toughness = 0;
+        let fighting = 0;
+        
+        if (abilities) {
+            ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                if (abilities[zone] && Array.isArray(abilities[zone])) {
+                    abilities[zone].forEach(ability => {
+                        if (ability && ability.name === 'Toughness') {
+                            toughness++;
+                        } else if (ability && ability.name === 'Fighting') {
+                            fighting++;
+                        }
+                    });
+                }
+            });
+        }
+        
+        return { toughness, fighting };
+    }
+    
+    // MODIFIED: Enhanced clearHeroAbilities to trigger stat updates
     clearHeroAbilities(heroPosition) {
+        // Check what abilities are being cleared for logging
+        const currentAbilities = this.heroAbilityZones[heroPosition] || {};
+        const statCount = this.countStatAbilities(currentAbilities);
+        
+        if (statCount.toughness > 0 || statCount.fighting > 0) {
+            console.log(`📊 Clearing ${statCount.toughness} Toughness and ${statCount.fighting} Fighting from ${heroPosition}`);
+        }
+        
         // Force complete reinitialization
         this.heroAbilityZones[heroPosition] = {
             zone1: [],
@@ -662,6 +754,17 @@ export class HeroAbilitiesManager {
         
         // Double-check the structure is valid
         this.ensureValidZoneStructure(heroPosition);
+        
+        // NEW: Trigger stat update after clearing
+        setTimeout(() => {
+            if (window.heroSelection && window.heroSelection.refreshHeroStats) {
+                window.heroSelection.refreshHeroStats();
+            }
+            
+            if (window.updateHeroStats) {
+                window.updateHeroStats(heroPosition);
+            }
+        }, 50);
     }
     
     // Get abilities for a specific hero
@@ -697,9 +800,11 @@ export class HeroAbilitiesManager {
         };
     }
     
-    // Import state for loading
+    // Enhanced importAbilitiesState to trigger stat updates after import
     importAbilitiesState(state) {
         if (!state) return false;
+        
+        console.log('📥 Importing abilities state...');
         
         if (state.heroAbilityZones) {
             this.heroAbilityZones = JSON.parse(JSON.stringify(state.heroAbilityZones));
@@ -742,7 +847,48 @@ export class HeroAbilitiesManager {
         }
         
         console.log('Imported hero abilities state with Leadership tracking and zone validation');
+        
+        // NEW: Log imported stat abilities and trigger stat updates
+        ['left', 'center', 'right'].forEach(position => {
+            const statCount = this.countStatAbilities(this.heroAbilityZones[position]);
+            if (statCount.toughness > 0 || statCount.fighting > 0) {
+                console.log(`📊 Restored ${position}: ${statCount.toughness} Toughness, ${statCount.fighting} Fighting`);
+            }
+        });
+        
+        // Trigger stat updates after import
+        setTimeout(() => {
+            if (window.heroSelection && window.heroSelection.refreshHeroStats) {
+                window.heroSelection.refreshHeroStats();
+            }
+        }, 100);
+        
         return true;
+    }
+
+    getAbilityStackCountForPosition(heroPosition, abilityName) {
+        // ENSURE zone structure is valid
+        this.ensureValidZoneStructure(heroPosition);
+        
+        const abilities = this.heroAbilityZones[heroPosition];
+        if (!abilities) return 0;
+        
+        let stackCount = 0;
+        
+        // Check all zones for the specific ability
+        for (let i = 1; i <= 3; i++) {
+            const zoneName = `zone${i}`;
+            const zone = abilities[zoneName];
+            
+            if (zone && Array.isArray(zone) && zone.length > 0) {
+                // If this zone has the ability we're looking for, add its stack count
+                if (zone[0].name === abilityName) {
+                    stackCount += zone.length;
+                }
+            }
+        }
+        
+        return stackCount;
     }
     
     // Reset to initial state
@@ -776,7 +922,7 @@ export class HeroAbilitiesManager {
         this.formationManager = null;
         this.onStateChange = null;
         
-        console.log('HeroAbilitiesManager reset with Leadership tracking');
+        console.log('HeroAbilitiesManager reset with Leadership tracking and stat bonus system');
     }
 }
 

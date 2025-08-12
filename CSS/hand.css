@@ -1,5 +1,5 @@
 /* ============================================
-   16. HAND DISPLAY
+   16. HAND DISPLAY WITH PIXEL FONT
    ============================================ */
 .hand-display-area {
     display: none;
@@ -45,6 +45,7 @@
 }
 
 .hand-display-area-inline .hand-title {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: #fff;
     font-size: 1.1rem;
     font-weight: bold;
@@ -53,6 +54,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
+    letter-spacing: 1px;
 }
 
 .hand-display-area-inline .hand-title::before {
@@ -108,6 +110,7 @@
     transform: translateX(-50%);
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
     color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 8px 16px;
     border-radius: var(--radius-large);
     font-size: 14px;
@@ -118,6 +121,7 @@
     white-space: nowrap;
     animation: tooltipFadeIn 0.3s ease-out;
     pointer-events: none;
+    letter-spacing: 0.5px;
 }
 
 /* Dynamic spacing based on number of cards */
@@ -231,6 +235,7 @@
     left: 50%;
     transform: translateX(-50%);
     color: #fff;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 0.7rem;
     font-weight: bold;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
@@ -248,6 +253,7 @@
     z-index: 15;
     pointer-events: none;
     user-select: none;
+    letter-spacing: 0.5px;
 }
 
 .hand-display-area-inline .hand-card:hover .hand-card-name {
@@ -324,6 +330,13 @@
     opacity: 0.5;
 }
 
+.hand-display-area-inline .hand-placeholder p {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+}
+
 /* Ability card states */
 .hand-card[data-card-type="ability"] {
     position: relative;
@@ -336,6 +349,7 @@
     right: 5px;
     background: rgba(102, 126, 234, 0.9);
     color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -411,6 +425,7 @@
     transform: translate(-50%, -50%);
     background: rgba(244, 67, 54, 0.95);
     color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 8px 16px;
     border-radius: 6px;
     font-weight: bold;
@@ -419,6 +434,7 @@
     white-space: nowrap;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
     animation: noActionsPulse 0.3s ease-out;
+    letter-spacing: 0.5px;
 }
 
 /* Hand display enhanced specifics for reward overlay */
@@ -434,4 +450,39 @@
 #cardRewardOverlay .reward-hand-content-normal .hand-cards {
     min-height: 200px !important;
     padding: 5px 0 !important;
+}
+
+/* Responsive adjustments for hand display */
+@media (max-width: 768px) {
+    .hand-display-area-inline .hand-title {
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .hand-display-area-inline .hand-card-name {
+        font-size: 0.6rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .hand-zone-drag-over::before {
+        font-size: 12px;
+        letter-spacing: 0.3px;
+    }
+}
+
+@media (max-width: 480px) {
+    .hand-display-area-inline .hand-title {
+        font-size: 0.9rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .hand-display-area-inline .hand-card-name {
+        font-size: 0.55rem;
+        letter-spacing: 0.2px;
+    }
+    
+    .hand-card.no-actions-available:hover::before {
+        font-size: 12px;
+        letter-spacing: 0.3px;
+    }
 }

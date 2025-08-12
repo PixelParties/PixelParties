@@ -88,6 +88,7 @@ export class CardRewardManager {
             thievingDetails: [],
             wantedPosterBonus: 0,
             wantedPosterDetails: [],
+            swordBonuses: [],  // NEW: Array of sword bonus objects
             total: 0
         };
 
@@ -179,6 +180,46 @@ export class CardRewardManager {
             if (wantedPosterData.totalBonus > 0) {
                 console.log('💰 Wanted Poster bonuses calculated:', wantedPosterData);
             }
+        }
+        
+        // NEW: Calculate LegendarySwordOfABarbarianKing bonuses
+        if (this.heroSelection && this.heroSelection.heroEquipmentManager) {
+            const formation = this.heroSelection.formationManager.getBattleFormation();
+            
+            ['left', 'center', 'right'].forEach(position => {
+                const hero = formation[position];
+                if (hero) {
+                    // Get equipment for this hero
+                    const equipment = this.heroSelection.heroEquipmentManager.getHeroEquipment(position);
+                    
+                    // Count LegendarySwordOfABarbarianKing
+                    const swordCount = equipment ? equipment.filter(item => 
+                        item && (item.name === 'LegendarySwordOfABarbarianKing' || item.cardName === 'LegendarySwordOfABarbarianKing')
+                    ).length : 0;
+                    
+                    if (swordCount > 0) {
+                        // Get kill count for this hero
+                        const killCount = killTracker.getKillCount('player', position);
+                        
+                        if (killCount > 0) {
+                            // Calculate bonuses: swordCount * killCount * 5 attack, * 20 HP
+                            const attackGain = swordCount * killCount * 5;
+                            const hpGain = swordCount * killCount * 20;
+                            
+                            breakdown.swordBonuses.push({
+                                heroName: hero.name,
+                                position: position,
+                                swordCount: swordCount,
+                                killCount: killCount,
+                                attackGain: attackGain,
+                                hpGain: hpGain
+                            });
+                            
+                            console.log(`⚔️ ${hero.name}: ${swordCount} sword(s) × ${killCount} kills = +${attackGain} ATK, +${hpGain} HP`);
+                        }
+                    }
+                }
+            });
         }
         
         // Calculate total
@@ -316,11 +357,39 @@ export class CardRewardManager {
                         thievingDetails: breakdown.thievingDetails
                     })}
 
-                    <!-- Wanted Poster Section (THIS IS THE KEY PART) -->
+                    <!-- Wanted Poster Section -->
                     ${generateWantedPosterBonusHTML({ 
                         totalBonus: breakdown.wantedPosterBonus, 
                         details: breakdown.wantedPosterDetails 
                     })}
+                    
+                    <!-- Legendary Sword Bonuses Section -->
+                    ${breakdown.swordBonuses && breakdown.swordBonuses.length > 0 ? `
+                        <div class="sword-bonuses-section-header">
+                            <div class="gold-line-item sword-bonuses-header-item">
+                                <span class="gold-source">
+                                    <span class="sword-icon">⚔️</span>
+                                    Legendary Sword Bonuses
+                                </span>
+                                <span class="gold-arrow">→</span>
+                                <span class="gold-amount">Stats</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Individual Sword Bonus Lines -->
+                        ${breakdown.swordBonuses.map(bonus => `
+                            <div class="sword-bonus-detail-line">
+                                <div class="sword-hero-info">
+                                    <span class="sword-hero-name">${bonus.heroName}</span>
+                                    <span class="sword-calculation">${bonus.swordCount} sword${bonus.swordCount > 1 ? 's' : ''} × ${bonus.killCount} kills</span>
+                                </div>
+                                <div class="sword-gains">
+                                    <span class="attack-gain">+${bonus.attackGain} ATK</span>
+                                    <span class="hp-gain">+${bonus.hpGain} HP</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    ` : ''}
                     
                     <!-- Redraw Deduction (if any) -->
                     ${breakdown.redrawDeduction > 0 ? `
@@ -1768,8 +1837,8 @@ export class CardRewardManager {
             }
             
             .reward-card-preview-area .preview-card-display {
-                width: 100%;
-                height: 100%;
+                width: 120%;
+                height: 120%;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
@@ -1779,15 +1848,16 @@ export class CardRewardManager {
             
             .reward-card-preview-area .preview-card-image {
                 width: 100%;
-                max-width: 340px; /* INCREASED from 240px to 340px */
+                max-width: 490px; 
                 height: auto;
-                max-height: 85%; /* INCREASED from 70% to 85% */
+                max-height: 99%; 
                 object-fit: contain;
                 border-radius: 15px;
                 box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
                 border: 3px solid rgba(102, 126, 234, 0.6);
                 transition: transform 0.2s ease;
             }
+                
             
             .reward-card-preview-area .preview-card-image:hover {
                 transform: scale(1.02);
@@ -2374,6 +2444,160 @@ export class CardRewardManager {
                 
                 .view-button-text {
                     font-size: 12px;
+                }
+            }
+
+            .sword-bonuses-container {
+                margin-top: 15px;
+                padding: 15px;
+                background: linear-gradient(135deg, rgba(255, 69, 0, 0.1), rgba(255, 140, 0, 0.1));
+                border: 2px solid rgba(255, 69, 0, 0.4);
+                border-radius: 12px;
+                backdrop-filter: blur(10px);
+                box-shadow: 0 6px 20px rgba(255, 69, 0, 0.25);
+            }
+
+            .sword-bonuses-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 12px;
+                padding-bottom: 8px;
+                border-bottom: 2px solid rgba(255, 69, 0, 0.3);
+            }
+
+            .sword-bonuses-header .sword-icon {
+                font-size: 20px;
+                animation: swordIconGlow 3s ease-in-out infinite;
+            }
+
+            .sword-bonuses-header h4 {
+                margin: 0;
+                font-size: 1.1rem;
+                font-weight: 800;
+                color: #ff4500;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            }
+
+            .sword-bonuses-content {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .sword-bonus-line {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 8px 12px;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 69, 0, 0.2);
+                transition: all 0.3s ease;
+            }
+
+            .sword-bonus-line:hover {
+                background: rgba(255, 69, 0, 0.1);
+                border-color: rgba(255, 69, 0, 0.4);
+                transform: translateX(3px);
+            }
+
+            .sword-hero-info {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .sword-hero-name {
+                font-weight: 700;
+                color: rgba(255, 255, 255, 0.95);
+                font-size: 0.9rem;
+            }
+
+            .sword-calculation {
+                font-size: 0.8rem;
+                color: rgba(255, 140, 0, 0.8);
+                font-style: italic;
+            }
+
+            .sword-gains {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .attack-gain {
+                font-weight: 700;
+                color: #ff6b6b;
+                font-size: 0.9rem;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+                padding: 2px 6px;
+                background: rgba(255, 107, 107, 0.1);
+                border-radius: 4px;
+                border: 1px solid rgba(255, 107, 107, 0.3);
+            }
+
+            .hp-gain {
+                font-weight: 700;
+                color: #4caf50;
+                font-size: 0.9rem;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+                padding: 2px 6px;
+                background: rgba(76, 175, 80, 0.1);
+                border-radius: 4px;
+                border: 1px solid rgba(76, 175, 80, 0.3);
+            }
+
+            /* Sword icon glow animation */
+            @keyframes swordIconGlow {
+                0%, 100% { 
+                    transform: rotate(0deg) scale(1); 
+                    filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.6));
+                }
+                25% { 
+                    transform: rotate(-5deg) scale(1.05); 
+                    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
+                }
+                50% { 
+                    transform: rotate(0deg) scale(1.1); 
+                    filter: drop-shadow(0 0 10px rgba(255, 69, 0, 1));
+                }
+                75% { 
+                    transform: rotate(5deg) scale(1.05); 
+                    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
+                }
+            }
+
+            /* Responsive adjustments for sword bonuses */
+            @media (max-width: 1200px) {
+                .sword-bonus-line {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 6px;
+                }
+                
+                .sword-gains {
+                    align-self: flex-end;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .sword-bonuses-header h4 {
+                    font-size: 1rem;
+                }
+                
+                .sword-hero-name {
+                    font-size: 0.85rem;
+                }
+                
+                .sword-calculation {
+                    font-size: 0.75rem;
+                }
+                
+                .attack-gain,
+                .hp-gain {
+                    font-size: 0.8rem;
+                    padding: 1px 4px;
                 }
             }
         `;
@@ -3655,7 +3879,7 @@ export class CardRewardManager {
         
         const totalGold = this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0);
         
-        if (this.goldManager && totalGold !== 0) { // Allow negative total from thieving
+        if (this.goldManager && totalGold !== 0) {
             // Apply the net gold effect (could be negative if opponent stole more than you gained)
             if (totalGold > 0) {
                 this.goldManager.awardGold(totalGold, false, 'battle_reward');
@@ -3666,7 +3890,7 @@ export class CardRewardManager {
             
             console.log(`✅ Applied ${totalGold} net gold change to player from battle rewards (including thieving)`);
             
-            // NEW: Send thieving update to opponent
+            // Send thieving update to opponent
             if (this.lastGoldBreakdown.thievingDetails) {
                 this.thievingManager.sendThievingUpdate(
                     this.lastGoldBreakdown.thievingDetails,
@@ -3682,11 +3906,49 @@ export class CardRewardManager {
                     timestamp: Date.now()
                 });
             }
-            
-            return true;
         }
         
-        return false;
+        // Apply LegendarySwordOfABarbarianKing bonuses
+        if (this.lastGoldBreakdown.swordBonuses && this.lastGoldBreakdown.swordBonuses.length > 0) {
+            this.applySwordBonuses(this.lastGoldBreakdown.swordBonuses);
+        }
+        
+        return totalGold !== 0;
+    }
+
+    applySwordBonuses(swordBonuses) {
+        if (!this.heroSelection || !this.heroSelection.formationManager) {
+            console.error('Cannot apply sword bonuses - missing heroSelection or formationManager');
+            return;
+        }
+        
+        const formation = this.heroSelection.formationManager.getBattleFormation();
+        
+        swordBonuses.forEach(bonus => {
+            const hero = formation[bonus.position];
+            if (hero) {
+                // Add permanent stat bonuses to the hero
+                if (typeof hero.addPermanentStatBonuses === 'function') {
+                    hero.addPermanentStatBonuses(bonus.attackGain, bonus.hpGain);
+                } else {
+                    // Fallback: directly add to hero properties
+                    if (hero.attackBonusses === undefined) hero.attackBonusses = 0;
+                    if (hero.hpBonusses === undefined) hero.hpBonusses = 0;
+                    
+                    hero.attackBonusses += bonus.attackGain;
+                    hero.hpBonusses += bonus.hpGain;
+                    
+                    console.log(`⚔️ ${hero.name}: Applied sword bonuses - ATK +${bonus.attackGain} (total: +${hero.attackBonusses}), HP +${bonus.hpGain} (total: +${hero.hpBonusses})`);
+                }
+            }
+        });
+        
+        // Refresh hero stats to reflect the new bonuses
+        if (this.heroSelection.refreshHeroStats) {
+            this.heroSelection.refreshHeroStats();
+        }
+        
+        console.log('⚔️ All LegendarySwordOfABarbarianKing bonuses applied successfully!');
     }
 
     handleOpponentThievingEffects(thievingData) {

@@ -1,4 +1,5 @@
 // battleManager.js - Complete Battle Manager with BattleLog Integration (REFACTORED)
+// UPDATED: Uses pre-calculated Hero stats instead of recalculating
 
 import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
@@ -284,7 +285,8 @@ export class BattleManager {
         playerAbilities = null, opponentAbilities = null,
         playerSpellbooks = null, opponentSpellbooks = null,
         playerCreatures = null, opponentCreatures = null,
-        playerEquips = null, opponentEquips = null) {
+        playerEquips = null, opponentEquips = null,
+        playerEffectiveStats = null) { 
         
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;
@@ -328,6 +330,10 @@ export class BattleManager {
         this.opponentCreatures = opponentCreatures;
         this.playerEquips = playerEquips;
         this.opponentEquips = opponentEquips;
+        
+        // Store effective stats
+        this.playerEffectiveStats = playerEffectiveStats;
+        this.opponentEffectiveStats = null; 
         
         // Initialize heroes with full HP, abilities, and fresh visual state
         this.initializeHeroes();
@@ -444,30 +450,34 @@ export class BattleManager {
         
         // Initialize all heroes - NOW INCLUDING EQUIPMENT
         this.initializeHeroesForSide('player', this.playerFormation, this.playerHeroes, 
-                                    this.playerAbilities, this.playerSpellbooks, 
-                                    this.playerCreatures, this.playerEquips, mySide);  // Added playerEquips
+                                this.playerAbilities, this.playerSpellbooks, 
+                                this.playerCreatures, this.playerEquips, mySide,
+                                this.playerEffectiveStats);
         this.initializeHeroesForSide('opponent', this.opponentFormation, this.opponentHeroes, 
-                                    this.opponentAbilities, this.opponentSpellbooks, 
-                                    this.opponentCreatures, this.opponentEquips, opponentSide);  // Added opponentEquips
+                                this.opponentAbilities, this.opponentSpellbooks, 
+                                this.opponentCreatures, this.opponentEquips, opponentSide,
+                                this.opponentEffectiveStats); 
     }
 
     // Initialize heroes for a specific side
-    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide) {
+
+    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide, effectiveStats = null) {
         ['left', 'center', 'right'].forEach(position => {
             const heroData = formation[position];
             if (heroData) {
                 const hero = new Hero(heroData, position, side, absoluteSide);
                 
+                // Set abilities first (needed for creature HP calculations)
                 if (abilities && abilities[position]) {
                     hero.setAbilities(abilities[position]);
-                    hero.applyToughnessHpBonus();
                 }
                 
+                // Set spellbooks
                 if (spellbooks && spellbooks[position]) {
                     hero.setSpellbook(spellbooks[position]);
                 }
                 
-                // Add creatures with health
+                // Add creatures with health (including Summoning Magic bonuses)
                 if (creatures && creatures[position]) {
                     const creaturesWithHealth = creatures[position].map(creature => {
                         const creatureInfo = getCardInfo(creature.name);
@@ -494,30 +504,35 @@ export class BattleManager {
                     hero.initializeNecromancyStacks();
                 }
                 
-                // FIXED: Robust equipment handling with fallbacks
-                try {
-                    // Try manager-level equipment first (for initial battle setup)
-                    if (equipment && equipment[position] && Array.isArray(equipment[position])) {
-                        hero.setEquipment(equipment[position]);
-                        console.log(`⚔️ Set ${equipment[position].length} equipment items for ${side} ${position} hero from manager`);
-                    }
-                    // If hero already has equipment (e.g., from checkpoint restoration), prefer that
-                    else if (hero.equipment && hero.equipment.length > 0) {
-                        console.log(`⚔️ Hero ${side} ${position} already has ${hero.equipment.length} equipment items from restoration`);
-                    }
-                    // Fallback to empty equipment
-                    else {
-                        hero.setEquipment([]);
-                        console.log(`⚔️ Initialized empty equipment for ${side} ${position} hero`);
-                    }
-                } catch (error) {
-                    console.error(`❌ Error setting equipment for ${side} ${position}:`, error);
-                    // Emergency fallback
-                    hero.equipment = [];
+                // Set equipment
+                if (equipment && equipment[position] && Array.isArray(equipment[position])) {
+                    hero.setEquipment(equipment[position]);
+                    console.log(`⚔️ Set ${equipment[position].length} equipment items for ${side} ${position}`);
+                } else {
+                    hero.setEquipment([]);
                 }
                 
+                // ★ SIMPLIFIED: Use existing setPrecalculatedStats method!
+                if (effectiveStats && effectiveStats[position]) {
+                    hero.setPrecalculatedStats(effectiveStats[position]);
+                    console.log(`✅ Applied pre-calculated stats to ${side} ${position} ${hero.name}: HP ${hero.maxHp}, ATK ${hero.atk}`);
+                    
+                    // Log bonuses for debugging
+                    if (effectiveStats[position].bonuses) {
+                        const bonuses = effectiveStats[position].bonuses;
+                        if (bonuses.hpBonus > 0 || bonuses.totalAttackBonus > 0) {
+                            console.log(`📊 ${hero.name} bonuses: +${bonuses.hpBonus} HP, +${bonuses.totalAttackBonus} ATK`);
+                        }
+                    }
+                } else {
+                    // No pre-calculated stats available - Hero constructor already set base stats
+                    console.log(`⚠️ No effective stats for ${side} ${position} ${hero.name} - using base stats (HP: ${hero.maxHp}, ATK: ${hero.atk})`);
+                }
+                
+                // Store the hero
                 heroesObj[position] = hero;
                 
+                // Update all visual elements with the correct stats
                 this.resetHeroVisualState(side, position);
                 this.updateHeroHealthBar(side, position, hero.currentHp, hero.maxHp);
                 this.updateHeroAttackDisplay(side, position, hero);
@@ -525,7 +540,7 @@ export class BattleManager {
             }
         });
         
-        // CRITICAL: Clear manager-level equipment references to prevent future conflicts
+        // Clear manager-level equipment references to prevent future conflicts
         if (side === 'player') {
             this.playerEquips = {};
         } else {
@@ -697,94 +712,8 @@ export class BattleManager {
         }
     }
 
-    // Log SummoningMagic bonuses for all creatures
-    logSummoningMagicBonuses() {
-        let bonusesApplied = false;
-        
-        // Check player heroes
-        ['left', 'center', 'right'].forEach(position => {
-            const playerHero = this.playerHeroes[position];
-            if (playerHero && playerHero.hasAbility('SummoningMagic') && playerHero.creatures.length > 0) {
-                const summoningLevel = playerHero.getAbilityStackCount('SummoningMagic');
-                const bonusPercent = summoningLevel * 10;
-                this.addCombatLog(
-                    `✨ ${playerHero.name}'s creatures receive +${bonusPercent}% HP from SummoningMagic level ${summoningLevel}!`, 
-                    'success'
-                );
-                bonusesApplied = true;
-            }
-            
-            const opponentHero = this.opponentHeroes[position];
-            if (opponentHero && opponentHero.hasAbility('SummoningMagic') && opponentHero.creatures.length > 0) {
-                const summoningLevel = opponentHero.getAbilityStackCount('SummoningMagic');
-                const bonusPercent = summoningLevel * 10;
-                this.addCombatLog(
-                    `✨ Opponent's ${opponentHero.name}'s creatures receive +${bonusPercent}% HP from SummoningMagic level ${summoningLevel}!`, 
-                    'error'
-                );
-                bonusesApplied = true;
-            }
-        });
-        
-        if (bonusesApplied) {
-            this.addCombatLog('🛡️ Summoning Magic empowers the summoned creatures!', 'info');
-        }
-    }
-
-    logTorasEquipmentBonuses() {
-        let bonusesApplied = false;
-        
-        // Check player heroes
-        ['left', 'center', 'right'].forEach(position => {
-            const playerHero = this.playerHeroes[position];
-            if (playerHero && playerHero.name === 'Toras' && playerHero.equipment && playerHero.equipment.length > 0) {
-                // Count unique equipment
-                const uniqueEquipmentNames = new Set();
-                playerHero.equipment.forEach(item => {
-                    const itemName = item.name || item.cardName;
-                    if (itemName) {
-                        uniqueEquipmentNames.add(itemName);
-                    }
-                });
-                
-                const uniqueCount = uniqueEquipmentNames.size;
-                if (uniqueCount > 0) {
-                    const bonus = uniqueCount * 10;
-                    this.addCombatLog(
-                        `⚔️ Toras gains +${bonus} ATK from mastering ${uniqueCount} unique equipment!`, 
-                        'success'
-                    );
-                    bonusesApplied = true;
-                }
-            }
-            
-            const opponentHero = this.opponentHeroes[position];
-            if (opponentHero && opponentHero.name === 'Toras' && opponentHero.equipment && opponentHero.equipment.length > 0) {
-                // Count unique equipment
-                const uniqueEquipmentNames = new Set();
-                opponentHero.equipment.forEach(item => {
-                    const itemName = item.name || item.cardName;
-                    if (itemName) {
-                        uniqueEquipmentNames.add(itemName);
-                    }
-                });
-                
-                const uniqueCount = uniqueEquipmentNames.size;
-                if (uniqueCount > 0) {
-                    const bonus = uniqueCount * 10;
-                    this.addCombatLog(
-                        `⚔️ Opponent's Toras gains +${bonus} ATK from mastering ${uniqueCount} unique equipment!`, 
-                        'error'
-                    );
-                    bonusesApplied = true;
-                }
-            }
-        });
-        
-        if (bonusesApplied) {
-            this.addCombatLog('🗡️ Toras\'s equipment mastery enhances combat prowess!', 'info');
-        }
-    }
+    // REMOVED: Stat logging functions that recalculated stats
+    // Heroes now have pre-calculated stats from heroSelection
 
     // Initialize extensible state
     initializeExtensibleState() {
@@ -1126,7 +1055,15 @@ export class BattleManager {
         creature.currentHp = Math.max(0, creature.currentHp - damage);
         const willDie = creature.currentHp <= 0;
         
-        // IMPORTANT: Set creature as dead BEFORE attempting revival
+        // CRITICAL: Record kill IMMEDIATELY when creature HP drops to 0, before any other processing
+        if (willDie && wasAlive && attacker && this.isAuthoritative) {
+            recordKillWithVisualFeedback(this, attacker, creature, 'creature');
+            this.addCombatLog(`⚔️ ${attacker.name} has slain ${creature.name}!`, 
+                            attacker.side === 'player' ? 'success' : 'error');
+            console.log(`🎯 PRIORITY: Recorded creature kill ${attacker.name} -> ${creature.name} (HP: ${oldHp} -> ${creature.currentHp})`);
+        }
+        
+        // IMPORTANT: Set creature as dead AFTER kill recording
         if (willDie) {
             creature.alive = false;
         }
@@ -1146,15 +1083,10 @@ export class BattleManager {
         let revivedByNecromancy = false;
         let necromancyArrayManipulation = null;
         
-        // If creature died, record kill and trigger death effects BEFORE attempting revival
+        // If creature died, trigger death effects AFTER kill recording but BEFORE attempting revival
         if (willDie && wasAlive) {
-            // 1. ALWAYS record the kill when creature HP drops to 0
-            if (attacker) {
-                recordKillWithVisualFeedback(this, attacker, creature, 'creature');
-                this.addCombatLog(`⚔️ ${attacker.name} has slain ${creature.name}!`, 
-                                attacker.side === 'player' ? 'success' : 'error');
-            }
-
+            // 1. Kill already recorded above
+            
             // 2. Trigger "when this dies" effects here
             this.triggerCreatureDeathEffects(creature, hero, attacker, context);
             this.checkForSkeletonMageReactions(creature, hero.side, 'creature');
@@ -1568,6 +1500,14 @@ export class BattleManager {
         if (this.attackEffectsManager && this.attackEffectsManager.stormbladeEffect) {
             this.attackEffectsManager.stormbladeEffect.handleGuestWindSwap(data);
         }
+    }
+    
+    guest_handleGreatswordSkeletonSummon(data) {
+        import('./Artifacts/skullmaelsGreatsword.js').then(({ skullmaelsGreatswordArtifact }) => {
+            skullmaelsGreatswordArtifact.handleGuestSkeletonSummon(data, this);
+        }).catch(error => {
+            console.error('Failed to load Greatsword artifact for guest handler:', error);
+        });
     }
 
 
@@ -2055,63 +1995,21 @@ export class BattleManager {
         }
     }
 
-    // Update hero attack display
+    // Update hero attack display - SIMPLIFIED to use pre-calculated stats
     updateHeroAttackDisplay(side, position, hero) {
         const heroElement = this.getHeroElement(side, position);
         if (!heroElement || !hero) return;
 
         const attackBase = heroElement.querySelector('.attack-base');
         const attackBonus = heroElement.querySelector('.attack-bonus');
-        const attackValue = heroElement.querySelector('.attack-value');
         const attackContainer = heroElement.querySelector('.battle-hero-attack');
         
-        if (attackBase) {
-            const currentAttack = hero.getCurrentAttack();
-            const abilityModifiers = this.getHeroAbilityModifiers(hero);
-            const totalBonus = (currentAttack - hero.baseAtk) + abilityModifiers.attackBonus;
+        if (attackBase && attackBonus) {
+            const currentAttack = hero.getCurrentAttack(); 
+            attackBase.textContent = currentAttack;
             
-            const oldValue = attackBase.textContent;
-            const newValue = hero.baseAtk.toString();
-            
-            attackBase.textContent = hero.baseAtk;
-            
-            if (attackBonus) {
-                if (totalBonus > 0) {
-                    attackBonus.textContent = `+${totalBonus}`;
-                    attackBonus.style.color = '#4caf50';
-                    attackBonus.style.display = 'inline';
-                    
-                    if (attackContainer) {
-                        attackContainer.classList.add('attack-buffed');
-                        attackContainer.classList.remove('attack-debuffed');
-                    }
-                } else if (totalBonus < 0) {
-                    attackBonus.textContent = `${totalBonus}`;
-                    attackBonus.style.color = '#f44336';
-                    attackBonus.style.display = 'inline';
-                    
-                    if (attackContainer) {
-                        attackContainer.classList.add('attack-debuffed');
-                        attackContainer.classList.remove('attack-buffed');
-                    }
-                } else {
-                    attackBonus.style.display = 'none';
-                    
-                    if (attackContainer) {
-                        attackContainer.classList.remove('attack-buffed', 'attack-debuffed');
-                    }
-                }
-            }
-            
-            if (attackValue && (oldValue !== newValue || totalBonus !== 0)) {
-                attackValue.classList.remove('value-changed');
-                void attackValue.offsetWidth;
-                attackValue.classList.add('value-changed');
-                
-                setTimeout(() => {
-                    attackValue.classList.remove('value-changed');
-                }, 500);
-            }
+            attackBonus.style.display = 'none';
+            if (attackContainer) attackContainer.classList.remove('attack-buffed', 'attack-debuffed');
         }
     }
 
@@ -2510,6 +2408,17 @@ export class BattleManager {
         } catch (error) {
             console.error('❌ Error cleaning up Boulders after battle:', error);
         }
+
+        // ===== CLEANUP GREATSWORD SKELETONS AFTER BATTLE =====
+        try {
+            const { SkullmaelsGreatswordArtifact } = await import('./Artifacts/skullmaelsGreatsword.js');
+            const skeletonsRemoved = SkullmaelsGreatswordArtifact.cleanupGreatswordSkeletonsAfterBattle(this);
+            if (skeletonsRemoved > 0) {
+                console.log(`⚔️🦴 Cleaned up ${skeletonsRemoved} Greatsword Skeletons after battle`);
+            }
+        } catch (error) {
+            console.error('❌ Error cleaning up Greatsword Skeletons after battle:', error);
+        }
         
 
         // CREATURE CLEANUPS
@@ -2540,6 +2449,13 @@ export class BattleManager {
         if (this.skeletonMageManager) {
             this.skeletonMageManager.cleanup();
             this.skeletonMageManager = null;
+        }
+
+
+        // ===== RESTORE OVERHEAT EQUIPMENT AFTER BATTLE =====
+        if (this.spellSystem && this.spellSystem.spellImplementations.has('Overheat')) {
+            const overheatSpell = this.spellSystem.spellImplementations.get('Overheat');
+            overheatSpell.restoreAllRemovedEquipment();
         }
 
 
@@ -2856,39 +2772,6 @@ export class BattleManager {
                 card.style.filter = 'grayscale(100%)';
                 card.style.opacity = '0.5';
             }
-        }
-    }
-
-    logToughnessHpBonuses() {
-        let bonusesApplied = false;
-        
-        // Check player heroes
-        ['left', 'center', 'right'].forEach(position => {
-            const playerHero = this.playerHeroes[position];
-            if (playerHero && playerHero.hasAbility('Toughness')) {
-                const toughnessLevel = playerHero.getAbilityStackCount('Toughness');
-                const hpBonus = toughnessLevel * 200;
-                this.addCombatLog(
-                    `🛡️ ${playerHero.name} gains +${hpBonus} HP from Toughness level ${toughnessLevel}!`, 
-                    'success'
-                );
-                bonusesApplied = true;
-            }
-            
-            const opponentHero = this.opponentHeroes[position];
-            if (opponentHero && opponentHero.hasAbility('Toughness')) {
-                const toughnessLevel = opponentHero.getAbilityStackCount('Toughness');
-                const hpBonus = toughnessLevel * 200;
-                this.addCombatLog(
-                    `🛡️ Opponent's ${opponentHero.name} gains +${hpBonus} HP from Toughness level ${toughnessLevel}!`, 
-                    'error'
-                );
-                bonusesApplied = true;
-            }
-        });
-        
-        if (bonusesApplied) {
-            this.addCombatLog('💪 Toughness ability fortifies the heroes!', 'info');
         }
     }
 

@@ -92,6 +92,7 @@
 
 .selection-header h2,
 .team-header h2 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 2.8rem;
     font-weight: 800;
     margin-bottom: 15px;
@@ -100,6 +101,7 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     text-shadow: var(--shadow-glow);
+    letter-spacing: 1px;
 }
 
 .team-header h2 {
@@ -114,10 +116,12 @@
 .selection-header p,
 .team-header p,
 .drag-hint {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 1.3rem;
     color: rgba(255, 255, 255, 0.9);
     font-weight: 500;
     margin: 10px 0;
+    letter-spacing: 0.5px;
 }
 
 .team-header p,
@@ -132,11 +136,13 @@
 }
 
 .hover-hint {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 1.1rem;
     color: #667eea;
     font-weight: 600;
     margin-top: 10px;
     opacity: 0.9;
+    letter-spacing: 0.5px;
 }
 
 .character-selection-grid {
@@ -221,11 +227,13 @@
 }
 
 .character-name {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 1.3rem;
     font-weight: 700;
     color: #333;
     text-align: center;
     margin-top: auto;
+    letter-spacing: 1px;
 }
 
 /* Character cards with ability zones */
@@ -286,12 +294,14 @@
 }
 
 .character-card .zone-placeholder {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: rgba(255, 255, 255, 0.4);
     font-size: 0.7rem;
     font-weight: 800;
     text-align: center;
     user-select: none;
     opacity: 0.6;
+    letter-spacing: 0.5px;
 }
 
 .ability-zone .ability-card-image {
@@ -317,6 +327,7 @@
     transform: translateX(-50%);
     background: var(--primary-gradient);
     color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 0.75rem;
     font-weight: bold;
     padding: 2px 6px;
@@ -328,6 +339,7 @@
         0 0 0 1px rgba(0, 0, 0, 0.2);
     z-index: 10;
     backdrop-filter: blur(4px);
+    letter-spacing: 0.5px;
 }
 
 .character-card.turn-limit-reached {
@@ -444,10 +456,12 @@
     left: 50%;
     transform: translate(-50%, -50%);
     color: #667eea;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-weight: bold;
     font-size: 16px;
     z-index: 10;
     text-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+    letter-spacing: 1px;
 }
 
 .team-slot.filled.drag-over::after {
@@ -458,11 +472,13 @@
     transform: translateX(-50%);
     background: rgba(102, 126, 234, 0.9);
     color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 12px;
     font-weight: bold;
     z-index: 20;
+    letter-spacing: 0.5px;
 }
 
 .team-slot.invalid-drop {
@@ -553,6 +569,7 @@
     transform: translateX(-50%);
     background: rgba(54, 162, 235, 0.95);
     color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 6px 12px;
     border-radius: 4px;
     font-size: 12px;
@@ -561,14 +578,17 @@
     z-index: 1000;
     pointer-events: none;
     animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
 }
 
 .slot-placeholder {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: rgba(255, 255, 255, 0.5);
     font-size: 1rem;
     font-weight: 600;
     text-align: center;
     padding: 20px;
+    letter-spacing: 1px;
 }
 
 .team-status {
@@ -585,17 +605,21 @@
 }
 
 .ready-indicator .status-text {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 1.4rem;
     font-weight: 700;
     color: #28a745;
     display: block;
     margin-bottom: 8px;
+    letter-spacing: 1px;
 }
 
 .ready-indicator p {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     margin: 0;
     font-size: 1rem;
     color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.5px;
 }
 
 .loading-heroes {
@@ -605,6 +629,7 @@
 }
 
 .loading-heroes h2 {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 2rem;
     font-weight: 800;
     margin-bottom: 20px;
@@ -612,6 +637,7 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    letter-spacing: 1px;
 }
 
 .selection-status {
@@ -624,9 +650,11 @@
     align-items: center;
     justify-content: center;
     gap: 15px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 1.2rem;
     color: rgba(255, 255, 255, 0.8);
     font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 .selection-spinner {
@@ -664,6 +692,7 @@
     border: 2px solid #4CAF50;
     border-radius: 8px;
     padding: 8px 16px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     font-size: 14px;
     font-weight: bold;
     color: #2E7D32;
@@ -673,6 +702,7 @@
     animation: guardChangeGlow 2s ease-in-out infinite alternate;
     white-space: nowrap;
     user-select: none;
+    letter-spacing: 1px;
 }
 
 .guard-change-indicator::before {
@@ -690,6 +720,7 @@
 
 /* Ability hint */
 .ability-hint {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: #6c757d;
     font-size: 14px;
     font-style: italic;
@@ -697,10 +728,141 @@
     display: flex;
     align-items: center;
     gap: 5px;
+    letter-spacing: 0.5px;
 }
 
 .ability-hint::before {
     content: '⚡';
     font-style: normal;
     color: #ffc107;
+}
+
+/* Hero stats with Pixel font - keep existing positioning, just update font */
+.hero-stat .stat-value {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    line-height: 1;
+    display: block;
+    font-variant-numeric: tabular-nums;
+}
+
+.fonts-loaded .hero-stats-overlay {
+    opacity: 1;
+}
+
+.no-font-loading .hero-stats-overlay {
+    opacity: 1;
+}
+
+.tooltip-image-container {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-sprite-stats {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.tooltip-sprite-stat {
+    position: absolute;
+    bottom: 48px; 
+    min-width: 32px;
+    text-align: center;
+}
+
+.tooltip-sprite-stat.hp-stat {
+    left: 105px;
+}
+
+.tooltip-sprite-stat.attack-stat {
+    right: 78px;
+}
+
+.tooltip-sprite-stat .stat-value {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 30px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
+    line-height: 1;
+    display: block;
+}
+
+.large-card-tooltip:hover .tooltip-sprite-stat .stat-value {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+}
+
+.large-card-tooltip.character-with-stats .tooltip-image-container {
+    margin-bottom: 5px;
+}
+
+.reward-image-container .tooltip-sprite-stat.hp-stat {
+    left: 25px;
+}
+
+.reward-image-container .tooltip-sprite-stat.attack-stat {
+    right: 25px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .selection-header h2,
+    .team-header h2 {
+        font-size: 2.2rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .character-name {
+        font-size: 1.1rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .tooltip-sprite-stat {
+        bottom: 10px;
+    }
+    
+    .tooltip-sprite-stat.hp-stat {
+        left: 15px;
+    }
+    
+    .tooltip-sprite-stat.attack-stat {
+        right: 15px;
+    }
+    
+    .tooltip-sprite-stat .stat-value {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .selection-header h2,
+    .team-header h2 {
+        font-size: 1.8rem;
+        letter-spacing: 0px;
+    }
+    
+    .character-name {
+        font-size: 1rem;
+        letter-spacing: 0px;
+    }
+    
+    .selection-header p,
+    .team-header p {
+        font-size: 1rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .drag-hint {
+        font-size: 0.8rem;
+        letter-spacing: 0.2px;
+    }
 }

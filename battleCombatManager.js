@@ -8,7 +8,7 @@ export class BattleCombatManager {
         this.battleManager = battleManager;
     }
 
-    // Get hero ability modifiers for damage calculation
+    // SIMPLIFIED: Use Hero's pre-calculated attack value directly
     getHeroAbilityModifiers(hero) {
         const modifiers = {
             attackBonus: 0,
@@ -16,22 +16,21 @@ export class BattleCombatManager {
             specialEffects: []
         };
         
-        if (hero.hasAbility('Fighting')) {
-            const stackCount = hero.getAbilityStackCount('Fighting');
-            modifiers.attackBonus += stackCount * 10;
-            modifiers.specialEffects.push(`Fighting (+${stackCount * 10} ATK)`);
-        }
+        // Simply return the difference between current attack and base attack
+        // The hero already has the correct attack value calculated in heroSelection
+        const attackDifference = hero.getCurrentAttack() - hero.baseAtk;
         
-        // Special case for Toras: +10 ATK per unique equipment
-        if (hero.name === 'Toras') {
-            let uniqueEquipmentCount = 0;
+        if (attackDifference > 0) {
+            modifiers.attackBonus = attackDifference;
             
-            // Use synchronized count if available (for guest displaying opponent's Toras)
-            if (hero._syncedUniqueEquipmentCount !== undefined) {
-                uniqueEquipmentCount = hero._syncedUniqueEquipmentCount;
-            } 
-            // Otherwise calculate locally (for own heroes or host)
-            else if (hero.equipment && hero.equipment.length > 0) {
+            // For display purposes, show what contributed to the bonus
+            if (hero.hasAbility('Fighting')) {
+                const fightingStacks = hero.getAbilityStackCount('Fighting');
+                modifiers.specialEffects.push(`Fighting (+${fightingStacks * 10} ATK)`);
+            }
+            
+            // Special case for Toras: show equipment bonus if applicable
+            if (hero.name === 'Toras' && hero.equipment && hero.equipment.length > 0) {
                 const uniqueEquipmentNames = new Set();
                 hero.equipment.forEach(item => {
                     const itemName = item.name || item.cardName;
@@ -39,13 +38,12 @@ export class BattleCombatManager {
                         uniqueEquipmentNames.add(itemName);
                     }
                 });
-                uniqueEquipmentCount = uniqueEquipmentNames.size;
-            }
-            
-            if (uniqueEquipmentCount > 0) {
-                const equipmentBonus = uniqueEquipmentCount * 10;
-                modifiers.attackBonus += equipmentBonus;
-                modifiers.specialEffects.push(`Toras Equipment Mastery (+${equipmentBonus} ATK from ${uniqueEquipmentCount} unique items)`);
+                
+                const uniqueCount = uniqueEquipmentNames.size;
+                if (uniqueCount > 0) {
+                    const equipmentBonus = uniqueCount * 10;
+                    modifiers.specialEffects.push(`Toras Equipment Mastery (+${equipmentBonus} ATK from ${uniqueCount} unique items)`);
+                }
             }
         }
         
@@ -272,16 +270,18 @@ export class BattleCombatManager {
         return allTargets[randomIndex];
     }
 
-    // Calculate damage for a hero
+    // SIMPLIFIED: Use hero's pre-calculated damage value directly
     calculateDamage(hero, canAct) {
         if (!canAct) return 0;
         
-        let damage = hero.getCurrentAttack();
-        const modifiers = this.getHeroAbilityModifiers(hero);
-        damage += modifiers.attackBonus;
+        // Simply use the hero's current attack - all bonuses are already included
+        const damage = hero.getCurrentAttack();
         
+        // Update display to reflect current stats
         this.battleManager.updateHeroAttackDisplay(hero.side, hero.position, hero);
         
+        // Log any ability effects for transparency (but don't recalculate)
+        const modifiers = this.getHeroAbilityModifiers(hero);
         if (modifiers.specialEffects.length > 0) {
             this.battleManager.addCombatLog(`🎯 ${hero.name} abilities: ${modifiers.specialEffects.join(', ')}`, 'info');
         }
@@ -291,11 +291,7 @@ export class BattleCombatManager {
 
     // Execute hero actions
     async executeHeroActions(playerHeroActor, opponentHeroActor, position) {
-        // Check if battle ended before executing actions
-        if (this.battleManager.checkBattleEnd()) {
-            console.log('Battle ended before hero actions, skipping');
-            return;
-        }
+        // The battle end check was preventing final kills from being recorded
         
         const playerCanAttack = playerHeroActor !== null;
         const opponentCanAttack = opponentHeroActor !== null;
@@ -347,7 +343,7 @@ export class BattleCombatManager {
         
         // Only proceed with attack animations/damage for heroes that are attacking
         if (playerValidAttack || opponentValidAttack) {
-            // Calculate base damage
+            // Calculate damage using pre-calculated hero stats
             let playerDamage = playerValidAttack ? 
                 this.calculateDamage(playerHeroActor.data, true) : 0;
             let opponentDamage = opponentValidAttack ? 
@@ -511,7 +507,7 @@ export class BattleCombatManager {
     }
 
     // Apply damage to target (hero or creature)
-    applyAttackDamageToTarget(attack) {
+    async applyAttackDamageToTarget(attack) {
         if (!attack || !attack.target) return;
         
         if (attack.target.type === 'creature') {
@@ -529,6 +525,8 @@ export class BattleCombatManager {
                 source: 'attack', // Specify this was from an attack
                 attacker: attack.hero // Pass the attacker for kill tracking
             });
+            
+            // REMOVED: Duplicate kill recording - already handled in authoritative_applyDamageToCreature
                         
             // Process attack effects for creature targets
             if (this.battleManager.attackEffectsManager) {
@@ -537,6 +535,14 @@ export class BattleCombatManager {
                     attack.target.creature,
                     attack.damage,
                     'basic'
+                );
+            }
+            
+            if (this.battleManager.spellSystem) {
+                await this.battleManager.spellSystem.checkAndApplyFightingSpellTriggers(
+                    attack.hero,
+                    attack.target.creature,
+                    attack.damage
                 );
             }
         } else {
@@ -550,12 +556,14 @@ export class BattleCombatManager {
             if (this.checkAndApplyToxicTrap(attacker, defender)) {
                 // Toxic trap triggered - original attack is blocked
                 console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
+                return; // Exit early, no damage applied
             }
 
             // Check for frost rune
             if (this.checkAndApplyFrostRune(attacker, defender)) {
                 // Frost rune triggered - original attack is blocked
                 console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
+                return; // Exit early, no damage applied
             }
             
             // Apply the damage
@@ -564,19 +572,15 @@ export class BattleCombatManager {
                 damage: attack.damage,
                 newHp: Math.max(0, defender.currentHp - attack.damage),
                 died: (defender.currentHp - attack.damage) <= 0
+            }, {
+                source: 'attack',
+                attacker: attacker
             });
             
-            // Check if hero died from this attack
-            if (wasAlive && !defender.alive && this.battleManager.isAuthoritative) {
-                // Use the Wanted Poster module's visual feedback function
-                console.log('💀 KILL DETECTED:', {
-                    attacker: attacker.name + ' (' + attacker.side + ')',
-                    defender: defender.name + ' (' + defender.side + ')',
-                    battleManagerInstance: this.battleManager.constructor.name
-                });
-                recordKillWithVisualFeedback(this.battleManager, attacker, defender, 'hero');
-                
-                // Check for SkeletonMage reactions to ally death
+            // REMOVED: Duplicate kill recording - already handled in authoritative_applyDamage
+            
+            // Check for SkeletonMage reactions to ally death (only if hero actually died)
+            if (wasAlive && !defender.alive) {
                 this.battleManager.checkForSkeletonMageReactions(defender, defender.side, 'hero');
             }
 
@@ -587,6 +591,14 @@ export class BattleCombatManager {
                     defender,
                     attack.damage,
                     'basic'
+                );
+            }
+            
+            if (this.battleManager.spellSystem) {
+                await this.battleManager.spellSystem.checkAndApplyFightingSpellTriggers(
+                    attacker,
+                    defender,
+                    attack.damage
                 );
             }
 
@@ -605,6 +617,12 @@ export class BattleCombatManager {
         const wasAlive = target.alive;
         const result = target.takeDamage(damage);
         
+        // CRITICAL: Record kill IMMEDIATELY when hero dies, before any other processing
+        if (result.died && wasAlive && attacker && this.battleManager.isAuthoritative) {
+            recordKillWithVisualFeedback(this.battleManager, attacker, target, 'hero');
+            console.log(`🎯 PRIORITY: Recorded hero kill ${attacker.name} -> ${target.name} (source: ${source})`);
+        }
+        
         if (!this.battleManager.totalDamageDealt[target.absoluteSide]) {
             this.battleManager.totalDamageDealt[target.absoluteSide] = 0;
         }
@@ -616,14 +634,10 @@ export class BattleCombatManager {
         );
 
         this.battleManager.updateHeroHealthBar(target.side, target.position, result.newHp, target.maxHp);
-        const damageSource = arguments[1]?.source || 'attack';
+        const damageSource = context?.source || 'attack';
         this.battleManager.animationManager.createDamageNumber(target.side, target.position, damage, target.maxHp, damageSource);
         
         if (result.died && wasAlive) {
-            // If we have an attacker and it's a spell kill, record with visual feedback
-            if (attacker && source === 'spell') {
-                recordKillWithVisualFeedback(this.battleManager, attacker, target, 'hero');
-            }
             this.battleManager.handleHeroDeath(target);
         }
 
@@ -716,12 +730,12 @@ export class BattleCombatManager {
                     position: hero.position,
                     name: hero.name,
                     abilities: hero.getAllAbilities(),
-                    // NEW: Add equipment count for Toras synchronization
+                    // Equipment count for synchronization (but stats are already calculated)
                     uniqueEquipmentCount: 0
                 }
             };
             
-            // Calculate unique equipment count if hero is Toras
+            // Calculate unique equipment count if hero is Toras (for display sync only)
             if (hero.name === 'Toras' && hero.equipment && hero.equipment.length > 0) {
                 const uniqueEquipmentNames = new Set();
                 hero.equipment.forEach(item => {
@@ -763,7 +777,7 @@ export class BattleCombatManager {
         };
     }
 
-    // Calculate wealth bonus for gold rewards
+    // SIMPLIFIED: Just count Wealth abilities from pre-calculated hero data
     calculateWealthBonus(heroes) {
         let totalWealthBonus = 0;
         

@@ -11,6 +11,8 @@ import ToxicTrapSpell from './Spells/toxicTrap.js';
 import IceboltSpell from './Spells/icebolt.js'; 
 import FrostRuneSpell from './Spells/frostRune.js';
 import IcyGraveSpell from './Spells/icyGrave.js';
+import HeavyHitSpell from './Spells/heavyHit.js';
+import OverheatSpell from './Spells/overheat.js';  
 
 
 
@@ -73,6 +75,15 @@ export class BattleSpellSystem {
         // Register Icy Grave
         const icyGrave = new IcyGraveSpell(this.battleManager);
         this.spellImplementations.set('IcyGrave', icyGrave);
+
+        
+        // Register HeavyHit (Fighting spell)
+        const heavyHit = new HeavyHitSpell(this.battleManager);
+        this.spellImplementations.set('HeavyHit', heavyHit);
+
+        // Register Overheat
+        const overheat = new OverheatSpell(this.battleManager);
+        this.spellImplementations.set('Overheat', overheat);
         
         console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
     }
@@ -340,6 +351,77 @@ export class BattleSpellSystem {
             }
         `;
         document.head.appendChild(style);
+    }
+
+    /**
+     * Check for Fighting spell triggers after an attack and apply their effects
+     * @param {Object} attacker - The attacking hero
+     * @param {Object} target - The target of the attack (hero or creature)
+     * @param {number} damage - The damage dealt by the attack
+     */
+    async checkAndApplyFightingSpellTriggers(attacker, target, damage) {
+        if (!this.battleManager.isAuthoritative || !attacker || !attacker.alive) {
+            return;
+        }
+        
+        // Check if attacker is silenced
+        if (this.battleManager.statusEffectsManager && 
+            !this.battleManager.statusEffectsManager.canCastSpells(attacker)) {
+            return;
+        }
+        
+        // Get all Fighting spells this hero has
+        const allSpells = attacker.getAllSpells();
+        if (!allSpells || allSpells.length === 0) {
+            return;
+        }
+        
+        // Filter for Fighting spells only
+        const fightingSpells = allSpells.filter(spell => spell.spellSchool === 'Fighting');
+        if (fightingSpells.length === 0) {
+            return;
+        }
+        
+        console.log(`⚔️ ${attacker.name} checking ${fightingSpells.length} Fighting spells for triggers...`);
+        
+        // Check each Fighting spell for triggers and execute immediately
+        for (const spell of fightingSpells) {
+            // Calculate trigger chance using existing logic
+            const triggerChance = this.calculateSpellCastingChance(attacker, spell);
+            
+            // Roll for trigger
+            const roll = this.battleManager.getRandom();
+            
+            if (roll <= triggerChance) {
+                console.log(`✨ ${attacker.name}'s ${spell.name} triggered!`);
+                
+                // Find the spell implementation and execute its effect
+                const spellImpl = this.spellImplementations.get(spell.name);
+                if (spellImpl && spellImpl.executeEffect) {
+                    try {
+                        await spellImpl.executeEffect(attacker, target, damage);
+                    } catch (error) {
+                        console.error(`Error executing Fighting spell ${spell.name}:`, error);
+                    }
+                } else {
+                    console.warn(`⚠️ No implementation found for Fighting spell: ${spell.name}`);
+                }
+                
+                // Track statistics
+                this.spellsCastThisBattle++;
+                this.spellCastHistory.push({
+                    hero: attacker.name,
+                    heroPosition: attacker.position,
+                    heroSide: attacker.absoluteSide,
+                    spell: spell.name,
+                    spellLevel: spell.level || 0,
+                    spellSchool: 'Fighting',
+                    turn: this.battleManager.currentTurn,
+                    timestamp: Date.now(),
+                    isFightingSpell: true
+                });
+            }
+        }
     }
 
     // ============================================

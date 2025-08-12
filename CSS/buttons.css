@@ -1,7 +1,8 @@
 /* ============================================
-   7. BUTTONS
+   7. BUTTONS WITH PIXEL FONT
    ============================================ */
 .btn {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 16px 32px;
     font-size: 1.1rem;
     border: none;
@@ -10,7 +11,7 @@
     transition: var(--transition-medium);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     position: relative;
     overflow: hidden;
     min-height: 56px;
@@ -44,9 +45,11 @@
 
 /* Button variants */
 .btn-primary {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     background: var(--primary-gradient);
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
+    letter-spacing: 2px;
 }
 
 .btn-primary:hover {
@@ -56,9 +59,11 @@
 }
 
 .btn-secondary {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     background: var(--secondary-gradient);
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
+    letter-spacing: 2px;
 }
 
 .btn-secondary:hover {
@@ -68,9 +73,11 @@
 }
 
 .btn-danger {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     background: var(--danger-gradient);
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
+    letter-spacing: 2px;
 }
 
 .btn-danger:hover {
@@ -80,6 +87,7 @@
 }
 
 .btn-back {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 8px 16px;
     background: rgba(102, 126, 234, 0.1);
     border: 2px solid rgba(102, 126, 234, 0.3);
@@ -89,6 +97,7 @@
     cursor: pointer;
     transition: var(--transition-medium);
     font-size: 0.9rem;
+    letter-spacing: 1px;
 }
 
 .btn-back:hover {
@@ -99,6 +108,7 @@
 
 /* Ready button states */
 .ready-button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 6px 12px;
     font-size: 0.8rem;
     border: none;
@@ -106,7 +116,7 @@
     cursor: pointer;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     transition: var(--transition-medium);
     min-width: 80px;
 }
@@ -143,6 +153,7 @@
 
 /* Specialized buttons */
 .surrender-button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     position: fixed;
     bottom: 30px;
     right: 30px;
@@ -153,7 +164,7 @@
     cursor: pointer;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     background: var(--danger-gradient);
     color: white;
     border: 2px solid rgba(255, 255, 255, 0.2);
@@ -191,6 +202,7 @@ body.battle-active .surrender-button {
 }
 
 .to-battle-button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     background: linear-gradient(135deg, #ff6b6b 0%, #c44569 100%);
     color: white;
     border: none;
@@ -202,7 +214,7 @@ body.battle-active .surrender-button {
     transition: var(--transition-medium);
     box-shadow: 0 4px 15px rgba(196, 69, 105, 0.3);
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
 }
 
 .to-battle-button:hover {
@@ -228,6 +240,7 @@ body.battle-active .surrender-button {
 /* Modal buttons */
 .btn-modal,
 .btn-surrender-confirm {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     flex: 1;
     padding: 12px 20px;
     font-size: 1rem;
@@ -236,7 +249,7 @@ body.battle-active .surrender-button {
     cursor: pointer;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     transition: var(--transition-medium);
 }
 
@@ -280,12 +293,15 @@ body.battle-active .surrender-button {
 
 /* Battle formation button from reward screen */
 .battle-formation-waiting-overlay .btn {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     margin-top: 30px;
     min-width: 150px;
+    letter-spacing: 1px;
 }
 
 /* Log control buttons */
 .log-control-btn {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
@@ -294,9 +310,89 @@ body.battle-active .surrender-button {
     cursor: pointer;
     font-size: 10px;
     transition: all 0.2s ease;
+    letter-spacing: 0.5px;
 }
 
 .log-control-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Menu buttons specifically */
+.menu-buttons button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
+}
+
+/* Input submit buttons */
+input[type="submit"],
+input[type="button"] {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
+}
+
+/* Generic button elements */
+button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Responsive adjustments for buttons */
+@media (max-width: 768px) {
+    .btn {
+        letter-spacing: 1px;
+        font-size: 1rem;
+        padding: 14px 28px;
+    }
+    
+    .to-battle-button {
+        font-size: 18px;
+        letter-spacing: 1px;
+        padding: 10px 25px;
+    }
+    
+    .surrender-button {
+        font-size: 1rem;
+        letter-spacing: 1px;
+        padding: 14px 28px;
+    }
+    
+    .btn-modal,
+    .btn-surrender-confirm {
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
+        padding: 10px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .btn {
+        letter-spacing: 0.5px;
+        font-size: 0.9rem;
+        padding: 12px 24px;
+    }
+    
+    .to-battle-button {
+        font-size: 16px;
+        letter-spacing: 0.5px;
+        padding: 8px 20px;
+    }
+    
+    .surrender-button {
+        font-size: 0.9rem;
+        letter-spacing: 0.5px;
+        padding: 12px 24px;
+        bottom: 20px;
+        right: 20px;
+    }
+    
+    .btn-back {
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        padding: 6px 12px;
+    }
+    
+    .ready-button {
+        font-size: 0.7rem;
+        letter-spacing: 0.5px;
+    }
 }

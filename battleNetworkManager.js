@@ -1,4 +1,5 @@
 // battleNetworkManager.js - Handles all network communication for battles
+// UPDATED: Uses pre-calculated Hero stats instead of manual calculations
 
 export class BattleNetworkManager {
     constructor(battleManager) {
@@ -735,6 +736,23 @@ export class BattleNetworkManager {
             case 'stormblade_wind_swap':
                 bm.guest_handleStormbladeWindSwap(data);
                 break;
+
+            case 'greatsword_skeleton_summon':
+                bm.guest_handleGreatswordSkeletonSummon(data);
+                break;
+
+
+
+
+
+            case 'heavy_hit_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('HeavyHit')) {
+                    const heavyHitSpell = this.battleManager.spellSystem.spellImplementations.get('HeavyHit');
+                    heavyHitSpell.handleGuestEffect(data);
+                }
+                break;
+                
                 
             case 'resistance_used':
                 if (bm.resistanceManager) {
@@ -759,15 +777,8 @@ export class BattleNetworkManager {
         bm.currentTurn = data.turn;
         bm.addCombatLog(`📍 Turn ${bm.currentTurn} begins`, 'info');
         
-        // Clear any cached equipment counts at turn start
-        ['left', 'center', 'right'].forEach(position => {
-            if (bm.playerHeroes[position]) {
-                delete bm.playerHeroes[position]._syncedUniqueEquipmentCount;
-            }
-            if (bm.opponentHeroes[position]) {
-                delete bm.opponentHeroes[position]._syncedUniqueEquipmentCount;
-            }
-        });
+        // REMOVED: Manual equipment count clearing - stats are pre-calculated
+        // No need to manage synced equipment counts anymore
     }
 
     guest_handleDamageApplied(data) {

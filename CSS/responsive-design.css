@@ -1,10 +1,22 @@
 /* ============================================
    23. RESPONSIVE DESIGN
    ============================================ */
+
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Global font application for responsive elements */
 @media (max-width: 1400px) {
     .reward-container.enhanced-with-gold-and-preview {
         padding: 30px !important;
         max-height: 96vh !important;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     #cardRewardOverlay .reward-hand-content-normal .hand-cards {
@@ -14,6 +26,7 @@
     .formation-spellbook-tooltip {
         min-width: 280px;
         max-width: 320px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .card-preview-column,
@@ -28,6 +41,7 @@
     
     .character-card {
         min-height: 240px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .character-image-container {
@@ -50,6 +64,7 @@
     .large-card-tooltip {
         max-width: 280px;
         padding: 15px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .large-card-image {
@@ -58,11 +73,14 @@
     
     .card-tooltip-name {
         font-size: 1rem;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        letter-spacing: 0.5px;
     }
     
     .battle-hero-slot {
         width: 280px;
         height: 240px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .card-grid-5x4 {
@@ -84,24 +102,30 @@
     .battle-hero-attack {
         padding: 3px 6px;
         gap: 6px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .attack-icon {
         font-size: 14px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .attack-value {
         font-size: 14px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .attack-bonus {
         font-size: 12px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .ability-drop-tooltip {
         font-size: 12px;
         padding: 6px 12px;
         top: -30px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        letter-spacing: 0.5px;
     }
     
     .team-building-actions .action-display-container {
@@ -111,10 +135,12 @@
     .action-display {
         min-width: 150px;
         padding: 12px 15px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .action-counter {
         font-size: 24px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .action-orb {
@@ -125,6 +151,7 @@
     .resource-display-container {
         right: 20px;
         max-width: 250px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .deck-tooltip-anchor {
@@ -162,6 +189,7 @@
     
     .formation-spellbook-tooltip .spell-entry {
         padding: 6px 10px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .battle-speed-panel-container {
@@ -177,11 +205,13 @@
     
     .gold-breakdown-content-scrollable {
         max-height: 180px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .battle-interface-panel {
         min-width: 280px;
         max-width: 350px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .card-preview-section {
@@ -207,10 +237,13 @@
     
     .game-title {
         font-size: 2.5rem;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        letter-spacing: -1px;
     }
     
     .selection-header h2 {
         font-size: 2.2rem;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .large-card-tooltip {
@@ -245,10 +278,13 @@
     .hero-info-bar {
         padding: 6px 12px 8px 12px;
         gap: 4px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .battle-hero-name {
         font-size: 14px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        letter-spacing: 1px;
     }
     
     .health-bar {
@@ -296,10 +332,12 @@
     
     .preview-card-info h4 {
         font-size: 16px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .card-type {
         font-size: 12px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
 }
 
@@ -316,6 +354,7 @@
     .team-building-container {
         flex-direction: column;
         gap: 20px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card {
@@ -357,10 +396,12 @@
     .empty-icon {
         font-size: 28px;
         margin-bottom: 6px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .empty-text {
         font-size: 12px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .battle-field-container {
@@ -420,6 +461,12 @@
 }
 
 @media (max-width: 768px) {
+    /* Apply font to all responsive text elements */
+    * {
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        font-size: 0.9em;
+    }
+    
     .life-display-container {
         padding: 10px 15px;
         flex-wrap: wrap;
@@ -483,6 +530,7 @@
         content: "👆 Drop to reorder";
         font-size: 12px;
         padding: 6px 12px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     
     .battle-hero-slot {
@@ -514,6 +562,8 @@
     
     .gold-amount-large .player-gold-number {
         font-size: 20px;
+        font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        letter-spacing: 2px;
     }
     
     .gold-change-indicator {
@@ -808,6 +858,11 @@
 }
 
 @media (max-width: 480px) {
+    /* Apply smaller font sizes for mobile */
+    * {
+        font-size: 0.85em;
+    }
+    
     .turn-container {
         padding: 6px 12px;
         gap: 4px;

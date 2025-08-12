@@ -1,11 +1,26 @@
 /* ============================================
    8. STATUS & MENU ELEMENTS
    ============================================ */
+
+/* Font Face Declaration for Pixel Intv */
+@font-face {
+    font-family: 'Pixel Intv';
+    src: url('../Fonts/Pixel Intv.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 .menu-buttons {
     display: flex;
     flex-direction: column;
     gap: 15px;
     margin-bottom: 30px;
+}
+
+.menu-buttons button {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
 }
 
 .status {
@@ -17,6 +32,8 @@
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .status.waiting {
@@ -46,6 +63,8 @@
     background: rgba(102, 126, 234, 0.1);
     border-radius: 10px;
     border: 1px solid rgba(102, 126, 234, 0.2);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }
 
 .connection-details {
@@ -58,4 +77,6 @@
     color: #555;
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
 }

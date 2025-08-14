@@ -5,6 +5,7 @@ export class ArtifactHandler {
         this.loadedArtifacts = new Map(); // Cache for loaded artifact modules
         this.exclusiveArtifactActive = null; // Track currently active exclusive artifact
         this.exclusiveActivatedAt = null; // Timestamp when exclusive was activated
+        this.permanentArtifacts = []; // Track permanent artifacts used this game
     }
 
     // ===== EXCLUSIVE ARTIFACT MANAGEMENT =====
@@ -120,6 +121,52 @@ export class ArtifactHandler {
             setTimeout(() => errorDiv.remove(), 300);
         }, 2500);
     }
+
+
+    // ===== PERMANENT ARTIFACT TRACKING =====
+
+    // Check if an artifact is permanent
+    isPermanentArtifact(cardName, heroSelection) {
+        // Get card info to check for permanent subtype
+        const cardInfo = heroSelection?.getCardInfo ? heroSelection.getCardInfo(cardName) : null;
+        return cardInfo && cardInfo.cardType === 'Artifact' && cardInfo.subtype === 'Permanent';
+    }
+
+    // Add a permanent artifact to the tracking list
+    addPermanentArtifact(cardName) {
+        const permanentArtifact = {
+            name: cardName,
+            usedAt: Date.now(),
+            id: this.generatePermanentArtifactId()
+        };
+        
+        this.permanentArtifacts.push(permanentArtifact);
+        console.log(`📋 Added permanent artifact: ${cardName}. Total: ${this.permanentArtifacts.length}`);
+    }
+
+    // Generate unique ID for permanent artifacts
+    generatePermanentArtifactId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    // Get all permanent artifacts used this game
+    getPermanentArtifacts() {
+        return [...this.permanentArtifacts];
+    }
+
+    // Get count of permanent artifacts
+    getPermanentArtifactCount() {
+        return this.permanentArtifacts.length;
+    }
+
+    // Reset permanent artifacts (for new games only)
+    resetPermanentArtifacts() {
+        const count = this.permanentArtifacts.length;
+        this.permanentArtifacts = [];
+        console.log(`🗑️ Reset ${count} permanent artifacts for new game`);
+    }
+
+
 
     // ===== ENHANCED ARTIFACT HANDLERS =====
 
@@ -250,6 +297,24 @@ export class ArtifactHandler {
         }
     }
 
+    // Export permanent artifacts state for saving
+    exportPermanentArtifactsState() {
+        return {
+            permanentArtifacts: [...this.permanentArtifacts],
+            exportedAt: Date.now()
+        };
+    }
+
+    // Import permanent artifacts state for loading
+    importPermanentArtifactsState(stateData) {
+        if (stateData && Array.isArray(stateData.permanentArtifacts)) {
+            this.permanentArtifacts = [...stateData.permanentArtifacts];
+            console.log(`📋 Restored ${this.permanentArtifacts.length} permanent artifacts`);
+            return true;
+        }
+        return false;
+    }
+
     // Reset exclusive state
     resetExclusiveState() {
         this.exclusiveArtifactActive = null;
@@ -342,6 +407,13 @@ export class ArtifactHandler {
         } catch (error) {
             return false;
         }
+    }
+
+    // Reset all artifact handler state (for new games)
+    reset() {
+        this.resetExclusiveState();
+        this.resetPermanentArtifacts();
+        console.log('🗑️ ArtifactHandler reset for new game');
     }
 
     validateArtifactModule(artifact, moduleName) {

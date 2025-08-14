@@ -205,7 +205,7 @@ export class GoldManager {
         }, 300);
     }
 
-    // Play gold gain animation
+    // Play gold gain animation - Updated to use CSS classes
     async playGoldAnimation(target, amount) {
         const goldElement = document.querySelector(`.${target}-gold-display`);
         if (!goldElement) {
@@ -215,21 +215,8 @@ export class GoldManager {
         
         // Create animation element
         const animationElement = document.createElement('div');
-        animationElement.className = 'gold-gain-animation';
+        animationElement.className = `gold-gain-animation ${amount > 0 ? 'positive' : 'negative'}`;
         animationElement.textContent = `${amount > 0 ? '+' : ''}${amount}`;
-        animationElement.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 100%;
-            transform: translateY(-50%);
-            color: ${amount > 0 ? '#28a745' : '#dc3545'};
-            font-size: 16px;
-            font-weight: bold;
-            z-index: 100;
-            pointer-events: none;
-            animation: goldGainFloat 1.5s ease-out forwards;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-        `;
         
         // Add to gold element
         goldElement.appendChild(animationElement);

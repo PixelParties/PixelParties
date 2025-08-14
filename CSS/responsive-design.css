@@ -151,6 +151,12 @@
     .resource-display-container {
         right: 20px;
         max-width: 250px;
+        /* Preserve the grid layout from action-display.css */
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        row-gap: 25px; /* Slightly reduced for 1400px screens */
+        column-gap: 10px;
         font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     }
     

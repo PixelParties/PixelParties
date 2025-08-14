@@ -3,6 +3,7 @@ import { TheMastersSwordEffect } from './Artifacts/theMastersSword.js';
 import { registerTheSunSword } from './Artifacts/theSunSword.js';
 import { registerTheStormblade } from './Artifacts/theStormblade.js';
 import { skullmaelsGreatswordArtifact } from './Artifacts/skullmaelsGreatsword.js';
+import ArrowSystem from './arrowSystem.js';
 
 export class AttackEffectsManager {
     constructor(battleManager) {
@@ -19,6 +20,9 @@ export class AttackEffectsManager {
         this.sunSwordEffect = null;
         this.stormbladeEffect = null;
         this.skullmaelsGreatswordArtifact = skullmaelsGreatswordArtifact;
+        
+        // Arrow System
+        this.arrowSystem = new ArrowSystem(this.battleManager);
         
         // Flag to prevent multiple skeleton summons per attack
         this._skeletonSummonedThisAttack = false;
@@ -54,13 +58,11 @@ export class AttackEffectsManager {
     // Register a new attack effect handler
     registerEffectHandler(effectName, handlerConfig) {
         this.effectHandlers.set(effectName, handlerConfig);
-        console.log(`📝 Registered attack effect handler: ${effectName}`);
     }
     
     // Register a damage modifier handler
     registerDamageModifier(modifierName, config) {
         this.damageModifiers.set(modifierName, config);
-        console.log(`📝 Registered damage modifier: ${modifierName}`);
     }
     
     // Calculate damage modifications BEFORE damage is applied
@@ -86,12 +88,16 @@ export class AttackEffectsManager {
                     multiplier: multiplier,
                     target: target
                 });
-                
                 console.log(`⚔️ TheMastersSword: ${swordCount} sword(s) → ×${multiplier} damage (${baseDamage} → ${modifiedDamage})`);
             }
         }
         
-        // Future damage modifiers can be added here
+        // Check for Arrow System effects
+        if (this.arrowSystem) {
+            const arrowResult = this.arrowSystem.calculateArrowDamageBonus(attacker, target, modifiedDamage);
+            modifiedDamage = arrowResult.modifiedDamage;
+            effectsTriggered.push(...arrowResult.effectsTriggered);
+        }
         
         return { modifiedDamage, effectsTriggered };
     }
@@ -108,7 +114,7 @@ export class AttackEffectsManager {
                 
                 // Add combat log message
                 this.battleManager.addCombatLog(
-                    `⚔️ The Master's Sword activates! Damage ×${effect.multiplier}!`,
+                    `The Master's Sword activates! Damage Ã—${effect.multiplier}!`,
                     'success'
                 );
             }
@@ -123,7 +129,7 @@ export class AttackEffectsManager {
     }
     
     // Process all attack effects when an attack lands
-    async processAttackEffects(attacker, defender, damage, attackType = 'basic') {
+    async processAttackEffects(attacker, defender, damage, attackType = 'basic', effectsTriggered = []) {
         // Reset skeleton summon flag at start of each attack
         this._skeletonSummonedThisAttack = false;
         
@@ -136,12 +142,21 @@ export class AttackEffectsManager {
         // Only process for basic attacks (not spells, not status damage)
         if (attackType !== 'basic') return;
         
+        // Process arrow effects from damage calculation
+        if (this.arrowSystem && effectsTriggered && effectsTriggered.length > 0) {
+            const arrowEffects = effectsTriggered.filter(effect => effect.arrowType);
+            if (arrowEffects.length > 0) {
+                console.log(`🏹 Processing ${arrowEffects.length} arrow effects`);
+                await this.arrowSystem.processArrowAttackEffects(attacker, defender, damage, arrowEffects);
+            }
+        }
+        
         // Get all equipment-based attack effects from the attacker
         const attackEffects = this.getAttackerEffects(attacker);
         
         if (attackEffects.length === 0) return;
         
-        console.log(`🎯 Processing ${attackEffects.length} attack effects for ${attacker.name}`);
+        console.log(`🎯 Processing ${attackEffects.length} equipment attack effects for ${attacker.name}`);
         
         // Process each effect
         for (const effect of attackEffects) {
@@ -205,7 +220,7 @@ export class AttackEffectsManager {
         }
         
         // Apply 1 stack of frozen
-        console.log(`❄️ BladeOfTheFrostbringer triggers! Freezing ${defender.name}`);
+        console.log(`â„ï¸ BladeOfTheFrostbringer triggers! Freezing ${defender.name}`);
         
         // Apply frozen status
         if (this.battleManager.statusEffectsManager) {
@@ -217,7 +232,7 @@ export class AttackEffectsManager {
         
         // Add combat log message
         this.battleManager.addCombatLog(
-            `❄️ ${attacker.name}'s Blade of the Frostbringer freezes ${defender.name}!`,
+            `â„ï¸ ${attacker.name}'s Blade of the Frostbringer freezes ${defender.name}!`,
             'info'
         );
         
@@ -248,14 +263,14 @@ export class AttackEffectsManager {
         // Check if we've already summoned a skeleton this attack
         // (Multiple swords can be equipped but only one skeleton summons)
         if (this._skeletonSummonedThisAttack) {
-            console.log(`⚔️🦴 Additional Greatsword triggered but skeleton already summoned this attack`);
+            console.log(`âš”ï¸ðŸ¦´ Additional Greatsword triggered but skeleton already summoned this attack`);
             return;
         }
         
         // Mark that we're summoning a skeleton for this attack
         this._skeletonSummonedThisAttack = true;
         
-        console.log(`⚔️🦴 SkullmaelsGreatsword triggers! Summoning skeleton for ${attacker.name}`);
+        console.log(`âš”ï¸ðŸ¦´ SkullmaelsGreatsword triggers! Summoning skeleton for ${attacker.name}`);
         
         // Execute the skeleton summon
         if (this.skullmaelsGreatswordArtifact) {
@@ -281,7 +296,7 @@ export class AttackEffectsManager {
         for (let i = 0; i < shardCount; i++) {
             const shard = document.createElement('div');
             shard.className = 'ice-shard';
-            shard.innerHTML = '❄️';
+            shard.innerHTML = 'â„ï¸';
             
             // Random angle for each shard
             const angle = (360 / shardCount) * i + (Math.random() * 30 - 15);
@@ -517,6 +532,12 @@ export class AttackEffectsManager {
     // Initialize (called when battle starts)
     init() {
         this.ensureAttackEffectsCSS();
+        
+        // Initialize the arrow system after AttackEffectsManager is ready
+        if (this.arrowSystem) {
+            this.arrowSystem.init();
+            console.log('🏹 ArrowSystem initialized via AttackEffectsManager');
+        }
     }
     
     // Cleanup
@@ -541,6 +562,12 @@ export class AttackEffectsManager {
         
         if (this.skullmaelsGreatswordArtifact) {
             this.skullmaelsGreatswordArtifact = null;
+        }
+
+        // NEW: Arrow System cleanup
+        if (this.arrowSystem) {
+            this.arrowSystem.cleanup();
+            this.arrowSystem = null;
         }
         
         this._skeletonSummonedThisAttack = false;

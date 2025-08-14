@@ -49,7 +49,9 @@ export class BattleScreen {
     actionManager = null,
     playerCreatures = null, opponentCreatures = null,
     playerEquips = null, opponentEquips = null,
-    playerEffectiveStats = null) { 
+    playerEffectiveStats = null,
+    opponentEffectiveStats = null,
+    permanentArtifacts = null) { 
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -67,7 +69,8 @@ export class BattleScreen {
         this.opponentCreatures = opponentCreatures;
         this.playerEquips = playerEquips;
         this.opponentEquips = opponentEquips;
-        
+        this.battlePermanentArtifacts = permanentArtifacts ? [...permanentArtifacts] : [];
+
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
             playerFormation,
@@ -87,7 +90,9 @@ export class BattleScreen {
             opponentCreatures,
             playerEquips,
             opponentEquips,
-            playerEffectiveStats 
+            playerEffectiveStats,
+            opponentEffectiveStats,
+            this.battlePermanentArtifacts
         );
     }
 
@@ -367,7 +372,7 @@ export class BattleScreen {
                         guestSpellbooks,
                         guestCreatures,
                         guestEquipment,
-                        guestEffectiveStats: guestStats, // ★ Send pre-calculated stats
+                        guestEffectiveStats: guestStats, 
                         timestamp: Date.now()
                     }
                 });
@@ -387,7 +392,7 @@ export class BattleScreen {
                     this.battleManager.opponentCreatures,
                     this.battleManager.opponentEquips,
                     'host',
-                    this.battleManager.opponentEffectiveStats // ★ Pass pre-calculated stats
+                    this.battleManager.opponentEffectiveStats
                 );
             }
             
@@ -447,7 +452,7 @@ export class BattleScreen {
                 this.battleManager.opponentEquips = data.guestEquipment;
             }
 
-            // ★ SIMPLIFIED: Just store the effective stats
+            // Just store the effective stats
             if (data.guestEffectiveStats) {
                 this.opponentEffectiveStats = data.guestEffectiveStats;
                 this.battleManager.opponentEffectiveStats = data.guestEffectiveStats;
@@ -466,8 +471,34 @@ export class BattleScreen {
                     this.battleManager.opponentCreatures,
                     this.battleManager.opponentEquips,
                     'guest',
-                    this.battleManager.opponentEffectiveStats // ★ Pass pre-calculated stats
+                    this.battleManager.opponentEffectiveStats
                 );
+                
+                // Re-apply FlameArrow counters for opponent heroes after equipment sync
+                if (this.battleManager.attackEffectsManager && 
+                    this.battleManager.attackEffectsManager.flameArrowEffect) {
+                    console.log('🔥🏹 Re-initializing FlameArrow counters for opponent after equipment sync');
+                    
+                    // Re-initialize counters only for opponent heroes
+                    const flameArrowEffect = this.battleManager.attackEffectsManager.flameArrowEffect;
+                    ['left', 'center', 'right'].forEach(position => {
+                        const hero = this.battleManager.opponentHeroes[position];
+                        if (hero && hero.alive) {
+                            const flameArrowCount = flameArrowEffect.countFlameArrows(hero);
+                            if (flameArrowCount > 0) {
+                                hero.flameArrowCounters = flameArrowCount;
+                                console.log(`🔥🏹 ${hero.name} receives ${flameArrowCount} Flame Arrow Counter(s) (late sync)`);
+                                this.battleManager.addCombatLog(
+                                    `🔥🏹 ${hero.name} receives ${flameArrowCount} Flame Arrow Counter${flameArrowCount > 1 ? 's' : ''}!`,
+                                    'info'
+                                );
+                            }
+                        }
+                    });
+                    
+                    // Update visual displays
+                    flameArrowEffect.updateAllFlameArrowDisplays();
+                }
                 
                 console.log('✅ HOST: All opponent data synced and heroes initialized');
             }

@@ -412,11 +412,9 @@ export class ReconnectionManager {
             if (this.heroSelection.potionHandler) {
                 const potionRestored = this.heroSelection.potionHandler.importPotionState(gameState.hostPotionState);
                 if (potionRestored) {
-                    console.log('✅ Host potion state restored during reconnection');
                     
-                    // ✅ FIX: Recalculate alchemy bonuses based on current abilities
+                    // Recalculate alchemy bonuses based on current abilities
                     this.heroSelection.potionHandler.updateAlchemyBonuses(this.heroSelection);
-                    console.log('🧪 Alchemy bonuses recalculated after potion state restoration');
                 }
             }
         } else if (!this.isHost && gameState.guestPotionState) {
@@ -425,9 +423,8 @@ export class ReconnectionManager {
                 if (potionRestored) {
                     console.log('✅ Guest potion state restored during reconnection');
                     
-                    // ✅ FIX: Recalculate alchemy bonuses based on current abilities  
+                    // Recalculate alchemy bonuses based on current abilities  
                     this.heroSelection.potionHandler.updateAlchemyBonuses(this.heroSelection);
-                    console.log('🧪 Alchemy bonuses recalculated after potion state restoration');
                 }
             }
         } else {
@@ -435,7 +432,6 @@ export class ReconnectionManager {
             if (this.heroSelection.potionHandler) {
                 this.heroSelection.potionHandler.reset();
                 this.heroSelection.potionHandler.updateAlchemyBonuses(this.heroSelection);
-                console.log('📝 No potion data found during reconnection - initialized with current Alchemy bonuses');
             }
         }
 

@@ -13,6 +13,15 @@ export class StatusEffectsManager {
                 visual: 'fire_ring',
                 description: 'Fire shield that deals recoil damage to attackers'
             },
+            taunting: {
+                name: 'taunting',
+                displayName: 'Taunting',
+                type: 'buff',
+                targetTypes: ['hero'],
+                persistent: false,
+                visual: 'taunt_shout',
+                description: 'Draws enemy attacks to this zone. Reduces by 1 stack each turn.'
+            },
             silenced: {
                 name: 'silenced',
                 displayName: 'Silenced',
@@ -133,14 +142,21 @@ export class StatusEffectsManager {
             return false;
         }
 
-        // ✅ FIX: Don't apply status effects to dead targets
+        //  Don't apply status effects to dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
             console.log(`⚰️ Ignoring status effect application to dead target: ${target.name}`);
             return false;
         }
+
+        // 🧃 JUICE CHECK: Check if we can negate this status effect with Juice
+        const definition = this.statusEffectDefinitions[effectName];
+        if (definition && definition.type === 'debuff' && this.checkAndConsumeJuice(target, effectName, stacks)) {
+            // Juice consumed to negate the negative effect!
+            return false;
+        }
         
-        // ☀️ TheSunSword: Check for frozen resistance  // <-- ADD THIS ENTIRE BLOCK
+        // ☀️ TheSunSword: Check for frozen resistance
         if (effectName === 'frozen' && this.battleManager && this.battleManager.attackEffectsManager) {
             const sunSwordEffect = this.battleManager.attackEffectsManager.sunSwordEffect;
             
@@ -157,6 +173,34 @@ export class StatusEffectsManager {
                 if (this.battleManager.isAuthoritative) {
                     this.battleManager.sendBattleUpdate('sun_sword_frozen_resist', {
                         targetInfo: this.getTargetSyncInfo(target),
+                        timestamp: Date.now()
+                    });
+                }
+                
+                return false; // Don't apply the frozen effect
+            }
+        }
+
+        // 🛡️ Fireshield: Check for frozen immunity
+        if (effectName === 'frozen') {
+            // Check if target has any fireshield stacks
+            const fireshieldEffect = target.statusEffects ? target.statusEffects.find(effect => effect.name === 'fireshield') : null;
+            const fireshieldStacks = fireshieldEffect ? fireshieldEffect.stacks : 0;
+            
+            if (fireshieldStacks > 0) {
+                // Fireshield provides complete immunity to frozen
+                this.createFireshieldFrozenImmunityEffect(target);
+                
+                this.battleManager.addCombatLog(
+                    `🛡️ ${target.name}'s Fireshield protects against the frozen effect! (${fireshieldStacks} stacks)`,
+                    target.side === 'player' ? 'success' : 'info'
+                );
+                
+                // Sync to guest if host
+                if (this.battleManager.isAuthoritative) {
+                    this.battleManager.sendBattleUpdate('fireshield_frozen_immunity', {
+                        targetInfo: this.getTargetSyncInfo(target),
+                        fireshieldStacks: fireshieldStacks,
                         timestamp: Date.now()
                     });
                 }
@@ -193,6 +237,121 @@ export class StatusEffectsManager {
         }
 
         return true;
+    }
+
+    checkAndConsumeJuice(target, effectName, stacks) {
+        // Only works on heroes
+        if (target.type && target.type !== 'hero') {
+            return false;
+        }
+        
+        // Check if battle has any Juice artifacts available
+        if (!this.battleManager.battlePermanentArtifacts) {
+            return false;
+        }
+        
+        const juiceIndex = this.battleManager.battlePermanentArtifacts.findIndex(
+            artifact => artifact.name === 'Juice'
+        );
+        
+        if (juiceIndex === -1) {
+            return false; // No Juice available
+        }
+        
+        // Consume one Juice to negate the status effect
+        this.battleManager.battlePermanentArtifacts.splice(juiceIndex, 1);
+        
+        // Create visual effect
+        this.createJuiceNegationEffect(target, effectName);
+        
+        // Log the negation
+        this.battleManager.addCombatLog(
+            `🧃 ${target.name} consumes Juice to negate ${stacks} stack${stacks > 1 ? 's' : ''} of ${effectName}!`,
+            target.side === 'player' ? 'success' : 'info'
+        );
+        
+        // Sync to guest if host
+        if (this.battleManager.isAuthoritative) {
+            this.battleManager.sendBattleUpdate('juice_negation', {
+                targetInfo: this.getTargetSyncInfo(target),
+                effectName: effectName,
+                stacks: stacks,
+                remainingJuice: this.battleManager.battlePermanentArtifacts.filter(a => a.name === 'Juice').length,
+                timestamp: Date.now()
+            });
+        }
+        
+        console.log(`🧃 Juice consumed! Remaining: ${this.battleManager.battlePermanentArtifacts.filter(a => a.name === 'Juice').length}`);
+        return true;
+    }
+
+    handleGuestJuiceNegation(data) {
+        const { targetInfo, effectName, stacks, remainingJuice } = data;
+        
+        // Update local juice count
+        if (this.battleManager.battlePermanentArtifacts) {
+            // Sync the juice count by removing consumed ones
+            const currentJuice = this.battleManager.battlePermanentArtifacts.filter(a => a.name === 'Juice').length;
+            if (currentJuice > remainingJuice) {
+                // Remove the difference
+                for (let i = 0; i < (currentJuice - remainingJuice); i++) {
+                    const index = this.battleManager.battlePermanentArtifacts.findIndex(a => a.name === 'Juice');
+                    if (index !== -1) {
+                        this.battleManager.battlePermanentArtifacts.splice(index, 1);
+                    }
+                }
+            }
+        }
+        
+        // Find the target
+        const target = this.findTargetFromSyncInfo(targetInfo);
+        if (!target) return;
+        
+        // Create visual effect
+        this.createJuiceNegationEffect(target, effectName);
+        
+        // Add to battle log
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetInfo.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const logType = targetLocalSide === 'player' ? 'success' : 'info';
+        
+        this.battleManager.addCombatLog(
+            `🧃 ${target.name} consumes Juice to negate ${stacks} stack${stacks > 1 ? 's' : ''} of ${effectName}!`,
+            logType
+        );
+        
+        console.log(`🧃 GUEST: Juice negation synchronized. Remaining: ${remainingJuice}`);
+    }
+
+    createJuiceNegationEffect(target, effectName) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+
+        const juiceEffect = document.createElement('div');
+        juiceEffect.className = 'juice-negation-effect';
+        juiceEffect.innerHTML = '🧃✨';
+        
+        juiceEffect.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            z-index: 400;
+            pointer-events: none;
+            animation: juiceNegationBurst ${this.battleManager.getSpeedAdjustedDelay(1000)}ms ease-out forwards;
+            text-shadow: 
+                0 0 20px rgba(255, 107, 107, 0.9),
+                0 0 40px rgba(255, 107, 107, 0.6);
+        `;
+        
+        targetElement.appendChild(juiceEffect);
+        
+        setTimeout(() => {
+            if (juiceEffect && juiceEffect.parentNode) {
+                juiceEffect.remove();
+            }
+        }, this.battleManager.getSpeedAdjustedDelay(1000));
     }
 
     // Remove status effect stacks from target
@@ -285,6 +444,7 @@ export class StatusEffectsManager {
 
         // Process duration-based effects
         this.processSilencedDuration(target);
+        this.processTauntingDuration(target);
 
         // Clean up expired effects
         this.cleanupExpiredEffects(target);
@@ -513,6 +673,20 @@ export class StatusEffectsManager {
         }
     }
 
+    // Process taunting duration (decreases each turn)
+    processTauntingDuration(target) {
+        if (this.hasStatusEffect(target, 'taunting')) {
+            this.removeStatusEffect(target, 'taunting', 1);
+            
+            if (!this.hasStatusEffect(target, 'taunting')) {
+                this.battleManager.addCombatLog(
+                    `📢 ${target.name} is no longer taunting!`,
+                    target.side === 'player' ? 'success' : 'error'
+                );
+            }
+        }
+    }
+
     // ============================================
     // STATUS EFFECT INTERACTIONS
     // ============================================
@@ -579,7 +753,8 @@ export class StatusEffectsManager {
             poisoned: { icon: '☠️', color: 'rgba(128, 0, 128, 0.9)' },
             stunned: { icon: '😵', color: 'rgba(255, 255, 0, 0.9)' },
             burned: { icon: '🔥', color: 'rgba(255, 100, 0, 0.9)' },
-            frozen: { icon: '🧊', color: 'rgba(100, 200, 255, 0.9)' }
+            frozen: { icon: '🧊', color: 'rgba(100, 200, 255, 0.9)' },
+            taunting: { icon: '📢', color: 'rgba(255, 107, 107, 0.9)' } 
         };
 
         const effect = effects[effectName];
@@ -635,7 +810,8 @@ export class StatusEffectsManager {
             poisoned: { icon: '☠️', color: '#800080' },
             stunned: { icon: '😵', color: '#ffff00' },
             burned: { icon: '🔥', color: '#ff6400' },
-            frozen: { icon: '🧊', color: '#64c8ff' }
+            frozen: { icon: '🧊', color: '#64c8ff' },
+            taunting: { icon: '📢', color: '#ff6b6b' }  
         };
 
         const indicator = indicators[effectName];
@@ -675,6 +851,42 @@ export class StatusEffectsManager {
         }
         
         targetElement.appendChild(statusIndicator);
+    }
+
+    /**
+     * Create visual effect for fireshield frozen immunity
+     * @param {Object} target - The target that resisted frozen
+     */
+    createFireshieldFrozenImmunityEffect(target) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+
+        const immunityEffect = document.createElement('div');
+        immunityEffect.className = 'fireshield-frozen-immunity-effect';
+        immunityEffect.innerHTML = '🛡️❄️';
+        
+        immunityEffect.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            z-index: 350;
+            pointer-events: none;
+            animation: fireshieldImmunityFlash ${this.battleManager.getSpeedAdjustedDelay(800)}ms ease-out forwards;
+            text-shadow: 
+                0 0 15px rgba(255, 100, 0, 0.9),
+                0 0 30px rgba(255, 150, 0, 0.6),
+                0 0 45px rgba(100, 200, 255, 0.4);
+        `;
+        
+        targetElement.appendChild(immunityEffect);
+        
+        setTimeout(() => {
+            if (immunityEffect && immunityEffect.parentNode) {
+                immunityEffect.remove();
+            }
+        }, this.battleManager.getSpeedAdjustedDelay(800));
     }
 
     // Create damage effect
@@ -809,6 +1021,44 @@ export class StatusEffectsManager {
             .status-application-effect,
             .status-damage-effect,
             .medea-poison-enhancement {
+                will-change: transform, opacity;
+            }
+
+            @keyframes fireshieldImmunityFlash {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5) rotate(-10deg); 
+                }
+                30% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.2) rotate(5deg); 
+                }
+                60% { 
+                    opacity: 0.9; 
+                    transform: translate(-50%, -50%) scale(1.1) rotate(-2deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(1) rotate(0deg); 
+                }
+            }
+
+            @keyframes juiceNegationBurst {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5) rotate(0deg); 
+                }
+                40% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.5) rotate(180deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(2) rotate(360deg); 
+                }
+            }
+            
+            .fireshield-frozen-immunity-effect {
                 will-change: transform, opacity;
             }
         `;
@@ -1001,6 +1251,34 @@ export class StatusEffectsManager {
             this.removeStatusEffectFromTarget(target, effectName);
             this.removeStatusVisualEffect(target, effectName);
         }
+    }
+
+    /**
+     * Handle fireshield frozen immunity on guest side
+     * @param {Object} data - Immunity event data
+     */
+    handleGuestFireshieldFrozenImmunity(data) {
+        const { targetInfo, fireshieldStacks } = data;
+        
+        // Find the target
+        const target = this.findTargetFromSyncInfo(targetInfo);
+        if (!target) return;
+        
+        // Determine log type based on target side
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetInfo.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const logType = targetLocalSide === 'player' ? 'success' : 'info';
+        
+        // Create visual effect
+        this.createFireshieldFrozenImmunityEffect(target);
+        
+        // Add to battle log
+        this.battleManager.addCombatLog(
+            `🛡️ ${target.name}'s Fireshield protects against the frozen effect! (${fireshieldStacks} stacks)`,
+            logType
+        );
+        
+        console.log(`🛡️ GUEST: ${target.name} resisted frozen due to fireshield (${fireshieldStacks} stacks)`);
     }
 
     // Find target from sync info

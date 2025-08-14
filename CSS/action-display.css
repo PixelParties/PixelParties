@@ -1,5 +1,6 @@
 /* ============================================
-   20. ACTION DISPLAY SYSTEM
+   UNIFIED RESOURCE DISPLAY MODULE
+   Combines Gold Display, Action Display, and Potion Display
    ============================================ */
 
 /* Font Face Declaration for Pixel Intv */
@@ -11,11 +12,454 @@
     font-display: swap;
 }
 
-.team-building-actions {
-    margin: 20px 0;
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.3);
+/* ============================================
+   SHARED RESOURCE CONTAINER - SINGLE ROW VERSION
+   ============================================ */
+
+.resource-display-container {
+    position: absolute;
+    bottom: 2%;        
+    right: 16%;           
+    z-index: 100;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto; 
+    column-gap: 12px;
+    width: 380px;
+    min-height: 50px; 
+    pointer-events: none;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Make child elements interactive while keeping container non-interactive */
+.resource-display-container > * {
+    pointer-events: auto;
+}
+
+/* Shared styling for all resource display elements */
+.resource-display-container .resource-element {
+    position: relative; /* FIXED: Ensure no absolute positioning conflicts */
+    width: 100%;
+    min-width: 120px;
+    max-width: 135px;
+    box-sizing: border-box;
+    backdrop-filter: blur(10px);
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    margin: 0 !important; /* FIXED: Remove any default margins */
+    align-self: start; /* FIXED: Align to top of grid cell */
+}
+
+.resource-display-container .resource-element:hover {
+    transform: translateY(-1px) scale(1.02);
+}
+
+/* Specific grid positioning for each resource type - SINGLE ROW LAYOUT */
+.resource-display-container .gold-display-enhanced {
+    grid-area: 1 / 1; /* First column */
+    position: relative !important;
+    bottom: auto !important;
+    right: auto !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+}
+
+.resource-display-container .action-display-container {
+    grid-area: 1 / 2; /* Second column */
+    position: relative;
+    margin: 0 !important;
+}
+
+.resource-display-container .potion-display {
+    grid-area: 1 / 3; /* Third column */
+    position: relative;
+    margin: 0 !important;
+}
+
+/* ============================================
+   GOLD DISPLAY STYLES - UPDATED FOR UNIFIED DESIGN
+   ============================================ */
+
+.resource-display-container .gold-display-enhanced {
+    position: relative !important;
+    bottom: auto !important;
+    right: auto !important;
+    transform: none !important;
+    margin: 0;
+}
+
+.resource-display-container .gold-amount-large {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.9) 0%, rgba(255, 152, 0, 0.9) 100%);
+    border: 2px solid #ffc107; /* UPDATED: Made border solid and more vibrant like actions */
+    border-radius: 0.5rem; /* ADDED: Border radius for consistency */
+    padding: 6px 12px;
+    box-shadow: 
+        0 6px 20px rgba(255, 193, 7, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    justify-content: flex-start;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    min-height: 32px; /* ADDED: Ensure consistent height */
+}
+
+.resource-display-container .gold-amount-large:hover {
+    box-shadow: 
+        0 8px 25px rgba(255, 193, 7, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    border-color: #ffb300; /* ADDED: Hover effect for border */
+}
+
+.resource-display-container .gold-icon-large {
+    font-size: 20px;
+    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
+    animation: goldIconFloat 3s ease-in-out infinite;
+}
+
+.resource-display-container .player-gold-number {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 18px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 
+        2px 2px 4px rgba(0, 0, 0, 0.8),
+        0 0 10px rgba(255, 193, 7, 0.6);
+    letter-spacing: 1px;
+    min-width: 30px;
+    text-align: center;
+}
+
+.resource-display-container .gold-change-indicator {
+    position: absolute;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 18px;
+    font-weight: bold;
+    z-index: 101;
+    pointer-events: none;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   GOLD GAIN ANIMATION STYLES (Extracted from goldManager.js)
+   ============================================ */
+
+.gold-gain-animation {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    font-weight: bold;
+    z-index: 100;
+    pointer-events: none;
+    animation: goldGainFloat 1.5s ease-out forwards;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.gold-gain-animation.positive {
+    color: #28a745;
+}
+
+.gold-gain-animation.negative {
+    color: #dc3545;
+}
+
+/* ============================================
+   ACTION DISPLAY STYLES - UPDATED TO REDUCE WIDTH
+   ============================================ */
+
+.resource-display-container .action-display-container {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(16, 16, 32, 0.95));
+    border: 2px solid #ffd700;
+    border-radius: 0.5rem;
+    padding: 6px 12px;
+    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 32px; /* ADDED: Ensure consistent height */
+}
+
+.resource-display-container .action-display-container:hover {
+    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.5);
+}
+
+.resource-display-container .action-display {
+    display: flex;
+    align-items: center;
+    gap: 2px; /* REDUCED: From 6px to 2px for tighter spacing */
+    justify-content: flex-start;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    width: 100%;
+}
+
+.resource-display-container .action-header {
+    display: flex;
+    align-items: center;
+    gap: 2px; /* REDUCED: From 4px to 2px for tighter spacing */
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.resource-display-container .action-icon {
+    font-size: 16px;
+    color: #ffd700;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    animation: actionPulse 2s ease-in-out infinite;
+}
+
+.resource-display-container .action-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffd700;
+    white-space: nowrap;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.resource-display-container .action-counter {
+    display: flex;
+    align-items: center;
+    gap: 5px; 
+    flex-shrink: 0;
+    margin-left: 20px; 
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.resource-display-container .action-counter.left-aligned {
+    margin-left: 0; 
+}
+
+.resource-display-container .current-actions {
+    color: #ffd700;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Hide any action separators or max action indicators */
+.resource-display-container .action-separator,
+.resource-display-container .action-slash,
+.action-separator,
+.action-slash {
+    display: none !important;
+}
+
+.resource-display-container .current-actions.action-changed {
+    animation: actionNumberChange 0.5s ease-out;
+}
+
+.resource-display-container .action-orbs {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 20px;
+}
+
+.resource-display-container .action-orb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #ffd700;
+    transition: all 0.3s ease;
+}
+
+.resource-display-container .action-orb.filled {
+    background: radial-gradient(circle at 30% 30%, #ffed4e, #ffd700);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+    animation: orbGlow 2s ease-in-out infinite;
+}
+
+.resource-display-container .action-orb.empty {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 215, 0, 0.3);
+}
+
+/* ============================================
+   ACTION ERROR TOOLTIP STYLES (Extracted from actionManager.js)
+   ============================================ */
+
+.action-error-tooltip {
+    position: fixed;
+    background: rgba(244, 67, 54, 0.95);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 10000;
+    pointer-events: none;
+    animation: actionErrorPulse 0.5s ease-out;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.action-error-tooltip.fade-out {
+    animation: actionErrorFadeOut 0.3s ease-out forwards;
+}
+
+/* ============================================
+   POTION DISPLAY STYLES - UPDATED FOR UNIFIED DESIGN
+   ============================================ */
+
+.resource-display-container .potion-display {
+    background: linear-gradient(135deg, #9c27b0 0%, #673ab7 100%);
+    border: 2px solid #ab47bc; /* UPDATED: Made border solid and more vibrant like actions */
+    border-radius: 0.5rem;
+    padding: 6px 12px;
+    box-shadow: 0 6px 20px rgba(156, 39, 176, 0.4);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    color: white;
+    text-align: center;
+    min-width: 85px;
+    transition: all 0.3s ease;
+    position: relative;
+    min-height: 32px; /* ADDED: Ensure consistent height */
+    display: flex; /* ADDED: For better alignment */
+    align-items: center; /* ADDED: For vertical centering */
+    justify-content: center; /* ADDED: For horizontal centering */
+}
+
+.resource-display-container .potion-display:hover {
+    box-shadow: 0 8px 25px rgba(156, 39, 176, 0.5);
+    border-color: #8e24aa; /* ADDED: Hover effect for border */
+}
+
+.resource-display-container .potion-display.potions-depleted {
+    background: linear-gradient(135deg, #757575 0%, #424242 100%);
+    border-color: #9e9e9e; /* UPDATED: Made depleted border solid too */
+    opacity: 0.7;
+}
+
+.resource-display-container .potion-amount {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.resource-display-container .potion-icon {
+    font-size: 18px;
+    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3));
+    animation: potionIconFloat 3s ease-in-out infinite;
+}
+
+.resource-display-container .potion-number {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 18px;
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 
+        2px 2px 4px rgba(0, 0, 0, 0.8),
+        0 0 10px rgba(156, 39, 176, 0.6);
+    letter-spacing: 1px;
+}
+
+.resource-display-container .active-effects-indicator {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #ff5722 0%, #d84315 100%);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    box-shadow: 0 2px 6px rgba(255, 87, 34, 0.5);
+    animation: activeEffectsPulse 2s ease-in-out infinite;
+    cursor: help;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* ============================================
+   POTION NOTIFICATION STYLES
+   ============================================ */
+
+.potion-usage-notification,
+.potion-error-popup,
+.potion-effect-added-notification,
+.potion-effects-applied-notification,
+.potion-effects-cleared-notification {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
     border-radius: 12px;
+    padding: 16px 24px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-weight: bold;
+    text-align: center;
+}
+
+.potion-usage-content,
+.potion-error-content,
+.potion-effect-content,
+.potion-effects-applied-content,
+.potion-effects-cleared-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+}
+
+.potion-usage-icon,
+.potion-error-icon,
+.potion-effect-icon,
+.potion-effects-applied-icon,
+.potion-effects-cleared-icon {
+    font-size: 20px;
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
+}
+
+.potion-usage-text,
+.potion-error-text,
+.potion-effect-text,
+.potion-effects-applied-text,
+.potion-effects-cleared-text {
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
+}
+
+/* Hand card potion indicator */
+.hand-card[data-card-type="potion"] {
+    position: relative;
+}
+
+.hand-card[data-card-type="potion"]::after {
+    content: "🧪";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 16px;
+    filter: drop-shadow(0 0 3px rgba(156, 39, 176, 0.8));
+    animation: potionCardPulse 2s ease-in-out infinite;
+}
+
+/* ============================================
+   LEGACY TEAM BUILDING ACTIONS (Keep for compatibility)
+   ============================================ */
+
+.team-building-actions {
+    margin: 16px 0; 
+    padding: 12px; 
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px; 
     border: 1px solid rgba(102, 126, 234, 0.3);
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
@@ -23,7 +467,7 @@
 .team-building-actions .action-display-container {
     position: relative;
     display: flex;
-    gap: 30px;
+    gap: 24px; 
     justify-content: center;
     align-items: center;
     z-index: 10;
@@ -32,12 +476,19 @@
 .action-display {
     background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(20, 20, 40, 0.9));
     border: 2px solid rgba(102, 126, 234, 0.5);
-    border-radius: 12px;
-    padding: 15px 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(10px);
-    min-width: 180px;
+    border-radius: 1px; 
+    padding: 8px 12px; 
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.5); 
+    backdrop-filter: blur(5px);
+    min-width: 100px;
+    max-width: 100px;
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Hide max actions in legacy displays too */
+.action-display .max-actions,
+.team-building-actions .max-actions {
+    display: none !important;
 }
 
 .action-display.player-actions {
@@ -50,226 +501,582 @@
     background: linear-gradient(135deg, rgba(20, 0, 0, 0.9), rgba(40, 20, 20, 0.9));
 }
 
-.action-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-}
+/* ============================================
+   STANDALONE GOLD DISPLAY (Fallback)
+   ============================================ */
 
-.action-icon {
-    font-size: 20px;
-    animation: actionPulse 2s ease-in-out infinite;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.action-label {
-    font-size: 14px;
-    font-weight: bold;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.action-counter {
-    font-size: 28px;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 10px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.current-actions {
-    color: #ffd700;
-    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-    transition: all 0.3s ease;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.current-actions.action-changed {
-    animation: actionNumberChange 0.5s ease-out;
-}
-
-.max-actions {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 20px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.action-orbs {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-}
-
-.action-orb {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid rgba(255, 215, 0, 0.5);
-    transition: all 0.3s ease;
-}
-
-.action-orb.filled {
-    background: radial-gradient(circle at 30% 30%, #ffd700, #ff8c00);
-    box-shadow: 
-        0 0 15px rgba(255, 215, 0, 0.6),
-        inset 0 0 5px rgba(255, 255, 255, 0.4);
-    animation: orbGlow 2s ease-in-out infinite;
-}
-
-.action-orb.empty {
-    background: rgba(0, 0, 0, 0.3);
-    opacity: 0.5;
-}
-
-.action-error-tooltip {
-    text-align: center;
-    animation: actionErrorPulse 0.5s ease-out;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.action-changed {
-    animation: actionPulse 0.5s ease-out;
-}
-
-/* Resource display container for Gold and Actions */
-.resource-display-container {
+.gold-display-enhanced:not(.resource-display-container .gold-display-enhanced) {
     position: absolute;
-    bottom: 20px;          
+    bottom: 70px;
     right: 22%;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-    width: auto;
-    max-width: 1000px;
+    z-index: var(--z-hand);
     pointer-events: none;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
-/* Make child elements interactive while keeping container non-interactive */
-.resource-display-container > * {
-    pointer-events: auto;
-}
-
-/* Ensure gold and action displays have constrained widths and are left-aligned */
-.resource-display-container .gold-display-enhanced,
-.resource-display-container .action-display-container {
-    width: auto;
-    max-width: 280px;
-    box-sizing: border-box;
-    flex-shrink: 0;
-    align-self: flex-start;
-}
-
-/* Target action displays within the resource container to be compact */
-.resource-display-container .action-display-container {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(16, 16, 32, 0.95));
-    border: 2px solid #ffd700;
-    border-radius: 12px;
-    padding: 8px 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(10px);
-    min-width: 160px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.resource-display-container .action-display {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: space-between;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.resource-display-container .action-header {
+.gold-amount-large {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin: 0;
-    flex-shrink: 0;
-}
-
-.resource-display-container .action-icon {
-    font-size: 18px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.resource-display-container .action-label {
-    font-size: 14px;
-    font-weight: bold;
-    color: #ffd700;
-    white-space: nowrap;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    letter-spacing: 1px;
-}
-
-.resource-display-container .action-counter {
-    font-size: 16px;
-    font-weight: bold;
-    color: white;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-.resource-display-container .current-actions {
-    color: #ffd700;
-    font-size: 20px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-}
-
-/* Hide the max actions display in resource container */
-.resource-display-container .max-actions {
-    display: none;
-}
-
-.resource-display-container .action-orbs {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.resource-display-container .action-orb {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 2px solid #ffd700;
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.9) 0%, rgba(255, 152, 0, 0.9) 100%);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 193, 7, 0.6);
+    border-radius: 0.5rem;
+    padding: 6px 12px;
+    box-shadow: 
+        0 6px 20px rgba(255, 193, 7, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    position: relative;
     transition: all 0.3s ease;
+    min-width: 85px;
+    max-width: 125px; 
+    justify-content: center;
 }
 
-.resource-display-container .action-orb.filled {
-    background: radial-gradient(circle at 30% 30%, #ffed4e, #ffd700);
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+/* ============================================
+   GOLD BREAKDOWN STYLES (Extended functionality)
+   ============================================ */
+
+.gold-line-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+    transition: all 0.3s ease;
+    margin-bottom: 8px;
 }
 
-.resource-display-container .action-orb.empty {
-    background: rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 215, 0, 0.3);
+.gold-line-item:hover {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: rgba(255, 193, 7, 0.4);
+    transform: translateX(2px);
 }
 
-/* Ensure gold display has proper constraints and left-alignment */
-.resource-display-container .gold-display-enhanced {
-    position: static !important;
-    transform: none !important;
-    margin: 0;
-    width: auto;
-    max-width: 200px;
-    align-self: flex-start;
-}
-
-.resource-display-container .gold-amount-large {
-    padding: 0.5rem 1rem;
-    gap: 8px;
-    width: auto;
-    max-width: 180px;
-    box-sizing: border-box;
-    justify-content: flex-start;
+.gold-line-item .gold-source,
+.gold-line-item .gold-amount {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.3px;
+    font-size: 11px;
+}
+
+.gold-line-item.victory-bonus {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.4);
+}
+
+.gold-line-item.participation-bonus {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+.gold-line-item.wealth-bonus {
+    background: rgba(156, 39, 176, 0.1);
+    border-color: rgba(156, 39, 176, 0.4);
+}
+
+.gold-line-item.semi-bonus {
+    background: rgba(64, 224, 208, 0.1);
+    border-color: rgba(64, 224, 208, 0.4);
+}
+
+.gold-line-item.redraw-deduction {
+    background: rgba(255, 107, 107, 0.1);
+    border-color: rgba(255, 107, 107, 0.4);
+}
+
+.gold-line-item.thieving-bonus {
+    background: rgba(255, 215, 0, 0.15);
+    border-color: rgba(255, 215, 0, 0.4);
+}
+
+.gold-line-item.thieving-penalty {
+    background: rgba(244, 67, 54, 0.15);
+    border-color: rgba(244, 67, 54, 0.4);
+}
+
+.gold-line-item.thieving-penalty .gold-amount {
+    color: #ff6b6b;
+    font-weight: bold;
+}
+
+.thieving-details,
+.wealth-details {
+    margin-left: 10px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(255, 193, 7, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.thieving-detail-line,
+.wealth-detail-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 193, 7, 0.05);
+    border-radius: 3px;
+    letter-spacing: 0.2px;
+}
+
+.thieving-level {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 0.65rem;
+    color: rgba(255, 215, 0, 0.8);
+    letter-spacing: 0.2px;
+}
+
+.thieving-gold {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: 600;
+    color: #ffd700;
+    letter-spacing: 0.3px;
+}
+
+.gold-breakdown-content-scrollable {
+    max-height: 100px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    margin-bottom: 12px;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 193, 7, 0.6) rgba(255, 193, 7, 0.1);
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar {
+    width: 5px;
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar-track {
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 2px;
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar-thumb {
+    background: rgba(255, 193, 7, 0.6);
+    border-radius: 2px;
+    transition: background 0.2s ease;
+}
+
+.gold-breakdown-content-scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 193, 7, 0.8);
+}
+
+.gold-breakdown-totals {
+    margin-bottom: 16px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.gold-breakdown-totals .gold-total-line {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    font-size: 12px;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes goldIconFloat {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+@keyframes potionIconFloat {
+    0%, 100% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    33% {
+        transform: translateY(-2px) rotate(2deg);
+    }
+    66% {
+        transform: translateY(2px) rotate(-2deg);
+    }
+}
+
+@keyframes actionPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+}
+
+@keyframes actionNumberChange {
+    0% {
+        transform: scale(1);
+        color: #ffd700;
+    }
+    50% {
+        transform: scale(1.2);
+        color: #fff;
+    }
+    100% {
+        transform: scale(1);
+        color: #ffd700;
+    }
+}
+
+@keyframes orbGlow {
+    0%, 100% {
+        box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+    }
+}
+
+@keyframes activeEffectsPulse {
+    0%, 100% { 
+        transform: scale(1); 
+        opacity: 0.9; 
+    }
+    50% { 
+        transform: scale(1.15); 
+        opacity: 1; 
+    }
+}
+
+@keyframes potionCardPulse {
+    0%, 100% { 
+        transform: scale(1); 
+        opacity: 0.8; 
+    }
+    50% { 
+        transform: scale(1.15); 
+        opacity: 1; 
+    }
+}
+
+@keyframes potionUsageBounce {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    60% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes potionUsageFade {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+}
+
+@keyframes potionEffectBounce {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.6) rotate(-10deg);
+    }
+    60% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    }
+}
+
+@keyframes potionEffectFade {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+}
+
+@keyframes potionEffectsAppliedBounce {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    60% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes potionEffectsAppliedFade {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+}
+
+@keyframes potionEffectsClearedBounce {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.7);
+    }
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes potionEffectsClearedFade {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+}
+
+@keyframes potionErrorBounce {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.7);
+    }
+    60% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.08);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes potionErrorFade {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.9);
+    }
+}
+
+@keyframes actionErrorPulse {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    60% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes actionErrorFadeOut {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+}
+
+@keyframes goldGainFloat {
+    0% {
+        opacity: 0;
+        transform: translateY(-50%) translateX(0) scale(0.8);
+    }
+    20% {
+        opacity: 1;
+        transform: translateY(-50%) translateX(10px) scale(1.1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50%) translateX(30px) scale(0.7);
+    }
+}
+
+/* ============================================
+   RESPONSIVE DESIGN - SINGLE ROW LAYOUT
+   ============================================ */
+
+@media (max-width: 768px) {
+    .resource-display-container {
+        right: 16%;
+        bottom: -40px;
+        width: 300px;
+        min-height: 40px;
+        gap: 8px;
+    }
+    
+    .resource-display-container .resource-element,
+    .resource-display-container .gold-display-enhanced,
+    .resource-display-container .action-display-container,
+    .resource-display-container .potion-display {
+        min-width: 80px;
+        max-width: 95px;
+    }
+    
+    .resource-display-container .gold-amount-large,
+    .resource-display-container .action-display-container,
+    .resource-display-container .potion-display {
+        padding: 5px 10px;
+    }
+    
+    .resource-display-container .player-gold-number,
+    .resource-display-container .current-actions,
+    .resource-display-container .potion-number {
+        font-size: 16px;
+        letter-spacing: 0.5px;
+    }
+    
+    .resource-display-container .action-icon,
+    .resource-display-container .potion-icon {
+        font-size: 14px;
+    }
+    
+    .resource-display-container .action-label {
+        font-size: 11px;
+        letter-spacing: 0.2px;
+    }
+    
+    .resource-display-container .action-orb {
+        width: 12px;
+        height: 12px;
+    }
+    
+    .resource-display-container .gold-icon-large {
+        font-size: 18px;
+    }
+    
+    .resource-display-container .active-effects-indicator {
+        width: 20px;
+        height: 20px;
+        font-size: 9px;
+        top: -6px;
+        right: -6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .resource-display-container {
+        right: 13%;
+        bottom: -30px;
+        width: 240px;
+        min-height: 35px;
+        gap: 6px;
+    }
+    
+    .resource-display-container .resource-element,
+    .resource-display-container .gold-display-enhanced,
+    .resource-display-container .action-display-container,
+    .resource-display-container .potion-display {
+        min-width: 65px;
+        max-width: 75px;
+    }
+    
+    .resource-display-container .gold-amount-large,
+    .resource-display-container .action-display-container,
+    .resource-display-container .potion-display {
+        padding: 4px 8px;
+        gap: 4px;
+    }
+    
+    .resource-display-container .player-gold-number,
+    .resource-display-container .current-actions,
+    .resource-display-container .potion-number {
+        font-size: 14px;
+        letter-spacing: 0.3px;
+    }
+    
+    .resource-display-container .action-icon,
+    .resource-display-container .potion-icon {
+        font-size: 12px;
+    }
+    
+    .resource-display-container .action-label {
+        font-size: 9px;
+        letter-spacing: 0.1px;
+    }
+    
+    .resource-display-container .action-orb {
+        width: 10px;
+        height: 10px;
+    }
+    
+    .resource-display-container .gold-icon-large {
+        font-size: 16px;
+    }
+    
+    .resource-display-container .action-counter {
+        gap: 2px;
+    }
+    
+    .resource-display-container .active-effects-indicator {
+        width: 18px;
+        height: 18px;
+        font-size: 8px;
+        top: -5px;
+        right: -5px;
+    }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.resource-display-container .text-pixel {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.resource-display-container .glow-gold {
+    text-shadow: 0 0 10px rgba(255, 193, 7, 0.6);
+}
+
+.resource-display-container .glow-action {
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.resource-display-container .glow-potion {
+    text-shadow: 0 0 8px rgba(156, 39, 176, 0.6);
 }

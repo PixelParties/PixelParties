@@ -26,7 +26,7 @@ const CARD_DATABASE = {
         subtype: null,
         hp: 400,
         atk: 80,
-        ability1: 'Diplomacy',
+        ability1: 'Navigation',
         ability2: 'Wealth'
     },
     'Darge': {
@@ -327,64 +327,64 @@ const CARD_DATABASE = {
         name: 'AngelfeatherArrow',
         image: './Cards/All/AngelfeatherArrow.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'BombArrow': {
         name: 'BombArrow',
         image: './Cards/All/BombArrow.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'FlameArrow': {
         name: 'FlameArrow',
         image: './Cards/All/FlameArrow.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'GoldenArrow': {
         name: 'GoldenArrow',
         image: './Cards/All/GoldenArrow.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'PoisonedArrow': {
         name: 'PoisonedArrow',
         image: './Cards/All/PoisonedArrow.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'RacketArrow': {
         name: 'RacketArrow',
         image: './Cards/All/RacketArrow.png',
         cardType: 'Artifact',
-        cost: 2,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'RainbowsArrow': {
         name: 'RainbowsArrow',
         image: './Cards/All/RainbowsArrow.png',
         cardType: 'Artifact',
-        cost: 10,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: 'Equip'
     },
     'RainOfArrows': {
         name: 'RainOfArrows',
@@ -393,7 +393,7 @@ const CARD_DATABASE = {
         level: 1,
         cost: 0,
         action: true,
-        spellSchool: 'DestructionMagic',
+        spellSchool: 'Fighting',
         subtype: null
     },
 
@@ -433,7 +433,7 @@ const CARD_DATABASE = {
         name: 'FrostRune',
         image: './Cards/All/FrostRune.png',
         cardType: 'Spell',
-        level: 3,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
@@ -475,7 +475,7 @@ const CARD_DATABASE = {
         cost: 5,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: "Permanent"
     },
 
     // Ida's Cards
@@ -931,7 +931,7 @@ const CARD_DATABASE = {
         name: 'Cavalry',
         image: './Cards/All/Cavalry.png',
         cardType: 'Spell',
-        level: 2,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -942,7 +942,7 @@ const CARD_DATABASE = {
         name: 'Challenge',
         image: './Cards/All/Challenge.png',
         cardType: 'Spell',
-        level: 1,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
@@ -1200,6 +1200,15 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: null
     },
+    'Navigation': {
+        name: 'Navigation',
+        image: './Cards/All/Navigation.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
     'Resistance': {
         name: 'Resistance',
         image: './Cards/All/Resistance.png',
@@ -1226,7 +1235,26 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: null,
         subtype: null
-    }
+    },
+    'Iceage': {
+        name: 'Iceage',
+        image: './Cards/All/Iceage.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'DecayMagic',
+        subtype: null
+    },
+    'Juice': {
+        name: 'Juice',
+        image: './Cards/All/Juice.png',
+        cardType: 'Artifact',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Permanent'
+    },
 };
 
 /**

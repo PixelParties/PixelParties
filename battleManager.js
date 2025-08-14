@@ -5,7 +5,6 @@ import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
 import { Hero } from './hero.js';
 import { BattleSpeedManager } from './battleSpeedManager.js';
-import { BattleRandomness } from './battleRandomness.js';
 import { BattleSpellSystem } from './battleSpellSystem.js';
 import StatusEffectsManager from './statusEffects.js';
 import AttackEffectsManager from './attackEffects.js';
@@ -18,10 +17,7 @@ import { BattleNetworkManager } from './battleNetworkManager.js';
 import { BattleFlowManager } from './battleFlowManager.js';
 import { BattleCombatManager } from './battleCombatManager.js';
 
-import { NecromancyManager } from './Abilities/necromancy.js';
-import { ResistanceManager, applyResistancePatches } from './Abilities/resistance.js';
-
-import JigglesCreature from './Creatures/jiggles.js';
+import { applyResistancePatches } from './Abilities/resistance.js';
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
@@ -58,8 +54,11 @@ export class BattleManager {
         // Spell System
         this.spellSystem = null;
 
+        
         //ABILITY STUFF
         this.necromancyManager = null; 
+        this.diplomacyManager = null;
+
 
         //CREATURE STUFF
         this.jigglesManager = null;
@@ -67,6 +66,7 @@ export class BattleManager {
         this.skeletonNecromancerManager = null;
         this.skeletonDeathKnightManager = null;
         this.skeletonReaperManager = null;
+
         
         // Attack effects
         this.attackEffectsManager = null;
@@ -286,7 +286,8 @@ export class BattleManager {
         playerSpellbooks = null, opponentSpellbooks = null,
         playerCreatures = null, opponentCreatures = null,
         playerEquips = null, opponentEquips = null,
-        playerEffectiveStats = null) { 
+        playerEffectiveStats = null, opponentEffectiveStats = null,
+        permanentArtifacts = null) { 
         
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;
@@ -298,8 +299,9 @@ export class BattleManager {
         this.onBattleEnd = onBattleEnd;
         this.roomManager = roomManager;
         this.isAuthoritative = isHost;
-    
-    
+        this.battlePermanentArtifacts = permanentArtifacts || [];
+
+
         this.checkpointSystem = getCheckpointSystem();
         this.checkpointSystem.init(this, roomManager, isHost);
 
@@ -333,7 +335,7 @@ export class BattleManager {
         
         // Store effective stats
         this.playerEffectiveStats = playerEffectiveStats;
-        this.opponentEffectiveStats = null; 
+        this.opponentEffectiveStats = opponentEffectiveStats; 
         
         // Initialize heroes with full HP, abilities, and fresh visual state
         this.initializeHeroes();
@@ -359,7 +361,7 @@ export class BattleManager {
         this.flowManager = new BattleFlowManager(this);
         
         
-        console.log('🔧 DEBUG: Initializing combat manager...');
+        console.log('🎗️ DEBUG: Initializing combat manager...');
         this.combatManager = new BattleCombatManager(this);
         
         // Verify initialization
@@ -399,7 +401,7 @@ export class BattleManager {
             this.battleSpeed = speed;
             
             const speedNames = { 1: 'Normal', 2: 'Fast', 4: 'Super Fast' };
-            this.addCombatLog(`⚡ Battle speed changed to ${speedNames[speed]} (${speed}x)`, 'info');
+            this.addCombatLog(`âš¡ Battle speed changed to ${speedNames[speed]} (${speed}x)`, 'info');
             
             // Sync speed change to guest
             this.sendBattleUpdate('speed_change', {
@@ -420,7 +422,7 @@ export class BattleManager {
         if (this.speedManager) {
             this.speedManager.handleSpeedChange(data);
         } else {
-            console.error('❌ GUEST: speedManager not available!');
+            console.error('âŒ GUEST: speedManager not available!');
         }
     }
 
@@ -456,7 +458,7 @@ export class BattleManager {
         this.initializeHeroesForSide('opponent', this.opponentFormation, this.opponentHeroes, 
                                 this.opponentAbilities, this.opponentSpellbooks, 
                                 this.opponentCreatures, this.opponentEquips, opponentSide,
-                                this.opponentEffectiveStats); 
+                                this.opponentEffectiveStats);
     }
 
     // Initialize heroes for a specific side
@@ -507,12 +509,15 @@ export class BattleManager {
                 // Set equipment
                 if (equipment && equipment[position] && Array.isArray(equipment[position])) {
                     hero.setEquipment(equipment[position]);
-                    console.log(`⚔️ Set ${equipment[position].length} equipment items for ${side} ${position}`);
+                    console.log(`⚡️ Set ${equipment[position].length} equipment items for ${side} ${position}`);
                 } else {
                     hero.setEquipment([]);
                 }
                 
-                // ★ SIMPLIFIED: Use existing setPrecalculatedStats method!
+                // ✅ NEW: Initialize arrow counters immediately after setting equipment
+                this.initializeHeroArrowCounters(hero, side, position);
+                
+                // Use existing setPrecalculatedStats method
                 if (effectiveStats && effectiveStats[position]) {
                     hero.setPrecalculatedStats(effectiveStats[position]);
                     console.log(`✅ Applied pre-calculated stats to ${side} ${position} ${hero.name}: HP ${hero.maxHp}, ATK ${hero.atk}`);
@@ -521,7 +526,7 @@ export class BattleManager {
                     if (effectiveStats[position].bonuses) {
                         const bonuses = effectiveStats[position].bonuses;
                         if (bonuses.hpBonus > 0 || bonuses.totalAttackBonus > 0) {
-                            console.log(`📊 ${hero.name} bonuses: +${bonuses.hpBonus} HP, +${bonuses.totalAttackBonus} ATK`);
+                            console.log(`💰 ${hero.name} bonuses: +${bonuses.hpBonus} HP, +${bonuses.totalAttackBonus} ATK`);
                         }
                     }
                 } else {
@@ -546,7 +551,24 @@ export class BattleManager {
         } else {
             this.opponentEquips = {};
         }
-        console.log(`📋 Cleared ${side} manager-level equipment references`);
+        console.log(`🗂️ Cleared ${side} manager-level equipment references`);
+    }
+
+    initializeHeroArrowCounters(hero, side, position) {
+        if (!this.attackEffectsManager || !this.attackEffectsManager.arrowSystem) {
+            // Arrow system not ready yet, will be initialized later
+            return;
+        }
+        
+        const arrowSystem = this.attackEffectsManager.arrowSystem;
+        
+        // Initialize counters for this specific hero
+        arrowSystem.initializeHeroArrowCounters(hero, side);
+        
+        // Update display for this hero
+        arrowSystem.updateArrowDisplay(side, position);
+        
+        console.log(`🹹 Initialized arrow counters for ${side} ${position} ${hero.name}`);
     }
 
     // Update creature visuals to show health
@@ -766,7 +788,7 @@ export class BattleManager {
                         creature.name === 'SkeletonMage' && 
                         creature !== deadUnit) {
                         // This SkeletonMage should react to the allied death
-                        console.log(`⚡ ${creature.name} reacting to ally death: ${deadUnit.name || 'hero'}`);
+                        console.log(`âš¡ ${creature.name} reacting to ally death: ${deadUnit.name || 'hero'}`);
                         this.skeletonMageManager.executeAllyDeathReaction(
                             creature, hero, position, deadUnitSide, deadUnit
                         );
@@ -808,7 +830,7 @@ export class BattleManager {
         
         if (maxCreatures === 0) return;
         
-        this.addCombatLog(`🐾 Creatures activate for ${position} position!`, 'info');
+        this.addCombatLog(`ðŸ¾ Creatures activate for ${position} position!`, 'info');
         
         // Process from the START of the arrays (first creatures first)
         for (let i = 0; i < maxCreatures; i++) {
@@ -875,13 +897,13 @@ export class BattleManager {
         if (playerCreature) {
             const playerIndex = this.playerHeroes[position].creatures.indexOf(playerCreature);
             shakePromises.push(this.animationManager.shakeCreature('player', position, playerIndex));
-            this.addCombatLog(`🌟 ${playerCreature.name} activates!`, 'success');
+            this.addCombatLog(`ðŸŒŸ ${playerCreature.name} activates!`, 'success');
         }
         
         if (opponentCreature) {
             const opponentIndex = this.opponentHeroes[position].creatures.indexOf(opponentCreature);
             shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentIndex));
-            this.addCombatLog(`🌟 ${opponentCreature.name} activates!`, 'error');
+            this.addCombatLog(`ðŸŒŸ ${opponentCreature.name} activates!`, 'error');
         }
         
         await Promise.all(shakePromises);
@@ -962,7 +984,7 @@ export class BattleManager {
                 
                 // Wait for effect animations
                 if (playerAttack.effectsTriggered?.length > 0 || opponentAttack.effectsTriggered?.length > 0) {
-                    await this.delay(400);
+                    await this.delay(100);
                 }
             }
             
@@ -988,7 +1010,7 @@ export class BattleManager {
             await this.animationManager.animateHeroAttack(attack.hero, attack.target);
             
             // ============================================
-            // NEW: Apply damage modifier visual effects BEFORE damage
+            // Apply damage modifier visual effects BEFORE damage
             // ============================================
             if (this.attackEffectsManager && attack.effectsTriggered && attack.effectsTriggered.length > 0) {
                 // Small delay to let attack animation complete
@@ -997,7 +1019,7 @@ export class BattleManager {
                 this.attackEffectsManager.applyDamageModifierEffects(attack.effectsTriggered);
                 
                 // Wait for effect animation
-                await this.delay(400);
+                await this.delay(100);
             }
             
             // Apply damage with potentially modified value
@@ -1009,11 +1031,11 @@ export class BattleManager {
 
     // Apply damage to target (hero or creature)
     applyAttackDamageToTarget(attack) {
-        console.log('🎯 DEBUG: applyAttackDamageToTarget called');
+        console.log('ðŸŽ¯ DEBUG: applyAttackDamageToTarget called');
         console.log('Attack object:', attack);
         
         if (!this.combatManager) {
-            console.error('❌ CRITICAL: Combat manager not initialized when applying damage!');
+            console.error('âŒ CRITICAL: Combat manager not initialized when applying damage!');
             console.error('Available managers:', {
                 combatManager: !!this.combatManager,
                 flowManager: !!this.flowManager,
@@ -1022,7 +1044,7 @@ export class BattleManager {
             return;
         }
         
-        console.log('✅ Delegating to combat manager...');
+        console.log('âœ… Delegating to combat manager...');
         return this.combatManager.applyAttackDamageToTarget(attack);
     }
 
@@ -1058,9 +1080,9 @@ export class BattleManager {
         // CRITICAL: Record kill IMMEDIATELY when creature HP drops to 0, before any other processing
         if (willDie && wasAlive && attacker && this.isAuthoritative) {
             recordKillWithVisualFeedback(this, attacker, creature, 'creature');
-            this.addCombatLog(`⚔️ ${attacker.name} has slain ${creature.name}!`, 
+            this.addCombatLog(`âš”ï¸ ${attacker.name} has slain ${creature.name}!`, 
                             attacker.side === 'player' ? 'success' : 'error');
-            console.log(`🎯 PRIORITY: Recorded creature kill ${attacker.name} -> ${creature.name} (HP: ${oldHp} -> ${creature.currentHp})`);
+            console.log(`ðŸŽ¯ PRIORITY: Recorded creature kill ${attacker.name} -> ${creature.name} (HP: ${oldHp} -> ${creature.currentHp})`);
         }
         
         // IMPORTANT: Set creature as dead AFTER kill recording
@@ -1074,7 +1096,7 @@ export class BattleManager {
         this.totalDamageDealt[hero.absoluteSide] += damage;
         
         this.addCombatLog(
-            `💔 ${creature.name} takes ${damage} damage! (${oldHp} → ${creature.currentHp} HP)`,
+            `ðŸ’” ${creature.name} takes ${damage} damage! (${oldHp} â†’ ${creature.currentHp} HP)`,
             side === 'player' ? 'error' : 'success'
         );
         
@@ -1112,7 +1134,7 @@ export class BattleManager {
                     
                     // Update creature health display with the NEW index
                     this.updateCreatureHealthBar(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp);
-                    this.addCombatLog(`💀✨ ${creature.name} rises again, but the kill still counts!`, 'info');
+                    this.addCombatLog(`ðŸ’€âœ¨ ${creature.name} rises again, but the kill still counts!`, 'info');
                 } else {
                     // Creature was not revived, continue with normal death handling
                     this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
@@ -1155,7 +1177,7 @@ export class BattleManager {
     async triggerCreatureDeathEffects(creature, heroOwner, attacker, context) {
         // SKELETON ARCHER DEATH SALVO
         if (creature.name === 'SkeletonArcher' && this.skeletonArcherManager) {
-            console.log(`💀🏹 Triggering Skeleton Archer death salvo for ${creature.name}`);
+            console.log(`ðŸ’€ðŸ¹ Triggering Skeleton Archer death salvo for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1167,7 +1189,7 @@ export class BattleManager {
         
         // SKELETON NECROMANCER HERO REVIVAL DEATH EFFECT
         if (creature.name === 'SkeletonNecromancer' && this.skeletonNecromancerManager) {
-            console.log(`💀✨ Triggering Skeleton Necromancer hero revival death effect for ${creature.name}`);
+            console.log(`ðŸ’€âœ¨ Triggering Skeleton Necromancer hero revival death effect for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1179,7 +1201,7 @@ export class BattleManager {
 
         // SKELETON DEATH KNIGHT DEATH SLASH STORM
         if (creature.name === 'SkeletonDeathKnight' && this.skeletonDeathKnightManager) {
-            console.log(`💀⚔️ Triggering Skeleton Death Knight death slash storm for ${creature.name}`);
+            console.log(`ðŸ’€âš”ï¸ Triggering Skeleton Death Knight death slash storm for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1191,7 +1213,7 @@ export class BattleManager {
 
         // BURNING SKELETON DEATH FLAME STORM
         if (creature.name === 'BurningSkeleton' && this.burningSkeletonManager) {
-            console.log(`💀🔥 Triggering Burning Skeleton death flame storm for ${creature.name}`);
+            console.log(`ðŸ’€ðŸ”¥ Triggering Burning Skeleton death flame storm for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1203,7 +1225,7 @@ export class BattleManager {
         
         // SKELETON REAPER DEATH SLASH STORM
         if (creature.name === 'SkeletonReaper' && this.skeletonReaperManager) {
-            console.log(`💀🔪 Triggering Skeleton Reaper death slash storm for ${creature.name}`);
+            console.log(`ðŸ’€ðŸ”ª Triggering Skeleton Reaper death slash storm for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1215,7 +1237,7 @@ export class BattleManager {
 
         // SKELETON BARD DEATH INSPIRATION
         if (creature.name === 'SkeletonBard' && this.skeletonBardManager) {
-            console.log(`💀🎵 Triggering Skeleton Bard death inspiration for ${creature.name}`);
+            console.log(`ðŸ’€ðŸŽµ Triggering Skeleton Bard death inspiration for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1226,9 +1248,7 @@ export class BattleManager {
         }
 
         // SKELETON MAGE REVENGE ICE DEATH EFFECT
-        if (creature.name === 'SkeletonMage' && this.skeletonMageManager) {
-            console.log(`💀❄️ Triggering Skeleton Mage revenge ice for ${creature.name}`);
-            
+        if (creature.name === 'SkeletonMage' && this.skeletonMageManager) {            
             // Check if there's an attacker and they're still alive
             if (attacker && attacker.alive) {
                 // Get the side and position for the death effect
@@ -1239,7 +1259,7 @@ export class BattleManager {
                 await this.skeletonMageManager.executeRevengeIce(creature, heroOwner, position, side, attacker);
             } else {
                 this.addCombatLog(
-                    `💀❄️ ${creature.name}'s dying spirit finds no living target for revenge!`, 
+                    `${creature.name}'s dying spirit finds no living target for revenge!`, 
                     'info'
                 );
             }
@@ -1252,7 +1272,7 @@ export class BattleManager {
             this.statusEffectsManager.clearAllStatusEffects(creature);
         }
 
-        this.addCombatLog(`☠️ ${creature.name} has been defeated!`, 'error');
+        this.addCombatLog(` ${creature.name} has been defeated!`, 'error');
         
         const creatureElement = document.querySelector(
             `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
@@ -1273,18 +1293,14 @@ export class BattleManager {
             const hpText = creatureElement.querySelector('.creature-hp-text');
             if (healthBar) {
                 healthBar.remove();
-                console.log(`🩸 Removed health bar for defeated ${creature.name}`);
             }
             if (hpText) {
                 hpText.remove();
-                console.log(`🩸 Removed HP text for defeated ${creature.name}`);
             }
         }
     }
 
-    refreshAllCreatureVisuals() {
-        console.log('🩸 Refreshing all creature visual states...');
-        
+    refreshAllCreatureVisuals() {       
         ['left', 'center', 'right'].forEach(position => {
             // Update player creature visuals
             if (this.playerHeroes[position] && this.playerHeroes[position].creatures) {
@@ -1294,7 +1310,7 @@ export class BattleManager {
                 // Log defeated creatures for debugging
                 const defeatedCreatures = hero.creatures.filter(c => !c.alive);
                 if (defeatedCreatures.length > 0) {
-                    console.log(`💀 Player ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
+                    console.log(`ðŸ’€ Player ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
                             defeatedCreatures.map(c => c.name));
                 }
             }
@@ -1307,13 +1323,11 @@ export class BattleManager {
                 // Log defeated creatures for debugging
                 const defeatedCreatures = hero.creatures.filter(c => !c.alive);
                 if (defeatedCreatures.length > 0) {
-                    console.log(`💀 Opponent ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
+                    console.log(`ðŸ’€ Opponent ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
                             defeatedCreatures.map(c => c.name));
                 }
             }
         });
-        
-        console.log('✅ All creature visual states refreshed');
     }
 
     renderCreaturesAfterInit() {
@@ -1347,7 +1361,7 @@ export class BattleManager {
             });
         });
         
-        // FIXED: Call the refresh helper to ensure proper visual states
+        // Call the refresh helper to ensure proper visual states
         setTimeout(() => {
             this.refreshAllCreatureVisuals();
         }, 100);
@@ -1414,6 +1428,14 @@ export class BattleManager {
             this.spellSystem.handleGuestSpellEffect(data);
         } else {
             console.warn('Received spell effect but spell system not initialized');
+        }
+    }
+    
+    guest_handleDiplomacyEffectsComplete(data) {
+        if (this.diplomacyManager) {
+            this.diplomacyManager.handleGuestDiplomacyEffects(data);
+        } else {
+            console.warn('Received diplomacy effects but diplomacy manager not available');
         }
     }
     
@@ -1510,6 +1532,110 @@ export class BattleManager {
         });
     }
 
+    guest_handleArrowImpact(arrowType, data) {
+        if (this.attackEffectsManager && this.attackEffectsManager.arrowSystem) {
+            this.attackEffectsManager.arrowSystem.handleGuestArrowImpact(arrowType, data);
+        }
+    }
+
+    guest_handleFlameArrowImpact(data) {
+        this.guest_handleArrowImpact('FlameArrow', data);
+    }
+
+    guest_handleGoldenArrowImpact(data) {
+        this.guest_handleArrowImpact('GoldenArrow', data);
+    }
+
+    guest_handleAngelfeatherArrowImpact(data) {
+        this.guest_handleArrowImpact('AngelfeatherArrow', data);
+    }
+
+    guest_handleBombArrowImpact(data) {
+        this.guest_handleArrowImpact('BombArrow', data);
+    }
+
+    guest_handlePoisonedArrowImpact(data) {
+        this.guest_handleArrowImpact('PoisonedArrow', data);
+    }
+
+    guest_handleRacketArrowImpact(data) {
+        this.guest_handleArrowImpact('RacketArrow', data);
+    }
+
+    guest_handleRainbowsArrowImpact(data) {
+        this.guest_handleArrowImpact('RainbowsArrow', data);
+    }
+
+    guest_handleRainbowsArrowGoldAward(data) {
+        if (this.isAuthoritative) {
+            console.warn('Host should not receive rainbows arrow gold award messages');
+            return;
+        }
+
+        const { attackerAbsoluteSide, attackerPosition, defenderInfo, goldGain, totalDamage } = data;
+        
+        // Determine local sides for the guest
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Award gold to the correct side
+        if (this.goldManager) {
+            if (attackerLocalSide === 'player') {
+                this.goldManager.addPlayerGold(goldGain, 'rainbows_arrow');
+            } else {
+                this.goldManager.addOpponentGold(goldGain, 'rainbows_arrow');
+            }
+        }
+        
+        // Find the defender for visual effect
+        const defender = this.findDefenderFromSyncInfo(defenderInfo);
+        if (defender) {
+            // Import and use the display function from rainbowsArrow
+            import('./Artifacts/rainbowsArrow.js').then(({ displayGoldGainAnimation }) => {
+                displayGoldGainAnimation(defender, goldGain, this);
+            }).catch(error => {
+                console.error('Failed to load rainbowsArrow for gold animation:', error);
+            });
+        }
+        
+        // Add to combat log
+        const attackerName = this.getAttackerNameFromSyncData(attackerAbsoluteSide, attackerPosition);
+        this.addCombatLog(
+            `🌈 ${attackerName}'s Rainbows Arrow grants +${goldGain} gold! (${totalDamage} damage ÷ 50)`,
+            attackerLocalSide === 'player' ? 'success' : 'info'
+        );
+    }
+
+    // Helper method to get attacker name from sync data
+    getAttackerNameFromSyncData(attackerAbsoluteSide, attackerPosition) {
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        const heroes = attackerLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+        const attacker = heroes[attackerPosition];
+        
+        return attacker ? attacker.name : 'Unknown Hero';
+    }
+
+    // Helper method to find defender from sync info
+    findDefenderFromSyncInfo(defenderInfo) {
+        if (!defenderInfo) return null;
+        
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const defenderLocalSide = (defenderInfo.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        if (defenderInfo.type === 'hero') {
+            const heroes = defenderLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+            return heroes[defenderInfo.position];
+        } else if (defenderInfo.type === 'creature') {
+            const heroes = defenderLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+            const hero = heroes[defenderInfo.position];
+            return hero?.creatures?.[defenderInfo.creatureIndex];
+        }
+        
+        return null;
+    }
+
 
 
     
@@ -1521,7 +1647,7 @@ export class BattleManager {
         const { seed } = data;
         if (seed) {
             this.randomnessManager.initializeFromSeed(seed);
-            this.addCombatLog(`🎲 Battle randomness synchronized`, 'info');
+            this.addCombatLog(`ðŸŽ² Battle randomness synchronized`, 'info');
         }
     }
 
@@ -1533,12 +1659,12 @@ export class BattleManager {
         
         if (playerCreature) {
             shakePromises.push(this.animationManager.shakeCreature('player', position, playerCreature.index));
-            this.addCombatLog(`🌟 ${playerCreature.name} activates!`, 'success');
+            this.addCombatLog(`ðŸŒŸ ${playerCreature.name} activates!`, 'success');
         }
         
         if (opponentCreature) {
             shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentCreature.index));
-            this.addCombatLog(`🌟 ${opponentCreature.name} activates!`, 'error');
+            this.addCombatLog(`ðŸŒŸ ${opponentCreature.name} activates!`, 'error');
         }
         
         return Promise.all(shakePromises);
@@ -1552,12 +1678,12 @@ export class BattleManager {
         
         if (playerActor && playerActor.type === 'creature') {
             shakePromises.push(this.animationManager.shakeCreature('player', position, playerActor.index));
-            this.addCombatLog(`🌟 ${playerActor.name} activates!`, 'success');
+            this.addCombatLog(`ðŸŒŸ ${playerActor.name} activates!`, 'success');
         }
         
         if (opponentActor && opponentActor.type === 'creature') {
             shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
-            this.addCombatLog(`🌟 ${opponentActor.name} activates!`, 'error');
+            this.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
         }
         
         return Promise.all(shakePromises);
@@ -1634,11 +1760,11 @@ export class BattleManager {
         this.updateGuestHeroDisplays(playerAction, opponentAction);
         
         if (playerAction && opponentAction) {
-            this.addCombatLog(`💥 Both heroes attack!`, 'warning');
+            this.addCombatLog(`ðŸ’¥ Both heroes attack!`, 'warning');
         } else if (playerAction) {
-            this.addCombatLog(`⚔️ Player hero attacks!`, 'success');
+            this.addCombatLog(`âš”ï¸ Player hero attacks!`, 'success');
         } else if (opponentAction) {
-            this.addCombatLog(`⚔️ Opponent hero attacks!`, 'error');
+            this.addCombatLog(`âš”ï¸ Opponent hero attacks!`, 'error');
         }
 
         if (playerAction && opponentAction) {
@@ -1668,7 +1794,7 @@ export class BattleManager {
                                 mod.multiplier
                             );
                             this.addCombatLog(
-                                `⚔️ The Master's Sword activates! Damage ×${mod.multiplier}!`,
+                                `The Master's Sword activates! Damage Ã—${mod.multiplier}!`,
                                 'success'
                             );
                         }
@@ -1688,7 +1814,7 @@ export class BattleManager {
                                 mod.multiplier
                             );
                             this.addCombatLog(
-                                `⚔️ Opponent's Master's Sword activates! Damage ×${mod.multiplier}!`,
+                                `Opponent's Master's Sword activates! Damage Ã—${mod.multiplier}!`,
                                 'error'
                             );
                         }
@@ -1698,7 +1824,7 @@ export class BattleManager {
             
             // Wait for effect animations if any were triggered
             if ((damageModifiers.player?.length > 0) || (damageModifiers.opponent?.length > 0)) {
-                await this.delay(400);
+                await this.delay(100);
             }
         }
         
@@ -1841,7 +1967,7 @@ export class BattleManager {
         if (localAttacker) {
             if (action.targetType === 'creature') {
                 this.addCombatLog(
-                    `⚔️ ${action.attackerData.name} attacks ${action.targetData.creatureName}!`,
+                    `âš”ï¸ ${action.attackerData.name} attacks ${action.targetData.creatureName}!`,
                     attackerLocalSide === 'player' ? 'success' : 'error'
                 );
                 await this.animationManager.guest_animateHeroToCreatureAttack(localAttacker, action.targetData, attackerLocalSide);
@@ -1852,7 +1978,7 @@ export class BattleManager {
                     : this.opponentHeroes[action.targetData.position];
                 
                 this.addCombatLog(
-                    `⚔️ ${action.attackerData.name} attacks ${action.targetData.name}!`,
+                    `âš”ï¸ ${action.attackerData.name} attacks ${action.targetData.name}!`,
                     attackerLocalSide === 'player' ? 'success' : 'error'
                 );
                 
@@ -1938,7 +2064,7 @@ export class BattleManager {
             frostRuneSpell.removeFrostRuneOnDeath(hero, hero.side, hero.position);
         }
 
-        this.addCombatLog(`☠️ ${hero.name} has been defeated!`, 'error');
+        this.addCombatLog(`â˜ ï¸ ${hero.name} has been defeated!`, 'error');
         
         const heroElement = this.getHeroElement(hero.side, hero.position);
         if (heroElement) {
@@ -2044,7 +2170,6 @@ export class BattleManager {
         if (this.isAuthoritative) {
             // Final reconnection check - don't end if guest is reconnecting
             if (this.guestReconnecting) {
-                console.log('🛑 Aborting battle end - guest is reconnecting');
                 this.battleActive = true; // Re-activate battle
                 return;
             }
@@ -2055,7 +2180,6 @@ export class BattleManager {
             const { hostResult, guestResult } = this.determineBattleResults(hostHeroesAlive, guestHeroesAlive);
 
             // Set game phase to Reward BEFORE clearing battle states
-            console.log('🎁 Setting game phase to Reward before cleanup');
             await this.setGamePhaseToReward();
 
             // CRITICAL: Mark battle as ended with timestamp for reconnection detection
@@ -2088,23 +2212,21 @@ export class BattleManager {
                 // Reset ability tracking for the new turn
                 if (window.heroSelection && window.heroSelection.heroAbilitiesManager) {
                     window.heroSelection.heroAbilitiesManager.resetTurnBasedTracking();
-                    console.log('✅ Reset ability tracking after turn increment');
+                    console.log('âœ… Reset ability tracking after turn increment');
                 }
             }
             
             // ===== CLEAR POTION EFFECTS AFTER BATTLE =====
             if (window.potionHandler) {
                 try {
-                    console.log('🧪 Clearing potion effects after battle...');
                     window.potionHandler.clearPotionEffects();
-                    console.log('✅ Potion effects cleared successfully');
                 } catch (error) {
-                    console.error('❌ Error clearing potion effects after battle:', error);
+                    console.error('âŒ Error clearing potion effects after battle:', error);
                 }
             }
             
             if (window.heroSelection) {
-                console.log('🥩 HOST: Clearing processed delayed artifact effects...');
+                console.log('ðŸ¥© HOST: Clearing processed delayed artifact effects...');
                 window.heroSelection.clearProcessedDelayedEffects();
             }
             
@@ -2115,7 +2237,7 @@ export class BattleManager {
                 guestLives: this.lifeManager ? this.lifeManager.getOpponentLives() : 10,
                 hostGold: this.goldManager ? this.goldManager.getPlayerGold() : 0,
                 guestGold: this.goldManager ? this.goldManager.getOpponentGold() : 0,
-                newTurn: newTurn  // 🔥 NEW: Include the new turn number
+                newTurn: newTurn  // ðŸ”¥ NEW: Include the new turn number
             };
             
             // Save final battle state before cleanup
@@ -2137,7 +2259,7 @@ export class BattleManager {
                 );
             }
 
-            // 🔥 MODIFIED: Don't increment turn again, just show rewards
+            // ðŸ”¥ MODIFIED: Don't increment turn again, just show rewards
             if (this.onBattleEnd) {
                 this.onBattleEnd(hostResult);
             }
@@ -2163,7 +2285,7 @@ export class BattleManager {
                 await roomRef.child('gameState').child('finalBattleState').set(
                     this.persistenceManager.sanitizeForFirebase(finalState)
                 );
-                console.log('💾 Final battle state saved for reward viewing');
+                console.log('ðŸ’¾ Final battle state saved for reward viewing');
             }
         } catch (error) {
             console.error('Error saving final battle state:', error);
@@ -2173,17 +2295,22 @@ export class BattleManager {
     // Restore final battle state for viewing
     async restoreFinalBattleState(finalState) {
         try {
-            console.log('🔄 Restoring final battle state for viewing...');
+            console.log('ðŸ”„ Restoring final battle state for viewing...');
             
             // Don't reactivate the battle
             this.battleActive = false;
             
-            // Initialize necromancy manager if not already done
+            // Initialize Ability managers if not already done
             if (!this.necromancyManager) {
                 const { NecromancyManager } = await import('./Abilities/necromancy.js');
                 this.necromancyManager = new NecromancyManager(this);
             }
+            if (!this.diplomacyManager) {
+                const { DiplomacyManager } = await import('./Abilities/diplomacy.js');
+                this.diplomacyManager = new DiplomacyManager(this);
+            }
             
+
             // Restore the state using existing restoration logic
             if (this.persistenceManager) {
                 await this.persistenceManager.restoreBattleState(this, finalState);
@@ -2214,7 +2341,7 @@ export class BattleManager {
             // FIXED: Explicitly refresh creature visuals to ensure defeated creatures have no health bars
             setTimeout(() => {
                 this.refreshAllCreatureVisuals();
-                console.log('🩸 Final battle state: All creature visual states properly applied');
+                console.log('ðŸ©¸ Final battle state: All creature visual states properly applied');
             }, 200);
             
             // Initialize and update necromancy displays
@@ -2240,10 +2367,10 @@ export class BattleManager {
                 });
                 
                 // Add final message
-                this.addCombatLog('📜 Viewing final battle state', 'info');
+                this.addCombatLog('ðŸ“œ Viewing final battle state', 'info');
             }
             
-            console.log('✅ Final battle state restored for viewing');
+            console.log('âœ… Final battle state restored for viewing');
             return true;
         } catch (error) {
             console.error('Error restoring final battle state:', error);
@@ -2294,7 +2421,7 @@ export class BattleManager {
                 gamePhaseUpdated: Date.now(),
                 battleEndedAt: Date.now()
             });
-            console.log('🎁 Game phase set to Reward');
+            console.log('ðŸŽ Game phase set to Reward');
             return true;
         } catch (error) {
             console.error('Error setting game phase to Reward:', error);
@@ -2335,7 +2462,7 @@ export class BattleManager {
                     // NOTE: We keep gamePhase as 'Reward' and lastBattleStateUpdate for reconnection
                     battleCleanedAt: Date.now()
                 });
-                console.log('✅ Battle ready states cleared, gamePhase remains as Reward');
+                console.log('âœ… Battle ready states cleared, gamePhase remains as Reward');
             } catch (error) {
                 console.error('Error clearing battle ready states:', error);
             }
@@ -2368,22 +2495,22 @@ export class BattleManager {
         // Return the battle results without awarding gold
         // Gold will be awarded by the reward screen
         return { 
-            hostGoldGain: 0,  // Set to 0 since gold is awarded later
-            guestGoldGain: 0  // Set to 0 since gold is awarded later
+            hostGoldGain: 0, 
+            guestGoldGain: 0 
         };
     }
 
     // Enhanced combat log message to show wealth bonuses
     addWealthBonusLogMessage(playerWealthBonus, opponentWealthBonus) {
         if (playerWealthBonus > 0 || opponentWealthBonus > 0) {
-            this.addCombatLog('💰 Wealth Ability Bonuses Applied!', 'info');
+            this.addCombatLog('ðŸ’° Wealth Ability Bonuses Applied!', 'info');
             
             if (playerWealthBonus > 0) {
-                this.addCombatLog(`🏆 You earned +${playerWealthBonus} bonus gold from Wealth abilities!`, 'success');
+                this.addCombatLog(`You earned +${playerWealthBonus} bonus gold from Wealth abilities!`, 'success');
             }
             
             if (opponentWealthBonus > 0) {
-                this.addCombatLog(`⚔️ Opponent earned +${opponentWealthBonus} bonus gold from Wealth abilities`, 'info');
+                this.addCombatLog(`Opponent earned +${opponentWealthBonus} bonus gold from Wealth abilities`, 'info');
             }
         }
     }
@@ -2406,18 +2533,31 @@ export class BattleManager {
             const bouldersRemoved = BoulderInABottlePotion.cleanupBouldersAfterBattle(this);
             
         } catch (error) {
-            console.error('❌ Error cleaning up Boulders after battle:', error);
+            console.error('Error cleaning up Boulders after battle:', error);
         }
 
+        // ===== CLEANUP DIPLOMACY AFTER BATTLE =====
+        try {
+            const { DiplomacyManager } = await import('./Abilities/diplomacy.js');
+            const recruitedCreatures = DiplomacyManager.cleanupDiplomacyAfterBattle(this);
+        } catch (error) {
+            console.error('Error cleaning up Diplomacy after battle:', error);
+        }
+
+
+        
         // ===== CLEANUP GREATSWORD SKELETONS AFTER BATTLE =====
         try {
             const { SkullmaelsGreatswordArtifact } = await import('./Artifacts/skullmaelsGreatsword.js');
             const skeletonsRemoved = SkullmaelsGreatswordArtifact.cleanupGreatswordSkeletonsAfterBattle(this);
-            if (skeletonsRemoved > 0) {
-                console.log(`⚔️🦴 Cleaned up ${skeletonsRemoved} Greatsword Skeletons after battle`);
-            }
         } catch (error) {
-            console.error('❌ Error cleaning up Greatsword Skeletons after battle:', error);
+            console.error('Error cleaning up Greatsword Skeletons after battle:', error);
+        }
+        
+
+        if (this.arrowSystem) {
+            this.arrowSystem.cleanup();
+            this.arrowSystem = null;
         }
         
 
@@ -2449,6 +2589,10 @@ export class BattleManager {
         if (this.skeletonMageManager) {
             this.skeletonMageManager.cleanup();
             this.skeletonMageManager = null;
+        }
+        if (this.cavalryManager) {
+            this.cavalryManager.cleanup();
+            this.cavalryManager = null;
         }
 
 
@@ -2488,7 +2632,7 @@ export class BattleManager {
                     // gamePhase stays as 'Reward'
                 });
                 
-                console.log('✅ Battle cleanup completed, gamePhase preserved for rewards');
+                console.log('âœ… Battle cleanup completed, gamePhase preserved for rewards');
             } catch (error) {
                 console.error('Error clearing battle messages:', error);
             }
@@ -2547,13 +2691,13 @@ export class BattleManager {
     getResultMessage(result) {
         switch (result) {
             case 'victory':
-                return '🎉 Victory! You have defeated your opponent!';
+                return 'Victory! You have defeated your opponent!';
             case 'defeat':
-                return '💀 Defeat! Your army has been vanquished!';
+                return 'Defeat! Your army has been vanquished!';
             case 'draw':
-                return '🤝 Draw! Both armies have fallen!';
+                return 'Draw! Both armies have fallen!';
             default:
-                return '❓ Battle outcome unknown';
+                return 'Battle outcome unknown';
         }
     }
 
@@ -2661,7 +2805,7 @@ export class BattleManager {
 
             if (stateData.battleLogState && this.battleScreen && this.battleScreen.restoreBattleLogState) {
                 this.battleScreen.restoreBattleLogState(stateData.battleLogState);
-                console.log('📜 BattleLog state restored');
+                console.log('ðŸ“œ BattleLog state restored');
             }
 
             if (stateData.spellSystemState && this.spellSystem) {
@@ -2679,7 +2823,7 @@ export class BattleManager {
 
     // Update all hero visuals after restoration
     updateAllHeroVisuals() {
-        console.log('🎨 Updating all hero visuals...');
+        console.log('ðŸŽ¨ Updating all hero visuals...');
         
         ['left', 'center', 'right'].forEach(position => {
             // Update player heroes
@@ -2745,7 +2889,7 @@ export class BattleManager {
             this.battleScreen.syncAbilitiesFromBattleManager();
         }
 
-        console.log('✅ All hero visuals updated');
+        console.log('âœ… All hero visuals updated');
     }
 
     // Restore fireshield visual effects after reconnection
@@ -2841,12 +2985,17 @@ export class BattleManager {
             this.combatManager = null;
         }
 
+        // Cleanup Ability managers
         if (this.necromancyManager) {
             this.necromancyManager.cleanup();
             this.necromancyManager = null;
         }
+        if (this.diplomacyManager) {
+            this.diplomacyManager.cleanup();
+            this.diplomacyManager = null;
+        }
 
-        // Cleanup Jiggles manager
+        // Cleanup Creature managers
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
             this.jigglesManager = null;
@@ -2876,7 +3025,10 @@ export class BattleManager {
             this.skeletonMageManager = null;
         }
 
-
+        if (this.frontSoldierManager) {
+            this.frontSoldierManager.cleanup();
+            this.frontSoldierManager = null;
+        }
 
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.reset();

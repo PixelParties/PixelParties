@@ -1,4 +1,4 @@
-// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, Nicolas Effect, and Hero Stats Display
+// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, Nicolas Effect, Hero Stats Display, and Permanent Artifacts
 
 export class HeroSelectionUI {
     constructor() {
@@ -12,6 +12,129 @@ export class HeroSelectionUI {
             .replace(/^./, str => str.toUpperCase())
             .trim();
     }
+
+    // ===== PERMANENT ARTIFACTS METHODS =====
+    
+    // Create permanent artifacts indicator element
+    createPermanentArtifactsIndicator() {
+        if (!window.artifactHandler) {
+            return ''; // No artifact handler available
+        }
+        
+        const permanentArtifacts = window.artifactHandler.getPermanentArtifacts();
+        const count = permanentArtifacts.length;
+        
+        // Don't show if no permanent artifacts have been used
+        if (count === 0) {
+            return `
+                <div class="permanent-artifacts-indicator empty" 
+                    id="permanentArtifactsIndicator"
+                    onmouseenter="window.showPermanentArtifactsTooltip(this)"
+                    onmouseleave="window.hidePermanentArtifactsTooltip()">
+                    <span class="artifact-scroll-icon">📜</span>
+                    <span class="artifact-count">0</span>
+                </div>
+            `;
+        }
+        
+        return `
+            <div class="permanent-artifacts-indicator" 
+                id="permanentArtifactsIndicator"
+                onmouseenter="window.showPermanentArtifactsTooltip(this)"
+                onmouseleave="window.hidePermanentArtifactsTooltip()">
+                <span class="artifact-scroll-icon">📜</span>
+                <span class="artifact-count">${count}</span>
+            </div>
+        `;
+    }
+
+    // Create permanent artifacts tooltip content
+    createPermanentArtifactsTooltip() {
+        if (!window.artifactHandler) {
+            return null;
+        }
+        
+        const permanentArtifacts = window.artifactHandler.getPermanentArtifacts();
+        
+        if (permanentArtifacts.length === 0) {
+            return {
+                title: 'Permanent Artifacts',
+                content: 'No permanent artifacts used yet',
+                isEmpty: true
+            };
+        }
+        
+        // Group artifacts by name and count them
+        const artifactCounts = {};
+        permanentArtifacts.forEach(artifact => {
+            const name = artifact.name || 'Unknown';
+            artifactCounts[name] = (artifactCounts[name] || 0) + 1;
+        });
+        
+        // Sort by most used
+        const sortedArtifacts = Object.entries(artifactCounts)
+            .sort((a, b) => b[1] - a[1]);
+        
+        // Build artifact list HTML
+        let artifactListHTML = sortedArtifacts.map(([name, count]) => {
+            const formattedName = this.formatCardName(name);
+            const countText = count > 1 ? ` x${count}` : '';
+            
+            // Add icon based on artifact name
+            let icon = '✨';
+            if (name === 'Juice') icon = '🧃';
+            else if (name === 'TreasureChest') icon = '📦';
+            else if (name === 'MagneticGlove') icon = '🧲';
+            
+            return `
+                <div class="permanent-artifact-item">
+                    <span class="artifact-icon">${icon}</span>
+                    <span class="artifact-name">${formattedName}</span>
+                    <span class="artifact-count-badge">${countText}</span>
+                </div>
+            `;
+        }).join('');
+        
+        const totalCount = permanentArtifacts.length;
+        const uniqueCount = sortedArtifacts.length;
+        
+        return {
+            title: 'Permanent Artifacts Used',
+            content: artifactListHTML,
+            summary: `${totalCount} total (${uniqueCount} unique)`,
+            isEmpty: false
+        };
+    }
+
+    // Update the permanent artifacts indicator (call this when artifacts change)
+    updatePermanentArtifactsIndicator() {
+        const indicator = document.getElementById('permanentArtifactsIndicator');
+        if (!indicator || !window.artifactHandler) return;
+        
+        const permanentArtifacts = window.artifactHandler.getPermanentArtifacts();
+        const count = permanentArtifacts.length;
+        
+        // Update count
+        const countElement = indicator.querySelector('.artifact-count');
+        if (countElement) {
+            countElement.textContent = count;
+        }
+        
+        // Update empty state
+        if (count === 0) {
+            indicator.classList.add('empty');
+        } else {
+            indicator.classList.remove('empty');
+            
+            // Add pulse animation for new artifact
+            indicator.classList.add('new-artifact-pulse');
+            setTimeout(() => {
+                indicator.classList.remove('new-artifact-pulse');
+            }, 1000);
+        }
+    }
+
+    // ===== EXISTING METHODS =====
 
     // Show spellbook tooltip for a hero in formation screen
     showHeroSpellbookTooltip(position, heroElement) {
@@ -260,7 +383,7 @@ export class HeroSelectionUI {
                 currentHp: effectiveStats.currentHp,
                 maxHp: effectiveStats.maxHp,
                 attack: effectiveStats.attack,
-                // NEW: Include bonus information for potential UI enhancements
+                // Include bonus information for potential UI enhancements
                 bonuses: effectiveStats.bonuses
             };
         }
@@ -688,7 +811,7 @@ export class HeroSelectionUI {
     // Generate team building screen HTML
     generateTeamBuildingHTML(selectedCharacter, battleFormation, deckGrid, handDisplay, lifeDisplay, goldDisplay, createTeamSlotFn) {
         if (!selectedCharacter) {
-            return '<div class="loading-heroes"><h2>❌ No character selected</h2></div>';
+            return '<div class="loading-heroes"><h2>⌛ No character selected</h2></div>';
         }
 
         const leftSlot = createTeamSlotFn('left', battleFormation.left);
@@ -726,8 +849,6 @@ export class HeroSelectionUI {
                     ${deckGrid}
                 </div>
                 
-                <!-- Gold Display - Now positioned in center between hand and deck -->
-                ${goldDisplay}
             </div>
         `;
     }
@@ -749,6 +870,76 @@ export class HeroSelectionUI {
         }
     }
 }
+
+// ===== GLOBAL FUNCTIONS FOR PERMANENT ARTIFACTS TOOLTIP =====
+
+window.showPermanentArtifactsTooltip = function(element) {
+    if (!window.heroSelection || !window.heroSelection.heroSelectionUI) return;
+    
+    const tooltipData = window.heroSelection.heroSelectionUI.createPermanentArtifactsTooltip();
+    if (!tooltipData) return;
+    
+    // Remove any existing tooltip
+    window.hidePermanentArtifactsTooltip();
+    
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.id = 'permanentArtifactsTooltip';
+    tooltip.className = `permanent-artifacts-tooltip ${tooltipData.isEmpty ? 'empty' : ''}`;
+    
+    tooltip.innerHTML = `
+        <div class="tooltip-header">
+            <span class="tooltip-icon">📜</span>
+            <span class="tooltip-title">${tooltipData.title}</span>
+        </div>
+        <div class="tooltip-content">
+            ${tooltipData.content}
+        </div>
+        ${tooltipData.summary ? `
+            <div class="tooltip-summary">
+                ${tooltipData.summary}
+            </div>
+        ` : ''}
+    `;
+    
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip above the indicator
+    const rect = element.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    let top = rect.top - tooltipRect.height - 10;
+    
+    // Adjust if going off screen
+    if (left < 10) left = 10;
+    if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+    }
+    if (top < 10) {
+        // Show below instead
+        top = rect.bottom + 10;
+        tooltip.classList.add('below');
+    }
+    
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    
+    // Add fade in animation
+    requestAnimationFrame(() => {
+        tooltip.classList.add('visible');
+    });
+};
+
+window.hidePermanentArtifactsTooltip = function() {
+    const tooltip = document.getElementById('permanentArtifactsTooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+        setTimeout(() => {
+            tooltip.remove();
+        }, 200);
+    }
+};
 
 // ===== ENHANCED DRAG AND DROP HANDLERS WITH IMPROVED TOOLTIP MANAGEMENT =====
 
@@ -1595,6 +1786,16 @@ async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount)
             }
             break;
             
+        case 'Navigation':
+            // Dynamically import the Navigation module
+            try {
+                const { navigationAbility } = await import('./Abilities/navigation.js');
+                await navigationAbility.handleClick(heroPosition, stackCount);
+            } catch (error) {
+                console.error('Failed to load Navigation ability handler:', error);
+            }
+            break;
+            
         default:
             // For other abilities, just log for now
             console.log(`No specific handler for ${abilityName} yet`);
@@ -1667,6 +1868,308 @@ if (typeof window !== 'undefined') {
             window.heroSelection.heroSelectionUI.updateAllHeroStats();
         }
     };
+}
+
+// ===== CSS STYLES FOR PERMANENT ARTIFACTS =====
+if (typeof document !== 'undefined' && !document.getElementById('permanentArtifactsStyles')) {
+    const style = document.createElement('style');
+    style.id = 'permanentArtifactsStyles';
+    style.textContent = `
+        /* Permanent Artifacts Indicator */
+        
+        .permanent-artifacts-indicator:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(111, 66, 193, 0.5);
+        }
+        
+        .permanent-artifacts-indicator.empty {
+            opacity: 0.5;
+            background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+        }
+        
+        .artifact-scroll-icon {
+            font-size: 24px;
+            filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
+        }
+        
+        .artifact-count {
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            min-width: 20px;
+            text-align: center;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* New artifact pulse animation */
+        .permanent-artifacts-indicator.new-artifact-pulse {
+            animation: artifactPulse 0.6s ease-out;
+        }
+        
+        @keyframes artifactPulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
+            }
+            50% {
+                transform: scale(1.2);
+                box-shadow: 0 6px 30px rgba(111, 66, 193, 0.8);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
+            }
+        }
+        
+        /* Permanent Artifacts Tooltip */
+        .permanent-artifacts-tooltip {
+            position: fixed;
+            background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+            border: 2px solid rgba(111, 66, 193, 0.5);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 250px;
+            max-width: 350px;
+            z-index: 10000;
+            opacity: 0;
+            transform: translateY(5px);
+            transition: all 0.2s ease;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+        
+        .permanent-artifacts-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .permanent-artifacts-tooltip.below {
+            transform: translateY(-5px);
+        }
+        
+        .permanent-artifacts-tooltip.below.visible {
+            transform: translateY(0);
+        }
+        
+        .permanent-artifacts-tooltip.empty .tooltip-content {
+            color: #868e96;
+            font-style: italic;
+            text-align: center;
+            padding: 10px 0;
+        }
+        
+        .tooltip-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(111, 66, 193, 0.3);
+        }
+        
+        .tooltip-icon {
+            font-size: 20px;
+        }
+        
+        .tooltip-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .tooltip-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .permanent-artifact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid #6f42c1;
+            transition: all 0.2s ease;
+        }
+        
+        .permanent-artifact-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(2px);
+        }
+        
+        .artifact-icon {
+            font-size: 18px;
+        }
+        
+        .artifact-name {
+            flex: 1;
+            color: #fff;
+            font-weight: 500;
+        }
+        
+        .artifact-count-badge {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .tooltip-summary {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(111, 66, 193, 0.3);
+            text-align: center;
+            color: #adb5bd;
+            font-size: 13px;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .permanent-artifacts-indicator {
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+            }
+            
+            .artifact-scroll-icon {
+                font-size: 20px;
+            }
+            
+            .artifact-count {
+                font-size: 16px;
+            }
+        }
+
+        .permanent-artifacts-indicator {
+            position: fixed;
+            top: 88%;
+            right: 14.5%;
+            background: linear-gradient(135deg, #6f42c1 0%, #495057 100%);
+            border-radius: 0.5rem; /* Changed from 50px to match gold/potions displays */
+            padding: 6px 12px; /* Adjusted padding to match gold/potions displays */
+            display: flex;
+            align-items: center;
+            gap: 6px; /* Reduced gap to match other displays */
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 6px 20px rgba(111, 66, 193, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3); /* Added inset shadow like gold display */
+            border: 2px solid #8e24aa; /* More vibrant border like other displays */
+            z-index: 100;
+            min-width: 85px; /* Added min-width like potion display */
+            min-height: 35px; /* Added min-height to match other displays */
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        }
+
+        .permanent-artifacts-indicator:hover {
+            transform: translateY(-1px) scale(1.02); /* Changed to match gold/potions hover effect */
+            box-shadow: 
+                0 8px 25px rgba(111, 66, 193, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4); /* Enhanced hover shadow like gold display */
+            border-color: #7b1fa2; /* Hover border color change like other displays */
+        }
+
+        .permanent-artifacts-indicator.empty {
+            opacity: 0.7; /* Reduced opacity to match potion depleted state */
+            background: linear-gradient(135deg, #757575 0%, #424242 100%);
+            border-color: #9e9e9e;
+        }
+
+        .artifact-scroll-icon {
+            font-size: 20px; /* Reduced from 24px to better match proportions */
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3)); /* Added consistent drop shadow */
+            animation: artifactIconFloat 3s ease-in-out infinite; /* Added floating animation like gold icon */
+        }
+
+        .artifact-count {
+            font-size: 18px;
+            font-weight: 900; /* Increased font weight to match gold/potion numbers */
+            color: #ffffff;
+            min-width: 20px;
+            text-align: center;
+            text-shadow: 
+                2px 2px 4px rgba(0, 0, 0, 0.8),
+                0 0 10px rgba(111, 66, 193, 0.6); /* Enhanced text shadow like gold/potion displays */
+            letter-spacing: 1px; /* Added letter spacing for consistency */
+        }
+
+        /* New floating animation for the artifact icon */
+        @keyframes artifactIconFloat {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-2px);
+            }
+        }
+
+        /* Enhanced new artifact pulse animation */
+        .permanent-artifacts-indicator.new-artifact-pulse {
+            animation: newArtifactPulse 1s ease-out;
+        }
+
+        @keyframes newArtifactPulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 
+                    0 6px 20px rgba(111, 66, 193, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            }
+            50% {
+                transform: scale(1.1);
+                box-shadow: 
+                    0 8px 30px rgba(111, 66, 193, 0.8),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 
+                    0 6px 20px rgba(111, 66, 193, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            }
+        }
+
+        /* Responsive adjustments - matching other displays */
+        @media (max-width: 768px) {
+            .permanent-artifacts-indicator {
+                top: 10px;
+                right: 10px;
+                padding: 5px 10px;
+                min-width: 70px;
+                min-height: 28px;
+            }
+            
+            .artifact-scroll-icon {
+                font-size: 16px;
+            }
+            
+            .artifact-count {
+                font-size: 14px;
+                letter-spacing: 0.5px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .permanent-artifacts-indicator {
+                padding: 4px 8px;
+                min-width: 60px;
+                min-height: 26px;
+                gap: 4px;
+            }
+            
+            .artifact-scroll-icon {
+                font-size: 14px;
+            }
+            
+            .artifact-count {
+                font-size: 12px;
+                letter-spacing: 0.3px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 // Add CSS styles for hero stats display

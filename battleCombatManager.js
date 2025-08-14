@@ -8,7 +8,7 @@ export class BattleCombatManager {
         this.battleManager = battleManager;
     }
 
-    // SIMPLIFIED: Use Hero's pre-calculated attack value directly
+    // Use Hero's pre-calculated attack value directly
     getHeroAbilityModifiers(hero) {
         const modifiers = {
             attackBonus: 0,
@@ -57,66 +57,79 @@ export class BattleCombatManager {
         const targets = attackerSide === 'player' ? 
             this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
         
-        // Helper function to create creature target if hero has living creatures
-        const createCreatureTargetIfAvailable = (hero, heroPosition) => {
-            if (!hero || !hero.alive) return null;
-            
-            const livingCreatures = hero.creatures.filter(c => c.alive);
-            if (livingCreatures.length > 0) {
-                // Target the FIRST living creature (newest to oldest as mentioned)
-                return {
-                    type: 'creature',
-                    hero: hero,
-                    creature: livingCreatures[0],
-                    creatureIndex: hero.creatures.indexOf(livingCreatures[0]),
-                    position: heroPosition,
-                    side: attackerSide === 'player' ? 'opponent' : 'player'
-                };
-            }
-            return null;
-        };
-
-        // Helper function to create hero target
-        const createHeroTarget = (hero, heroPosition) => {
-            if (!hero || !hero.alive) return null;
-            
-            return {
-                type: 'hero',
-                hero: hero,
-                position: heroPosition,
-                side: attackerSide === 'player' ? 'opponent' : 'player'
-            };
-        };
-
-        // Helper function to get target (creature first, then hero) for any position
-        const getTargetForPosition = (heroPosition) => {
-            const hero = targets[heroPosition];
-            if (!hero || !hero.alive) return null;
-            
-            // Always check creatures first, regardless of position
-            const creatureTarget = createCreatureTargetIfAvailable(hero, heroPosition);
-            if (creatureTarget) return creatureTarget;
-            
-            // If no creatures, target the hero
-            return createHeroTarget(hero, heroPosition);
-        };
-
         // Get all alive targets for fallback
         const aliveTargets = Object.values(targets).filter(hero => hero && hero.alive);
         if (aliveTargets.length === 0) return null;
 
+        // NEW: Check for taunting zones first
+        const tauntingZones = this.findTauntingZones(attackerSide);
+        
+        if (tauntingZones.length > 0) {
+            console.log(`🎯 Taunting detected! Prioritizing zones: ${tauntingZones.join(', ')}`);
+            
+            // Prioritize taunting zones - try to find closest taunting zone to attacker
+            let preferredTauntingZone = null;
+            
+            // Check if attacker's same position has taunting first
+            if (tauntingZones.includes(attackerPosition)) {
+                preferredTauntingZone = attackerPosition;
+            } else {
+                // Find closest taunting zone based on attacker position
+                switch (attackerPosition) {
+                    case 'left':
+                        if (tauntingZones.includes('center')) preferredTauntingZone = 'center';
+                        else if (tauntingZones.includes('right')) preferredTauntingZone = 'right';
+                        break;
+                    case 'center':
+                        // For center, pick first available taunting zone
+                        preferredTauntingZone = tauntingZones[0];
+                        break;
+                    case 'right':
+                        if (tauntingZones.includes('center')) preferredTauntingZone = 'center';
+                        else if (tauntingZones.includes('left')) preferredTauntingZone = 'left';
+                        break;
+                }
+                
+                // If no preferred zone found, use first taunting zone
+                if (!preferredTauntingZone) {
+                    preferredTauntingZone = tauntingZones[0];
+                }
+            }
+            
+            // Try to get target from preferred taunting zone
+            if (preferredTauntingZone) {
+                const tauntingTarget = this.getTargetForPosition(preferredTauntingZone, attackerSide);
+                if (tauntingTarget) {
+                    console.log(`📢 ${tauntingTarget.hero.name} draws the attack with taunting!`);
+                    return tauntingTarget;
+                }
+            }
+            
+            // Fallback: try any taunting zone
+            for (const zone of tauntingZones) {
+                const tauntingTarget = this.getTargetForPosition(zone, attackerSide);
+                if (tauntingTarget) {
+                    console.log(`📢 ${tauntingTarget.hero.name} draws the attack with taunting!`);
+                    return tauntingTarget;
+                }
+            }
+        }
+
+        // No taunting or taunting zones have no valid targets - use normal targeting logic
+        console.log(`🎯 Normal targeting (no taunting priority)`);
+
         // Primary targeting: try same position first
-        const primaryTarget = getTargetForPosition(attackerPosition);
+        const primaryTarget = this.getTargetForPosition(attackerPosition, attackerSide);
         if (primaryTarget) return primaryTarget;
 
-        // Alternative targeting with creature priority
+        // Alternative targeting logic (same as before)
         switch (attackerPosition) {
             case 'left':
                 // Try center first, then right
-                const leftToCenterTarget = getTargetForPosition('center');
+                const leftToCenterTarget = this.getTargetForPosition('center', attackerSide);
                 if (leftToCenterTarget) return leftToCenterTarget;
                 
-                const leftToRightTarget = getTargetForPosition('right');
+                const leftToRightTarget = this.getTargetForPosition('right', attackerSide);
                 if (leftToRightTarget) return leftToRightTarget;
                 break;
                 
@@ -124,29 +137,28 @@ export class BattleCombatManager {
                 // Random target selection, but still check creatures first
                 const randomTargetHero = this.battleManager.getRandomChoice(aliveTargets);
                 if (randomTargetHero) {
-                    const randomTarget = getTargetForPosition(randomTargetHero.position);
+                    const randomTarget = this.getTargetForPosition(randomTargetHero.position, attackerSide);
                     if (randomTarget) return randomTarget;
                 }
                 break;
                 
             case 'right':
                 // Try center first, then left
-                const rightToCenterTarget = getTargetForPosition('center');
+                const rightToCenterTarget = this.getTargetForPosition('center', attackerSide);
                 if (rightToCenterTarget) return rightToCenterTarget;
                 
-                const rightToLeftTarget = getTargetForPosition('left');
+                const rightToLeftTarget = this.getTargetForPosition('left', attackerSide);
                 if (rightToLeftTarget) return rightToLeftTarget;
                 break;
         }
         
         // Last resort - find any alive target (creature first, then hero)
         for (const hero of aliveTargets) {
-            const lastResortTarget = getTargetForPosition(hero.position);
+            const lastResortTarget = this.getTargetForPosition(hero.position, attackerSide);
             if (lastResortTarget) return lastResortTarget;
         }
         
-        // This should never happen if there are alive targets, but safety fallback
-        return createHeroTarget(aliveTargets[0], aliveTargets[0].position);
+        return null;
     }
 
     // Find target ignoring creatures (heroes only)
@@ -156,7 +168,7 @@ export class BattleCombatManager {
         const targets = attackerSide === 'player' ? 
             this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
         
-        // Helper function to create hero target
+        // Helper function to create hero target (ignoring creatures)
         const createHeroTarget = (hero, heroPosition) => {
             if (!hero || !hero.alive) return null;
             
@@ -180,6 +192,63 @@ export class BattleCombatManager {
         // Get all alive targets for fallback
         const aliveTargets = Object.values(targets).filter(hero => hero && hero.alive);
         if (aliveTargets.length === 0) return null;
+
+        // NEW: Check for taunting zones first (even for ranged attacks)
+        const tauntingZones = this.findTauntingZones(attackerSide);
+        
+        if (tauntingZones.length > 0) {
+            console.log(`🏹 Ranged attack with taunting priority! Zones: ${tauntingZones.join(', ')}`);
+            
+            // For ranged attacks, still prioritize taunting zones
+            let preferredTauntingZone = null;
+            
+            // Check if attacker's same position has taunting first
+            if (tauntingZones.includes(attackerPosition)) {
+                preferredTauntingZone = attackerPosition;
+            } else {
+                // Find closest taunting zone based on attacker position
+                switch (attackerPosition) {
+                    case 'left':
+                        if (tauntingZones.includes('center')) preferredTauntingZone = 'center';
+                        else if (tauntingZones.includes('right')) preferredTauntingZone = 'right';
+                        break;
+                    case 'center':
+                        // For center, pick first available taunting zone
+                        preferredTauntingZone = tauntingZones[0];
+                        break;
+                    case 'right':
+                        if (tauntingZones.includes('center')) preferredTauntingZone = 'center';
+                        else if (tauntingZones.includes('left')) preferredTauntingZone = 'left';
+                        break;
+                }
+                
+                // If no preferred zone found, use first taunting zone
+                if (!preferredTauntingZone) {
+                    preferredTauntingZone = tauntingZones[0];
+                }
+            }
+            
+            // Try to get hero target from preferred taunting zone
+            if (preferredTauntingZone) {
+                const tauntingTarget = getHeroOnlyTargetForPosition(preferredTauntingZone);
+                if (tauntingTarget) {
+                    console.log(`📢 ${tauntingTarget.hero.name} draws the ranged attack with taunting!`);
+                    return tauntingTarget;
+                }
+            }
+            
+            // Fallback: try any taunting zone
+            for (const zone of tauntingZones) {
+                const tauntingTarget = getHeroOnlyTargetForPosition(zone);
+                if (tauntingTarget) {
+                    console.log(`📢 ${tauntingTarget.hero.name} draws the ranged attack with taunting!`);
+                    return tauntingTarget;
+                }
+            }
+        }
+
+        // No taunting or taunting zones have no valid targets - use normal targeting logic
+        console.log(`🏹 Normal ranged targeting (no taunting priority)`);
 
         // Primary targeting: try same position first
         const primaryTarget = getHeroOnlyTargetForPosition(attackerPosition);
@@ -270,7 +339,73 @@ export class BattleCombatManager {
         return allTargets[randomIndex];
     }
 
-    // SIMPLIFIED: Use hero's pre-calculated damage value directly
+    findTauntingZones(attackerSide) {
+        if (!this.battleManager.isAuthoritative) return [];
+
+        const targets = attackerSide === 'player' ? 
+            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+        
+        const tauntingZones = [];
+        
+        Object.keys(targets).forEach(position => {
+            const hero = targets[position];
+            if (hero && hero.alive && this.battleManager.statusEffectsManager) {
+                if (this.battleManager.statusEffectsManager.hasStatusEffect(hero, 'taunting')) {
+                    tauntingZones.push(position);
+                }
+            }
+        });
+        
+        return tauntingZones;
+    }
+
+    getTargetForPosition(heroPosition, attackerSide) {
+        const targets = attackerSide === 'player' ? 
+            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+        
+        const hero = targets[heroPosition];
+        if (!hero || !hero.alive) return null;
+        
+        // Helper function to create creature target if hero has living creatures
+        const createCreatureTargetIfAvailable = (hero, heroPosition) => {
+            if (!hero || !hero.alive) return null;
+            
+            const livingCreatures = hero.creatures.filter(c => c.alive);
+            if (livingCreatures.length > 0) {
+                // Target the FIRST living creature
+                return {
+                    type: 'creature',
+                    hero: hero,
+                    creature: livingCreatures[0],
+                    creatureIndex: hero.creatures.indexOf(livingCreatures[0]),
+                    position: heroPosition,
+                    side: attackerSide === 'player' ? 'opponent' : 'player'
+                };
+            }
+            return null;
+        };
+
+        // Helper function to create hero target
+        const createHeroTarget = (hero, heroPosition) => {
+            if (!hero || !hero.alive) return null;
+            
+            return {
+                type: 'hero',
+                hero: hero,
+                position: heroPosition,
+                side: attackerSide === 'player' ? 'opponent' : 'player'
+            };
+        };
+
+        // Always check creatures first, then hero
+        const creatureTarget = createCreatureTargetIfAvailable(hero, heroPosition);
+        if (creatureTarget) return creatureTarget;
+        
+        // If no creatures, target the hero
+        return createHeroTarget(hero, heroPosition);
+    }
+
+    // Use hero's pre-calculated damage value directly
     calculateDamage(hero, canAct) {
         if (!canAct) return 0;
         
@@ -325,11 +460,31 @@ export class BattleCombatManager {
             this.battleManager.spellSystem.executeSpellCasting(opponentHeroActor.data, opponentSpellToCast);
         }
         
-        // Continue with normal attack logic for heroes that didn't cast spells
-        const playerTarget = playerWillAttack ? 
-            this.authoritative_findTargetWithCreatures(position, 'player') : null;
-        const opponentTarget = opponentWillAttack ? 
-            this.authoritative_findTargetWithCreatures(position, 'opponent') : null;
+        // UPDATED: Check for ranged attackers and use appropriate targeting
+        let playerTarget = null;
+        let playerIsRanged = false;
+        let opponentTarget = null;
+        let opponentIsRanged = false;
+        
+        if (playerWillAttack) {
+            playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
+            if (playerIsRanged) {
+                playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
+                this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+            } else {
+                playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
+            }
+        }
+        
+        if (opponentWillAttack) {
+            opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
+            if (opponentIsRanged) {
+                opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
+                this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+            } else {
+                opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
+            }
+        }
         
         // Check if targets are valid before proceeding
         const playerValidAttack = playerWillAttack && playerTarget;
@@ -400,19 +555,21 @@ export class BattleCombatManager {
             
             this.battleManager.sendBattleUpdate('hero_turn_execution', turnData);
             
-            // Execute attacks with modified damage and effects
-            const executionPromise = this.executeHeroAttacksWithDamage(
+            // Execute attacks with modified damage and effects - UPDATED with ranged flags
+            const executionPromise = this.battleManager.executeHeroAttacksWithDamage(
                 playerValidAttack ? { 
                     hero: playerHeroActor.data, 
                     target: playerTarget, 
                     damage: playerDamage,
-                    effectsTriggered: playerEffectsTriggered  // NEW: Pass effects for animation
+                    effectsTriggered: playerEffectsTriggered,
+                    isRanged: playerIsRanged  // NEW: Add ranged flag
                 } : null,
                 opponentValidAttack ? { 
                     hero: opponentHeroActor.data, 
                     target: opponentTarget, 
                     damage: opponentDamage,
-                    effectsTriggered: opponentEffectsTriggered  // NEW: Pass effects for animation
+                    effectsTriggered: opponentEffectsTriggered,
+                    isRanged: opponentIsRanged  // NEW: Add ranged flag
                 } : null
             );
             
@@ -420,6 +577,11 @@ export class BattleCombatManager {
             
             await Promise.all([executionPromise, ackPromise]);
         }
+    }
+
+    isRangedAttacker(hero) {
+        // For now, Darge always uses ranged attacks as proof of concept
+        return hero.name === 'Darge';
     }
 
     // Execute hero attacks with damage application
@@ -437,41 +599,41 @@ export class BattleCombatManager {
             }
             
             // Log attacks with host first
-            if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
-                this.battleManager.battleScreen.battleLog.logAttackMessage(hostAttack);
-                this.battleManager.battleScreen.battleLog.logAttackMessage(guestAttack);
+            if (this.battleScreen && this.battleScreen.battleLog) {
+                this.battleScreen.battleLog.logAttackMessage(hostAttack);
+                this.battleScreen.battleLog.logAttackMessage(guestAttack);
             }
             
             // Both heroes attack - collision animation (meet in middle)
-            await this.battleManager.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
+            await this.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
             // ============================================
-            // NEW: Apply damage modifier visual effects BEFORE damage
+            // Apply damage modifier visual effects BEFORE damage
             // ============================================
-            if (this.battleManager.attackEffectsManager) {
+            if (this.attackEffectsManager) {
                 // Small delay to let attack animation reach target
-                await this.battleManager.delay(100);
+                await this.delay(100);
                 
                 if (playerAttack.effectsTriggered && playerAttack.effectsTriggered.length > 0) {
-                    this.battleManager.attackEffectsManager.applyDamageModifierEffects(playerAttack.effectsTriggered);
+                    this.attackEffectsManager.applyDamageModifierEffects(playerAttack.effectsTriggered);
                 }
                 if (opponentAttack.effectsTriggered && opponentAttack.effectsTriggered.length > 0) {
-                    this.battleManager.attackEffectsManager.applyDamageModifierEffects(opponentAttack.effectsTriggered);
+                    this.attackEffectsManager.applyDamageModifierEffects(opponentAttack.effectsTriggered);
                 }
                 
                 // Wait for effect animations
                 if (playerAttack.effectsTriggered?.length > 0 || opponentAttack.effectsTriggered?.length > 0) {
-                    await this.battleManager.delay(400);
+                    await this.delay(400);
                 }
             }
             
-            // Apply damage with potentially modified values
+            // Apply damage with potentially modified values - now includes ranged flag
             this.applyAttackDamageToTarget(playerAttack);
             this.applyAttackDamageToTarget(opponentAttack);
             
             await Promise.all([
-                this.battleManager.animationManager.animateReturn(playerAttack.hero, 'player'),
-                this.battleManager.animationManager.animateReturn(opponentAttack.hero, 'opponent')
+                this.animationManager.animateReturn(playerAttack.hero, 'player'),
+                this.animationManager.animateReturn(opponentAttack.hero, 'opponent')
             ]);
             
         } else if (playerAttack || opponentAttack) {
@@ -480,29 +642,29 @@ export class BattleCombatManager {
             const side = playerAttack ? 'player' : 'opponent';
             
             // Log the single attack
-            if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
-                this.battleManager.battleScreen.battleLog.logAttackMessage(attack);
+            if (this.battleScreen && this.battleScreen.battleLog) {
+                this.battleScreen.battleLog.logAttackMessage(attack);
             }
             
-            await this.battleManager.animationManager.animateHeroAttack(attack.hero, attack.target);
+            await this.animationManager.animateHeroAttack(attack.hero, attack.target);
             
             // ============================================
-            // NEW: Apply damage modifier visual effects BEFORE damage
+            // Apply damage modifier visual effects BEFORE damage
             // ============================================
-            if (this.battleManager.attackEffectsManager && attack.effectsTriggered && attack.effectsTriggered.length > 0) {
+            if (this.attackEffectsManager && attack.effectsTriggered && attack.effectsTriggered.length > 0) {
                 // Small delay to let attack animation complete
-                await this.battleManager.delay(100);
+                await this.delay(100);
                 
-                this.battleManager.attackEffectsManager.applyDamageModifierEffects(attack.effectsTriggered);
+                this.attackEffectsManager.applyDamageModifierEffects(attack.effectsTriggered);
                 
                 // Wait for effect animation
-                await this.battleManager.delay(400);
+                await this.delay(400);
             }
             
-            // Apply damage with potentially modified value
+            // Apply damage with potentially modified value - now includes ranged flag
             this.applyAttackDamageToTarget(attack);
             
-            await this.battleManager.animationManager.animateReturn(attack.hero, side);
+            await this.animationManager.animateReturn(attack.hero, side);
         }
     }
 
@@ -525,16 +687,15 @@ export class BattleCombatManager {
                 source: 'attack', // Specify this was from an attack
                 attacker: attack.hero // Pass the attacker for kill tracking
             });
-            
-            // REMOVED: Duplicate kill recording - already handled in authoritative_applyDamageToCreature
-                        
-            // Process attack effects for creature targets
+                                    
+            // ✅ FIXED: Process attack effects for creature targets WITH effectsTriggered
             if (this.battleManager.attackEffectsManager) {
                 this.battleManager.attackEffectsManager.processAttackEffects(
                     attack.hero,
                     attack.target.creature,
                     attack.damage,
-                    'basic'
+                    'basic',
+                    attack.effectsTriggered || []  // ✅ Pass the effects that were triggered!
                 );
             }
             
@@ -545,25 +706,33 @@ export class BattleCombatManager {
                     attack.damage
                 );
             }
+            
         } else {
             // Hero-to-hero attack
             const defender = attack.target.hero;
             const attacker = attack.hero;
+            const isRanged = attack.isRanged || false;
             
             const wasAlive = defender.alive;
             
-            // Check for toxic trap
-            if (this.checkAndApplyToxicTrap(attacker, defender)) {
-                // Toxic trap triggered - original attack is blocked
-                console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
-                return; // Exit early, no damage applied
-            }
+            // Skip trap checks for ranged attacks - they don't trigger close-range traps!
+            if (!isRanged) {
+                // Check for toxic trap (only for melee attacks)
+                if (this.checkAndApplyToxicTrap(attacker, defender)) {
+                    // Toxic trap triggered - original attack is blocked
+                    console.log(`🍄 ${attacker.name}'s attack was blocked by ${defender.name}'s toxic trap!`);
+                    return; // Exit early, no damage applied
+                }
 
-            // Check for frost rune
-            if (this.checkAndApplyFrostRune(attacker, defender)) {
-                // Frost rune triggered - original attack is blocked
-                console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
-                return; // Exit early, no damage applied
+                // Check for frost rune (only for melee attacks)
+                if (this.checkAndApplyFrostRune(attacker, defender)) {
+                    // Frost rune triggered - original attack is blocked
+                    console.log(`❄️ ${attacker.name}'s attack was blocked by ${defender.name}'s frost rune!`);
+                    return; // Exit early, no damage applied
+                }
+            } else {
+                // Ranged attack - traps don't trigger
+                console.log(`🏹 ${attacker.name}'s ranged attack bypasses close-range traps!`);
             }
             
             // Apply the damage
@@ -576,21 +745,20 @@ export class BattleCombatManager {
                 source: 'attack',
                 attacker: attacker
             });
-            
-            // REMOVED: Duplicate kill recording - already handled in authoritative_applyDamage
-            
+                        
             // Check for SkeletonMage reactions to ally death (only if hero actually died)
             if (wasAlive && !defender.alive) {
                 this.battleManager.checkForSkeletonMageReactions(defender, defender.side, 'hero');
             }
 
-            // Process attack effects for hero targets (after damage is applied)
+            // ✅ FIXED: Process attack effects for hero targets WITH effectsTriggered
             if (this.battleManager.attackEffectsManager) {
                 this.battleManager.attackEffectsManager.processAttackEffects(
                     attacker,
                     defender,
                     attack.damage,
-                    'basic'
+                    'basic',
+                    attack.effectsTriggered || []  // ✅ Pass the effects that were triggered!
                 );
             }
             
@@ -602,8 +770,13 @@ export class BattleCombatManager {
                 );
             }
 
-            // Check for fireshield recoil damage (only for hero-to-hero attacks)
-            this.checkAndApplyFireshieldRecoil(attacker, defender);
+            // Skip fireshield recoil for ranged attacks (they're not close enough to get burned)
+            if (!isRanged) {
+                // Check for fireshield recoil damage (only for melee hero-to-hero attacks)
+                this.checkAndApplyFireshieldRecoil(attacker, defender);
+            } else {
+                console.log(`🏹 ${attacker.name}'s ranged attack avoids ${defender.name}'s fireshield recoil!`);
+            }
         }
     }
 

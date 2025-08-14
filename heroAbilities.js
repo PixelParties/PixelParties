@@ -38,13 +38,20 @@ export class HeroAbilitiesManager {
             right: false
         };
         
-        // NEW: Track Leadership usage per turn
+        // Track specific Ability usage per turn
         this.heroLeadershipUsedThisTurn = {
             left: false,
             center: false,
             right: false
         };
-        
+        this.heroNavigationUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+
+
+
         // References to other managers (will be set by heroSelection)
         this.handManager = null;
         this.formationManager = null;
@@ -114,6 +121,28 @@ export class HeroAbilitiesManager {
         return false;
     }
 
+
+    // Check if hero can use Navigation this turn
+    canUseNavigation(heroPosition) {
+        if (!this.heroNavigationUsedThisTurn.hasOwnProperty(heroPosition)) {
+            console.error(`Invalid hero position: ${heroPosition}`);
+            return false;
+        }
+        return !this.heroNavigationUsedThisTurn[heroPosition];
+    }
+
+    // Mark Navigation as used for this hero this turn
+    markNavigationUsed(heroPosition) {
+        if (this.heroNavigationUsedThisTurn.hasOwnProperty(heroPosition)) {
+            this.heroNavigationUsedThisTurn[heroPosition] = true;
+            console.log(`${heroPosition} hero's Navigation marked as used this turn`);
+            return true;
+        }
+        return false;
+    }
+
+
+
     // Reset turn-based tracking (called after battle)
     resetTurnBasedTracking() {
         this.heroAbilityAttachedThisTurn = {
@@ -122,8 +151,13 @@ export class HeroAbilitiesManager {
             right: false
         };
         
-        // Reset Leadership usage
+        // Reset Ability usage
         this.heroLeadershipUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+        this.heroNavigationUsedThisTurn = {
             left: false,
             center: false,
             right: false
@@ -796,7 +830,8 @@ export class HeroAbilitiesManager {
             heroAbilityRegistry: registryExport,
             heroAbilityAttachedThisTurn: JSON.parse(JSON.stringify(this.heroAbilityAttachedThisTurn)),
             // Include Leadership usage in save state
-            heroLeadershipUsedThisTurn: JSON.parse(JSON.stringify(this.heroLeadershipUsedThisTurn))
+            heroLeadershipUsedThisTurn: JSON.parse(JSON.stringify(this.heroLeadershipUsedThisTurn)),
+            heroNavigationUsedThisTurn: JSON.parse(JSON.stringify(this.heroNavigationUsedThisTurn))
         };
     }
     
@@ -834,7 +869,7 @@ export class HeroAbilitiesManager {
             };
         }
         
-        // Import Leadership usage tracking
+        // Import Ability usage tracking (Leadership, Navigation etc)
         if (state.heroLeadershipUsedThisTurn) {
             this.heroLeadershipUsedThisTurn = JSON.parse(JSON.stringify(state.heroLeadershipUsedThisTurn));
         } else {
@@ -845,10 +880,22 @@ export class HeroAbilitiesManager {
                 right: false
             };
         }
+        if (state.heroNavigationUsedThisTurn) {
+            this.heroNavigationUsedThisTurn = JSON.parse(JSON.stringify(state.heroNavigationUsedThisTurn));
+        } else {
+            // Default to false if not in save state (backward compatibility)
+            this.heroNavigationUsedThisTurn = {
+                left: false,
+                center: false,
+                right: false
+            };
+        }
         
+
+
         console.log('Imported hero abilities state with Leadership tracking and zone validation');
         
-        // NEW: Log imported stat abilities and trigger stat updates
+        // Log imported stat abilities and trigger stat updates
         ['left', 'center', 'right'].forEach(position => {
             const statCount = this.countStatAbilities(this.heroAbilityZones[position]);
             if (statCount.toughness > 0 || statCount.fighting > 0) {
@@ -911,8 +958,14 @@ export class HeroAbilitiesManager {
             right: false
         };
         
-        // Reset Leadership tracking
+        // Reset specific Ability tracking
         this.heroLeadershipUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+
+        this.heroNavigationUsedThisTurn = {
             left: false,
             center: false,
             right: false

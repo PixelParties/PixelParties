@@ -237,7 +237,6 @@ export class PotionHandler {
         if (hostPotionState && hostPotionState.activePotionEffects && hostPotionState.activePotionEffects.length > 0) {
             const otherHostEffects = hostPotionState.activePotionEffects.filter(effect => effect.name !== 'SwordInABottle');
             if (otherHostEffects.length > 0) {
-                console.log(`🧪 Applying ${otherHostEffects.length} other host potion effects`);
                 const hostEffects = await this.applyPotionEffectsForPlayer(
                     { ...hostPotionState, activePotionEffects: otherHostEffects }, 
                     'host', 
@@ -251,7 +250,6 @@ export class PotionHandler {
         if (guestPotionState && guestPotionState.activePotionEffects && guestPotionState.activePotionEffects.length > 0) {
             const otherGuestEffects = guestPotionState.activePotionEffects.filter(effect => effect.name !== 'SwordInABottle');
             if (otherGuestEffects.length > 0) {
-                console.log(`🧪 Applying ${otherGuestEffects.length} other guest potion effects`);
                 const guestEffects = await this.applyPotionEffectsForPlayer(
                     { ...guestPotionState, activePotionEffects: otherGuestEffects }, 
                     'guest', 
@@ -867,303 +865,25 @@ export class PotionHandler {
             // Clear active effects for new game scenarios
             const clearedCount = this.activePotionEffects.length;
             this.activePotionEffects = [];
-            console.log(`🧪 PotionHandler reset to initial state (${clearedCount} active effects cleared for new game)`);
-        } else {
-            // Preserve active effects for turn resets within same game
-            console.log('🧪 PotionHandler reset to initial state (active effects preserved for same game)');
         }
     }
 
-    // NEW: Specific method for new game reset
+    // Specific method for new game reset
     resetForNewGame() {
         this.reset(true); // Force clear active effects
-        console.log('🧪 PotionHandler completely reset for new game');
     }
 
-    // NEW: Specific method for turn reset (existing behavior)
+    // Specific method for turn reset (existing behavior)
     resetForTurn() {
         this.reset(false); // Preserve active effects
-        console.log('🧪 PotionHandler reset for new turn (effects preserved)');
     }
 }
 
 // Create global instance
 const potionHandler = new PotionHandler();
 
-// Add CSS for potion effect notifications (same as before)
-if (typeof document !== 'undefined' && !document.getElementById('potionEffectStyles')) {
-    const style = document.createElement('style');
-    style.id = 'potionEffectStyles';
-    style.textContent = `
-        /* Existing potion styles... */
-        .potion-display {
-            background: linear-gradient(135deg, #9c27b0 0%, #673ab7 100%);
-            color: white;
-            padding: 12px 16px;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            min-width: 140px;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .potion-display.potions-depleted {
-            background: linear-gradient(135deg, #757575 0%, #424242 100%);
-            opacity: 0.7;
-        }
-
-        /* Active effects indicator */
-        .active-effects-indicator {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background: linear-gradient(135deg, #ff5722 0%, #d84315 100%);
-            color: white;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            font-weight: bold;
-            box-shadow: 0 2px 6px rgba(255, 87, 34, 0.5);
-            animation: activeEffectsPulse 2s ease-in-out infinite;
-            cursor: help;
-        }
-
-        @keyframes activeEffectsPulse {
-            0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.15); opacity: 1; }
-        }
-
-        /* Notification animations */
-        @keyframes potionEffectBounce {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.6) rotate(-10deg);
-            }
-            60% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
-            }
-            100% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1) rotate(0deg);
-            }
-        }
-
-        @keyframes potionEffectFade {
-            from {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-            to {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.8);
-            }
-        }
-
-        @keyframes potionEffectsAppliedBounce {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.5);
-            }
-            60% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1.1);
-            }
-            100% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-        }
-
-        @keyframes potionEffectsAppliedFade {
-            from {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-            to {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.9);
-            }
-        }
-
-        @keyframes potionEffectsClearedBounce {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.7);
-            }
-            50% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1.05);
-            }
-            100% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-        }
-
-        @keyframes potionEffectsClearedFade {
-            from {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-            to {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.9);
-            }
-        }
-
-        .potion-label {
-            font-weight: bold;
-            font-size: 14px;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-            margin-bottom: 4px;
-        }
-
-        .potion-amount {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .potion-icon {
-            font-size: 20px;
-            filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
-        }
-
-        .potion-number {
-            font-size: 24px;
-            font-weight: bold;
-            color: #e1f5fe;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-        }
-
-        @keyframes potionUsageBounce {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.5);
-            }
-            60% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1.1);
-            }
-            100% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-        }
-
-        @keyframes potionUsageFade {
-            from {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-            to {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.9);
-            }
-        }
-
-        @keyframes potionErrorBounce {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.7);
-            }
-            60% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1.08);
-            }
-            100% {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-        }
-
-        @keyframes potionErrorFade {
-            from {
-                opacity: 1;
-                transform: translate(-50%, -50%) scale(1);
-            }
-            to {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.9);
-            }
-        }
-
-        .potion-usage-content,
-        .potion-error-content,
-        .potion-effect-content,
-        .potion-effects-applied-content,
-        .potion-effects-cleared-content {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .potion-usage-icon,
-        .potion-error-icon,
-        .potion-effect-icon,
-        .potion-effects-applied-icon,
-        .potion-effects-cleared-icon {
-            font-size: 20px;
-            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
-        }
-
-        .potion-usage-text,
-        .potion-error-text,
-        .potion-effect-text,
-        .potion-effects-applied-text,
-        .potion-effects-cleared-text {
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-        }
-
-        .hand-card[data-card-type="potion"] {
-            position: relative;
-        }
-
-        .hand-card[data-card-type="potion"]::after {
-            content: "🧪";
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            font-size: 16px;
-            filter: drop-shadow(0 0 3px rgba(156, 39, 176, 0.8));
-            animation: potionCardPulse 2s ease-in-out infinite;
-        }
-
-        @keyframes potionCardPulse {
-            0%, 100% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.15); opacity: 1; }
-        }
-
-        .resource-display-container {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            left: 64%;
-            align-items: center;
-        }
-
-        .resource-top-row {
-            display: flex;
-            gap: 16px;
-            align-items: flex-start;
-            margin-left: 30px; 
-        }
-
-        .resource-bottom-row {
-            display: flex;
-            justify-content: center;
-        }
-    `;
-    document.head.appendChild(style);
-}
+// CSS is now handled in action-display.css instead of dynamic injection
+// (The previous dynamic CSS injection code has been removed)
 
 // Export both the class and the instance
 export { potionHandler };

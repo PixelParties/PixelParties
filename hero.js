@@ -188,28 +188,28 @@ export class Hero {
             if (Array.isArray(equipment)) {
                 this.equipment = equipment.filter(item => {
                     if (!item || typeof item !== 'object') {
-                        console.warn(`⚠️ Invalid equipment item for ${this.name}:`, item);
+                        console.warn(`âš ï¸ Invalid equipment item for ${this.name}:`, item);
                         return false;
                     }
                     
                     const itemName = item.name || item.cardName;
                     if (!itemName || typeof itemName !== 'string') {
-                        console.warn(`⚠️ Equipment item missing name for ${this.name}:`, item);
+                        console.warn(`âš ï¸ Equipment item missing name for ${this.name}:`, item);
                         return false;
                     }
                     
                     return true;
                 }).map(item => ({ ...item }));
                 
-                console.log(`✅ Set ${this.equipment.length} valid equipment items for ${this.name}`);
+                console.log(`âœ… Set ${this.equipment.length} valid equipment items for ${this.name}`);
             } else {
                 if (equipment !== undefined && equipment !== null) {
-                    console.warn(`⚠️ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
+                    console.warn(`âš ï¸ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
                 }
                 this.equipment = [];
             }
         } catch (error) {
-            console.error(`❌ Error setting equipment for ${this.name}:`, error);
+            console.error(`âŒ Error setting equipment for ${this.name}:`, error);
             this.equipment = [];
         }
     }
@@ -217,7 +217,7 @@ export class Hero {
     // Get equipment for this hero (sorted alphabetically)
     getEquipment() {
         if (!Array.isArray(this.equipment)) {
-            console.warn(`⚠️ Equipment is not an array for ${this.name}, resetting to empty array`);
+            console.warn(`âš ï¸ Equipment is not an array for ${this.name}, resetting to empty array`);
             this.equipment = [];
         }
         return [...this.equipment].sort((a, b) => {
@@ -463,7 +463,7 @@ export class Hero {
     
     // Get current attack (base attack from heroSelection + temporary modifiers)
     getCurrentAttack() {
-        // ★ SIMPLIFIED: Just return the stored attack value (already includes all bonuses)
+        // â˜… SIMPLIFIED: Just return the stored attack value (already includes all bonuses)
         return this.atk;
     }
 
@@ -519,7 +519,7 @@ export class Hero {
             baseAtk: this.baseAtk,
             alive: this.alive,
             
-            // NEW: Permanent stat bonuses
+            // Permanent stat bonuses
             attackBonusses: this.attackBonusses,
             hpBonusses: this.hpBonusses,
             

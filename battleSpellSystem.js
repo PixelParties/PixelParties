@@ -13,6 +13,9 @@ import FrostRuneSpell from './Spells/frostRune.js';
 import IcyGraveSpell from './Spells/icyGrave.js';
 import HeavyHitSpell from './Spells/heavyHit.js';
 import OverheatSpell from './Spells/overheat.js';  
+import RainOfArrowsSpell from './Spells/rainOfArrows.js';
+import IceAgeSpell from './Spells/iceage.js';
+import ChallengeSpell from './Spells/challenge.js';
 
 
 
@@ -81,9 +84,21 @@ export class BattleSpellSystem {
         const heavyHit = new HeavyHitSpell(this.battleManager);
         this.spellImplementations.set('HeavyHit', heavyHit);
 
+        // Register Challenge (Fighting spell)
+        const challenge = new ChallengeSpell(this.battleManager);
+        this.spellImplementations.set('Challenge', challenge);
+
         // Register Overheat
         const overheat = new OverheatSpell(this.battleManager);
         this.spellImplementations.set('Overheat', overheat);
+                
+        // Register RainOfArrows (Fighting spell)
+        const rainOfArrows = new RainOfArrowsSpell(this.battleManager);
+        this.spellImplementations.set('RainOfArrows', rainOfArrows);
+
+        // Register Ice Age
+        const iceAge = new IceAgeSpell(this.battleManager);
+        this.spellImplementations.set('Iceage', iceAge);
         
         console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
     }
@@ -121,7 +136,7 @@ export class BattleSpellSystem {
             return null; // No castable spells
         }
 
-        // NEW: Filter out spells that can't be cast due to conditions
+        // Filter out spells that can't be cast due to conditions
         const availableSpells = castableSpells.filter(spell => {
             // Check if we have a specific implementation for this spell
             if (this.spellImplementations.has(spell.name)) {
@@ -281,7 +296,7 @@ export class BattleSpellSystem {
             timestamp: Date.now()
         });
         
-        // TODO: Add actual spell effects here in the future
+        // Add actual spell effects here in the future
         this.executeSpellEffects(hero, spell);
     }
 
@@ -589,13 +604,6 @@ export class BattleSpellSystem {
         // Calculate percentages
         results.spellCastPercentage = (results.spellsCast / iterations * 100).toFixed(2);
         results.attackPercentage = (results.attacksPerformed / iterations * 100).toFixed(2);
-        
-        console.log(`🧪 Spell Casting Test Results for ${hero.name}:`);
-        console.log(`Total spells: ${results.totalSpells}`);
-        console.log(`Spells cast: ${results.spellsCast}/${iterations} (${results.spellCastPercentage}%)`);
-        console.log(`Attacks: ${results.attacksPerformed}/${iterations} (${results.attackPercentage}%)`);
-        console.log('Spell breakdown:', results.spellBreakdown);
-        console.log('Theoretical chances:', results.spellChances);
         
         return results;
     }

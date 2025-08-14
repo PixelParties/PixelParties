@@ -102,7 +102,7 @@ export class ActionManager {
         });
     }
 
-    // Set opponent actions (for sync) - REMOVED OPPONENT TRACKING
+    // Set opponent actions (for sync)
 
     // Notify listeners of action changes
     notifyActionChange(changeData) {
@@ -111,14 +111,13 @@ export class ActionManager {
         }
     }
 
-    // Create action display HTML - SIMPLIFIED WITHOUT OPPONENT
+    // Create action display HTML
     createActionDisplay() {
         return `
             <div class="action-display-container compact">
                 <div class="action-display player-actions">
                     <div class="action-header">
                         <span class="action-icon">⚡</span>
-                        <span class="action-label">Actions</span>
                     </div>
                     <div class="action-counter">
                         <span class="current-actions">${this.playerActions}</span>
@@ -212,26 +211,11 @@ export class ActionManager {
     }
 }
 
-// Create action error tooltip
+// Create action error tooltip - Updated to use CSS classes
 function createActionErrorTooltip(message) {
     const tooltip = document.createElement('div');
     tooltip.className = 'action-error-tooltip';
     tooltip.textContent = message;
-    
-    tooltip.style.cssText = `
-        position: fixed;
-        background: rgba(244, 67, 54, 0.95);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        font-weight: bold;
-        font-size: 16px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        z-index: 10000;
-        pointer-events: none;
-        animation: actionErrorPulse 0.5s ease-out;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-    `;
     
     return tooltip;
 }
@@ -267,7 +251,7 @@ window.showActionError = function(message, event) {
     
     // Remove after delay
     setTimeout(() => {
-        tooltip.style.animation = 'actionErrorFadeOut 0.3s ease-out';
+        tooltip.classList.add('fade-out');
         setTimeout(() => tooltip.remove(), 300);
     }, 2000);
 };

@@ -153,7 +153,7 @@ export class HeroSelection {
         // Character card mappings
         this.characterCards = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'LootThePrincess', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
-            'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'TreasureChest', 'WantedPoster', 'Wealth'],
+            'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'Clone', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Ida': ['BottledFlame', 'BurningSkeleton',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
@@ -622,7 +622,19 @@ export class HeroSelection {
             
             // Delegate all reconnection logic to the centralized manager
             const success = await this.reconnectionManager.handleReconnection(gameState);
-            
+
+            // Additional restoration for permanent artifacts (direct handling)
+            if (success && gameState && window.artifactHandler) {
+                const playerRole = this.isHost ? 'host' : 'guest';
+                const permanentArtifactsKey = `${playerRole}PermanentArtifacts`;
+                const permanentArtifactsData = gameState[permanentArtifactsKey];
+                
+                if (permanentArtifactsData) {
+                    window.artifactHandler.importPermanentArtifactsState(permanentArtifactsData);
+                    console.log('📋 Permanent artifacts restored during reconnection');
+                }
+            }
+
             return success;
 
         } catch (error) {
@@ -811,6 +823,11 @@ export class HeroSelection {
                     gameState.hostActionData = sanitizeForFirebase(this.actionManager.exportActionData());
                 }
 
+                // Save permanent artifacts for host
+                if (window.artifactHandler) {
+                    gameState.hostPermanentArtifacts = sanitizeForFirebase(window.artifactHandler.exportPermanentArtifactsState());
+                }
+
                 // Save magnetic glove state for host
                 if (window.magneticGloveArtifact) {
                     gameState.hostMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
@@ -906,6 +923,11 @@ export class HeroSelection {
                     gameState.guestActionData = sanitizeForFirebase(this.actionManager.exportActionData());
                 }
 
+                // Save permanent artifacts for guest
+                if (window.artifactHandler) {
+                    gameState.guestPermanentArtifacts = sanitizeForFirebase(window.artifactHandler.exportPermanentArtifactsState());
+                }
+
                 // Save magnetic glove state for guest
                 if (window.magneticGloveArtifact) {
                     gameState.guestMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
@@ -993,7 +1015,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1085,6 +1107,19 @@ export class HeroSelection {
             this.delayedArtifactEffects = [];
             console.log('📝 No delayed artifact effects found - initialized empty array');
         }
+
+        // ===== Restore permanent artifacts =====
+        if (permanentArtifactsData && window.artifactHandler) {
+            const restored = window.artifactHandler.importPermanentArtifactsState(permanentArtifactsData);
+            if (restored) {
+                console.log('✅ Permanent artifacts state restored successfully');
+            } else {
+                console.log('🔍 No permanent artifacts found - initialized empty list');
+            }
+        } else {
+            console.log('🔍 No permanent artifacts data found - keeping current state');
+        }
+
         
         // Restore player-specific global spell state (including Guard Change mode)
         if (globalSpellData && this.globalSpellManager) {
@@ -2061,6 +2096,11 @@ export class HeroSelection {
             center: this.heroAbilitiesManager.getHeroAbilities('center'),
             right: this.heroAbilitiesManager.getHeroAbilities('right')
         };
+
+
+        // Get permanent artifacts list for battle
+        const permanentArtifacts = window.artifactHandler ? 
+            window.artifactHandler.getPermanentArtifacts() : [];
         
         // Verify player abilities
         let totalPlayerAbilities = 0;
@@ -2190,6 +2230,12 @@ export class HeroSelection {
             opponentCreatures = this.opponentCreaturesData;
         }
         
+        // Get opponent effective stats (from stored data if available)
+        let opponentEffectiveStats = null;
+        if (this.opponentEffectiveStatsData) {
+            opponentEffectiveStats = this.opponentEffectiveStatsData;
+        }
+        
         // Initialize battle screen with all data        
         try {
             // Pass to battleScreen.init()
@@ -2212,7 +2258,9 @@ export class HeroSelection {
                 opponentCreatures,
                 playerEquipment,
                 opponentEquipment,
-                playerEffectiveStats       
+                playerEffectiveStats,
+                opponentEffectiveStats,
+                permanentArtifacts   
             );
             
             console.log('✅ Battle screen initialized with stat-enhanced Hero instances');
@@ -2575,12 +2623,17 @@ export class HeroSelection {
         // Get card info to check if it requires an action
         const cardInfo = getCardInfo(spellCardName);
         
-        // Check if player can play action card
-        const actionCheck = this.actionManager.canPlayActionCard(cardInfo);
-        if (!actionCheck.canPlay) {
-            this.handManager.endHandCardDrag();
-            window.showActionError(actionCheck.reason, window.event || { clientX: 0, clientY: 0 });
-            return false;
+        // Check if this is FrontSoldier being summoned for free
+        const isFrontSoldierFree = this.canSummonFrontSoldierForFree(targetSlot, spellCardName);
+        
+        // Check if player can play action card (skip for free FrontSoldier)
+        if (!isFrontSoldierFree) {
+            const actionCheck = this.actionManager.canPlayActionCard(cardInfo);
+            if (!actionCheck.canPlay) {
+                this.handManager.endHandCardDrag();
+                window.showActionError(actionCheck.reason, window.event || { clientX: 0, clientY: 0 });
+                return false;
+            }
         }
 
         // Check if it's a creature spell
@@ -2598,8 +2651,8 @@ export class HeroSelection {
             const success = this.heroCreatureManager.addCreatureToHero(targetSlot, spellCardName);
 
             if (success) {
-                // Consume action if required
-                if (cardInfo.action) {
+                // Consume action if required (skip for free FrontSoldier)
+                if (cardInfo.action && !isFrontSoldierFree) {
                     this.actionManager.consumeAction();
                 }
                 
@@ -2607,7 +2660,9 @@ export class HeroSelection {
                 this.handManager.removeCardFromHandByIndex(cardIndex);
                 
                 // Show success message
-                const successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)}!`;
+                const successMessage = isFrontSoldierFree ? 
+                    `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free!` :
+                    `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)}!`;
                 this.showSpellDropResult(targetSlot, successMessage, true);
 
                 // Update UI and save
@@ -2810,6 +2865,11 @@ export class HeroSelection {
             this.actionManager.reset();
         }
 
+        // Reset artifact handler (including permanent artifacts for new games)
+        if (window.artifactHandler) {
+            window.artifactHandler.reset();
+        }
+
         // ===== RESET POTION HANDLER FOR NEW GAME =====
         if (this.potionHandler) {
             this.potionHandler.resetForNewGame(); 
@@ -2899,6 +2959,9 @@ export class HeroSelection {
         // Create life display
         const lifeDisplay = this.lifeManager.createLifeDisplay();
         
+        const permanentArtifactsIndicator = this.heroSelectionUI.createPermanentArtifactsIndicator();
+
+
         // Create hand display
         const handDisplay = this.handManager.createHandDisplay(
             (cardName) => this.formatCardName(cardName)
@@ -2921,6 +2984,7 @@ export class HeroSelection {
         
         return `
             ${lifeDisplay}
+            ${permanentArtifactsIndicator}
             <div class="team-building-container">
                 <!-- Left Column - Team Formation -->
                 <div class="team-building-left">
@@ -3012,6 +3076,23 @@ export class HeroSelection {
             return { canLearn: false, reason: "Invalid spell card!" };
         }
 
+        // Special exception for Cavalry with 3 total heroes
+        if (spellCardName === 'Cavalry') {
+            // Count total heroes in formation
+            const totalHeroes = Object.values(formation).filter(h => h !== null && h !== undefined).length;
+            if (totalHeroes >= 3) {
+                return { canLearn: true, heroName: hero.name };
+            }
+        }
+
+        // Special exception for FrontSoldier when hero has no creatures
+        if (spellCardName === 'FrontSoldier') {
+            const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
+            if (heroCreatures.length === 0) {
+                return { canLearn: true, heroName: hero.name };
+            }
+        }
+
         // Check 3: Does hero have required spell school at required level?
         const spellSchool = spellInfo.spellSchool;
         const spellLevel = spellInfo.level || 0;
@@ -3062,6 +3143,16 @@ export class HeroSelection {
         }
 
         return { canLearn: true, heroName: hero.name };
+    }
+
+    canSummonFrontSoldierForFree(heroPosition, spellCardName) {
+        if (spellCardName !== 'FrontSoldier') {
+            return false;
+        }
+        
+        // Check if hero has no creatures yet
+        const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
+        return heroCreatures.length === 0;
     }
 
     // Add helper method to check if dragging an equip artifact card

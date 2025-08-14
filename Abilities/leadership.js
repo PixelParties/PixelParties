@@ -1,4 +1,4 @@
-// leadership.js - Leadership Ability Implementation - FIXED VERSION
+// leadership.js - Leadership Ability Implementation - FIXED VERSION WITH BONUS DRAWS
 
 export const leadershipAbility = {
     // Track which heroes have used Leadership this turn
@@ -53,6 +53,13 @@ export const leadershipAbility = {
                 window.heroSelection.saveGameState();
             }
         }
+    },
+    
+    // Calculate total cards to draw including bonus
+    calculateTotalDraws(cardsRemoved) {
+        const baseDraws = cardsRemoved;
+        const bonusDraws = Math.floor(cardsRemoved / 3);
+        return baseDraws + bonusDraws;
     },
     
     // Handle Leadership ability click
@@ -140,6 +147,7 @@ export const leadershipAbility = {
                 <div class="leadership-mode-header">
                     <h3>Select Cards to Shuffle Back</h3>
                     <p>Select up to <strong>${this.leadershipMode.maxCards}</strong> card${this.leadershipMode.maxCards > 1 ? 's' : ''} to shuffle into your deck and draw that many.</p>
+                    <p class="leadership-bonus-info">💡 <strong>Bonus:</strong> Draw +1 extra card for every 3 cards shuffled back!</p>
                 </div>
                 <div class="leadership-mode-buttons">
                     <button class="btn btn-primary leadership-confirm-btn" onclick="window.leadershipAbility.confirmSelection()" disabled>
@@ -156,6 +164,9 @@ export const leadershipAbility = {
                     <span class="arrow-down">↓</span>
                     <span class="instruction">Click cards below to select</span>
                     <span class="arrow-down">↓</span>
+                </div>
+                <div class="leadership-draw-preview">
+                    <span class="draw-preview-text">Will draw: <span class="draw-count">0</span> cards</span>
                 </div>
             </div>
         `;
@@ -264,12 +275,28 @@ export const leadershipAbility = {
     updateLeadershipUI() {
         const selectedCount = this.leadershipMode.selectedCards.length;
         const maxCards = this.leadershipMode.maxCards;
+        const totalDraws = this.calculateTotalDraws(selectedCount);
         
         // Update confirm button
         const confirmBtn = document.querySelector('.leadership-confirm-btn');
         if (confirmBtn) {
             confirmBtn.disabled = selectedCount === 0;
             confirmBtn.textContent = `Confirm (${selectedCount}/${maxCards})`;
+        }
+        
+        // Update draw preview
+        const drawCountElement = document.querySelector('.draw-count');
+        if (drawCountElement) {
+            drawCountElement.textContent = totalDraws;
+            
+            // Add visual feedback for bonus draws
+            const drawPreviewElement = document.querySelector('.draw-preview-text');
+            if (drawPreviewElement && selectedCount >= 3) {
+                const bonusDraws = Math.floor(selectedCount / 3);
+                drawPreviewElement.innerHTML = `Will draw: <span class="draw-count">${totalDraws}</span> cards <span class="bonus-indicator">(+${bonusDraws} bonus!)</span>`;
+            } else if (drawPreviewElement) {
+                drawPreviewElement.innerHTML = `Will draw: <span class="draw-count">${totalDraws}</span> cards`;
+            }
         }
         
         // Update card states
@@ -284,12 +311,14 @@ export const leadershipAbility = {
         });
     },
     
-    // Confirm card selection
+    // Confirm card selection with bonus draws
     async confirmSelection() {
         if (this.leadershipMode.selectedCards.length === 0) return;
         
         const selectedCount = this.leadershipMode.selectedCards.length;
         const heroPosition = this.leadershipMode.heroPosition;
+        const totalDraws = this.calculateTotalDraws(selectedCount);
+        const bonusDraws = Math.floor(selectedCount / 3);
         
         // Get hand manager
         const handManager = window.heroSelection.getHandManager();
@@ -316,9 +345,9 @@ export const leadershipAbility = {
         // The cards are shuffled back into the deck conceptually (infinite deck)
         console.log(`Shuffled ${selectedCardNames.length} cards back into deck:`, selectedCardNames);
         
-        // Draw that many cards
-        const drawnCards = handManager.drawCards(selectedCount);
-        console.log(`Drew ${drawnCards.length} cards:`, drawnCards);
+        // Draw total cards (base + bonus)
+        const drawnCards = handManager.drawCards(totalDraws);
+        console.log(`Drew ${drawnCards.length} cards (${selectedCount} base + ${bonusDraws} bonus):`, drawnCards);
         
         // Mark Leadership as used for this hero
         this.markLeadershipUsed(heroPosition);
@@ -333,8 +362,12 @@ export const leadershipAbility = {
             await window.heroSelection.saveGameState();
         }
         
-        // Show success message
-        this.showSuccess(`Shuffled ${selectedCount} card${selectedCount > 1 ? 's' : ''} and drew ${drawnCards.length} new card${drawnCards.length > 1 ? 's' : ''}!`);
+        // Show success message with bonus info
+        let successMessage = `Shuffled ${selectedCount} card${selectedCount > 1 ? 's' : ''} and drew ${drawnCards.length} new card${drawnCards.length > 1 ? 's' : ''}!`;
+        if (bonusDraws > 0) {
+            successMessage += ` (Including ${bonusDraws} bonus draw${bonusDraws > 1 ? 's' : ''}!)`;
+        }
+        this.showSuccess(successMessage);
         
         // End Leadership mode
         this.endLeadershipMode();
@@ -555,7 +588,7 @@ if (typeof window !== 'undefined') {
     window.leadershipAbility = leadershipAbility;
 }
 
-// Enhanced CSS for Leadership mode with fixes for disabled cards
+// Enhanced CSS for Leadership mode with bonus draw styling
 if (typeof document !== 'undefined' && !document.getElementById('leadershipStyles')) {
     const style = document.createElement('style');
     style.id = 'leadershipStyles';
@@ -612,7 +645,7 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             left: 0;
             right: 0;
             background: rgba(0, 0, 0, 0.9);
-            z-index: 1500; /* Higher than other overlays */
+            z-index: 1500;
             padding: 20px;
             animation: slideDown 0.3s ease-out;
         }
@@ -637,6 +670,20 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
         .leadership-mode-header p {
             color: #ddd;
             font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        .leadership-bonus-info {
+            color: #28a745 !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            text-shadow: 0 0 10px rgba(40, 167, 69, 0.5) !important;
+            animation: bonusInfoGlow 2s ease-in-out infinite;
+        }
+        
+        @keyframes bonusInfoGlow {
+            0%, 100% { text-shadow: 0 0 10px rgba(40, 167, 69, 0.5); }
+            50% { text-shadow: 0 0 15px rgba(40, 167, 69, 0.8); }
         }
         
         .leadership-mode-buttons {
@@ -663,22 +710,58 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             animation: bounce 1s ease-in-out infinite;
         }
         
+        .leadership-draw-preview {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: rgba(40, 167, 69, 0.2);
+            border: 2px solid rgba(40, 167, 69, 0.5);
+            border-radius: 15px;
+            display: inline-block;
+        }
+        
+        .draw-preview-text {
+            color: #28a745;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .draw-count {
+            color: #ffffff;
+            font-size: 22px;
+            text-shadow: 0 0 10px rgba(40, 167, 69, 0.8);
+        }
+        
+        .bonus-indicator {
+            color: #ffd700;
+            font-size: 16px;
+            animation: bonusPulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes bonusPulse {
+            0%, 100% { 
+                transform: scale(1);
+                text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+            }
+            50% { 
+                transform: scale(1.1);
+                text-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+            }
+        }
+        
         /* ENHANCED: Override all card restrictions during Leadership mode */
         body.leadership-mode-active .hand-card {
             transition: all 0.3s ease;
-            pointer-events: auto !important; /* Force enable clicks */
+            pointer-events: auto !important;
         }
         
         body.leadership-mode-active .hand-card.no-actions-available,
         body.leadership-mode-active .hand-card.exclusive-hand-disabled,
         body.leadership-mode-active .hand-card[data-unaffordable="true"] {
-            /* Override restrictions during Leadership mode */
             cursor: pointer !important;
-            opacity: 0.7 !important; /* Still show they're normally disabled, but allow selection */
+            opacity: 0.7 !important;
             filter: grayscale(50%) !important;
         }
         
-        /* Make selectable cards clearly clickable */
         .hand-card.leadership-selectable {
             cursor: pointer !important;
             border: 2px solid transparent;
@@ -747,10 +830,9 @@ if (typeof document !== 'undefined' && !document.getElementById('leadershipStyle
             box-shadow: none !important;
         }
         
-        /* Fix for cards that are normally restricted but should be selectable in Leadership mode */
         body.leadership-mode-active .hand-card.leadership-selectable.no-actions-available:hover::before,
         body.leadership-mode-active .hand-card.leadership-selectable.exclusive-hand-disabled:hover::before {
-            content: none; /* Remove the "Can't use that" message during Leadership mode */
+            content: none;
         }
         
         /* Animations */

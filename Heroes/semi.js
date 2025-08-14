@@ -226,6 +226,24 @@ export class SemiEffectManager {
                 return false;
             }
             
+            // NEW: Check if spell requires action and if player has actions
+            const cardInfo = heroSelection.getCardInfo(spellCardName);
+            if (cardInfo && cardInfo.action) {
+                const actionCheck = heroSelection.actionManager.canPlayActionCard(cardInfo);
+                if (!actionCheck.canPlay) {
+                    console.error('Cannot use Semi gold learning: no actions available');
+                    this.closeSemiDialog(dialogOverlay);
+                    
+                    // Show action error feedback
+                    const teamSlot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
+                    if (teamSlot) {
+                        this.showActionErrorFeedback(teamSlot, actionCheck.reason);
+                    }
+                    
+                    return false;
+                }
+            }
+            
             // Deduct gold
             const currentGold = heroSelection.goldManager.getPlayerGold();
             heroSelection.goldManager.setPlayerGold(currentGold - goldCost, 'semi_spell_learning');
@@ -236,6 +254,12 @@ export class SemiEffectManager {
             const success = heroSelection.heroSpellbookManager.addSpellToHero(heroPosition, spellCardName);
             
             if (success) {
+                // NEW: Consume action if the spell requires one
+                if (cardInfo && cardInfo.action) {
+                    heroSelection.actionManager.consumeAction();
+                    console.log('⚡ Action consumed for Semi\'s gold learning');
+                }
+                
                 // Remove spell from hand
                 heroSelection.handManager.removeCardFromHandByIndex(cardIndex);
                 
@@ -245,6 +269,7 @@ export class SemiEffectManager {
                 // Update UI
                 heroSelection.updateHandDisplay();
                 heroSelection.updateGoldDisplay();
+                heroSelection.updateActionDisplay(); // NEW: Update action display
                 await heroSelection.saveGameState();
                 await heroSelection.sendFormationUpdate();
                 
@@ -265,6 +290,40 @@ export class SemiEffectManager {
             this.closeSemiDialog(dialogOverlay);
             return false;
         }
+    }
+
+    // Show action error feedback
+    showActionErrorFeedback(teamSlot, errorMessage) {
+        const feedback = document.createElement('div');
+        feedback.className = 'semi-action-error-feedback';
+        feedback.textContent = errorMessage;
+        
+        feedback.style.cssText = `
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #dc3545 0%, #e63946 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 1000;
+            pointer-events: none;
+            animation: semiErrorBounce 1s ease-out;
+            box-shadow: 0 4px 20px rgba(220, 53, 69, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        `;
+        
+        teamSlot.style.position = 'relative';
+        teamSlot.appendChild(feedback);
+        
+        // Remove after animation
+        setTimeout(() => {
+            feedback.remove();
+        }, 3000);
     }
 
     // Show success feedback
@@ -380,6 +439,24 @@ if (typeof document !== 'undefined' && !document.getElementById('semiEffectStyle
         }
         
         @keyframes semiSuccessBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-5px) scale(1.05);
+            }
+            80% {
+                transform: translateX(-50%) translateY(0) scale(0.98);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes semiErrorBounce {
             0% {
                 opacity: 0;
                 transform: translateX(-50%) translateY(20px) scale(0.8);

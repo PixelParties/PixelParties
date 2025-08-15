@@ -1,30 +1,30 @@
-// ./Spells/flameAvalanche.js - FlameAvalanche Spell Implementation
+// ./Spells/mountainTearRiver.js - Mountain Tear River Spell Implementation
 
-export class FlameAvalancheSpell {
+export class MountainTearRiverSpell {
     constructor(battleManager) {
         this.battleManager = battleManager;
-        this.spellName = 'FlameAvalanche';
-        this.displayName = 'Flame Avalanche';
+        this.spellName = 'MountainTearRiver';
+        this.displayName = 'Mountain Tear River';
         
-        console.log('🔥 FlameAvalanche spell module initialized');
+        console.log('🌋 MountainTearRiver spell module initialized');
     }
 
     // ============================================
     // CORE SPELL EXECUTION
     // ============================================
 
-    // Execute FlameAvalanche spell effect
+    // Execute MountainTearRiver spell effect
     async executeSpell(caster, spell) {
-        console.log(`🔥 ${caster.name} casting ${this.displayName}!`);
+        console.log(`🌋 ${caster.name} casting ${this.displayName}!`);
         
-        // Calculate damage based on DestructionMagic level
-        const damage = this.calculateDamage(caster);
+        // Calculate burn stacks based on DestructionMagic level
+        const burnStacks = this.calculateBurnStacks(caster);
         
         // Find all enemy targets
         const allTargets = this.findAllEnemyTargets(caster);
         
         if (allTargets.length === 0) {
-            console.log(`🔥 ${this.displayName}: No valid targets found!`);
+            console.log(`🌋 ${this.displayName}: No valid targets found!`);
             return;
         }
         
@@ -32,23 +32,23 @@ export class FlameAvalancheSpell {
         const resistanceResults = this.checkResistanceForAllTargets(allTargets, caster);
         
         // Log the spell effect with resistance info
-        this.logSpellEffect(caster, damage, allTargets, resistanceResults);
+        this.logSpellEffect(caster, burnStacks, allTargets, resistanceResults);
         
-        // Start visual effects and damage application
-        const animationPromise = this.playFlameAvalancheAnimation(allTargets, caster, resistanceResults);
-        const damagePromise = this.applyDamageToAllTargets(allTargets, damage, caster, resistanceResults);
+        // Start visual effects and burn application
+        const animationPromise = this.playLavaFlowAnimation(allTargets, caster, resistanceResults);
+        const burnPromise = this.applyBurnToAllTargets(allTargets, burnStacks, caster, resistanceResults);
         
         // Wait for both to complete
-        await Promise.all([animationPromise, damagePromise]);
+        await Promise.all([animationPromise, burnPromise]);
         
-        console.log(`🔥 ${this.displayName} completed!`);
+        console.log(`🌋 ${this.displayName} completed!`);
     }
 
     // ============================================
     // RESISTANCE CHECKING
     // ============================================
 
-    // Check resistance for all targets upfront (UPDATED to pass caster)
+    // Check resistance for all targets upfront (same as FlameAvalanche)
     checkResistanceForAllTargets(targets, caster) {
         const resistanceMap = new Map();
         
@@ -87,31 +87,32 @@ export class FlameAvalancheSpell {
     }
 
     // ============================================
-    // DAMAGE CALCULATION
+    // BURN STACK CALCULATION
     // ============================================
 
-    // Calculate FlameAvalanche damage: 60 + 30X (X = DestructionMagic level)
-    calculateDamage(caster) {
-        const baseDamage = 60;
-        const perLevelDamage = 30;
+    // Calculate burn stacks: 1 + floor(DestructionMagic level / 3)
+    calculateBurnStacks(caster) {
+        const baseBurnStacks = 1;
         
         // Get DestructionMagic level
         const destructionLevel = caster.hasAbility('DestructionMagic') 
             ? caster.getAbilityStackCount('DestructionMagic') 
             : 0;
         
-        const totalDamage = baseDamage + (perLevelDamage * destructionLevel);
+        // Add 1 stack for every 3 levels of DestructionMagic
+        const bonusStacks = Math.floor(destructionLevel / 3);
+        const totalStacks = baseBurnStacks + bonusStacks;
         
-        console.log(`🔥 ${caster.name} DestructionMagic level ${destructionLevel}: ${totalDamage} damage`);
+        console.log(`🌋 ${caster.name} DestructionMagic level ${destructionLevel}: ${totalStacks} burn stacks (${baseBurnStacks} base + ${bonusStacks} bonus)`);
         
-        return totalDamage;
+        return totalStacks;
     }
 
     // ============================================
     // TARGET FINDING
     // ============================================
 
-    // Find all enemy targets (heroes and creatures)
+    // Find all enemy targets (heroes and creatures) - same as FlameAvalanche
     findAllEnemyTargets(caster) {
         const targets = [];
         const enemySide = caster.side === 'player' ? 'opponent' : 'player';
@@ -153,57 +154,51 @@ export class FlameAvalancheSpell {
     }
 
     // ============================================
-    // DAMAGE APPLICATION
+    // BURN APPLICATION
     // ============================================
 
-    // Apply damage to all targets with staggered timing for visual effect
-    async applyDamageToAllTargets(targets, damage, caster, resistanceResults) {
-        const damagePromises = [];
+    // Apply burn to all targets with staggered timing for visual effect
+    async applyBurnToAllTargets(targets, burnStacks, caster, resistanceResults) {
+        const burnPromises = [];
         
-        // Apply damage to all targets with slight delays for visual effect
+        // Apply burn to all targets with slight delays for visual effect
         targets.forEach((target, index) => {
             const delay = index * 50;
             const targetKey = this.getTargetKey(target);
             const isResisted = resistanceResults.get(targetKey);
             
-            const damagePromise = new Promise((resolve) => {
+            const burnPromise = new Promise((resolve) => {
                 setTimeout(() => {
-                    // Only apply damage if not resisted
+                    // Only apply burn if not resisted
                     if (!isResisted) {
-                        this.applyDamageToTarget(target, damage, caster);
+                        this.applyBurnToTarget(target, burnStacks, caster);
                     }
                     resolve();
                 }, this.battleManager.getSpeedAdjustedDelay(delay));
             });
             
-            damagePromises.push(damagePromise);
+            burnPromises.push(burnPromise);
         });
         
-        // Wait for all damage to be applied
-        await Promise.all(damagePromises);
+        // Wait for all burn to be applied
+        await Promise.all(burnPromises);
     }
 
-    // Apply damage to a single target
-    applyDamageToTarget(target, damage, caster) {
+    // Apply burn stacks to a single target
+    applyBurnToTarget(target, burnStacks, caster) {
+        let actualTarget = null;
+        
         if (target.type === 'hero') {
-            // Apply damage to hero
-            this.battleManager.authoritative_applyDamage({
-                target: target.hero,
-                damage: damage,
-                newHp: Math.max(0, target.hero.currentHp - damage),
-                died: (target.hero.currentHp - damage) <= 0
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
-            
+            actualTarget = target.hero;
         } else if (target.type === 'creature') {
-            // Apply damage to creature
-            this.battleManager.authoritative_applyDamageToCreature({
-                hero: target.hero,
-                creature: target.creature,
-                creatureIndex: target.creatureIndex,
-                damage: damage,
-                position: target.position,
-                side: target.side
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
+            actualTarget = target.creature;
+        }
+        
+        if (actualTarget && this.battleManager.statusEffectsManager) {
+            // Apply burn status effect using the status effects manager
+            this.battleManager.statusEffectsManager.applyStatusEffect(actualTarget, 'burned', burnStacks);
+            
+            console.log(`🔥 Applied ${burnStacks} burn stacks to ${actualTarget.name}`);
         }
     }
 
@@ -211,76 +206,156 @@ export class FlameAvalancheSpell {
     // VISUAL EFFECTS
     // ============================================
 
-    // Play the main FlameAvalanche animation with flying flames
-    async playFlameAvalancheAnimation(targets, caster, resistanceResults) {
-        console.log(`🔥 Playing Flame Avalanche animation with ${targets.length} targets...`);
+    // Play the main lava flow animation
+    async playLavaFlowAnimation(targets, caster, resistanceResults) {
+        console.log(`🌋 Playing Mountain Tear River animation with ${targets.length} targets...`);
         
-        // Total animation duration: ~400ms (same as melee attack)
-        const totalDuration = 400;
-        const waveDuration = totalDuration / 3; // ~133ms per wave
-        const waveDelay = waveDuration; // Time between wave starts
+        // Total animation duration: ~800ms (longer than FlameAvalanche for the lava flow effect)
+        const totalDuration = 800;
         
-        // Spawn 3 waves of flames
-        const wavePromises = [];
+        // Create the lava flow that sweeps across the enemy side
+        await this.createLavaFlow(targets, caster, totalDuration, resistanceResults);
         
-        for (let wave = 0; wave < 3; wave++) {
-            const wavePromise = new Promise((resolve) => {
-                setTimeout(() => {
-                    this.spawnFlameWave(targets, caster, wave + 1, waveDuration, resistanceResults);
-                    resolve();
-                }, this.battleManager.getSpeedAdjustedDelay(wave * waveDelay));
-            });
-            wavePromises.push(wavePromise);
-        }
-        
-        // Wait for all waves to start, then wait for total duration
-        await Promise.all(wavePromises);
-        await this.battleManager.delay(waveDuration); // Wait for last wave to complete
-        
-        // Cleanup any remaining flame effects
-        this.cleanupAllFlameEffects();
+        // Cleanup any remaining lava effects
+        this.cleanupAllLavaEffects();
     }
 
-    // Spawn a single wave of 10X flames (10 flames per target)
-    spawnFlameWave(targets, caster, waveNumber, waveDuration, resistanceResults) {
-        console.log(`🔥 Spawning wave ${waveNumber} with ${targets.length * 10} flames`);
+    // Create a lava flow that sweeps across the enemy side
+    async createLavaFlow(targets, caster, duration, resistanceResults) {
+        // Use document.body like FlameAvalanche does for reliable positioning
+        const container = document.body;
         
-        // Get caster position for flame spawn point
-        const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
-        if (!casterElement) {
-            console.error('Could not find caster element for flame spawn');
-            return;
+        // Determine enemy side for animation
+        const enemySide = caster.side === 'player' ? 'opponent' : 'player';
+        
+        // Find the enemy side area by looking for hero elements
+        const enemySlots = document.querySelectorAll(`.${enemySide}-slot`);
+        if (enemySlots.length === 0) {
+            console.warn('Could not find enemy slots for lava flow positioning');
+            // Continue anyway - the lava will flow across the whole screen
         }
         
-        const casterRect = casterElement.getBoundingClientRect();
-        const casterCenterX = casterRect.left + casterRect.width / 2;
-        const casterCenterY = casterRect.top + casterRect.height / 2;
+        // Calculate the area to cover (or use full screen as fallback)
+        let flowTop = '20%';
+        let flowBottom = '80%';
         
-        // Spawn 10 flames for each target
-        targets.forEach((target, targetIndex) => {
-            const targetKey = this.getTargetKey(target);
-            const isResisted = resistanceResults.get(targetKey);
+        if (enemySlots.length > 0) {
+            // Get bounding boxes of enemy area
+            let minTop = Infinity;
+            let maxBottom = 0;
             
-            for (let flameIndex = 0; flameIndex < 10; flameIndex++) {
+            enemySlots.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                minTop = Math.min(minTop, rect.top);
+                maxBottom = Math.max(maxBottom, rect.bottom);
+            });
+            
+            // Convert to percentages relative to viewport
+            flowTop = `${(minTop / window.innerHeight) * 100}%`;
+            flowBottom = `${(maxBottom / window.innerHeight) * 100}%`;
+        }
+        
+        // Create main lava flow container
+        const lavaFlow = document.createElement('div');
+        lavaFlow.className = 'mountain-tear-river-flow';
+        lavaFlow.style.cssText = `
+            position: fixed;
+            top: ${flowTop};
+            left: 0;
+            right: 0;
+            bottom: calc(100% - ${flowBottom});
+            z-index: 200;
+            pointer-events: none;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255, 100, 0, 0.3) 20%, 
+                rgba(255, 50, 0, 0.6) 50%, 
+                rgba(200, 0, 0, 0.4) 80%, 
+                transparent 100%);
+            clip-path: polygon(0% 40%, 100% 35%, 100% 65%, 0% 70%);
+            animation: lavaFlowSweep ${this.battleManager.getSpeedAdjustedDelay(duration)}ms ease-out forwards;
+            transform: translateX(-100%);
+        `;
+        
+        container.appendChild(lavaFlow);
+        
+        // Create lava bubbles and impacts
+        const bubblePromises = [];
+        
+        // Create 20 lava bubbles that flow across
+        for (let i = 0; i < 20; i++) {
+            bubblePromises.push(this.createLavaBubble(container, i, duration));
+        }
+        
+        // Create impact effects on targets after a delay
+        setTimeout(() => {
+            targets.forEach((target, index) => {
+                const targetKey = this.getTargetKey(target);
+                const isResisted = resistanceResults.get(targetKey);
+                
                 setTimeout(() => {
-                    this.spawnFlyingFlame(
-                        casterCenterX, 
-                        casterCenterY, 
-                        target, 
-                        waveNumber, 
-                        targetIndex, 
-                        flameIndex,
-                        waveDuration,
-                        isResisted
-                    );
-                }, this.battleManager.getSpeedAdjustedDelay(flameIndex * 5)); // Slight stagger within each target
-            }
+                    this.createLavaImpactEffect(target, isResisted);
+                }, index * 30);
+            });
+        }, this.battleManager.getSpeedAdjustedDelay(duration * 0.4)); // Impacts start at 40% through animation
+        
+        // Wait for all bubbles and the main flow to complete
+        await Promise.all([
+            ...bubblePromises,
+            new Promise(resolve => setTimeout(resolve, this.battleManager.getSpeedAdjustedDelay(duration)))
+        ]);
+        
+        // Remove the main lava flow
+        if (lavaFlow && lavaFlow.parentNode) {
+            lavaFlow.remove();
+        }
+        
+        this.ensureMountainTearRiverCSS();
+    }
+
+    // Create individual lava bubbles that flow across the screen
+    createLavaBubble(container, index, totalDuration) {
+        return new Promise(resolve => {
+            const bubble = document.createElement('div');
+            bubble.className = 'lava-bubble';
+            bubble.innerHTML = '🔥';
+            
+            // Randomize bubble properties
+            const size = 16 + Math.random() * 16; // 16-32px
+            const startDelay = (index / 20) * totalDuration * 0.3; // Stagger bubble starts
+            const bubbleDuration = totalDuration * 0.8; // Bubbles take 80% of total time
+            const yPosition = 40 + Math.random() * 20; // 40-60% from top
+            
+            bubble.style.cssText = `
+                position: fixed;
+                top: ${yPosition}%;
+                left: -50px;
+                font-size: ${size}px;
+                z-index: 210;
+                pointer-events: none;
+                transform: translateY(-50%);
+                animation: lavaBubbleFlow ${this.battleManager.getSpeedAdjustedDelay(bubbleDuration)}ms linear forwards;
+                animation-delay: ${this.battleManager.getSpeedAdjustedDelay(startDelay)}ms;
+                text-shadow: 
+                    0 0 10px rgba(255, 100, 0, 0.8),
+                    0 0 20px rgba(255, 150, 0, 0.6),
+                    0 0 30px rgba(255, 200, 0, 0.4);
+            `;
+            
+            container.appendChild(bubble);
+            
+            // Remove bubble after animation
+            setTimeout(() => {
+                if (bubble && bubble.parentNode) {
+                    bubble.remove();
+                }
+                resolve();
+            }, this.battleManager.getSpeedAdjustedDelay(startDelay + bubbleDuration + 100));
         });
     }
 
-    // Spawn a single flying flame that moves from caster to target
-    spawnFlyingFlame(startX, startY, target, waveNumber, targetIndex, flameIndex, duration, isResisted) {
-        // Get target position
+    // Create impact effect when lava hits a target
+    createLavaImpactEffect(target, isResisted) {
         let targetElement = null;
         
         if (target.type === 'hero') {
@@ -291,104 +366,20 @@ export class FlameAvalancheSpell {
             );
         }
         
-        if (!targetElement) {
-            console.warn(`Could not find target element for flame`, target);
-            return;
-        }
+        if (!targetElement) return;
         
-        const targetRect = targetElement.getBoundingClientRect();
-        const targetCenterX = targetRect.left + targetRect.width / 2;
-        const targetCenterY = targetRect.top + targetRect.height / 2;
-        
-        // Calculate cone spread for this flame
-        const coneSpread = this.calculateConeSpread(flameIndex, 10);
-        const flameSize = this.calculateFlameSize(flameIndex, 10);
-        
-        // Create flying flame element
-        const flame = document.createElement('div');
-        flame.className = `flying-flame wave-${waveNumber} target-${targetIndex} flame-${flameIndex}`;
-        flame.innerHTML = '🔥';
-        
-        // Add slight randomness to start position for visual variety
-        const startOffsetX = (Math.random() - 0.5) * 30; // ±15px
-        const startOffsetY = (Math.random() - 0.5) * 30; // ±15px
-        
-        // Calculate final target position with cone spread
-        const finalTargetX = targetCenterX + coneSpread.x;
-        const finalTargetY = targetCenterY + coneSpread.y;
-        
-        flame.style.cssText = `
-            position: fixed;
-            left: ${startX + startOffsetX}px;
-            top: ${startY + startOffsetY}px;
-            font-size: ${flameSize}px;
-            z-index: 300;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            animation: flyToTarget ${this.battleManager.getSpeedAdjustedDelay(duration)}ms linear forwards;
-        `;
-        
-        // Set CSS custom properties for target position
-        flame.style.setProperty('--target-x', `${finalTargetX}px`);
-        flame.style.setProperty('--target-y', `${finalTargetY}px`);
-        
-        document.body.appendChild(flame);
-        
-        // Remove flame when it reaches target
-        setTimeout(() => {
-            if (flame && flame.parentNode) {
-                // Create impact effect at target (only for some flames to avoid spam)
-                if (flameIndex % 3 === 0) { // Every 3rd flame creates impact
-                    this.createFlameImpactEffect(targetElement, target.type, isResisted);
-                }
-                flame.remove();
-            }
-        }, this.battleManager.getSpeedAdjustedDelay(duration));
-        
-        // Ensure CSS exists
-        this.ensureFlameAvalancheCSS();
-    }
-
-    // Calculate cone spread for flame positioning
-    calculateConeSpread(flameIndex, totalFlames) {
-        // Create a cone pattern around the target
-        const angle = (flameIndex / (totalFlames - 1)) * Math.PI * 0.6 - Math.PI * 0.3; // 60-degree cone
-        const distance = 20 + Math.random() * 40; // 20-60px spread from target center
-        
-        return {
-            x: Math.cos(angle) * distance,
-            y: Math.sin(angle) * distance
-        };
-    }
-
-    // Calculate flame size variation
-    calculateFlameSize(flameIndex, totalFlames) {
-        // Vary flame sizes between 18px and 32px
-        const minSize = 18;
-        const maxSize = 32;
-        
-        // Create some pattern + randomness
-        const pattern = Math.sin((flameIndex / totalFlames) * Math.PI * 2);
-        const randomness = (Math.random() - 0.5) * 0.4; // ±20% randomness
-        const sizeMultiplier = 0.5 + (pattern + randomness) * 0.5; // 0-1 range
-        
-        return Math.round(minSize + (maxSize - minSize) * sizeMultiplier);
-    }
-
-    // Create impact effect when flame hits target
-    createFlameImpactEffect(targetElement, targetType, isResisted) {
         const impactEffect = document.createElement('div');
-        impactEffect.className = 'flame-impact-effect';
+        impactEffect.className = 'lava-impact-effect';
         
         if (isResisted) {
             // Show shield effect for resisted targets
             impactEffect.innerHTML = '🛡️✨';
             impactEffect.classList.add('resisted');
         } else {
-            impactEffect.innerHTML = '💥🔥';
+            impactEffect.innerHTML = '🌋🔥';
         }
         
-        const fontSize = targetType === 'hero' ? '32px' : '20px';
+        const fontSize = target.type === 'hero' ? '36px' : '24px';
         
         impactEffect.style.cssText = `
             position: absolute;
@@ -398,7 +389,7 @@ export class FlameAvalancheSpell {
             font-size: ${fontSize};
             z-index: 250;
             pointer-events: none;
-            animation: ${isResisted ? 'flameResisted' : 'flameImpact'} ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
+            animation: ${isResisted ? 'lavaResisted' : 'lavaImpact'} ${this.battleManager.getSpeedAdjustedDelay(300)}ms ease-out forwards;
         `;
         
         if (isResisted) {
@@ -406,6 +397,12 @@ export class FlameAvalancheSpell {
                 0 0 10px rgba(100, 200, 255, 0.9),
                 0 0 20px rgba(150, 150, 255, 0.7),
                 0 0 30px rgba(200, 200, 255, 0.5)
+            `;
+        } else {
+            impactEffect.style.textShadow = `
+                0 0 15px rgba(255, 50, 0, 0.9),
+                0 0 25px rgba(255, 100, 0, 0.7),
+                0 0 35px rgba(255, 150, 0, 0.5)
             `;
         }
         
@@ -416,60 +413,89 @@ export class FlameAvalancheSpell {
             if (impactEffect && impactEffect.parentNode) {
                 impactEffect.remove();
             }
-        }, this.battleManager.getSpeedAdjustedDelay(200));
+        }, this.battleManager.getSpeedAdjustedDelay(300));
     }
 
-    // Clean up any remaining flame effects
-    cleanupAllFlameEffects() {
-        // Remove any remaining flying flames
-        const flyingFlames = document.querySelectorAll('.flying-flame');
-        flyingFlames.forEach(flame => flame.remove());
+    // Clean up any remaining lava effects
+    cleanupAllLavaEffects() {
+        // Remove any remaining lava flows
+        const lavaFlows = document.querySelectorAll('.mountain-tear-river-flow');
+        lavaFlows.forEach(flow => flow.remove());
+        
+        // Remove any remaining lava bubbles
+        const lavaBubbles = document.querySelectorAll('.lava-bubble');
+        lavaBubbles.forEach(bubble => bubble.remove());
         
         // Remove any remaining impact effects
-        const impactEffects = document.querySelectorAll('.flame-impact-effect');
+        const impactEffects = document.querySelectorAll('.lava-impact-effect');
         impactEffects.forEach(effect => effect.remove());
     }
 
-    // Ensure CSS animations exist for flame effects
-    ensureFlameAvalancheCSS() {
-        if (document.getElementById('flameAvalancheCSS')) return;
+    // Ensure CSS animations exist for lava effects
+    ensureMountainTearRiverCSS() {
+        if (document.getElementById('mountainTearRiverCSS')) return;
         
         const style = document.createElement('style');
-        style.id = 'flameAvalancheCSS';
+        style.id = 'mountainTearRiverCSS';
         style.textContent = `
-            @keyframes flyToTarget {
+            @keyframes lavaFlowSweep {
                 0% { 
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
+                    transform: translateX(-100%);
+                    opacity: 0;
                 }
-                20% {
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(1.1) rotate(90deg);
+                10% {
+                    opacity: 0.8;
                 }
-                80% {
+                20% { 
+                    transform: translateX(-50%);
                     opacity: 1;
-                    transform: translate(-50%, -50%) scale(1.0) rotate(270deg);
+                }
+                80% { 
+                    transform: translateX(50%);
+                    opacity: 1;
+                }
+                90% {
+                    opacity: 0.6;
                 }
                 100% { 
-                    left: var(--target-x);
-                    top: var(--target-y);
-                    opacity: 0.8;
-                    transform: translate(-50%, -50%) scale(1.2) rotate(360deg);
+                    transform: translateX(100%);
+                    opacity: 0;
                 }
             }
             
-            @keyframes flameImpact {
+            @keyframes lavaBubbleFlow {
+                0% { 
+                    left: -50px;
+                    opacity: 0;
+                    transform: translateY(-50%) scale(0.5) rotate(0deg);
+                }
+                10% {
+                    opacity: 1;
+                    transform: translateY(-50%) scale(1.1) rotate(45deg);
+                }
+                90% {
+                    opacity: 1;
+                    transform: translateY(-50%) scale(1.0) rotate(315deg);
+                }
+                100% { 
+                    left: calc(100vw + 50px);
+                    opacity: 0;
+                    transform: translateY(-50%) scale(0.8) rotate(360deg);
+                }
+            }
+            
+            @keyframes lavaImpact {
                 0% { 
                     opacity: 0; 
                     transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
                 }
                 30% { 
                     opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.2) rotate(180deg); 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(120deg); 
                 }
                 70% { 
-                    opacity: 0.8; 
-                    transform: translate(-50%, -50%) scale(1.1) rotate(270deg); 
+                    opacity: 0.9; 
+                    transform: translate(-50%, -50%) scale(1.2) rotate(240deg); 
                 }
                 100% { 
                     opacity: 0; 
@@ -477,50 +503,43 @@ export class FlameAvalancheSpell {
                 }
             }
             
-            @keyframes flameResisted {
+            @keyframes lavaResisted {
                 0% { 
                     opacity: 0; 
                     transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
                 }
                 30% { 
                     opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.3) rotate(45deg); 
+                    transform: translate(-50%, -50%) scale(1.4) rotate(60deg); 
                 }
                 70% { 
                     opacity: 0.8; 
-                    transform: translate(-50%, -50%) scale(1.2) rotate(90deg); 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(120deg); 
                 }
                 100% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(1.4) rotate(135deg); 
+                    transform: translate(-50%, -50%) scale(1.5) rotate(180deg); 
                 }
             }
             
-            .flying-flame {
-                text-shadow: 
-                    0 0 8px rgba(255, 100, 0, 0.8),
-                    0 0 12px rgba(255, 150, 0, 0.6),
-                    0 0 16px rgba(255, 200, 0, 0.4);
-                filter: drop-shadow(0 0 4px rgba(255, 100, 0, 0.7));
+            .mountain-tear-river-flow {
+                will-change: transform, opacity;
             }
             
-            .flame-impact-effect {
-                text-shadow: 
-                    0 0 10px rgba(255, 50, 0, 0.9),
-                    0 0 20px rgba(255, 100, 0, 0.7),
-                    0 0 30px rgba(255, 200, 0, 0.5);
+            .lava-bubble {
+                will-change: transform, opacity, left;
+                filter: drop-shadow(0 0 6px rgba(255, 100, 0, 0.8));
             }
             
-            .flame-impact-effect.resisted {
+            .lava-impact-effect {
+                will-change: transform, opacity;
+            }
+            
+            .lava-impact-effect.resisted {
                 text-shadow: 
                     0 0 10px rgba(100, 200, 255, 0.9),
                     0 0 20px rgba(150, 150, 255, 0.7),
-                    0 0 30px rgba(200, 200, 255, 0.5);
-            }
-            
-            /* Cleanup styles for better performance */
-            .flying-flame, .flame-impact-effect {
-                will-change: transform, opacity;
+                    0 0 30px rgba(200, 200, 255, 0.5) !important;
             }
         `;
         
@@ -532,7 +551,7 @@ export class FlameAvalancheSpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, damage, targets, resistanceResults) {
+    logSpellEffect(caster, burnStacks, targets, resistanceResults) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
@@ -562,13 +581,13 @@ export class FlameAvalancheSpell {
             parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        let message = `🔥 ${this.displayName} engulfs the battlefield`;
+        let message = `🌋 ${this.displayName} flows across the battlefield`;
         
         if (parts.length > 0) {
-            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+            message += `, burning ${parts.join(' and ')} with ${burnStacks} stack${burnStacks > 1 ? 's' : ''} each!`;
         } else {
             // All targets resisted
-            message += `, but all targets resisted!`;
+            message += `, but all targets resisted the molten flow!`;
         }
         
         // Add resistance info if any
@@ -606,14 +625,14 @@ export class FlameAvalancheSpell {
             casterName: caster.name,
             casterAbsoluteSide: caster.absoluteSide,
             casterPosition: caster.position,
-            damage: damage,
+            burnStacks: burnStacks,
             targetCount: targets.length,
             heroHits: heroHits,
             heroResists: heroResists,
             creatureHits: creatureHits,
             creatureResists: creatureResists,
             resistanceData: resistanceData,
-            effectType: 'area_damage',
+            effectType: 'area_burn',
             timestamp: Date.now()
         });
     }
@@ -624,7 +643,7 @@ export class FlameAvalancheSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, damage, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
+        const { displayName, casterName, burnStacks, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
@@ -640,12 +659,12 @@ export class FlameAvalancheSpell {
             parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        let message = `🔥 ${displayName} engulfs the battlefield`;
+        let message = `🌋 ${displayName} flows across the battlefield`;
         
         if (parts.length > 0) {
-            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+            message += `, burning ${parts.join(' and ')} with ${burnStacks} stack${burnStacks > 1 ? 's' : ''} each!`;
         } else {
-            message += `, but all targets resisted!`;
+            message += `, but all targets resisted the molten flow!`;
         }
         
         // Add main log
@@ -693,13 +712,13 @@ export class FlameAvalancheSpell {
         
         // Play visual effects on guest side
         if (guestTargets.length > 0) {
-            this.playFlameAvalancheAnimation(guestTargets, mockCaster, guestResistanceMap);
+            this.playLavaFlowAnimation(guestTargets, mockCaster, guestResistanceMap);
         }
         
-        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${data.targetCount} targets`);
+        console.log(`🌋 GUEST: ${casterName} used ${displayName} on ${data.targetCount} targets`);
     }
 
-    // Find enemy targets for guest-side animation (simplified version)
+    // Find enemy targets for guest-side animation (same as FlameAvalanche)
     findAllEnemyTargetsForGuest(caster) {
         const targets = [];
         const enemySide = caster.side === 'player' ? 'opponent' : 'player';
@@ -753,25 +772,25 @@ export class FlameAvalancheSpell {
         return {
             name: this.spellName,
             displayName: this.displayName,
-            description: 'A powerful barrage of flames that hits all enemies on the battlefield. When cast by Ida, applies additional flame damage to non-resisted targets.',
-            damageFormula: '60 + 30 × DestructionMagic level',
+            description: 'A flowing river of molten lava that engulfs all enemies, applying burn stacks. Burn causes damage over time.',
+            burnFormula: '1 + floor(DestructionMagic level / 3) burn stacks',
             targetType: 'all_enemies',
             spellSchool: 'DestructionMagic',
-            specialEffects: ['Ida: +50 flame damage to non-resisted targets']
+            specialEffects: ['Applies Burn status effect instead of direct damage']
         };
     }
 
     // Cleanup (called when battle ends)
     cleanup() {
-        this.cleanupAllFlameEffects();
+        this.cleanupAllLavaEffects();
         
         // Remove CSS if needed
-        const css = document.getElementById('flameAvalancheCSS');
+        const css = document.getElementById('mountainTearRiverCSS');
         if (css) css.remove();
         
-        console.log('🔥 FlameAvalanche spell cleaned up');
+        console.log('🌋 MountainTearRiver spell cleaned up');
     }
 }
 
 // Export for use in spell system
-export default FlameAvalancheSpell;
+export default MountainTearRiverSpell;

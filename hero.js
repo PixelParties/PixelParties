@@ -1,4 +1,4 @@
-// hero.js - Enhanced Hero Class with Pre-calculated Stats from heroSelection
+// hero.js - Enhanced Hero Class with Pre-calculated Stats from heroSelection + Battle Bonus System
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -48,9 +48,13 @@ export class Hero {
         this.creatures = [];
         this.equipment = [];
         
-        // NEW: Permanent stat bonuses from LegendarySwordOfABarbarianKing
+        // Permanent stat bonuses from LegendarySwordOfABarbarianKing
         this.attackBonusses = 0;  // Permanent attack bonuses
         this.hpBonusses = 0;      // Permanent HP bonuses
+        
+        // NEW: Battle-duration temporary bonuses (persist until battle ends)
+        this.battleAttackBonus = 0;  // Temporary attack bonus for this battle only
+        this.battleHpBonus = 0;      // Temporary HP bonus for this battle only
         
         // Necromancy stacks tracking
         this.necromancyStacks = 0;
@@ -72,6 +76,78 @@ export class Hero {
         this.attackBonusses += attackBonus;
         this.hpBonusses += hpBonus;
         console.log(`${this.name}: Added permanent bonuses - ATK +${attackBonus} (total: +${this.attackBonusses}), HP +${hpBonus} (total: +${this.hpBonusses})`);
+    }
+    
+    // NEW: Battle bonus system - these bonuses last for the entire battle
+    addBattleAttackBonus(amount) {
+        if (amount <= 0) return;
+        
+        this.battleAttackBonus += amount;
+        console.log(`${this.name}: Added battle attack bonus +${amount} (total battle bonus: +${this.battleAttackBonus})`);
+        
+        // Log new total attack
+        const newAttack = this.getCurrentAttack();
+        console.log(`${this.name}: New total attack: ${newAttack} (base: ${this.atk}, battle bonus: +${this.battleAttackBonus})`);
+    }
+    
+    addBattleHpBonus(amount) {
+        if (amount <= 0) return;
+        
+        const oldMaxHp = this.maxHp;
+        this.battleHpBonus += amount;
+        this.maxHp += amount;
+        
+        // Increase current HP by the same amount (maintains HP ratio)
+        this.currentHp += amount;
+        
+        console.log(`${this.name}: Added battle HP bonus +${amount} (total battle bonus: +${this.battleHpBonus})`);
+        console.log(`${this.name}: HP increased from ${oldMaxHp} to ${this.maxHp} (current: ${this.currentHp})`);
+    }
+    
+    // Clear battle bonuses (called when battle ends)
+    clearBattleBonuses() {
+        if (this.battleAttackBonus > 0 || this.battleHpBonus > 0) {
+            console.log(`${this.name}: Clearing battle bonuses (ATK: -${this.battleAttackBonus}, HP: -${this.battleHpBonus})`);
+            
+            // Remove HP bonus from max and current HP
+            if (this.battleHpBonus > 0) {
+                this.maxHp -= this.battleHpBonus;
+                this.currentHp -= this.battleHpBonus;
+                
+                // Ensure current HP doesn't go below 0 or above max
+                this.currentHp = Math.max(0, Math.min(this.currentHp, this.maxHp));
+            }
+            
+            this.battleAttackBonus = 0;
+            this.battleHpBonus = 0;
+        }
+    }
+    
+    // Get current attack including battle bonuses
+    getCurrentAttack() {
+        return this.atk + this.battleAttackBonus;
+    }
+    
+    // Get current max HP including battle bonuses (for display purposes)
+    getCurrentMaxHp() {
+        return this.maxHp; // maxHp already includes battle bonuses
+    }
+    
+    // Check if hero has any battle bonuses active
+    hasBattleBonuses() {
+        return this.battleAttackBonus > 0 || this.battleHpBonus > 0;
+    }
+    
+    // Get battle bonus summary for display
+    getBattleBonusSummary() {
+        const summary = [];
+        if (this.battleAttackBonus > 0) {
+            summary.push(`+${this.battleAttackBonus} ATK`);
+        }
+        if (this.battleHpBonus > 0) {
+            summary.push(`+${this.battleHpBonus} HP`);
+        }
+        return summary.length > 0 ? summary.join(', ') : null;
     }
     
     // Set pre-calculated stats directly from heroSelection
@@ -188,28 +264,28 @@ export class Hero {
             if (Array.isArray(equipment)) {
                 this.equipment = equipment.filter(item => {
                     if (!item || typeof item !== 'object') {
-                        console.warn(`âš ï¸ Invalid equipment item for ${this.name}:`, item);
+                        console.warn(`⚠️ Invalid equipment item for ${this.name}:`, item);
                         return false;
                     }
                     
                     const itemName = item.name || item.cardName;
                     if (!itemName || typeof itemName !== 'string') {
-                        console.warn(`âš ï¸ Equipment item missing name for ${this.name}:`, item);
+                        console.warn(`⚠️ Equipment item missing name for ${this.name}:`, item);
                         return false;
                     }
                     
                     return true;
                 }).map(item => ({ ...item }));
                 
-                console.log(`âœ… Set ${this.equipment.length} valid equipment items for ${this.name}`);
+                console.log(`✅ Set ${this.equipment.length} valid equipment items for ${this.name}`);
             } else {
                 if (equipment !== undefined && equipment !== null) {
-                    console.warn(`âš ï¸ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
+                    console.warn(`⚠️ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
                 }
                 this.equipment = [];
             }
         } catch (error) {
-            console.error(`âŒ Error setting equipment for ${this.name}:`, error);
+            console.error(`❌ Error setting equipment for ${this.name}:`, error);
             this.equipment = [];
         }
     }
@@ -217,7 +293,7 @@ export class Hero {
     // Get equipment for this hero (sorted alphabetically)
     getEquipment() {
         if (!Array.isArray(this.equipment)) {
-            console.warn(`âš ï¸ Equipment is not an array for ${this.name}, resetting to empty array`);
+            console.warn(`⚠️ Equipment is not an array for ${this.name}, resetting to empty array`);
             this.equipment = [];
         }
         return [...this.equipment].sort((a, b) => {
@@ -460,12 +536,6 @@ export class Hero {
             console.warn('Permanent attack modifications must be done in heroSelection, not during battle');
         }
     }
-    
-    // Get current attack (base attack from heroSelection + temporary modifiers)
-    getCurrentAttack() {
-        // â˜… SIMPLIFIED: Just return the stored attack value (already includes all bonuses)
-        return this.atk;
-    }
 
     // Get attack bonus (difference between current and original base)
     getAttackBonus() {
@@ -523,6 +593,10 @@ export class Hero {
             attackBonusses: this.attackBonusses,
             hpBonusses: this.hpBonusses,
             
+            // NEW: Battle-duration bonuses
+            battleAttackBonus: this.battleAttackBonus,
+            battleHpBonus: this.battleHpBonus,
+            
             // Abilities
             abilities: this.abilities,
             abilityRegistry: Array.from(this.abilityRegistry),
@@ -573,9 +647,13 @@ export class Hero {
         hero.atk = savedState.atk;
         hero.alive = savedState.alive;
         
-        // NEW: Restore permanent stat bonuses
+        // Restore permanent stat bonuses
         hero.attackBonusses = savedState.attackBonusses || 0;
         hero.hpBonusses = savedState.hpBonusses || 0;
+        
+        // NEW: Restore battle bonuses
+        hero.battleAttackBonus = savedState.battleAttackBonus || 0;
+        hero.battleHpBonus = savedState.battleHpBonus || 0;
         
         // Restore abilities
         hero.abilities = savedState.abilities || { zone1: [], zone2: [], zone3: [] };

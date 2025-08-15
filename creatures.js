@@ -147,7 +147,8 @@ export class HeroCreatureManager {
             ...cardInfo,
             addedAt: Date.now(),
             statusEffects: [],
-            type: 'creature'  
+            type: 'creature',
+            counters: 0  
         });
         
         // Notify state change

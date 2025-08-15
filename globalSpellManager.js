@@ -93,6 +93,9 @@ export class GlobalSpellManager {
         if (cardName === 'GuardChange') {
             return await this.handleGuardChangeClick(cardIndex, cardName, heroSelection);
         }
+        if (cardName === 'TharxianHorse') {
+            return await this.handleTharxianHorseClick(cardIndex, cardName, heroSelection);
+        }
         
         return false;
     }
@@ -109,6 +112,22 @@ export class GlobalSpellManager {
             }
         } catch (error) {
             console.error('Failed to load GuardChange spell:', error);
+            return false;
+        }
+    }
+
+    async handleTharxianHorseClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('tharxianHorse');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('TharxianHorse spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load TharxianHorse spell:', error);
             return false;
         }
     }

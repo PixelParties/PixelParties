@@ -16,6 +16,8 @@ import OverheatSpell from './Spells/overheat.js';
 import RainOfArrowsSpell from './Spells/rainOfArrows.js';
 import IceAgeSpell from './Spells/iceage.js';
 import ChallengeSpell from './Spells/challenge.js';
+import MountainTearRiverSpell from './Spells/mountainTearRiver.js';
+import VampireOnFireSpell from './Spells/vampireOnFire.js';
 
 
 
@@ -99,6 +101,14 @@ export class BattleSpellSystem {
         // Register Ice Age
         const iceAge = new IceAgeSpell(this.battleManager);
         this.spellImplementations.set('Iceage', iceAge);
+
+        // Register MountainTearRiver
+        const mountainTearRiver = new MountainTearRiverSpell(this.battleManager);
+        this.spellImplementations.set('MountainTearRiver', mountainTearRiver);
+
+        // Register VampireOnFire
+        const vampireOnFire = new VampireOnFireSpell(this.battleManager);
+        this.spellImplementations.set('VampireOnFire', vampireOnFire);
         
         console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
     }

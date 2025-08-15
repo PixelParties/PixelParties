@@ -523,7 +523,7 @@ const CARD_DATABASE = {
         name: 'FlameAvalanche',
         image: './Cards/All/FlameAvalanche.png',
         cardType: 'Spell',
-        level: 3,
+        level: 4,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -547,7 +547,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
-        subtype: 'Equip'
+        subtype: null
     },
 
     // Medea's Cards
@@ -955,7 +955,7 @@ const CARD_DATABASE = {
         cost: 6,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Permanent'
     },
     'FrontSoldier': {
         name: 'FrontSoldier',
@@ -972,11 +972,11 @@ const CARD_DATABASE = {
         name: 'FuriousAnger',
         image: './Cards/All/FuriousAnger.png',
         cardType: 'Spell',
-        level: 1,
+        level: 0,
         cost: 0,
         action: true,
-        spellSchool: 'SummoningMagic',
-        subtype: null
+        spellSchool: 'Fighting',
+        subtype: 'Reaction'
     },
     'GuardChange': {
         name: 'GuardChange',
@@ -993,11 +993,12 @@ const CARD_DATABASE = {
         name: 'TharxianHorse',
         image: './Cards/All/TharxianHorse.png',
         cardType: 'Spell',
-        level: 3,
+        level: 0,
         cost: 0,
-        action: false,
+        action: true,
         spellSchool: 'MagicArts',
-        subtype: 'Trap'
+        subtype: null,
+        global: true
     },
 
     // Toras's Cards
@@ -1121,7 +1122,7 @@ const CARD_DATABASE = {
         name: 'SkeletonDeathKnight',
         image: './Cards/All/SkeletonDeathKnight.png',
         cardType: 'Spell',
-        level: 1,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1132,7 +1133,7 @@ const CARD_DATABASE = {
         name: 'SkeletonMage',
         image: './Cards/All/SkeletonMage.png',
         cardType: 'Spell',
-        level: 1,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1143,7 +1144,7 @@ const CARD_DATABASE = {
         name: 'SkeletonNecromancer',
         image: './Cards/All/SkeletonNecromancer.png',
         cardType: 'Spell',
-        level: 1,
+        level: 5,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',

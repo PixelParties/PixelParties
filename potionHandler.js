@@ -1,4 +1,5 @@
 // potionHandler.js - Enhanced Potion Management System with Persistent Battle Effects and Multi-Player Support
+// UPDATED: Added ElixirOfStrength support
 
 export class PotionHandler {
     constructor() {
@@ -219,7 +220,7 @@ export class PotionHandler {
                 console.log(`✅ Simultaneous Sword in a Bottle processing completed: ${swordEffectsProcessed} effects`);
                 
             } catch (error) {
-                console.error('❌ Error processing simultaneous Sword in a Bottle effects:', error);
+                console.error('⚠️ Error processing simultaneous Sword in a Bottle effects:', error);
                 // Fall back to individual processing if simultaneous fails
                 if (hostSwordEffects.length > 0) {
                     const hostEffects = await this.handleSwordInABottleEffects(hostSwordEffects, 'host', battleManager);
@@ -305,6 +306,12 @@ export class PotionHandler {
     // Delegate potion effects to their specific modules
     async delegatePotionEffectToModule(potionName, effects, playerRole, battleManager) {
         switch (potionName) {
+            case 'ElixirOfStrength':
+                return await this.handleElixirOfStrengthEffects(effects, playerRole, battleManager);
+
+            case 'LifeSerum':
+                return await this.handleLifeSerumEffects(effects, playerRole, battleManager);
+            
             case 'BottledFlame':
                 return await this.handleBottledFlameEffects(effects, playerRole, battleManager);
             
@@ -320,11 +327,6 @@ export class PotionHandler {
             case 'SwordInABottle':  // <-- INDIVIDUAL FALLBACK PROCESSING
                 return await this.handleSwordInABottleEffects(effects, playerRole, battleManager);
 
-            case 'ElixirOfStrength':
-                // TODO: Implement when ElixirOfStrength battle effects are added
-                console.log(`ElixirOfStrength effects not yet implemented for battle`);
-                return 0;
-                
             case 'ElixirOfImmortality':
                 // TODO: Implement when ElixirOfImmortality battle effects are added
                 console.log(`ElixirOfImmortality effects not yet implemented for battle`);
@@ -334,6 +336,93 @@ export class PotionHandler {
             default:
                 console.log(`No battle effect defined for potion: ${potionName}`);
                 return 0;
+        }
+    }
+
+    async handleElixirOfStrengthEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the ElixirOfStrength module
+            const { ElixirOfStrengthPotion } = await import('./Potions/elixirOfStrength.js');
+            const elixirOfStrengthPotion = new ElixirOfStrengthPotion();
+            
+            // Delegate everything to the ElixirOfStrength module
+            const effectsProcessed = await elixirOfStrengthPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ ElixirOfStrength delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating ElixirOfStrength effects for ${playerRole}:`, error);
+            
+            // Fallback: try basic strength application
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            const attackBonus = 50 * effectCount; // 50 per potion
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive && hero.addBattleAttackBonus) {
+                    hero.addBattleAttackBonus(attackBonus);
+                    
+                    // Update display
+                    if (battleManager.updateHeroAttackDisplay) {
+                        battleManager.updateHeroAttackDisplay(hero.side, hero.position, hero);
+                    }
+                    
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`⚔️ Elixir of Strength effects applied (+${attackBonus} attack to ${fallbackTargets} heroes)`, 'info');
+            return effectCount;
+        }
+    }
+
+    async handleLifeSerumEffects(effects, playerRole, battleManager) {
+        try {
+            const { LifeSerumPotion } = await import('./Potions/lifeSerum.js');
+            const lifeSerumPotion = new LifeSerumPotion();
+            
+            const effectsProcessed = await lifeSerumPotion.handlePotionEffectsForPlayer(
+                effects, playerRole, battleManager
+            );
+            
+            console.log(`✅ LifeSerum delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating LifeSerum effects for ${playerRole}:`, error);
+            
+            // Fallback: basic HP application
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            const hpBonus = 200 * effectCount;
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive && hero.addBattleHpBonus) {
+                    hero.addBattleHpBonus(hpBonus);
+                    
+                    if (battleManager.updateHeroHealthBar) {
+                        battleManager.updateHeroHealthBar(hero.side, hero.position, hero.currentHp, hero.maxHp);
+                    }
+                    
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`❤️ Life Serum effects applied (+${hpBonus} HP to ${fallbackTargets} heroes)`, 'info');
+            return effectCount;
         }
     }
 

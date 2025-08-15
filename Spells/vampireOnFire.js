@@ -1,66 +1,72 @@
-// ./Spells/flameAvalanche.js - FlameAvalanche Spell Implementation
+// ./Spells/vampireOnFire.js - Vampire On Fire Spell Implementation
 
-export class FlameAvalancheSpell {
+export class VampireOnFireSpell {
     constructor(battleManager) {
         this.battleManager = battleManager;
-        this.spellName = 'FlameAvalanche';
-        this.displayName = 'Flame Avalanche';
+        this.spellName = 'VampireOnFire';
+        this.displayName = 'Vampire On Fire';
         
-        console.log('🔥 FlameAvalanche spell module initialized');
+        console.log('🧛‍♂️🔥 VampireOnFire spell module initialized');
     }
 
     // ============================================
     // CORE SPELL EXECUTION
     // ============================================
 
-    // Execute FlameAvalanche spell effect
+    // Execute VampireOnFire spell effect
     async executeSpell(caster, spell) {
-        console.log(`🔥 ${caster.name} casting ${this.displayName}!`);
+        console.log(`🧛‍♂️🔥 ${caster.name} casting ${this.displayName}!`);
         
-        // Calculate damage based on DestructionMagic level
-        const damage = this.calculateDamage(caster);
+        // Calculate heal-block stacks and damage based on DestructionMagic level
+        const destructionLevel = caster.hasAbility('DestructionMagic') 
+            ? caster.getAbilityStackCount('DestructionMagic') 
+            : 0;
+        
+        const healBlockStacks = destructionLevel + 1; // X + 1
+        const damage = 10 + (10 * destructionLevel); // 10 + 10*X
         
         // Find all enemy targets
         const allTargets = this.findAllEnemyTargets(caster);
         
         if (allTargets.length === 0) {
-            console.log(`🔥 ${this.displayName}: No valid targets found!`);
+            console.log(`🧛‍♂️🔥 ${this.displayName}: No valid targets found!`);
             return;
         }
         
-        // Pass caster to resistance check for Ida effect
+        // Pass caster to resistance check for potential resistance effects
         const resistanceResults = this.checkResistanceForAllTargets(allTargets, caster);
         
         // Log the spell effect with resistance info
-        this.logSpellEffect(caster, damage, allTargets, resistanceResults);
+        this.logSpellEffect(caster, healBlockStacks, damage, allTargets, resistanceResults);
         
-        // Start visual effects and damage application
-        const animationPromise = this.playFlameAvalancheAnimation(allTargets, caster, resistanceResults);
-        const damagePromise = this.applyDamageToAllTargets(allTargets, damage, caster, resistanceResults);
+        // Start visual effects
+        const animationPromise = this.playSicklyFlamesAnimation(allTargets, caster, resistanceResults);
+        
+        // Apply heal-block FIRST, then damage
+        const effectsPromise = this.applyHealBlockAndDamageToAllTargets(allTargets, healBlockStacks, damage, caster, resistanceResults);
         
         // Wait for both to complete
-        await Promise.all([animationPromise, damagePromise]);
+        await Promise.all([animationPromise, effectsPromise]);
         
-        console.log(`🔥 ${this.displayName} completed!`);
+        console.log(`🧛‍♂️🔥 ${this.displayName} completed!`);
     }
 
     // ============================================
-    // RESISTANCE CHECKING
+    // RESISTANCE CHECKING (same pattern as mountainTearRiver)
     // ============================================
 
-    // Check resistance for all targets upfront (UPDATED to pass caster)
+    // Check resistance for all targets upfront
     checkResistanceForAllTargets(targets, caster) {
         const resistanceMap = new Map();
         
         targets.forEach(target => {
             let resisted = false;
             
-            // Pass caster to resistance manager for Ida effect
+            // Pass caster to resistance manager for potential effects
             if (this.battleManager.resistanceManager) {
                 if (target.type === 'hero') {
                     resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
                 } else if (target.type === 'creature') {
-                    // For area spells, shouldResistAreaSpell handles creatures differently
                     resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName, caster);
                 }
             }
@@ -87,28 +93,7 @@ export class FlameAvalancheSpell {
     }
 
     // ============================================
-    // DAMAGE CALCULATION
-    // ============================================
-
-    // Calculate FlameAvalanche damage: 60 + 30X (X = DestructionMagic level)
-    calculateDamage(caster) {
-        const baseDamage = 60;
-        const perLevelDamage = 30;
-        
-        // Get DestructionMagic level
-        const destructionLevel = caster.hasAbility('DestructionMagic') 
-            ? caster.getAbilityStackCount('DestructionMagic') 
-            : 0;
-        
-        const totalDamage = baseDamage + (perLevelDamage * destructionLevel);
-        
-        console.log(`🔥 ${caster.name} DestructionMagic level ${destructionLevel}: ${totalDamage} damage`);
-        
-        return totalDamage;
-    }
-
-    // ============================================
-    // TARGET FINDING
+    // TARGET FINDING (same as mountainTearRiver)
     // ============================================
 
     // Find all enemy targets (heroes and creatures)
@@ -153,16 +138,30 @@ export class FlameAvalancheSpell {
     }
 
     // ============================================
-    // DAMAGE APPLICATION
+    // HEAL-BLOCK AND DAMAGE APPLICATION
     // ============================================
 
-    // Apply damage to all targets with staggered timing for visual effect
-    async applyDamageToAllTargets(targets, damage, caster, resistanceResults) {
+    // Apply heal-block first, then damage to all targets
+    async applyHealBlockAndDamageToAllTargets(targets, healBlockStacks, damage, caster, resistanceResults) {
+        // Apply heal-block to all targets first
+        targets.forEach((target) => {
+            const targetKey = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(targetKey);
+            
+            // Only apply effects if not resisted
+            if (!isResisted) {
+                this.applyHealBlockToTarget(target, healBlockStacks, caster);
+            }
+        });
+        
+        // Small delay to ensure heal-block is applied before damage
+        await this.battleManager.delay(100);
+        
+        // Then apply damage to all targets
         const damagePromises = [];
         
-        // Apply damage to all targets with slight delays for visual effect
         targets.forEach((target, index) => {
-            const delay = index * 50;
+            const delay = index * 50; // Stagger damage slightly for visual effect
             const targetKey = this.getTargetKey(target);
             const isResisted = resistanceResults.get(targetKey);
             
@@ -183,19 +182,39 @@ export class FlameAvalancheSpell {
         await Promise.all(damagePromises);
     }
 
+    // Apply heal-block status effect to a single target
+    applyHealBlockToTarget(target, healBlockStacks, caster) {
+        let actualTarget = null;
+        
+        if (target.type === 'hero') {
+            actualTarget = target.hero;
+        } else if (target.type === 'creature') {
+            actualTarget = target.creature;
+        }
+        
+        if (actualTarget && this.battleManager.statusEffectsManager) {
+            // Apply heal-block status effect using the status effects manager
+            this.battleManager.statusEffectsManager.applyStatusEffect(actualTarget, 'healblock', healBlockStacks);
+            
+            console.log(`🚫 Applied ${healBlockStacks} heal-block stacks to ${actualTarget.name}`);
+        }
+    }
+
     // Apply damage to a single target
     applyDamageToTarget(target, damage, caster) {
         if (target.type === 'hero') {
-            // Apply damage to hero
+            // Hero damage
             this.battleManager.authoritative_applyDamage({
                 target: target.hero,
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
-            
+            }, { 
+                source: 'vampireOnFire',
+                attacker: caster
+            });
         } else if (target.type === 'creature') {
-            // Apply damage to creature
+            // Creature damage
             this.battleManager.authoritative_applyDamageToCreature({
                 hero: target.hero,
                 creature: target.creature,
@@ -203,7 +222,10 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 position: target.position,
                 side: target.side
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
+            }, {
+                source: 'vampireOnFire',
+                attacker: caster
+            });
         }
     }
 
@@ -211,265 +233,186 @@ export class FlameAvalancheSpell {
     // VISUAL EFFECTS
     // ============================================
 
-    // Play the main FlameAvalanche animation with flying flames
-    async playFlameAvalancheAnimation(targets, caster, resistanceResults) {
-        console.log(`🔥 Playing Flame Avalanche animation with ${targets.length} targets...`);
+    // Play the main sickly flames animation
+    async playSicklyFlamesAnimation(targets, caster, resistanceResults) {
+        console.log(`🧛‍♂️🔥 Playing Vampire On Fire animation with ${targets.length} targets...`);
         
-        // Total animation duration: ~400ms (same as melee attack)
-        const totalDuration = 400;
-        const waveDuration = totalDuration / 3; // ~133ms per wave
-        const waveDelay = waveDuration; // Time between wave starts
+        // Total animation duration
+        const totalDuration = 1000;
         
-        // Spawn 3 waves of flames
-        const wavePromises = [];
-        
-        for (let wave = 0; wave < 3; wave++) {
-            const wavePromise = new Promise((resolve) => {
-                setTimeout(() => {
-                    this.spawnFlameWave(targets, caster, wave + 1, waveDuration, resistanceResults);
-                    resolve();
-                }, this.battleManager.getSpeedAdjustedDelay(wave * waveDelay));
-            });
-            wavePromises.push(wavePromise);
-        }
-        
-        // Wait for all waves to start, then wait for total duration
-        await Promise.all(wavePromises);
-        await this.battleManager.delay(waveDuration); // Wait for last wave to complete
+        // Create sickly flames effect that engulfs all targets
+        await this.createSicklyFlames(targets, caster, totalDuration, resistanceResults);
         
         // Cleanup any remaining flame effects
         this.cleanupAllFlameEffects();
     }
 
-    // Spawn a single wave of 10X flames (10 flames per target)
-    spawnFlameWave(targets, caster, waveNumber, waveDuration, resistanceResults) {
-        console.log(`🔥 Spawning wave ${waveNumber} with ${targets.length * 10} flames`);
+    // Create sickly green flames that engulf all enemies
+    async createSicklyFlames(targets, caster, duration, resistanceResults) {
+        const container = document.body;
         
-        // Get caster position for flame spawn point
-        const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
-        if (!casterElement) {
-            console.error('Could not find caster element for flame spawn');
-            return;
-        }
+        // Create individual flame effects on each target
+        const flamePromises = [];
         
-        const casterRect = casterElement.getBoundingClientRect();
-        const casterCenterX = casterRect.left + casterRect.width / 2;
-        const casterCenterY = casterRect.top + casterRect.height / 2;
-        
-        // Spawn 10 flames for each target
-        targets.forEach((target, targetIndex) => {
+        targets.forEach((target, index) => {
             const targetKey = this.getTargetKey(target);
             const isResisted = resistanceResults.get(targetKey);
             
-            for (let flameIndex = 0; flameIndex < 10; flameIndex++) {
-                setTimeout(() => {
-                    this.spawnFlyingFlame(
-                        casterCenterX, 
-                        casterCenterY, 
-                        target, 
-                        waveNumber, 
-                        targetIndex, 
-                        flameIndex,
-                        waveDuration,
-                        isResisted
-                    );
-                }, this.battleManager.getSpeedAdjustedDelay(flameIndex * 5)); // Slight stagger within each target
-            }
+            // Create flame effect with slight delay for visual spread
+            flamePromises.push(this.createTargetFlameEffect(target, isResisted, index * 100));
         });
-    }
-
-    // Spawn a single flying flame that moves from caster to target
-    spawnFlyingFlame(startX, startY, target, waveNumber, targetIndex, flameIndex, duration, isResisted) {
-        // Get target position
-        let targetElement = null;
         
-        if (target.type === 'hero') {
-            targetElement = this.battleManager.getHeroElement(target.side, target.position);
-        } else if (target.type === 'creature') {
-            targetElement = document.querySelector(
-                `.${target.side}-slot.${target.position}-slot .creature-icon[data-creature-index="${target.creatureIndex}"]`
-            );
-        }
-        
-        if (!targetElement) {
-            console.warn(`Could not find target element for flame`, target);
-            return;
-        }
-        
-        const targetRect = targetElement.getBoundingClientRect();
-        const targetCenterX = targetRect.left + targetRect.width / 2;
-        const targetCenterY = targetRect.top + targetRect.height / 2;
-        
-        // Calculate cone spread for this flame
-        const coneSpread = this.calculateConeSpread(flameIndex, 10);
-        const flameSize = this.calculateFlameSize(flameIndex, 10);
-        
-        // Create flying flame element
-        const flame = document.createElement('div');
-        flame.className = `flying-flame wave-${waveNumber} target-${targetIndex} flame-${flameIndex}`;
-        flame.innerHTML = '🔥';
-        
-        // Add slight randomness to start position for visual variety
-        const startOffsetX = (Math.random() - 0.5) * 30; // ±15px
-        const startOffsetY = (Math.random() - 0.5) * 30; // ±15px
-        
-        // Calculate final target position with cone spread
-        const finalTargetX = targetCenterX + coneSpread.x;
-        const finalTargetY = targetCenterY + coneSpread.y;
-        
-        flame.style.cssText = `
+        // Create ambient sickly flame overlay
+        const ambientFlame = document.createElement('div');
+        ambientFlame.className = 'vampire-fire-ambient';
+        ambientFlame.style.cssText = `
             position: fixed;
-            left: ${startX + startOffsetX}px;
-            top: ${startY + startOffsetY}px;
-            font-size: ${flameSize}px;
-            z-index: 300;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 180;
             pointer-events: none;
-            transform: translate(-50%, -50%);
-            animation: flyToTarget ${this.battleManager.getSpeedAdjustedDelay(duration)}ms linear forwards;
+            background: radial-gradient(circle, 
+                rgba(50, 205, 50, 0.1) 0%, 
+                rgba(34, 139, 34, 0.2) 30%, 
+                rgba(0, 128, 0, 0.1) 60%, 
+                transparent 100%);
+            animation: vampireFireAmbient ${this.battleManager.getSpeedAdjustedDelay(duration)}ms ease-in-out forwards;
+            opacity: 0;
         `;
         
-        // Set CSS custom properties for target position
-        flame.style.setProperty('--target-x', `${finalTargetX}px`);
-        flame.style.setProperty('--target-y', `${finalTargetY}px`);
+        container.appendChild(ambientFlame);
         
-        document.body.appendChild(flame);
+        // Wait for all flame effects to complete
+        await Promise.all([
+            ...flamePromises,
+            new Promise(resolve => setTimeout(resolve, this.battleManager.getSpeedAdjustedDelay(duration)))
+        ]);
         
-        // Remove flame when it reaches target
-        setTimeout(() => {
-            if (flame && flame.parentNode) {
-                // Create impact effect at target (only for some flames to avoid spam)
-                if (flameIndex % 3 === 0) { // Every 3rd flame creates impact
-                    this.createFlameImpactEffect(targetElement, target.type, isResisted);
+        // Remove ambient flame
+        if (ambientFlame && ambientFlame.parentNode) {
+            ambientFlame.remove();
+        }
+        
+        this.ensureVampireFireCSS();
+    }
+
+    // Create flame effect on individual target
+    createTargetFlameEffect(target, isResisted, delay) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                let targetElement = null;
+                
+                if (target.type === 'hero') {
+                    targetElement = this.battleManager.getHeroElement(target.side, target.position);
+                } else if (target.type === 'creature') {
+                    targetElement = document.querySelector(
+                        `.${target.side}-slot.${target.position}-slot .creature-icon[data-creature-index="${target.creatureIndex}"]`
+                    );
                 }
-                flame.remove();
-            }
-        }, this.battleManager.getSpeedAdjustedDelay(duration));
-        
-        // Ensure CSS exists
-        this.ensureFlameAvalancheCSS();
-    }
-
-    // Calculate cone spread for flame positioning
-    calculateConeSpread(flameIndex, totalFlames) {
-        // Create a cone pattern around the target
-        const angle = (flameIndex / (totalFlames - 1)) * Math.PI * 0.6 - Math.PI * 0.3; // 60-degree cone
-        const distance = 20 + Math.random() * 40; // 20-60px spread from target center
-        
-        return {
-            x: Math.cos(angle) * distance,
-            y: Math.sin(angle) * distance
-        };
-    }
-
-    // Calculate flame size variation
-    calculateFlameSize(flameIndex, totalFlames) {
-        // Vary flame sizes between 18px and 32px
-        const minSize = 18;
-        const maxSize = 32;
-        
-        // Create some pattern + randomness
-        const pattern = Math.sin((flameIndex / totalFlames) * Math.PI * 2);
-        const randomness = (Math.random() - 0.5) * 0.4; // ±20% randomness
-        const sizeMultiplier = 0.5 + (pattern + randomness) * 0.5; // 0-1 range
-        
-        return Math.round(minSize + (maxSize - minSize) * sizeMultiplier);
-    }
-
-    // Create impact effect when flame hits target
-    createFlameImpactEffect(targetElement, targetType, isResisted) {
-        const impactEffect = document.createElement('div');
-        impactEffect.className = 'flame-impact-effect';
-        
-        if (isResisted) {
-            // Show shield effect for resisted targets
-            impactEffect.innerHTML = '🛡️✨';
-            impactEffect.classList.add('resisted');
-        } else {
-            impactEffect.innerHTML = '💥🔥';
-        }
-        
-        const fontSize = targetType === 'hero' ? '32px' : '20px';
-        
-        impactEffect.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: ${fontSize};
-            z-index: 250;
-            pointer-events: none;
-            animation: ${isResisted ? 'flameResisted' : 'flameImpact'} ${this.battleManager.getSpeedAdjustedDelay(200)}ms ease-out forwards;
-        `;
-        
-        if (isResisted) {
-            impactEffect.style.textShadow = `
-                0 0 10px rgba(100, 200, 255, 0.9),
-                0 0 20px rgba(150, 150, 255, 0.7),
-                0 0 30px rgba(200, 200, 255, 0.5)
-            `;
-        }
-        
-        targetElement.appendChild(impactEffect);
-        
-        // Remove after animation
-        setTimeout(() => {
-            if (impactEffect && impactEffect.parentNode) {
-                impactEffect.remove();
-            }
-        }, this.battleManager.getSpeedAdjustedDelay(200));
+                
+                if (!targetElement) {
+                    resolve();
+                    return;
+                }
+                
+                const flameEffect = document.createElement('div');
+                flameEffect.className = 'vampire-fire-target-effect';
+                
+                if (isResisted) {
+                    // Show resistance effect
+                    flameEffect.innerHTML = '🛡️✨';
+                    flameEffect.classList.add('resisted');
+                } else {
+                    flameEffect.innerHTML = '🧛‍♂️🔥';
+                }
+                
+                const fontSize = target.type === 'hero' ? '48px' : '32px';
+                
+                flameEffect.style.cssText = `
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-size: ${fontSize};
+                    z-index: 200;
+                    pointer-events: none;
+                    animation: ${isResisted ? 'vampireFireResisted' : 'vampireFireTarget'} ${this.battleManager.getSpeedAdjustedDelay(800)}ms ease-out forwards;
+                `;
+                
+                if (isResisted) {
+                    flameEffect.style.textShadow = `
+                        0 0 15px rgba(100, 200, 255, 0.9),
+                        0 0 25px rgba(150, 150, 255, 0.7),
+                        0 0 35px rgba(200, 200, 255, 0.5)
+                    `;
+                } else {
+                    flameEffect.style.textShadow = `
+                        0 0 20px rgba(50, 205, 50, 0.9),
+                        0 0 30px rgba(34, 139, 34, 0.8),
+                        0 0 40px rgba(0, 128, 0, 0.6)
+                    `;
+                }
+                
+                targetElement.appendChild(flameEffect);
+                
+                // Remove after animation
+                setTimeout(() => {
+                    if (flameEffect && flameEffect.parentNode) {
+                        flameEffect.remove();
+                    }
+                    resolve();
+                }, this.battleManager.getSpeedAdjustedDelay(800));
+            }, this.battleManager.getSpeedAdjustedDelay(delay));
+        });
     }
 
     // Clean up any remaining flame effects
     cleanupAllFlameEffects() {
-        // Remove any remaining flying flames
-        const flyingFlames = document.querySelectorAll('.flying-flame');
-        flyingFlames.forEach(flame => flame.remove());
+        // Remove any remaining ambient flames
+        const ambientFlames = document.querySelectorAll('.vampire-fire-ambient');
+        ambientFlames.forEach(flame => flame.remove());
         
-        // Remove any remaining impact effects
-        const impactEffects = document.querySelectorAll('.flame-impact-effect');
-        impactEffects.forEach(effect => effect.remove());
+        // Remove any remaining target effects
+        const targetEffects = document.querySelectorAll('.vampire-fire-target-effect');
+        targetEffects.forEach(effect => effect.remove());
     }
 
-    // Ensure CSS animations exist for flame effects
-    ensureFlameAvalancheCSS() {
-        if (document.getElementById('flameAvalancheCSS')) return;
+    // Ensure CSS animations exist for vampire fire effects
+    ensureVampireFireCSS() {
+        if (document.getElementById('vampireFireCSS')) return;
         
         const style = document.createElement('style');
-        style.id = 'flameAvalancheCSS';
+        style.id = 'vampireFireCSS';
         style.textContent = `
-            @keyframes flyToTarget {
+            @keyframes vampireFireAmbient {
                 0% { 
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
+                    opacity: 0;
                 }
                 20% {
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(1.1) rotate(90deg);
+                    opacity: 0.8;
                 }
                 80% {
-                    opacity: 1;
-                    transform: translate(-50%, -50%) scale(1.0) rotate(270deg);
+                    opacity: 0.6;
                 }
                 100% { 
-                    left: var(--target-x);
-                    top: var(--target-y);
-                    opacity: 0.8;
-                    transform: translate(-50%, -50%) scale(1.2) rotate(360deg);
+                    opacity: 0;
                 }
             }
             
-            @keyframes flameImpact {
+            @keyframes vampireFireTarget {
                 0% { 
                     opacity: 0; 
                     transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
                 }
                 30% { 
                     opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.2) rotate(180deg); 
+                    transform: translate(-50%, -50%) scale(1.4) rotate(180deg); 
                 }
                 70% { 
-                    opacity: 0.8; 
-                    transform: translate(-50%, -50%) scale(1.1) rotate(270deg); 
+                    opacity: 0.9; 
+                    transform: translate(-50%, -50%) scale(1.2) rotate(270deg); 
                 }
                 100% { 
                     opacity: 0; 
@@ -477,50 +420,38 @@ export class FlameAvalancheSpell {
                 }
             }
             
-            @keyframes flameResisted {
+            @keyframes vampireFireResisted {
                 0% { 
                     opacity: 0; 
                     transform: translate(-50%, -50%) scale(0.3) rotate(0deg); 
                 }
                 30% { 
                     opacity: 1; 
-                    transform: translate(-50%, -50%) scale(1.3) rotate(45deg); 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(90deg); 
                 }
                 70% { 
                     opacity: 0.8; 
-                    transform: translate(-50%, -50%) scale(1.2) rotate(90deg); 
+                    transform: translate(-50%, -50%) scale(1.2) rotate(180deg); 
                 }
                 100% { 
                     opacity: 0; 
-                    transform: translate(-50%, -50%) scale(1.4) rotate(135deg); 
+                    transform: translate(-50%, -50%) scale(1.4) rotate(270deg); 
                 }
             }
             
-            .flying-flame {
-                text-shadow: 
-                    0 0 8px rgba(255, 100, 0, 0.8),
-                    0 0 12px rgba(255, 150, 0, 0.6),
-                    0 0 16px rgba(255, 200, 0, 0.4);
-                filter: drop-shadow(0 0 4px rgba(255, 100, 0, 0.7));
+            .vampire-fire-ambient {
+                will-change: opacity;
             }
             
-            .flame-impact-effect {
-                text-shadow: 
-                    0 0 10px rgba(255, 50, 0, 0.9),
-                    0 0 20px rgba(255, 100, 0, 0.7),
-                    0 0 30px rgba(255, 200, 0, 0.5);
-            }
-            
-            .flame-impact-effect.resisted {
-                text-shadow: 
-                    0 0 10px rgba(100, 200, 255, 0.9),
-                    0 0 20px rgba(150, 150, 255, 0.7),
-                    0 0 30px rgba(200, 200, 255, 0.5);
-            }
-            
-            /* Cleanup styles for better performance */
-            .flying-flame, .flame-impact-effect {
+            .vampire-fire-target-effect {
                 will-change: transform, opacity;
+            }
+            
+            .vampire-fire-target-effect.resisted {
+                text-shadow: 
+                    0 0 15px rgba(100, 200, 255, 0.9),
+                    0 0 25px rgba(150, 150, 255, 0.7),
+                    0 0 35px rgba(200, 200, 255, 0.5) !important;
             }
         `;
         
@@ -532,7 +463,7 @@ export class FlameAvalancheSpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, damage, targets, resistanceResults) {
+    logSpellEffect(caster, healBlockStacks, damage, targets, resistanceResults) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
@@ -562,13 +493,13 @@ export class FlameAvalancheSpell {
             parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        let message = `🔥 ${this.displayName} engulfs the battlefield`;
+        let message = `🧛‍♂️🔥 ${this.displayName} engulfs all enemies in sickly flames`;
         
         if (parts.length > 0) {
-            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+            message += `, cursing ${parts.join(' and ')} with ${healBlockStacks} heal-block stack${healBlockStacks > 1 ? 's' : ''} and ${damage} damage each!`;
         } else {
             // All targets resisted
-            message += `, but all targets resisted!`;
+            message += `, but all targets resisted the cursed flames!`;
         }
         
         // Add resistance info if any
@@ -606,6 +537,7 @@ export class FlameAvalancheSpell {
             casterName: caster.name,
             casterAbsoluteSide: caster.absoluteSide,
             casterPosition: caster.position,
+            healBlockStacks: healBlockStacks,
             damage: damage,
             targetCount: targets.length,
             heroHits: heroHits,
@@ -613,7 +545,7 @@ export class FlameAvalancheSpell {
             creatureHits: creatureHits,
             creatureResists: creatureResists,
             resistanceData: resistanceData,
-            effectType: 'area_damage',
+            effectType: 'area_healblock_damage',
             timestamp: Date.now()
         });
     }
@@ -624,7 +556,7 @@ export class FlameAvalancheSpell {
 
     // Handle spell effect on guest side
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, damage, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
+        const { displayName, casterName, healBlockStacks, damage, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
@@ -640,12 +572,12 @@ export class FlameAvalancheSpell {
             parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
         }
         
-        let message = `🔥 ${displayName} engulfs the battlefield`;
+        let message = `🧛‍♂️🔥 ${displayName} engulfs all enemies in sickly flames`;
         
         if (parts.length > 0) {
-            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+            message += `, cursing ${parts.join(' and ')} with ${healBlockStacks} heal-block stack${healBlockStacks > 1 ? 's' : ''} and ${damage} damage each!`;
         } else {
-            message += `, but all targets resisted!`;
+            message += `, but all targets resisted the cursed flames!`;
         }
         
         // Add main log
@@ -693,13 +625,13 @@ export class FlameAvalancheSpell {
         
         // Play visual effects on guest side
         if (guestTargets.length > 0) {
-            this.playFlameAvalancheAnimation(guestTargets, mockCaster, guestResistanceMap);
+            this.playSicklyFlamesAnimation(guestTargets, mockCaster, guestResistanceMap);
         }
         
-        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${data.targetCount} targets`);
+        console.log(`🧛‍♂️🔥 GUEST: ${casterName} used ${displayName} on ${data.targetCount} targets`);
     }
 
-    // Find enemy targets for guest-side animation (simplified version)
+    // Find enemy targets for guest-side animation (same pattern as mountainTearRiver)
     findAllEnemyTargetsForGuest(caster) {
         const targets = [];
         const enemySide = caster.side === 'player' ? 'opponent' : 'player';
@@ -753,11 +685,12 @@ export class FlameAvalancheSpell {
         return {
             name: this.spellName,
             displayName: this.displayName,
-            description: 'A powerful barrage of flames that hits all enemies on the battlefield. When cast by Ida, applies additional flame damage to non-resisted targets.',
-            damageFormula: '60 + 30 × DestructionMagic level',
+            description: 'Sickly green flames engulf all enemies, applying heal-block first then damage. Heal-block prevents revival.',
+            damageFormula: '10 + 10*DestructionMagic level damage',
+            healBlockFormula: 'DestructionMagic level + 1 heal-block stacks',
             targetType: 'all_enemies',
             spellSchool: 'DestructionMagic',
-            specialEffects: ['Ida: +50 flame damage to non-resisted targets']
+            specialEffects: ['Applies heal-block before damage to prevent revival']
         };
     }
 
@@ -766,12 +699,12 @@ export class FlameAvalancheSpell {
         this.cleanupAllFlameEffects();
         
         // Remove CSS if needed
-        const css = document.getElementById('flameAvalancheCSS');
+        const css = document.getElementById('vampireFireCSS');
         if (css) css.remove();
         
-        console.log('🔥 FlameAvalanche spell cleaned up');
+        console.log('🧛‍♂️🔥 VampireOnFire spell cleaned up');
     }
 }
 
 // Export for use in spell system
-export default FlameAvalancheSpell;
+export default VampireOnFireSpell;

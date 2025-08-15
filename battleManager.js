@@ -23,6 +23,9 @@ import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 
 
+import { checkFuriousAngerReactions } from './Spells/furiousAnger.js';
+
+
 export class BattleManager {
     constructor() {
         this.battleActive = false;
@@ -66,7 +69,7 @@ export class BattleManager {
         this.skeletonNecromancerManager = null;
         this.skeletonDeathKnightManager = null;
         this.skeletonReaperManager = null;
-
+        this.archerManager = null;
         
         // Attack effects
         this.attackEffectsManager = null;
@@ -493,8 +496,11 @@ export class BattleManager {
                         
                         const finalHp = Math.floor(baseHp * hpMultiplier);
                         
+                        // Create clean creature object without status effects
+                        const { statusEffects, ...cleanCreature } = creature;
+                        
                         return {
-                            ...creature,
+                            ...cleanCreature,  // ✅ Now excludes statusEffects
                             currentHp: finalHp,
                             maxHp: finalHp,
                             atk: creatureInfo?.atk || 0,
@@ -591,11 +597,17 @@ export class BattleManager {
                 // Update defeated state
                 if (!creature.alive) {
                     creatureElement.classList.add('defeated');
+                    // Reset counters when creature dies
+                    if (creature.counters !== undefined) {
+                        creature.counters = 0;
+                    }
+
                     // Remove health bar and HP text when defeated
                     const healthBar = creatureElement.querySelector('.creature-health-bar');
                     const hpText = creatureElement.querySelector('.creature-hp-text');
                     if (healthBar) healthBar.remove();
                     if (hpText) hpText.remove();
+                    if (counterDisplay) counterDisplay.remove();
                 } else {
                     // Add or update health bar
                     let healthBar = creatureElement.querySelector('.creature-health-bar');
@@ -633,6 +645,8 @@ export class BattleManager {
                     if (hpText) {
                         hpText.textContent = `${creature.currentHp}/${creature.maxHp}`;
                     }
+                    // Update counter display
+                    this.updateCreatureCounterDisplay(creatureElement, creature);
                 }
                 
                 // Update sprite visual state
@@ -648,6 +662,45 @@ export class BattleManager {
                 }
             }
         });
+    }
+
+    // Update creature counter display
+    updateCreatureCounterDisplay(creatureElement, creature) {
+        if (!creatureElement) return;
+
+        // Remove existing counter display
+        const existingCounter = creatureElement.querySelector('.creature-counter-display');
+        if (existingCounter) {
+            existingCounter.remove();
+        }
+
+        // Add new counter display if counters > 0 and creature is alive
+        if (creature.alive && creature.counters > 0) {
+            const counterDisplay = document.createElement('div');
+            counterDisplay.className = 'creature-counter-display';
+            counterDisplay.textContent = creature.counters;
+            counterDisplay.style.cssText = `
+                position: absolute;
+                top: -5px;
+                right: -5px;
+                width: 20px;
+                height: 20px;
+                background: white;
+                color: #333;
+                border: 2px solid #666;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 10;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                animation: counterPulse 2s ease-in-out infinite;
+            `;
+            
+            creatureElement.appendChild(counterDisplay);
+        }
     }
 
     // Reset hero visual state
@@ -1072,20 +1125,35 @@ export class BattleManager {
         const { hero, creature, creatureIndex, damage, position, side } = damageData;
         const { source, attacker } = context;
         
+        // Find the creature's CURRENT index (after any movements)
+        const currentCreatureIndex = hero.creatures.indexOf(creature);
+        
+        if (currentCreatureIndex === -1) {
+            console.error(`❌ CRITICAL: Creature ${creature.name} not found in ${hero.name}'s creatures array!`);
+            console.log('Hero creatures:', hero.creatures.map(c => c.name));
+            return;
+        }
+        
+        // Verify we're targeting the right creature
+        if (hero.creatures[currentCreatureIndex] !== creature) {
+            console.error(`❌ CRITICAL: Creature reference mismatch for ${creature.name}!`);
+            return;
+        }
+        
         const oldHp = creature.currentHp;
         const wasAlive = creature.alive;
         creature.currentHp = Math.max(0, creature.currentHp - damage);
         const willDie = creature.currentHp <= 0;
         
-        // CRITICAL: Record kill IMMEDIATELY when creature HP drops to 0, before any other processing
+        // Record kill IMMEDIATELY when creature HP drops to 0, before any other processing
         if (willDie && wasAlive && attacker && this.isAuthoritative) {
             recordKillWithVisualFeedback(this, attacker, creature, 'creature');
-            this.addCombatLog(`âš”ï¸ ${attacker.name} has slain ${creature.name}!`, 
+            this.addCombatLog(`${attacker.name} has slain ${creature.name}!`, 
                             attacker.side === 'player' ? 'success' : 'error');
-            console.log(`ðŸŽ¯ PRIORITY: Recorded creature kill ${attacker.name} -> ${creature.name} (HP: ${oldHp} -> ${creature.currentHp})`);
+            console.log(`PRIORITY: Recorded creature kill ${attacker.name} -> ${creature.name} (HP: ${oldHp} -> ${creature.currentHp})`);
         }
         
-        // IMPORTANT: Set creature as dead AFTER kill recording
+        // Set creature as dead AFTER kill recording
         if (willDie) {
             creature.alive = false;
         }
@@ -1096,12 +1164,12 @@ export class BattleManager {
         this.totalDamageDealt[hero.absoluteSide] += damage;
         
         this.addCombatLog(
-            `ðŸ’” ${creature.name} takes ${damage} damage! (${oldHp} â†’ ${creature.currentHp} HP)`,
+            `${creature.name} takes ${damage} damage! (${oldHp} → ${creature.currentHp} HP)`,
             side === 'player' ? 'error' : 'success'
         );
         
         // Track necromancy revival status and final creature index
-        let finalCreatureIndex = creatureIndex;
+        let finalCreatureIndex = currentCreatureIndex;
         let revivedByNecromancy = false;
         let necromancyArrayManipulation = null;
         
@@ -1112,63 +1180,91 @@ export class BattleManager {
             // 2. Trigger "when this dies" effects here
             this.triggerCreatureDeathEffects(creature, hero, attacker, context);
             this.checkForSkeletonMageReactions(creature, hero.side, 'creature');
+    
+            // 3: Check for Furious Anger reactions (must be before revival to trigger on every defeat)
+            setTimeout(async () => {
+                await checkFuriousAngerReactions(creature, side, hero, this);
+            }, 100); // Small delay to avoid interfering with damage processing
             
-            // 3. THEN attempt necromancy revival
+            // 4. THEN attempt necromancy revival
             if (this.necromancyManager) {
                 const revivalResult = this.necromancyManager.attemptNecromancyRevival(
-                    creature, hero, creatureIndex, side, position
+                    creature, hero, currentCreatureIndex, side, position
                 );
                 
                 if (revivalResult) {
                     revivedByNecromancy = true;
+
+                    // Reset counters when revived (creatures start fresh)
+                    if (creature.counters !== undefined) {
+                        creature.counters = 0;
+                    }
                     
                     // Get the new creature index after revival (creature moved to end)
                     finalCreatureIndex = hero.creatures.indexOf(creature);
                     
                     // Create array manipulation instructions for guest
                     necromancyArrayManipulation = {
-                        originalIndex: creatureIndex,
+                        originalIndex: currentCreatureIndex,
                         moveToEnd: true,
                         newIndex: finalCreatureIndex
                     };
                     
                     // Update creature health display with the NEW index
                     this.updateCreatureHealthBar(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp);
-                    this.addCombatLog(`ðŸ’€âœ¨ ${creature.name} rises again, but the kill still counts!`, 'info');
+                    this.addCombatLog(`${creature.name} rises again, but the kill still counts!`, 'info');
                 } else {
                     // Creature was not revived, continue with normal death handling
-                    this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
+                    this.handleCreatureDeathWithoutRevival(hero, creature, currentCreatureIndex, side, position);
                 }
             } else {
                 // No necromancy manager, continue with normal death handling
-                this.handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position);
+                this.handleCreatureDeathWithoutRevival(hero, creature, currentCreatureIndex, side, position);
             }
         } else {
-            // Creature survived, update health bar with original index
-            this.updateCreatureHealthBar(side, position, creatureIndex, creature.currentHp, creature.maxHp);
+            // Creature survived, update health bar with current index
+            this.updateCreatureHealthBar(side, position, currentCreatureIndex, creature.currentHp, creature.maxHp);
         }
         
         // Create damage number animation at the correct index
         const damageSource = context?.source || 'attack';
         this.animationManager.createDamageNumberOnCreature(side, position, finalCreatureIndex, damage, creature.maxHp, damageSource);
         
-        // Send battle update with array manipulation instructions for perfect guest sync
+        // ENHANCED: Send comprehensive position information for perfect guest sync
         this.sendBattleUpdate('creature_damage_applied', {
             heroAbsoluteSide: hero.absoluteSide,
             heroPosition: position,
-            creatureIndex: creatureIndex,               // Original index where damage was applied
+            
+            // MOVEMENT-AWARE INDEXING: Send both original and current positions
+            originalCreatureIndex: creatureIndex,          // Index where damage was conceptually applied
+            currentCreatureIndex: currentCreatureIndex,   // ACTUAL index in array at time of damage
+            finalCreatureIndex: finalCreatureIndex,       // Index after necromancy (if any)
+            
+            // CREATURE IDENTIFICATION: Multiple ways to identify the correct creature
+            creatureName: creature.name,
+            creatureId: creature.addedAt ? `${creature.name}_${creature.addedAt}` : creature.name,
+            
+            // DAMAGE DATA
             damage: damage,
             oldHp: oldHp,
             newHp: creature.currentHp,
             maxHp: creature.maxHp,
             died: willDie,
             revivedByNecromancy: revivedByNecromancy,
-            creatureName: creature.name,
-            // Include array manipulation instructions for guest to perform identical operations
-            necromancyArrayManipulation: necromancyArrayManipulation
+            
+            // NECROMANCY HANDLING (unchanged)
+            necromancyArrayManipulation: necromancyArrayManipulation,
+            
+            // DEBUGGING INFO
+            debugInfo: {
+                heroCreatureCount: hero.creatures.length,
+                damageSource: damageSource,
+                wasOriginalIndexCorrect: creatureIndex === currentCreatureIndex,
+                indexShift: currentCreatureIndex - creatureIndex
+            }
         });
         
-        // Save the updated battle state to persistence (includes the reordered creatures array)
+        // Save the updated battle state to persistence
         this.saveBattleStateToPersistence().catch(error => {
             console.error('Error saving state after creature damage:', error);
         });
@@ -1189,7 +1285,7 @@ export class BattleManager {
         
         // SKELETON NECROMANCER HERO REVIVAL DEATH EFFECT
         if (creature.name === 'SkeletonNecromancer' && this.skeletonNecromancerManager) {
-            console.log(`ðŸ’€âœ¨ Triggering Skeleton Necromancer hero revival death effect for ${creature.name}`);
+            console.log(`Triggering Skeleton Necromancer hero revival death effect for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1201,7 +1297,7 @@ export class BattleManager {
 
         // SKELETON DEATH KNIGHT DEATH SLASH STORM
         if (creature.name === 'SkeletonDeathKnight' && this.skeletonDeathKnightManager) {
-            console.log(`ðŸ’€âš”ï¸ Triggering Skeleton Death Knight death slash storm for ${creature.name}`);
+            console.log(`Triggering Skeleton Death Knight death slash storm for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1213,7 +1309,7 @@ export class BattleManager {
 
         // BURNING SKELETON DEATH FLAME STORM
         if (creature.name === 'BurningSkeleton' && this.burningSkeletonManager) {
-            console.log(`ðŸ’€ðŸ”¥ Triggering Burning Skeleton death flame storm for ${creature.name}`);
+            console.log(`Triggering Burning Skeleton death flame storm for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1225,7 +1321,7 @@ export class BattleManager {
         
         // SKELETON REAPER DEATH SLASH STORM
         if (creature.name === 'SkeletonReaper' && this.skeletonReaperManager) {
-            console.log(`ðŸ’€ðŸ”ª Triggering Skeleton Reaper death slash storm for ${creature.name}`);
+            console.log(`Triggering Skeleton Reaper death slash storm for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1237,7 +1333,7 @@ export class BattleManager {
 
         // SKELETON BARD DEATH INSPIRATION
         if (creature.name === 'SkeletonBard' && this.skeletonBardManager) {
-            console.log(`ðŸ’€ðŸŽµ Triggering Skeleton Bard death inspiration for ${creature.name}`);
+            console.log(`Triggering Skeleton Bard death inspiration for ${creature.name}`);
             
             // Get the side and position for the death effect
             const side = heroOwner.side;
@@ -1288,7 +1384,7 @@ export class BattleManager {
                 sprite.style.opacity = '0.5';
             }
             
-            // FIXED: Remove health bar and HP text when defeated (same as updateCreatureVisuals)
+            // Remove health bar and HP text when defeated (same as updateCreatureVisuals)
             const healthBar = creatureElement.querySelector('.creature-health-bar');
             const hpText = creatureElement.querySelector('.creature-hp-text');
             if (healthBar) {
@@ -1310,7 +1406,7 @@ export class BattleManager {
                 // Log defeated creatures for debugging
                 const defeatedCreatures = hero.creatures.filter(c => !c.alive);
                 if (defeatedCreatures.length > 0) {
-                    console.log(`ðŸ’€ Player ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
+                    console.log(`Player ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
                             defeatedCreatures.map(c => c.name));
                 }
             }
@@ -1323,7 +1419,7 @@ export class BattleManager {
                 // Log defeated creatures for debugging
                 const defeatedCreatures = hero.creatures.filter(c => !c.alive);
                 if (defeatedCreatures.length > 0) {
-                    console.log(`ðŸ’€ Opponent ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
+                    console.log(`Opponent ${position}: ${defeatedCreatures.length} defeated creatures with hidden health bars:`, 
                             defeatedCreatures.map(c => c.name));
                 }
             }
@@ -1490,6 +1586,14 @@ export class BattleManager {
         }
     }
 
+    guest_handleFuriousAngerAction(data) {
+        import('./Artifacts/furiousAnger.js').then(({ handleGuestFuriousAngerAction }) => {
+            handleGuestFuriousAngerAction(data, this);
+        }).catch(error => {
+            console.error('Failed to load FuriousAnger for guest handler:', error);
+        });
+    }
+
 
 
     //GUEST EQUIP HANDLERS
@@ -1566,6 +1670,18 @@ export class BattleManager {
         this.guest_handleArrowImpact('RainbowsArrow', data);
     }
 
+    guest_handleFieldStandardEffects(data) {
+        import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardEffects }) => {
+            handleGuestFieldStandardEffects(data, this);
+        });
+    }
+
+    guest_handleFieldStandardRally(data) {
+        import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardRally }) => {
+            handleGuestFieldStandardRally(data, this);
+        });
+    }
+
     guest_handleRainbowsArrowGoldAward(data) {
         if (this.isAuthoritative) {
             console.warn('Host should not receive rainbows arrow gold award messages');
@@ -1604,6 +1720,38 @@ export class BattleManager {
             `🌈 ${attackerName}'s Rainbows Arrow grants +${goldGain} gold! (${totalDamage} damage ÷ 50)`,
             attackerLocalSide === 'player' ? 'success' : 'info'
         );
+    }
+
+    guest_handleCreatureCounterUpdate(data) {
+        if (this.isAuthoritative) {
+            console.warn('Host should not receive creature counter update messages');
+            return;
+        }
+
+        if (!this.moonlightButterflyManager) {
+            import('./Creatures/moonlightButterfly.js').then(({ default: MoonlightButterflyCreature }) => {
+                this.moonlightButterflyManager = new MoonlightButterflyCreature(this);
+                this.moonlightButterflyManager.handleGuestCounterUpdate(data);
+            });
+        } else {
+            this.moonlightButterflyManager.handleGuestCounterUpdate(data);
+        }
+    }
+
+    guest_handleMoonlightButterflyAttack(data) {
+        if (this.isAuthoritative) {
+            console.warn('Host should not receive moonlight butterfly attack messages');
+            return;
+        }
+
+        if (!this.moonlightButterflyManager) {
+            import('./Creatures/moonlightButterfly.js').then(({ default: MoonlightButterflyCreature }) => {
+                this.moonlightButterflyManager = new MoonlightButterflyCreature(this);
+                this.moonlightButterflyManager.handleGuestMoonlightAttack(data);
+            });
+        } else {
+            this.moonlightButterflyManager.handleGuestMoonlightAttack(data);
+        }
     }
 
     // Helper method to get attacker name from sync data
@@ -1760,11 +1908,11 @@ export class BattleManager {
         this.updateGuestHeroDisplays(playerAction, opponentAction);
         
         if (playerAction && opponentAction) {
-            this.addCombatLog(`ðŸ’¥ Both heroes attack!`, 'warning');
+            this.addCombatLog(`Both heroes attack!`, 'warning');
         } else if (playerAction) {
-            this.addCombatLog(`âš”ï¸ Player hero attacks!`, 'success');
+            this.addCombatLog(`Player hero attacks!`, 'success');
         } else if (opponentAction) {
-            this.addCombatLog(`âš”ï¸ Opponent hero attacks!`, 'error');
+            this.addCombatLog(`Opponent hero attacks!`, 'error');
         }
 
         if (playerAction && opponentAction) {
@@ -1893,38 +2041,14 @@ export class BattleManager {
         const heroes = this.getGuestHeroesForActions(playerAction, opponentAction);
         
         if (heroes.playerHero && heroes.opponentHero) {
-            // Check if attacks target creatures
-            const playerTargetsCreature = playerAction.targetType === 'creature';
-            const opponentTargetsCreature = opponentAction.targetType === 'creature';
+            // Reconstruct attack objects to match host format
+            const playerAttack = this.reconstructAttackObject(playerAction, heroes.playerHero, heroes.playerLocalSide);
+            const opponentAttack = this.reconstructAttackObject(opponentAction, heroes.opponentHero, heroes.opponentLocalSide);
             
-            const animations = [];
+            // Use the SAME method as host: animateSimultaneousHeroAttacks
+            await this.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
-            if (playerTargetsCreature) {
-                animations.push(this.animationManager.guest_animateHeroToCreatureAttack(
-                    heroes.playerHero, playerAction.targetData, heroes.playerLocalSide
-                ));
-            } else {
-                animations.push(this.animationManager.animateCollisionAttackTowards(
-                    heroes.playerHero, 
-                    this.getHeroElement(heroes.opponentLocalSide, playerAction.targetData.position),
-                    heroes.playerLocalSide
-                ));
-            }
-            
-            if (opponentTargetsCreature) {
-                animations.push(this.animationManager.guest_animateHeroToCreatureAttack(
-                    heroes.opponentHero, opponentAction.targetData, heroes.opponentLocalSide
-                ));
-            } else {
-                animations.push(this.animationManager.animateCollisionAttackTowards(
-                    heroes.opponentHero,
-                    this.getHeroElement(heroes.playerLocalSide, opponentAction.targetData.position),
-                    heroes.opponentLocalSide
-                ));
-            }
-            
-            await Promise.all(animations);
-            
+            // Use the SAME return animation as host
             await Promise.all([
                 this.animationManager.animateReturn(heroes.playerHero, heroes.playerLocalSide),
                 this.animationManager.animateReturn(heroes.opponentHero, heroes.opponentLocalSide)
@@ -1965,30 +2089,63 @@ export class BattleManager {
             : this.opponentHeroes[action.attackerData.position];
 
         if (localAttacker) {
-            if (action.targetType === 'creature') {
-                this.addCombatLog(
-                    `âš”ï¸ ${action.attackerData.name} attacks ${action.targetData.creatureName}!`,
-                    attackerLocalSide === 'player' ? 'success' : 'error'
-                );
-                await this.animationManager.guest_animateHeroToCreatureAttack(localAttacker, action.targetData, attackerLocalSide);
-            } else {
-                const targetLocalSide = (action.targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
-                const localTarget = targetLocalSide === 'player'
-                    ? this.playerHeroes[action.targetData.position]
-                    : this.opponentHeroes[action.targetData.position];
-                
-                this.addCombatLog(
-                    `âš”ï¸ ${action.attackerData.name} attacks ${action.targetData.name}!`,
-                    attackerLocalSide === 'player' ? 'success' : 'error'
-                );
-                
-                if (localTarget) {
-                    await this.animateFullAttack(localAttacker, localTarget);
-                }
-            }
+            // Reconstruct attack object to match host format
+            const attack = this.reconstructAttackObject(action, localAttacker, attackerLocalSide);
             
+            // Use the SAME method as host: animateHeroAttack
+            await this.animationManager.animateHeroAttack(attack.hero, attack.target);
+            
+            // Use the SAME return animation as host
             await this.animationManager.animateReturn(localAttacker, attackerLocalSide);
         }
+    }
+
+    reconstructAttackObject(actionData, attackerHero, attackerLocalSide) {
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        
+        // Find the target
+        let target = null;
+        if (actionData.targetData.type === 'creature') {
+            const targetLocalSide = (actionData.targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+            const targetHeroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+            const targetHero = targetHeroes[actionData.targetData.position];
+            
+            if (targetHero && targetHero.creatures) {
+                const creature = targetHero.creatures[actionData.targetData.creatureIndex];
+                if (creature) {
+                    target = {
+                        type: 'creature',
+                        hero: targetHero,
+                        creature: creature,
+                        creatureIndex: actionData.targetData.creatureIndex,
+                        position: actionData.targetData.position,
+                        side: targetLocalSide
+                    };
+                }
+            }
+        } else {
+            const targetLocalSide = (actionData.targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+            const targetHeroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+            const targetHero = targetHeroes[actionData.targetData.position];
+            
+            if (targetHero) {
+                target = {
+                    type: 'hero',
+                    hero: targetHero,
+                    position: actionData.targetData.position,
+                    side: targetLocalSide
+                };
+            }
+        }
+        
+        // Return attack object in the same format as host expects
+        return {
+            hero: attackerHero,
+            target: target,
+            damage: actionData.damage || 0,
+            effectsTriggered: [], // Guest doesn't have this info, but animations don't need it
+            isRanged: false // Guest doesn't have this info, but animations don't need it
+        };
     }
 
     calculateWealthBonus(heroes) {
@@ -2064,7 +2221,7 @@ export class BattleManager {
             frostRuneSpell.removeFrostRuneOnDeath(hero, hero.side, hero.position);
         }
 
-        this.addCombatLog(`â˜ ï¸ ${hero.name} has been defeated!`, 'error');
+        this.addCombatLog(`${hero.name} has been defeated!`, 'error');
         
         const heroElement = this.getHeroElement(hero.side, hero.position);
         if (heroElement) {
@@ -2134,8 +2291,25 @@ export class BattleManager {
             const currentAttack = hero.getCurrentAttack(); 
             attackBase.textContent = currentAttack;
             
-            attackBonus.style.display = 'none';
-            if (attackContainer) attackContainer.classList.remove('attack-buffed', 'attack-debuffed');
+            // Show battle bonuses if active
+            const battleBonus = hero.battleAttackBonus || 0;
+            if (battleBonus > 0) {
+                attackBonus.textContent = `+${battleBonus}`;
+                attackBonus.style.display = 'inline';
+                if (attackContainer) {
+                    attackContainer.classList.add('attack-buffed');
+                    attackContainer.classList.remove('attack-debuffed');
+                }
+                
+                // Add tooltip to show it's a battle bonus
+                attackContainer.title = `Base Attack: ${hero.atk}, Battle Bonus: +${battleBonus}, Total: ${currentAttack}`;
+            } else {
+                attackBonus.style.display = 'none';
+                if (attackContainer) {
+                    attackContainer.classList.remove('attack-buffed', 'attack-debuffed');
+                    attackContainer.title = `Attack: ${currentAttack}`;
+                }
+            }
         }
     }
 
@@ -2526,7 +2700,10 @@ export class BattleManager {
             this.statusEffectsManager.clearAllBattleStatusEffects();
         }
 
-        
+        // Clear battle bonuses from all Heroes and Creatures
+        this.clearAllBattleBonuses();
+        this.resetAllCreatureCounters();
+
         // ===== CLEANUP BOULDERS AFTER BATTLE =====
         try {
             const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
@@ -2544,8 +2721,6 @@ export class BattleManager {
             console.error('Error cleaning up Diplomacy after battle:', error);
         }
 
-
-        
         // ===== CLEANUP GREATSWORD SKELETONS AFTER BATTLE =====
         try {
             const { SkullmaelsGreatswordArtifact } = await import('./Artifacts/skullmaelsGreatsword.js');
@@ -2554,15 +2729,17 @@ export class BattleManager {
             console.error('Error cleaning up Greatsword Skeletons after battle:', error);
         }
         
-
         if (this.arrowSystem) {
             this.arrowSystem.cleanup();
             this.arrowSystem = null;
         }
+
+        if (this.furiousAngerEffect) {
+            this.furiousAngerEffect.cleanup();
+            this.furiousAngerEffect = null;
+        }
         
-
         // CREATURE CLEANUPS
-
         if (this.jigglesManager) {
             this.jigglesManager.cleanup();
         }
@@ -2574,7 +2751,7 @@ export class BattleManager {
             this.skeletonNecromancerManager.cleanup();
             this.skeletonNecromancerManager = null;
         }
-                if (this.skeletonDeathKnightManager) {
+        if (this.skeletonDeathKnightManager) {
             this.skeletonDeathKnightManager.cleanup();
             this.skeletonDeathKnightManager = null;
         }
@@ -2594,15 +2771,20 @@ export class BattleManager {
             this.cavalryManager.cleanup();
             this.cavalryManager = null;
         }
-
+        if (this.archerManager) {
+            this.archerManager.cleanup();
+            this.archerManager = null;
+        }
+        if (this.moonlightButterflyManager) {
+            this.moonlightButterflyManager.cleanup();
+            this.moonlightButterflyManager = null;
+        }
 
         // ===== RESTORE OVERHEAT EQUIPMENT AFTER BATTLE =====
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Overheat')) {
             const overheatSpell = this.spellSystem.spellImplementations.get('Overheat');
             overheatSpell.restoreAllRemovedEquipment();
         }
-
-
 
         if (this.roomManager && this.roomManager.getRoomRef()) {
             try {
@@ -2632,10 +2814,82 @@ export class BattleManager {
                     // gamePhase stays as 'Reward'
                 });
                 
-                console.log('âœ… Battle cleanup completed, gamePhase preserved for rewards');
+                console.log('✅ Battle cleanup completed, gamePhase preserved for rewards');
             } catch (error) {
                 console.error('Error clearing battle messages:', error);
             }
+        }
+    }
+
+    clearAllBattleBonuses() {
+        console.log('🔄 Clearing battle bonuses from all heroes...');
+        
+        let bonusesCleared = 0;
+        
+        // Clear bonuses from player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            if (this.playerHeroes[position]) {
+                const hero = this.playerHeroes[position];
+                if (hero.hasBattleBonuses && hero.hasBattleBonuses()) {
+                    const summary = hero.getBattleBonusSummary();
+                    console.log(`Clearing battle bonuses from player ${hero.name}: ${summary}`);
+                    hero.clearBattleBonuses();
+                    bonusesCleared++;
+                }
+            }
+            
+            if (this.opponentHeroes[position]) {
+                const hero = this.opponentHeroes[position];
+                if (hero.hasBattleBonuses && hero.hasBattleBonuses()) {
+                    const summary = hero.getBattleBonusSummary();
+                    console.log(`Clearing battle bonuses from opponent ${hero.name}: ${summary}`);
+                    hero.clearBattleBonuses();
+                    bonusesCleared++;
+                }
+            }
+        });
+        
+        if (bonusesCleared > 0) {
+            console.log(`✅ Cleared battle bonuses from ${bonusesCleared} heroes`);
+            
+            // Add a combat log message
+            this.addCombatLog(`🔄 Battle bonuses cleared from all heroes`, 'info');
+        } else {
+            console.log('No battle bonuses to clear');
+        }
+    }
+
+    resetAllCreatureCounters() {
+        console.log('🔄 Resetting creature counters for all heroes...');
+        
+        let countersReset = 0;
+        
+        // Reset counters for player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            if (this.playerHeroes[position] && this.playerHeroes[position].creatures) {
+                this.playerHeroes[position].creatures.forEach(creature => {
+                    if (creature.counters > 0) {
+                        creature.counters = 0;
+                        countersReset++;
+                    }
+                });
+            }
+            
+            if (this.opponentHeroes[position] && this.opponentHeroes[position].creatures) {
+                this.opponentHeroes[position].creatures.forEach(creature => {
+                    if (creature.counters > 0) {
+                        creature.counters = 0;
+                        countersReset++;
+                    }
+                });
+            }
+        });
+        
+        if (countersReset > 0) {
+            console.log(`✅ Reset counters on ${countersReset} creatures`);
+            this.addCombatLog(`🔄 Creature counters reset`, 'info');
+        } else {
+            console.log('No creature counters to reset');
         }
     }
 
@@ -2823,7 +3077,9 @@ export class BattleManager {
 
     // Update all hero visuals after restoration
     updateAllHeroVisuals() {
-        console.log('ðŸŽ¨ Updating all hero visuals...');
+        console.log('🎨 Updating all hero visuals...');
+        
+        let totalBattleBonuses = 0;
         
         ['left', 'center', 'right'].forEach(position => {
             // Update player heroes
@@ -2833,8 +3089,14 @@ export class BattleManager {
                 // Update health bar
                 this.updateHeroHealthBar('player', position, hero.currentHp, hero.maxHp);
                 
-                // Update attack display
+                // Update attack display (now shows battle bonuses)
                 this.updateHeroAttackDisplay('player', position, hero);
+                
+                // Count battle bonuses for logging
+                if (hero.battleAttackBonus > 0) {
+                    totalBattleBonuses++;
+                    console.log(`⚔️ Player ${hero.name}: ${hero.getCurrentAttack()} ATK (base: ${hero.atk}, bonus: +${hero.battleAttackBonus})`);
+                }
                 
                 // Handle defeated state
                 if (!hero.alive) {
@@ -2847,8 +3109,6 @@ export class BattleManager {
                 if (hero.creatures && hero.creatures.length > 0) {
                     this.updateCreatureVisuals('player', position, hero.creatures);
                 }
-                
-                console.log(`Updated player ${hero.name}: ${hero.currentHp}/${hero.maxHp} HP, alive: ${hero.alive}`);
             }
             
             // Update opponent heroes
@@ -2858,8 +3118,14 @@ export class BattleManager {
                 // Update health bar
                 this.updateHeroHealthBar('opponent', position, hero.currentHp, hero.maxHp);
                 
-                // Update attack display
+                // Update attack display (now shows battle bonuses)
                 this.updateHeroAttackDisplay('opponent', position, hero);
+                
+                // Count battle bonuses for logging
+                if (hero.battleAttackBonus > 0) {
+                    totalBattleBonuses++;
+                    console.log(`⚔️ Opponent ${hero.name}: ${hero.getCurrentAttack()} ATK (base: ${hero.atk}, bonus: +${hero.battleAttackBonus})`);
+                }
                 
                 // Handle defeated state
                 if (!hero.alive) {
@@ -2872,11 +3138,13 @@ export class BattleManager {
                 if (hero.creatures && hero.creatures.length > 0) {
                     this.updateCreatureVisuals('opponent', position, hero.creatures);
                 }
-                
-                console.log(`Updated opponent ${hero.name}: ${hero.currentHp}/${hero.maxHp} HP, alive: ${hero.alive}`);
             }
         });
         
+        if (totalBattleBonuses > 0) {
+            console.log(`⚔️ Displayed ${totalBattleBonuses} heroes with active battle bonuses`);
+            this.addCombatLog(`⚔️ ${totalBattleBonuses} heroes have active battle bonuses`, 'info');
+        }
         
         // Restore fireshield visual effects
         this.restoreFireshieldVisuals();
@@ -2889,7 +3157,7 @@ export class BattleManager {
             this.battleScreen.syncAbilitiesFromBattleManager();
         }
 
-        console.log('âœ… All hero visuals updated');
+        console.log('✅ All hero visuals updated');
     }
 
     // Restore fireshield visual effects after reconnection
@@ -3029,6 +3297,16 @@ export class BattleManager {
             this.frontSoldierManager.cleanup();
             this.frontSoldierManager = null;
         }
+        if (this.archerManager) {
+            this.archerManager.cleanup();
+            this.archerManager = null;
+        }
+        if (this.moonlightButterflyManager) {
+            this.moonlightButterflyManager.cleanup();
+            this.moonlightButterflyManager = null;
+        }
+
+
 
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.reset();

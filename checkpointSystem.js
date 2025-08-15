@@ -1,6 +1,6 @@
 // checkpointSystem.js - Complete Battle State Checkpoint System
 // Handles atomic battle state snapshots for robust reconnection and persistence
-// UPDATED: Fixed equipment dual-storage issue
+// UPDATED: Fixed equipment dual-storage issue + Battle Bonus Support
 
 import { Hero } from './hero.js';
 
@@ -8,7 +8,7 @@ export class CheckpointSystem {
     constructor() {
         this.currentCheckpoint = null;
         this.previousCheckpoint = null; // Fallback
-        this.checkpointVersion = '2.0.1'; // Updated version for equipment fix
+        this.checkpointVersion = '2.1.0'; // Updated version for battle bonus support
         this.isEnabled = true;
         this.roomManager = null;
         this.isHost = false;
@@ -17,7 +17,7 @@ export class CheckpointSystem {
         this.lastCheckpointTime = 0;
         this.minCheckpointInterval = 100; // ms
         
-        console.log('ðŸ”„ CheckpointSystem initialized v' + this.checkpointVersion);
+        console.log('🔄 CheckpointSystem initialized v' + this.checkpointVersion);
     }
 
     // Initialize with battle context
@@ -26,7 +26,7 @@ export class CheckpointSystem {
         this.roomManager = roomManager;
         this.isHost = isHost;
         
-        console.log(`ðŸ“ CheckpointSystem initialized for ${isHost ? 'HOST' : 'GUEST'}`);
+        console.log(`📋 CheckpointSystem initialized for ${isHost ? 'HOST' : 'GUEST'}`);
     }
 
     // ============================================
@@ -95,7 +95,7 @@ export class CheckpointSystem {
             return checkpoint;
             
         } catch (error) {
-            console.error('âŒ Error creating checkpoint:', error);
+            console.error('❌ Error creating checkpoint:', error);
             return null;
         }
     }
@@ -128,6 +128,21 @@ export class CheckpointSystem {
     }
 
     captureHeroState(hero) {
+        // FIXED: Use the hero's built-in exportState() method to ensure all properties are captured
+        // This includes battle bonuses and any other state that the hero manages
+        if (hero.exportState && typeof hero.exportState === 'function') {
+            const heroState = hero.exportState();
+            console.log(`✅ Captured complete state for ${hero.name} (including battle bonuses: ATK+${hero.battleAttackBonus || 0}, HP+${hero.battleHpBonus || 0})`);
+            return heroState;
+        } else {
+            // Fallback to manual capture if exportState is not available
+            console.warn(`⚠️ Using fallback state capture for ${hero.name} - exportState method not available`);
+            return this.captureHeroStateFallback(hero);
+        }
+    }
+
+    // Fallback method for hero state capture (keeps existing logic as backup)
+    captureHeroStateFallback(hero) {
         return {
             // Identity
             id: hero.id,
@@ -146,6 +161,10 @@ export class CheckpointSystem {
             position: hero.position,
             side: hero.side,
             absoluteSide: hero.absoluteSide,
+            
+            // Battle bonuses - MANUALLY ADDED for fallback
+            battleAttackBonus: hero.battleAttackBonus || 0,
+            battleHpBonus: hero.battleHpBonus || 0,
             
             // Abilities state
             abilities: hero.abilities ? JSON.parse(JSON.stringify(hero.abilities)) : {},
@@ -195,7 +214,8 @@ export class CheckpointSystem {
             statusEffects: creature.statusEffects || [],
             temporaryModifiers: creature.temporaryModifiers || {},
             createdAt: creature.createdAt,
-            lastDamaged: creature.lastDamaged
+            lastDamaged: creature.lastDamaged,
+            counters: creature.counters || 0
         };
     }
 
@@ -229,7 +249,7 @@ export class CheckpointSystem {
 
     captureEquipment() {
         // Return empty objects for backward compatibility
-        console.log('ðŸ“‹ Equipment capture skipped - using hero-level storage only');
+        console.log('📋 Equipment capture skipped - using hero-level storage only');
         return {
             player: {},
             opponent: {}
@@ -360,7 +380,7 @@ export class CheckpointSystem {
         }
         
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
-            console.warn('âš ï¸ Cannot save checkpoint - no room reference');
+            console.warn('⚠️ Cannot save checkpoint - no room reference');
             return false;
         }
         
@@ -368,7 +388,7 @@ export class CheckpointSystem {
             // Create checkpoint
             const checkpoint = this.createCheckpoint(checkpointType);
             if (!checkpoint) {
-                console.warn('âš ï¸ Failed to create checkpoint');
+                console.warn('⚠️ Failed to create checkpoint');
                 return false;
             }
             
@@ -391,11 +411,11 @@ export class CheckpointSystem {
                 checkpointType: checkpointType
             });
             
-            console.log(`âœ… Checkpoint saved (${checkpointType}) at turn ${checkpoint.turnNumber}`);
+            console.log(`✅ Checkpoint saved (${checkpointType}) at turn ${checkpoint.turnNumber}`);
             return true;
             
         } catch (error) {
-            console.error('âŒ Error saving checkpoint:', error);
+            console.error('❌ Error saving checkpoint:', error);
             return false;
         }
     }
@@ -410,7 +430,7 @@ export class CheckpointSystem {
      */
     async loadCheckpoint() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
-            console.warn('âš ï¸ Cannot load checkpoint - no room reference');
+            console.warn('⚠️ Cannot load checkpoint - no room reference');
             return null;
         }
         
@@ -421,21 +441,21 @@ export class CheckpointSystem {
             const checkpoint = snapshot.val();
             
             if (!checkpoint) {
-                console.log('ðŸ“ No checkpoint found in Firebase');
+                console.log('📋 No checkpoint found in Firebase');
                 return null;
             }
             
             // Validate checkpoint
             if (!this.validateCheckpoint(checkpoint)) {
-                console.warn('âš ï¸ Invalid checkpoint data');
+                console.warn('⚠️ Invalid checkpoint data');
                 return null;
             }
             
-            console.log(`ðŸ“¥ Loaded checkpoint from turn ${checkpoint.turnNumber} (${checkpoint.checkpointType})`);
+            console.log(`📥 Loaded checkpoint from turn ${checkpoint.turnNumber} (${checkpoint.checkpointType})`);
             return checkpoint;
             
         } catch (error) {
-            console.error('âŒ Error loading checkpoint:', error);
+            console.error('❌ Error loading checkpoint:', error);
             return null;
         }
     }
@@ -451,12 +471,12 @@ export class CheckpointSystem {
      */
     async restoreFromCheckpoint(checkpoint) {
         if (!checkpoint || !this.battleManager) {
-            console.error('âŒ Cannot restore - missing checkpoint or battleManager');
+            console.error('❌ Cannot restore - missing checkpoint or battleManager');
             return false;
         }
         
         try {
-            console.log(`ðŸ”„ Restoring from checkpoint (turn ${checkpoint.turnNumber})...`);
+            console.log(`🔄 Restoring from checkpoint (turn ${checkpoint.turnNumber})...`);
             
             // 1. Restore core battle state
             this.restoreBattleState(checkpoint.battleState);
@@ -479,7 +499,7 @@ export class CheckpointSystem {
                 // Force reinitialize the kill tracking structure
                 this.battleManager.killTracker.reset();
                 this.battleManager.killTracker.init(this.battleManager);
-                console.log('ðŸ”„ Kill tracker reset and reinitialized after perspective swap');
+                console.log('🔄 Kill tracker reset and reinitialized after perspective swap');
             }
             
             // 5. Restore random state for determinism
@@ -500,22 +520,22 @@ export class CheckpointSystem {
             // Store this as current checkpoint
             this.currentCheckpoint = checkpoint;
             
-            console.log(`âœ… Successfully restored from checkpoint (turn ${checkpoint.turnNumber})`);
+            console.log(`✅ Successfully restored from checkpoint (turn ${checkpoint.turnNumber})`);
             
             // Add restoration message to combat log
             this.battleManager.addCombatLog(
-                `ðŸ“ Battle restored from checkpoint (Turn ${checkpoint.turnNumber})`,
+                `📋 Battle restored from checkpoint (Turn ${checkpoint.turnNumber})`,
                 'system'
             );
             
             return true;
             
         } catch (error) {
-            console.error('âŒ Error restoring from checkpoint:', error);
+            console.error('❌ Error restoring from checkpoint:', error);
             
             // Try fallback to previous checkpoint if available
             if (this.previousCheckpoint && checkpoint !== this.previousCheckpoint) {
-                console.log('ðŸ”„ Attempting fallback to previous checkpoint...');
+                console.log('🔄 Attempting fallback to previous checkpoint...');
                 return this.restoreFromCheckpoint(this.previousCheckpoint);
             }
             
@@ -583,7 +603,7 @@ export class CheckpointSystem {
                 formationManager.opponentBattleFormation = alignedOpponent;
             }
             
-            console.log('âœ… FormationManager updated with restored formations');
+            console.log('✅ FormationManager updated with restored formations');
         }
     }
 
@@ -634,7 +654,7 @@ export class CheckpointSystem {
         if (!equipment) return;
         
         // Log but don't actually restore anything at manager level
-        console.log('ðŸ“‹ Manager-level equipment restoration skipped - heroes handle their own equipment');
+        console.log('📋 Manager-level equipment restoration skipped - heroes handle their own equipment');
         
         // Clear any existing manager-level equipment to avoid conflicts
         if (this.battleManager) {
@@ -647,7 +667,7 @@ export class CheckpointSystem {
         if (!permanentArtifacts) return;
         
         this.battleManager.battlePermanentArtifacts = [...permanentArtifacts];
-        console.log(`ðŸ§ƒ Restored ${this.battleManager.battlePermanentArtifacts.length} permanent artifacts from checkpoint`);
+        console.log(`🎆 Restored ${this.battleManager.battlePermanentArtifacts.length} permanent artifacts from checkpoint`);
     }
 
     restoreAllHeroes(heroStates) {
@@ -675,6 +695,11 @@ export class CheckpointSystem {
                 // CRITICAL: Update the side property to match the new perspective
                 hero.side = 'player';
                 this.battleManager.playerHeroes[position] = hero;
+                
+                // Log battle bonus restoration
+                if (hero.battleAttackBonus > 0 || hero.battleHpBonus > 0) {
+                    console.log(`⚔️ Restored battle bonuses for player ${hero.name}: ATK+${hero.battleAttackBonus}, HP+${hero.battleHpBonus}`);
+                }
             }
             
             if (opponentHeroes[position]) {
@@ -682,37 +707,39 @@ export class CheckpointSystem {
                 // CRITICAL: Update the side property to match the new perspective  
                 hero.side = 'opponent';
                 this.battleManager.opponentHeroes[position] = hero;
+                
+                // Log battle bonus restoration
+                if (hero.battleAttackBonus > 0 || hero.battleHpBonus > 0) {
+                    console.log(`⚔️ Restored battle bonuses for opponent ${hero.name}: ATK+${hero.battleAttackBonus}, HP+${hero.battleHpBonus}`);
+                }
             }
         });
         
         // CRITICAL: Reinitialize kill tracker for the new perspective
         if (this.battleManager.killTracker) {
             this.battleManager.killTracker.initializeKillTracking();
-            console.log('ðŸ”„ Kill tracker reinitialized for perspective swap');
+            console.log('🔄 Kill tracker reinitialized for perspective swap');
         }
         
         // CRITICAL: Clear manager-level equipment after hero restoration
         this.battleManager.playerEquips = {};
         this.battleManager.opponentEquips = {};
-        console.log('ðŸ“‹ Cleared manager-level equipment to prevent conflicts');
+        console.log('📋 Cleared manager-level equipment to prevent conflicts');
     }
 
     restoreHero(heroState) {
-        // Create hero from saved state using the imported Hero class
+        // FIXED: Use the hero's built-in fromSavedState method properly
+        // This will handle battle bonuses and all other state correctly
         const hero = Hero.fromSavedState(heroState);
         
-        // Ensure all properties are restored
-        hero.abilities = heroState.abilities || {};
-        hero.spells = heroState.spells || [];
-        hero.equipment = heroState.equipment || [];
-        hero.creatures = heroState.creatures || [];
-        hero.statusEffects = heroState.statusEffects || [];
-        hero.temporaryModifiers = heroState.temporaryModifiers || {};
-        hero.necromancyStacks = heroState.necromancyStacks || 0;
-        hero.maxNecromancyStacks = heroState.maxNecromancyStacks || 0;
-
-        /// Arrows
-        hero.flameArrowCounters = heroState.flameArrowCounters || 0;
+        // The fromSavedState method should handle everything, but ensure critical properties are set
+        // (This is defensive programming - the fromSavedState should already handle this)
+        if (heroState.battleAttackBonus !== undefined) {
+            hero.battleAttackBonus = heroState.battleAttackBonus;
+        }
+        if (heroState.battleHpBonus !== undefined) {
+            hero.battleHpBonus = heroState.battleHpBonus;
+        }
         
         return hero;
     }
@@ -721,7 +748,7 @@ export class CheckpointSystem {
         if (!randomState || !this.battleManager.randomnessManager) return;
         
         this.battleManager.randomnessManager.importState(randomState);
-        console.log('ðŸŽ² Random state restored');
+        console.log('🎲 Random state restored');
     }
 
     restoreManagerStates(managerStates) {
@@ -775,7 +802,7 @@ export class CheckpointSystem {
         } else if (!Array.isArray(battleLog)) {
             // If it's not an array at all, create empty array
             logArray = [];
-            console.warn('âš ï¸ Battle log was not in expected format');
+            console.warn('⚠️ Battle log was not in expected format');
         }
         
         // Restore to BattleScreen's BattleLog if available
@@ -813,13 +840,13 @@ export class CheckpointSystem {
                 const battleHTML = this.battleManager.battleScreen.generateBattleScreenHTML();
                 if (battleHTML && battleHTML.trim() !== '') {
                     battleArena.innerHTML = battleHTML;
-                    console.log('âœ… Battle screen HTML recreated with restored heroes');
+                    console.log('✅ Battle screen HTML recreated with restored heroes');
                     
                     // Re-initialize battle log after DOM is recreated
                     setTimeout(() => {
                         if (this.battleManager.battleScreen.battleLog) {
                             this.battleManager.battleScreen.battleLog.init();
-                            console.log('âœ… Battle log re-initialized');
+                            console.log('✅ Battle log re-initialized');
                         }
                         
                         // Re-initialize speed controls
@@ -832,19 +859,22 @@ export class CheckpointSystem {
         // Now update all hero visuals (they should exist in DOM now)
         this.battleManager.updateAllHeroVisuals();
         
+        // NEW: Explicitly update attack displays to show battle bonuses
+        this.updateHeroAttackDisplaysWithBonuses();
+        
         // Explicitly update creature visuals to ensure proper death states
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
                 const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
                 const hero = heroes[position];
                 if (hero && hero.creatures && hero.creatures.length > 0) {
-                    console.log(`ðŸ©¸ Updating creature visuals for ${side} ${position} (${hero.creatures.length} creatures)`);
+                    console.log(`🩸 Updating creature visuals for ${side} ${position} (${hero.creatures.length} creatures)`);
                     this.battleManager.updateCreatureVisuals(side, position, hero.creatures);
                     
                     // Log defeated creatures for debugging
                     const defeatedCreatures = hero.creatures.filter(c => !c.alive);
                     if (defeatedCreatures.length > 0) {
-                        console.log(`ðŸ’€ ${defeatedCreatures.length} defeated creatures should have hidden health bars:`, 
+                        console.log(`💀 ${defeatedCreatures.length} defeated creatures should have hidden health bars:`, 
                                 defeatedCreatures.map(c => c.name));
                     }
                 }
@@ -865,12 +895,39 @@ export class CheckpointSystem {
         if (this.battleManager.attackEffectsManager && 
             this.battleManager.attackEffectsManager.flameArrowEffect) {
             this.battleManager.attackEffectsManager.flameArrowEffect.updateAllFlameArrowDisplays();
-            console.log('ðŸ”¥ðŸ¹ FlameArrow counter displays restored');
+            console.log('🔥🏹 FlameArrow counter displays restored');
         }
         
         // Restore visual effects
         this.battleManager.restoreFireshieldVisuals();
         this.battleManager.restoreFrostRuneVisuals();
+    }
+
+    // NEW: Update hero attack displays to show current totals including battle bonuses
+    updateHeroAttackDisplaysWithBonuses() {
+        ['left', 'center', 'right'].forEach(position => {
+            // Update player heroes
+            const playerHero = this.battleManager.playerHeroes[position];
+            if (playerHero) {
+                this.battleManager.updateHeroAttackDisplay('player', position, playerHero);
+                
+                // Log if battle bonuses are active
+                if (playerHero.battleAttackBonus > 0) {
+                    console.log(`⚔️ Player ${playerHero.name} displaying attack: ${playerHero.getCurrentAttack()} (base: ${playerHero.atk}, bonus: +${playerHero.battleAttackBonus})`);
+                }
+            }
+            
+            // Update opponent heroes
+            const opponentHero = this.battleManager.opponentHeroes[position];
+            if (opponentHero) {
+                this.battleManager.updateHeroAttackDisplay('opponent', position, opponentHero);
+                
+                // Log if battle bonuses are active
+                if (opponentHero.battleAttackBonus > 0) {
+                    console.log(`⚔️ Opponent ${opponentHero.name} displaying attack: ${opponentHero.getCurrentAttack()} (base: ${opponentHero.atk}, bonus: +${opponentHero.battleAttackBonus})`);
+                }
+            }
+        });
     }
 
     // ============================================
@@ -889,7 +946,7 @@ export class CheckpointSystem {
         const [major] = checkpoint.version.split('.');
         const [currentMajor] = this.checkpointVersion.split('.');
         if (major !== currentMajor) {
-            console.warn(`âš ï¸ Checkpoint version mismatch: ${checkpoint.version} vs ${this.checkpointVersion}`);
+            console.warn(`⚠️ Checkpoint version mismatch: ${checkpoint.version} vs ${this.checkpointVersion}`);
             // Could add migration logic here
         }
         
@@ -953,11 +1010,11 @@ export class CheckpointSystem {
             this.currentCheckpoint = null;
             this.previousCheckpoint = null;
             
-            console.log('ðŸ§¹ Checkpoint cleared');
+            console.log('🧹 Checkpoint cleared');
             return true;
             
         } catch (error) {
-            console.error('âŒ Error clearing checkpoint:', error);
+            console.error('❌ Error clearing checkpoint:', error);
             return false;
         }
     }
@@ -997,7 +1054,7 @@ export class CheckpointSystem {
     async restoreFromLatestCheckpoint() {
         const checkpoint = await this.loadCheckpoint();
         if (!checkpoint) {
-            console.log('ðŸ“ No checkpoint available for restoration');
+            console.log('📋 No checkpoint available for restoration');
             return false;
         }
         

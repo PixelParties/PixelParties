@@ -600,6 +600,14 @@ export class BattleNetworkManager {
                 bm.guest_handleKillTracked(data);
                 break;
 
+            case 'battle_stat_bonus':
+                this.guest_handleBattleStatBonus(data);
+                break;
+            
+
+
+
+
             case 'necromancy_revival':
                 bm.guest_handleNecromancyRevival(data);
                 break;
@@ -609,6 +617,7 @@ export class BattleNetworkManager {
                     this.battleManager.guest_handleDiplomacyEffectsComplete(data);
                 }
                 break;
+
 
 
 
@@ -698,6 +707,41 @@ export class BattleNetworkManager {
                 if (bm.frontSoldierManager) {
                     bm.frontSoldierManager.handleGuestSwordSlash(data);
                 }
+                break;
+
+            case 'archer_arrow_attack':
+                if (bm.archerManager) {
+                    bm.archerManager.handleGuestArrowAttack(data);
+                }
+                break;
+
+            case 'creature_counter_update':
+                bm.guest_handleCreatureCounterUpdate(data);
+                break;
+
+            case 'moonlight_butterfly_attack':
+                bm.guest_handleMoonlightButterflyAttack(data);
+                break;
+
+
+
+
+
+            
+            case 'field_standard_effects_complete':
+                import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardEffects }) => {
+                    handleGuestFieldStandardEffects(data, this.battleManager);
+                });
+                break;
+
+            case 'field_standard_rally':
+                import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardRally }) => {
+                    handleGuestFieldStandardRally(data, this.battleManager);
+                });
+                break;
+
+            case 'furious_anger_action':
+                bm.guest_handleFuriousAngerAction(data);
                 break;
 
 
@@ -899,7 +943,13 @@ export class BattleNetworkManager {
 
     guest_handleCreatureDamageApplied(data) {
         const bm = this.battleManager;
-        const { heroAbsoluteSide, heroPosition, creatureIndex, damage, oldHp, newHp, maxHp, died, revivedByNecromancy, creatureName } = data;
+        const { 
+            heroAbsoluteSide, heroPosition, 
+            originalCreatureIndex, currentCreatureIndex, finalCreatureIndex,
+            creatureName, creatureId,
+            damage, oldHp, newHp, maxHp, died, revivedByNecromancy,
+            necromancyArrayManipulation, debugInfo 
+        } = data;
         
         const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
         const heroLocalSide = (heroAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
@@ -908,87 +958,176 @@ export class BattleNetworkManager {
             ? bm.playerHeroes[heroPosition]
             : bm.opponentHeroes[heroPosition];
 
-        if (localHero && localHero.creatures[creatureIndex]) {
-            const creature = localHero.creatures[creatureIndex];
-            creature.currentHp = newHp;
-            
-            // Handle death and revival status
-            if (died) {
-                if (revivedByNecromancy) {
-                    // Creature died but was revived
-                    creature.alive = true;
-                    bm.addCombatLog(
-                        `ðŸ’” ${creatureName} takes ${damage} damage and dies! (${oldHp} â†’ ${newHp} HP)`,
-                        heroLocalSide === 'player' ? 'error' : 'success'
-                    );
-                    bm.addCombatLog(
-                        `ðŸ’€âœ¨ But ${creatureName} is revived by Necromancy!`,
-                        'info'
-                    );
-                } else {
-                    // Creature died and stayed dead
-                    creature.alive = false;
-                    bm.addCombatLog(
-                        `ðŸ’” ${creatureName} takes ${damage} damage! (${oldHp} â†’ ${newHp} HP)`,
-                        heroLocalSide === 'player' ? 'error' : 'success'
-                    );
+        if (!localHero || !localHero.creatures) {
+            console.error(`❌ Guest: Hero not found for creature damage`, { heroLocalSide, heroPosition });
+            return;
+        }
+
+        // MOVEMENT-AWARE CREATURE FINDING: Try multiple strategies to find the correct creature
+        let targetCreature = null;
+        let targetCreatureIndex = -1;
+
+        // Strategy 1: Use currentCreatureIndex (most likely to be correct)
+        if (currentCreatureIndex >= 0 && currentCreatureIndex < localHero.creatures.length) {
+            const candidateCreature = localHero.creatures[currentCreatureIndex];
+            if (candidateCreature && candidateCreature.name === creatureName) {
+                targetCreature = candidateCreature;
+                targetCreatureIndex = currentCreatureIndex;
+                console.log(`✅ Guest: Found creature using currentCreatureIndex ${currentCreatureIndex}`);
+            }
+        }
+
+        // Strategy 2: Use originalCreatureIndex as fallback (in case movement hasn't been processed)
+        if (!targetCreature && originalCreatureIndex >= 0 && originalCreatureIndex < localHero.creatures.length) {
+            const candidateCreature = localHero.creatures[originalCreatureIndex];
+            if (candidateCreature && candidateCreature.name === creatureName) {
+                targetCreature = candidateCreature;
+                targetCreatureIndex = originalCreatureIndex;
+                console.log(`⚠️ Guest: Using originalCreatureIndex ${originalCreatureIndex} as fallback`);
+            }
+        }
+
+        // Strategy 3: Search by creature name and unique ID (last resort)
+        if (!targetCreature) {
+            for (let i = 0; i < localHero.creatures.length; i++) {
+                const creature = localHero.creatures[i];
+                if (creature.name === creatureName) {
+                    // If we have a unique ID, verify it matches
+                    if (creatureId && creature.addedAt) {
+                        const expectedId = `${creature.name}_${creature.addedAt}`;
+                        if (expectedId === creatureId) {
+                            targetCreature = creature;
+                            targetCreatureIndex = i;
+                            console.log(`🔍 Guest: Found creature by unique ID ${creatureId} at index ${i}`);
+                            break;
+                        }
+                    } else {
+                        // No unique ID available, use first match by name
+                        targetCreature = creature;
+                        targetCreatureIndex = i;
+                        console.log(`🔍 Guest: Found creature by name ${creatureName} at index ${i}`);
+                        break;
+                    }
                 }
-            } else {
-                // Creature survived
-                creature.alive = true;
+            }
+        }
+
+        // SAFETY CHECK: If we still can't find the creature, log detailed debug info
+        if (!targetCreature) {
+            console.error(`❌ Guest: Could not find creature for damage application!`, {
+                creatureName,
+                creatureId,
+                originalCreatureIndex,
+                currentCreatureIndex,
+                heroLocalSide,
+                heroPosition,
+                availableCreatures: localHero.creatures.map((c, i) => ({ 
+                    index: i, 
+                    name: c.name, 
+                    id: c.addedAt ? `${c.name}_${c.addedAt}` : 'no-id',
+                    alive: c.alive 
+                })),
+                debugInfo
+            });
+            return;
+        }
+
+        // DEBUG LOGGING: Show index resolution
+        if (debugInfo && !debugInfo.wasOriginalIndexCorrect) {
+            console.log(`🐎 Guest: Creature moved! Original: ${originalCreatureIndex} → Current: ${currentCreatureIndex} (shift: ${debugInfo.indexShift})`);
+        }
+
+        // Apply necromancy array manipulation if needed (unchanged)
+        if (necromancyArrayManipulation && necromancyArrayManipulation.moveToEnd) {
+            // Remove from current position
+            const creature = localHero.creatures.splice(targetCreatureIndex, 1)[0];
+            // Add to end
+            localHero.creatures.push(creature);
+            // Update target index
+            targetCreatureIndex = localHero.creatures.length - 1;
+            console.log(`🧟 Guest: Applied necromancy manipulation - moved to index ${targetCreatureIndex}`);
+        }
+
+        // APPLY DAMAGE to the correctly identified creature
+        targetCreature.currentHp = newHp;
+        
+        // Handle death and revival status
+        if (died) {
+            if (revivedByNecromancy) {
+                // Creature died but was revived
+                targetCreature.alive = true;
                 bm.addCombatLog(
-                    `ðŸ’” ${creatureName} takes ${damage} damage! (${oldHp} â†’ ${newHp} HP)`,
+                    `💀 ${creatureName} takes ${damage} damage and dies! (${oldHp} → ${newHp} HP)`,
+                    heroLocalSide === 'player' ? 'error' : 'success'
+                );
+                bm.addCombatLog(
+                    `🧟‍♂️✨ But ${creatureName} is revived by Necromancy!`,
+                    'info'
+                );
+            } else {
+                // Creature died and stayed dead
+                targetCreature.alive = false;
+                bm.addCombatLog(
+                    `💀 ${creatureName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
                     heroLocalSide === 'player' ? 'error' : 'success'
                 );
             }
+        } else {
+            // Creature survived
+            targetCreature.alive = true;
+            bm.addCombatLog(
+                `💥 ${creatureName} takes ${damage} damage! (${oldHp} → ${newHp} HP)`,
+                heroLocalSide === 'player' ? 'error' : 'success'
+            );
+        }
 
-            bm.updateCreatureHealthBar(heroLocalSide, heroPosition, creatureIndex, newHp, maxHp);
-            bm.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, creatureIndex, damage, creature.maxHp, 'attack');
+        // Update visuals using the FINAL creature index
+        const visualIndex = necromancyArrayManipulation ? finalCreatureIndex : targetCreatureIndex;
+        bm.updateCreatureHealthBar(heroLocalSide, heroPosition, visualIndex, newHp, maxHp);
+        bm.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, visualIndex, damage, targetCreature.maxHp, debugInfo?.damageSource || 'attack');
+        
+        // Handle visual death state (only if creature stayed dead)
+        if (died && !revivedByNecromancy && oldHp > 0) {
+            bm.handleCreatureDeath(localHero, targetCreature, visualIndex, heroLocalSide, heroPosition);
             
-            // Handle visual death state (only if creature stayed dead)
-            if (died && !revivedByNecromancy && oldHp > 0) {
-                bm.handleCreatureDeath(localHero, creature, creatureIndex, heroLocalSide, heroPosition);
-                
-                // FIXED: Immediately hide health bar and HP text for defeated creature
-                const creatureElement = document.querySelector(
-                    `.${heroLocalSide}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
-                );
-                
-                if (creatureElement) {
-                    const healthBar = creatureElement.querySelector('.creature-health-bar');
-                    const hpText = creatureElement.querySelector('.creature-hp-text');
-                    if (healthBar) {
-                        healthBar.remove();
-                        console.log(`ðŸ©¸ GUEST: Removed health bar for defeated ${creatureName}`);
-                    }
-                    if (hpText) {
-                        hpText.remove();
-                        console.log(`ðŸ©¸ GUEST: Removed HP text for defeated ${creatureName}`);
-                    }
+            // Remove health bar and HP text for defeated creature
+            const creatureElement = document.querySelector(
+                `.${heroLocalSide}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${visualIndex}"]`
+            );
+            
+            if (creatureElement) {
+                const healthBar = creatureElement.querySelector('.creature-health-bar');
+                const hpText = creatureElement.querySelector('.creature-hp-text');
+                if (healthBar) {
+                    healthBar.remove();
+                    console.log(`🏥 GUEST: Removed health bar for defeated ${creatureName}`);
+                }
+                if (hpText) {
+                    hpText.remove();
+                    console.log(`🏥 GUEST: Removed HP text for defeated ${creatureName}`);
                 }
             }
+        }
+        
+        // If creature was revived, restore visual state
+        if (died && revivedByNecromancy) {
+            const creatureElement = document.querySelector(
+                `.${heroLocalSide}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${visualIndex}"]`
+            );
             
-            // If creature was revived, make sure visual state reflects being alive
-            if (died && revivedByNecromancy) {
-                const creatureElement = document.querySelector(
-                    `.${heroLocalSide}-slot.${heroPosition}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
-                );
-                
-                if (creatureElement) {
-                    creatureElement.classList.remove('defeated');
-                    const sprite = creatureElement.querySelector('.creature-sprite');
-                    if (sprite) {
-                        sprite.style.filter = '';
-                        sprite.style.opacity = '';
-                    }
-                    
-                    // FIXED: Ensure revived creatures have their health bars restored
-                    // Call updateCreatureVisuals to recreate health bar if needed
-                    setTimeout(() => {
-                        bm.updateCreatureVisuals(heroLocalSide, heroPosition, localHero.creatures);
-                        console.log(`ðŸ’€âœ¨ GUEST: Restored health bar for revived ${creatureName}`);
-                    }, 100);
+            if (creatureElement) {
+                creatureElement.classList.remove('defeated');
+                const sprite = creatureElement.querySelector('.creature-sprite');
+                if (sprite) {
+                    sprite.style.filter = '';
+                    sprite.style.opacity = '';
                 }
+                
+                // Restore health bars for revived creatures
+                setTimeout(() => {
+                    bm.updateCreatureVisuals(heroLocalSide, heroPosition, localHero.creatures);
+                    console.log(`🧟‍♂️✨ GUEST: Restored health bar for revived ${creatureName}`);
+                }, 100);
             }
         }
     }
@@ -1355,6 +1494,57 @@ export class BattleNetworkManager {
             console.log('âœ… HOST: Guest desync resolved successfully');
         } else {
             console.error('âŒ HOST: Failed to resolve guest desync');
+        }
+    }
+
+    guest_handleBattleStatBonus(data) {
+        const bm = this.battleManager;
+        if (bm.isAuthoritative) return; // Only process on guest side
+        
+        const { heroAbsoluteSide, heroPosition, heroName, bonusType, bonusAmount, source } = data;
+        
+        // Determine local side for guest
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const heroLocalSide = (heroAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Find the hero
+        const heroes = heroLocalSide === 'player' ? bm.playerHeroes : bm.opponentHeroes;
+        const hero = heroes[heroPosition];
+        
+        if (!hero) {
+            console.error(`Guest: Hero not found for stat bonus: ${heroLocalSide} ${heroPosition}`);
+            return;
+        }
+        
+        // Apply the battle bonus
+        if (bonusType === 'attack') {
+            hero.addBattleAttackBonus(bonusAmount);
+            
+            // Update the display
+            bm.updateHeroAttackDisplay(heroLocalSide, heroPosition, hero);
+            
+            // Add to combat log
+            const logType = heroLocalSide === 'player' ? 'success' : 'info';
+            bm.addCombatLog(
+                `⚔️ ${heroName} gains +${bonusAmount} attack from ${source}!`,
+                logType
+            );
+            
+            console.log(`Guest: Applied +${bonusAmount} attack bonus to ${heroLocalSide} ${heroName}`);
+        } else if (bonusType === 'hp') {
+            hero.addBattleHpBonus(bonusAmount);
+            
+            // Update the health display
+            bm.updateHeroHealthBar(heroLocalSide, heroPosition, hero.currentHp, hero.maxHp);
+            
+            // Add to combat log
+            const logType = heroLocalSide === 'player' ? 'success' : 'info';
+            bm.addCombatLog(
+                `❤️ ${heroName} gains +${bonusAmount} HP from ${source}!`,
+                logType
+            );
+            
+            console.log(`Guest: Applied +${bonusAmount} HP bonus to ${heroLocalSide} ${heroName}`);
         }
     }
 

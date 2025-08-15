@@ -30,7 +30,7 @@ export class IceboltSpell {
 
         // Check if target resists the spell
         const isResisted = this.battleManager.resistanceManager && 
-            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (isResisted) {
             console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);

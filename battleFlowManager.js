@@ -112,6 +112,11 @@ export class BattleFlowManager {
             bm.frontSoldierManager = new FrontSoldierCreature(bm);
             console.log('✅ Front Soldier manager initialized');
 
+            // Initialize Archer manager
+            const ArcherCreature = (await import('./Creatures/archer.js')).default;
+            bm.archerManager = new ArcherCreature(bm);
+            console.log('✅ Archer manager initialized');
+
             // Verify managers are properly set
             if (!bm.jigglesManager) {
                 console.error('❌ CRITICAL: Jiggles manager failed to initialize!');
@@ -146,6 +151,15 @@ export class BattleFlowManager {
             if (!bm.skeletonNecromancerManager) bm.skeletonNecromancerManager = null;
             if (!bm.skeletonDeathKnightManager) bm.skeletonDeathKnightManager = null;
             if (!bm.skeletonReaperManager) bm.skeletonReaperManager = null;
+        }
+
+        try {
+            // Initialize Furious Anger effect
+            const { initFuriousAngerEffect } = await import('./Artifacts/furiousAnger.js');
+            bm.furiousAngerEffect = initFuriousAngerEffect(bm);
+            console.log('🔥 Furious Anger effect initialized');
+        } catch (error) {
+            console.error('⚠️ Error initializing Furious Anger effect:', error);
         }
 
         // Ensure randomness is initialized before battle starts
@@ -253,6 +267,13 @@ export class BattleFlowManager {
                     await applySnowCannonBattleEffects(bm);
                 } catch (error) {
                     console.error('❌ Error applying Snow Cannon effects:', error);
+                }
+
+                try {
+                    const { applyFieldStandardBattleEffects } = await import('./Artifacts/fieldStandard.js');
+                    await applyFieldStandardBattleEffects(bm);
+                } catch (error) {
+                    console.error('⚠️ Error applying Field Standard effects:', error);
                 }
                 
                 console.log('✅ All start of battle effects applied successfully');
@@ -541,9 +562,7 @@ export class BattleFlowManager {
         if (this.battleManager.attackEffectsManager && 
             this.battleManager.attackEffectsManager.hasActiveStormbladeAnimations()) {
             
-            console.log('ðŸŒªï¸ Waiting for active Stormblade animations to complete...');
             await this.battleManager.attackEffectsManager.waitForStormbladeAnimations();
-            console.log('ðŸŒªï¸ Stormblade animations completed, continuing battle...');
         }
 
         // ============================================
@@ -609,9 +628,8 @@ export class BattleFlowManager {
     async executeActorActions(playerActor, opponentActor, position) {
         const bm = this.battleManager;
         
-        // â­ NEW: Check for Ice Age pause before executing actions
+        // â­Check for Ice Age pause before executing actions
         if (bm.iceAgeInProgress) {
-            console.log('ðŸŒ¨ï¸ Actor actions paused due to Ice Age in progress');
             // Wait for Ice Age to complete
             while (bm.iceAgeInProgress && bm.battleActive) {
                 await bm.delay(100);
@@ -682,6 +700,8 @@ export class BattleFlowManager {
                 const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
                 const BoulderCreature = (await import('./Creatures/boulder.js')).default;
                 const FrontSoldierCreature = (await import('./Creatures/frontSoldier.js')).default; 
+                const ArcherCreature = (await import('./Creatures/archer.js')).default; 
+                const MoonlightButterflyCreature = (await import('./Creatures/moonlightButterfly.js')).default;
 
                 if (!bm.skeletonNecromancerManager) {
                     console.error('CRITICAL: Skeleton Necromancer manager failed to initialize!');
@@ -758,6 +778,15 @@ export class BattleFlowManager {
                     }
                     actions.push(bm.boulderManager.executeSpecialAttack(playerActor, position));
                     hasSpecialAttacks = true;
+                } else if (ArcherCreature.isArcher(playerActor.name)) {
+                    if (bm.archerManager) {
+                        actions.push(bm.archerManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('CRITICAL: ArcherManager not available for', playerActor.name);
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`${playerActor.name} activates!`, 'success');
+                    }
                 } else if (FrontSoldierCreature.isFrontSoldier(playerActor.name)) {
                     if (bm.frontSoldierManager) {
                         actions.push(bm.frontSoldierManager.executeSpecialAttack(playerActor, position));
@@ -767,6 +796,12 @@ export class BattleFlowManager {
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                         bm.addCombatLog(`${playerActor.name} activates!`, 'success');
                     }
+                } else if (MoonlightButterflyCreature.isMoonlightButterfly(playerActor.name)) {
+                    if (!bm.moonlightButterflyManager) {
+                        bm.moonlightButterflyManager = new MoonlightButterflyCreature(bm);
+                    }
+                    actions.push(bm.moonlightButterflyManager.executeMoonlightButterflyAction(playerActor, position));
+                    hasSpecialAttacks = true;
                 } else {
                     actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                     bm.addCombatLog(`${playerActor.name} activates!`, 'success');
@@ -789,87 +824,104 @@ export class BattleFlowManager {
                 const SkeletonReaperCreature = (await import('./Creatures/skeletonReaper.js')).default;
                 const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
                 const FrontSoldierCreature = (await import('./Creatures/frontSoldier.js')).default;
+                const ArcherCreature = (await import('./Creatures/archer.js')).default;
+                const MoonlightButterflyCreature = (await import('./Creatures/moonlightButterfly.js')).default;
 
                 if (JigglesCreature.isJiggles(opponentActor.name)) {
                     if (bm.jigglesManager) {
                         actions.push(bm.jigglesManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: JigglesManager not available for', opponentActor.name);
+                        console.error('RITICAL: JigglesManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (SkeletonArcherCreature.isSkeletonArcher(opponentActor.name)) {
                     if (bm.skeletonArcherManager) {
                         actions.push(bm.skeletonArcherManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: SkeletonArcherManager not available for', opponentActor.name);
+                        console.error('CRITICAL: SkeletonArcherManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(opponentActor.name)) {
                     if (bm.skeletonNecromancerManager) {
                         actions.push(bm.skeletonNecromancerManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: SkeletonNecromancerManager not available for', opponentActor.name);
+                        console.error('CRITICAL: SkeletonNecromancerManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(opponentActor.name)) {
                     if (bm.skeletonDeathKnightManager) {
                         actions.push(bm.skeletonDeathKnightManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: SkeletonDeathKnightManager not available for', opponentActor.name);
+                        console.error('CRITICAL: SkeletonDeathKnightManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (BurningSkeletonCreature.isBurningSkeleton(opponentActor.name)) {
                     if (bm.burningSkeletonManager) {
                         actions.push(bm.burningSkeletonManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: BurningSkeletonManager not available for', opponentActor.name);
+                        console.error('CRITICAL: BurningSkeletonManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (SkeletonReaperCreature.isSkeletonReaper(opponentActor.name)) {
                     if (bm.skeletonReaperManager) {
                         actions.push(bm.skeletonReaperManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: SkeletonReaperManager not available for', opponentActor.name);
+                        console.error('CRITICAL: SkeletonReaperManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (SkeletonBardCreature.isSkeletonBard(opponentActor.name)) {
                     if (bm.skeletonBardManager) {
                         actions.push(bm.skeletonBardManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âŒ CRITICAL: SkeletonBardManager not available for', opponentActor.name);
+                        console.error('CRITICAL: SkeletonBardManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
                 } else if (FrontSoldierCreature.isFrontSoldier(opponentActor.name)) {
                     if (bm.frontSoldierManager) {
                         actions.push(bm.frontSoldierManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
-                        console.error('âš ï¸ CRITICAL: FrontSoldierManager not available for', opponentActor.name);
+                        console.error('CRITICAL: FrontSoldierManager not available for', opponentActor.name);
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                        bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                        bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                     }
+                } else if (ArcherCreature.isArcher(opponentActor.name)) {
+                    if (bm.archerManager) {
+                        actions.push(bm.archerManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        console.error('🔥 CRITICAL: ArcherManager not available for', opponentActor.name);
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🔸 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else if (MoonlightButterflyCreature.isMoonlightButterfly(opponentActor.name)) {
+                    if (!bm.moonlightButterflyManager) {
+                        bm.moonlightButterflyManager = new MoonlightButterflyCreature(bm);
+                    }
+                    actions.push(bm.moonlightButterflyManager.executeMoonlightButterflyAction(opponentActor, position));
+                    hasSpecialAttacks = true;
                 } else {
                     actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                    bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
                 }
             } catch (error) {
-                console.error('âŒ Error importing creature classes:', error);
+                console.error('Error importing creature classes:', error);
                 actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                bm.addCombatLog(`ðŸŒŸ ${opponentActor.name} activates!`, 'error');
+                bm.addCombatLog(`${opponentActor.name} activates!`, 'error');
             }
         }
         

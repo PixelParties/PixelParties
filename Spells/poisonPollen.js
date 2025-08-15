@@ -22,8 +22,8 @@ export class PoisonPollenSpell {
         
         console.log(`🌸 ${caster.name} casting ${this.displayName} on ${poisonedTargets.length} poisoned enemies!`);
         
-        // Check resistance for each target BEFORE animations
-        const resistanceResults = this.checkResistanceForAllTargets(poisonedTargets);
+        // Check resistance for each target BEFORE animations (UPDATED to pass caster)
+        const resistanceResults = this.checkResistanceForAllTargets(poisonedTargets, caster);
         
         // Log the spell effect with resistance info
         this.logSpellEffect(caster, poisonedTargets, resistanceResults);
@@ -45,20 +45,20 @@ export class PoisonPollenSpell {
     // RESISTANCE CHECKING
     // ============================================
 
-    // Check resistance for all targets upfront
-    checkResistanceForAllTargets(targets) {
+    // Check resistance for all targets upfront (UPDATED to pass caster)
+    checkResistanceForAllTargets(targets, caster) {
         const resistanceMap = new Map();
         
         targets.forEach(target => {
             let resisted = false;
             
-            // Check resistance based on target type
+            // Check resistance based on target type (UPDATED to pass caster)
             if (this.battleManager.resistanceManager) {
                 if (target.type === 'hero') {
-                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
                 } else if (target.type === 'creature') {
                     // For area spells, shouldResistAreaSpell handles creatures differently
-                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName);
+                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName, caster);
                 }
             }
             
@@ -643,11 +643,12 @@ export class PoisonPollenSpell {
         return {
             name: this.spellName,
             displayName: this.displayName,
-            description: 'Covers all poisoned enemies in stunning pollen particles, applying 1 stun stack to each. Can only be cast if there are poisoned enemies.',
+            description: 'Covers all poisoned enemies in stunning pollen particles, applying 1 stun stack to each. Can only be cast if there are poisoned enemies. When cast by Ida, applies additional flame damage to non-resisted targets.',
             effectFormula: '1 stun stack to all poisoned enemies',
             targetType: 'poisoned_enemies_only',
             spellSchool: 'DecayMagic',
-            condition: 'Requires at least 1 poisoned enemy'
+            condition: 'Requires at least 1 poisoned enemy',
+            specialEffects: ['Ida: +50 flame damage to non-resisted targets']
         };
     }
 

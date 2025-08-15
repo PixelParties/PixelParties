@@ -2626,8 +2626,11 @@ export class HeroSelection {
         // Check if this is FrontSoldier being summoned for free
         const isFrontSoldierFree = this.canSummonFrontSoldierForFree(targetSlot, spellCardName);
         
-        // Check if player can play action card (skip for free FrontSoldier)
-        if (!isFrontSoldierFree) {
+        // NEW: Check if this is Archer being summoned for free (Leadership 3+)
+        const isArcherFree = this.canSummonArcherForFree(targetSlot, spellCardName);
+        
+        // Check if player can play action card (skip for free creatures)
+        if (!isFrontSoldierFree && !isArcherFree) {
             const actionCheck = this.actionManager.canPlayActionCard(cardInfo);
             if (!actionCheck.canPlay) {
                 this.handManager.endHandCardDrag();
@@ -2651,18 +2654,26 @@ export class HeroSelection {
             const success = this.heroCreatureManager.addCreatureToHero(targetSlot, spellCardName);
 
             if (success) {
-                // Consume action if required (skip for free FrontSoldier)
-                if (cardInfo.action && !isFrontSoldierFree) {
+                // Consume action if required (skip for free creatures)
+                if (cardInfo.action && !isFrontSoldierFree && !isArcherFree) {
                     this.actionManager.consumeAction();
                 }
                 
                 // Remove spell from hand
                 this.handManager.removeCardFromHandByIndex(cardIndex);
                 
-                // Show success message
-                const successMessage = isFrontSoldierFree ? 
-                    `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free!` :
-                    `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)}!`;
+                // Show success message with appropriate text
+                let successMessage;
+                if (isFrontSoldierFree) {
+                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free!`;
+                } else if (isArcherFree) {
+                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free with Leadership!`;
+                } else if (learnCheck.isArcherReducedLevel) {
+                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} with reduced requirements!`;
+                } else {
+                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)}!`;
+                }
+                
                 this.showSpellDropResult(targetSlot, successMessage, true);
 
                 // Update UI and save
@@ -2740,6 +2751,58 @@ export class HeroSelection {
         if (this.potionHandler) {
             this.potionHandler.updatePotionDisplay();
         }
+    }
+
+    // Show visual feedback for spell drop result
+    showArcherSummonFeedback(heroPosition, archerSummonType) {
+        const teamSlot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
+        if (!teamSlot) return;
+        
+        let message = '';
+        let bgColor = '';
+        
+        switch (archerSummonType) {
+            case 'reduced_level':
+                message = '🏹 Archer summoned with reduced level requirement!';
+                bgColor = 'rgba(34, 139, 34, 0.9)';
+                break;
+            case 'free_leadership':
+                message = '👑 Leadership allows free Archer summoning!';
+                bgColor = 'rgba(255, 215, 0, 0.9)';
+                break;
+            default:
+                return;
+        }
+        
+        // Create and show feedback element
+        const feedback = document.createElement('div');
+        feedback.className = 'archer-summon-feedback';
+        feedback.textContent = message;
+        
+        feedback.style.cssText = `
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${bgColor};
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 1000;
+            animation: fadeInOut 3s ease-out;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+        
+        teamSlot.style.position = 'relative';
+        teamSlot.appendChild(feedback);
+        
+        setTimeout(() => {
+            feedback.remove();
+        }, 3000);
     }
 
     // Show visual feedback for spell drop result
@@ -3078,7 +3141,6 @@ export class HeroSelection {
 
         // Special exception for Cavalry with 3 total heroes
         if (spellCardName === 'Cavalry') {
-            // Count total heroes in formation
             const totalHeroes = Object.values(formation).filter(h => h !== null && h !== undefined).length;
             if (totalHeroes >= 3) {
                 return { canLearn: true, heroName: hero.name };
@@ -3090,6 +3152,19 @@ export class HeroSelection {
             const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
             if (heroCreatures.length === 0) {
                 return { canLearn: true, heroName: hero.name };
+            }
+        }
+
+        // NEW: Special exception for Archer when hero has 1+ creatures (level becomes 0)
+        if (spellCardName === 'Archer') {
+            const canSummonWithReducedLevel = this.canSummonArcherWithReducedLevel(heroPosition, spellCardName);
+            if (canSummonWithReducedLevel) {
+                console.log(`🏹 ${hero.name} can summon Archer with reduced level requirement (has creatures)`);
+                return { 
+                    canLearn: true, 
+                    heroName: hero.name,
+                    isArcherReducedLevel: true 
+                };
             }
         }
 
@@ -3114,7 +3189,7 @@ export class HeroSelection {
 
         // Check 4: Compare levels
         if (totalSpellSchoolLevel < spellLevel) {
-            // NEW: Check if Semi can use gold learning
+            // Check if Semi can use gold learning
             if (hero.name === 'Semi') {
                 const semiCheck = this.semiEffectManager.canUseSemiGoldLearning(this, heroPosition, spellCardName);
                 if (semiCheck.canUse) {
@@ -3153,6 +3228,15 @@ export class HeroSelection {
         // Check if hero has no creatures yet
         const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
         return heroCreatures.length === 0;
+    }
+
+    canSummonArcherForFree(heroPosition, spellCardName) {
+        if (spellCardName !== 'Archer') {
+            return false;
+        }
+        
+        // Check if hero has Leadership 3 or higher
+        return this.canSummonArcherForFree(heroPosition, spellCardName);
     }
 
     // Add helper method to check if dragging an equip artifact card
@@ -3274,6 +3358,45 @@ export class HeroSelection {
                 }
             }
         });
+    }
+
+    isArcherCreature(creatureName) {
+        return creatureName === 'Archer';
+    }
+
+    // Check if Archer can be summoned with level 0 (when hero has 1+ creatures)
+    canSummonArcherWithReducedLevel(heroPosition, spellCardName) {
+        if (spellCardName !== 'Archer') {
+            return false;
+        }
+        
+        // Check if hero has 1 or more creatures already
+        const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
+        return heroCreatures.length >= 1;
+    }
+
+    // Check if Archer can be summoned for free (when hero has Leadership 3+)
+    canSummonArcherForFree(heroPosition, spellCardName) {
+        if (spellCardName !== 'Archer') {
+            return false;
+        }
+        
+        // Check if hero has Leadership 3 or higher
+        const heroAbilities = this.heroAbilitiesManager.getHeroAbilities(heroPosition);
+        let leadershipLevel = 0;
+        
+        // Count leadership abilities across all zones
+        ['zone1', 'zone2', 'zone3'].forEach(zone => {
+            if (heroAbilities && heroAbilities[zone]) {
+                heroAbilities[zone].forEach(ability => {
+                    if (ability && ability.name === 'Leadership') {
+                        leadershipLevel++;
+                    }
+                });
+            }
+        });
+        
+        return leadershipLevel >= 3;
     }
 }
 

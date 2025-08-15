@@ -128,6 +128,13 @@ export class SkeletonNecromancerCreature {
         ['left', 'center', 'right'].forEach(heroPosition => {
             const hero = allies[heroPosition];
             if (hero && !hero.alive) {
+                // Skip heroes with heal-block
+                if (this.battleManager.statusEffectsManager && 
+                    this.battleManager.statusEffectsManager.hasStatusEffect(hero, 'healblock')) {
+                    console.log(`🚫 Skipping heal-blocked ${hero.name} for SkeletonNecromancer hero revival`);
+                    return;
+                }
+                
                 deadHeroes.push({
                     hero: hero,
                     position: heroPosition,
@@ -406,6 +413,13 @@ export class SkeletonNecromancerCreature {
             if (hero && hero.alive && hero.creatures) {
                 hero.creatures.forEach((creature, creatureIndex) => {
                     if (!creature.alive) {
+                        // Skip creatures with heal-block
+                        if (this.battleManager.statusEffectsManager && 
+                            this.battleManager.statusEffectsManager.hasStatusEffect(creature, 'healblock')) {
+                            console.log(`🚫 Skipping heal-blocked ${creature.name} for SkeletonNecromancer revival`);
+                            return;
+                        }
+                        
                         defeatedAllies.push({
                             hero: hero,
                             creature: creature,

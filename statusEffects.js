@@ -66,6 +66,15 @@ export class StatusEffectsManager {
                 persistent: false, // Decreases when skipping turns
                 visual: 'freeze_crystal',
                 description: 'Skips turns. Reduces by 1 stack when turn is skipped. Removes burned.'
+            },
+            healblock: {
+                name: 'healblock',
+                displayName: 'Heal-Block',
+                type: 'debuff',
+                targetTypes: ['hero', 'creature'], // Both can be heal-blocked
+                persistent: false, // Decreases each turn via duration
+                visual: 'heal_block_symbol',
+                description: 'Cannot be healed or revived. Reduces by 1 stack each turn (persists when dead).'
             }
         };
         
@@ -445,6 +454,7 @@ export class StatusEffectsManager {
         // Process duration-based effects
         this.processSilencedDuration(target);
         this.processTauntingDuration(target);
+        this.processHealBlockDuration(target);
 
         // Clean up expired effects
         this.cleanupExpiredEffects(target);
@@ -687,6 +697,20 @@ export class StatusEffectsManager {
         }
     }
 
+    // Process heal-block duration (decreases each turn, but only for alive targets)
+    processHealBlockDuration(target) {
+        if (this.hasStatusEffect(target, 'healblock')) {
+            this.removeStatusEffect(target, 'healblock', 1);
+            
+            if (!this.hasStatusEffect(target, 'healblock')) {
+                this.battleManager.addCombatLog(
+                    `🩹 ${target.name} is no longer heal-blocked!`,
+                    target.side === 'player' ? 'success' : 'error'
+                );
+            }
+        }
+    }
+
     // ============================================
     // STATUS EFFECT INTERACTIONS
     // ============================================
@@ -754,7 +778,8 @@ export class StatusEffectsManager {
             stunned: { icon: '😵', color: 'rgba(255, 255, 0, 0.9)' },
             burned: { icon: '🔥', color: 'rgba(255, 100, 0, 0.9)' },
             frozen: { icon: '🧊', color: 'rgba(100, 200, 255, 0.9)' },
-            taunting: { icon: '📢', color: 'rgba(255, 107, 107, 0.9)' } 
+            taunting: { icon: '📢', color: 'rgba(255, 107, 107, 0.9)' },
+            healblock: { icon: '🚫', color: 'rgba(220, 53, 69, 0.9)' }
         };
 
         const effect = effects[effectName];
@@ -811,7 +836,8 @@ export class StatusEffectsManager {
             stunned: { icon: '😵', color: '#ffff00' },
             burned: { icon: '🔥', color: '#ff6400' },
             frozen: { icon: '🧊', color: '#64c8ff' },
-            taunting: { icon: '📢', color: '#ff6b6b' }  
+            taunting: { icon: '📢', color: '#ff6b6b' },
+            healblock: { icon: '🚫', color: '#dc3545' }
         };
 
         const indicator = indicators[effectName];
@@ -1060,6 +1086,24 @@ export class StatusEffectsManager {
             
             .fireshield-frozen-immunity-effect {
                 will-change: transform, opacity;
+            }
+
+            /* Heal-block specific styling */
+            .status-indicator-healblock {
+                background: #dc3545 !important;
+                border-color: rgba(220, 53, 69, 0.8) !important;
+                animation: healBlockPulse 2s ease-in-out infinite !important;
+            }
+            
+            @keyframes healBlockPulse {
+                0%, 100% { 
+                    box-shadow: 0 2px 6px rgba(220, 53, 69, 0.3);
+                    transform: translateX(-50%) scale(1);
+                }
+                50% { 
+                    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.6);
+                    transform: translateX(-50%) scale(1.05);
+                }
             }
         `;
         
@@ -1313,70 +1357,101 @@ export class StatusEffectsManager {
     // BATTLE MANAGEMENT (ENHANCED WITH FIXES)
     // ============================================
 
-    // Clear all status effects from target (battle end) - ✅ ENHANCED
-    clearAllStatusEffects(target) {
-        if (!target.statusEffects) return;
+    // Clear all status effects from target (battle end
+    clearAllStatusEffects(target, completeClearing = false) {
+    if (!target.statusEffects) return;
         
-        // Remove all visual indicators
+        // Determine which effects to preserve based on clearing mode
+        let effectsToPreserve = [];
+        
+        if (!completeClearing) {
+            // During battle: Preserve heal-block effects when target dies
+            effectsToPreserve = target.statusEffects.filter(effect => effect.name === 'healblock');
+        }
+        // If completeClearing = true, preserve nothing (clear everything)
+        
+        // Remove visual indicators
         const targetElement = this.getTargetElement(target);
         if (targetElement) {
             const indicators = targetElement.querySelectorAll('.status-indicator');
-            indicators.forEach(indicator => indicator.remove());
+            indicators.forEach(indicator => {
+                // If complete clearing, remove all indicators
+                if (completeClearing) {
+                    indicator.remove();
+                } else {
+                    // Otherwise, only remove non-heal-block indicators
+                    if (!indicator.classList.contains('status-indicator-healblock')) {
+                        indicator.remove();
+                    }
+                }
+            });
             
-            // ✅ FIX: Also remove any floating status effects
+            // Remove any floating status effects
             const floatingEffects = targetElement.querySelectorAll(
                 '.status-application-effect, .status-damage-effect, .medea-poison-enhancement'
             );
             floatingEffects.forEach(effect => effect.remove());
         }
         
-        // Clear the status effects array
-        target.statusEffects = [];
-        console.log(`🧹 Cleared all status effects from ${target.name} (alive: ${target.alive})`);
+        // Set status effects to preserved effects (empty array if complete clearing)
+        target.statusEffects = effectsToPreserve;
+        
+        const isAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
+        const clearingMode = completeClearing ? 'COMPLETE' : 'PARTIAL';
+        console.log(`🧹 ${clearingMode} cleared status effects from ${target.name} (alive: ${isAlive}), preserved ${effectsToPreserve.length} effects`);
     }
 
-    // ✅ NEW: Add a safety cleanup method to be called after death
-    cleanupDeadTargetVisuals(target) {
+    // Add a safety cleanup method to be called after death
+    cleanupDeadTargetVisuals(target, completeClearing = false) {
         const targetElement = this.getTargetElement(target);
         if (!targetElement) return;
         
-        // Remove all status-related visual elements
-        const statusElements = targetElement.querySelectorAll(`
-            .status-indicator,
-            .status-application-effect,
-            .status-damage-effect,
-            .medea-poison-enhancement
-        `);
+        // Remove status-related visual elements
+        let selector = '.status-application-effect, .status-damage-effect, .medea-poison-enhancement';
         
+        if (completeClearing) {
+            // For complete clearing, remove ALL status indicators including heal-block
+            selector += ', .status-indicator';
+        } else {
+            // For partial clearing, preserve heal-block indicators
+            selector += ', .status-indicator:not(.status-indicator-healblock)';
+        }
+        
+        const statusElements = targetElement.querySelectorAll(selector);
         statusElements.forEach(element => {
             element.remove();
         });
         
-        console.log(`🧹 Cleaned up all status visuals for dead target: ${target.name}`);
+        const clearingMode = completeClearing ? 'COMPLETE' : 'PARTIAL';
+        console.log(`🧹 ${clearingMode} cleaned up status visuals for dead target: ${target.name}`);
     }
 
     // Clear all status effects from all targets (battle end)
     clearAllBattleStatusEffects() {
-        console.log('🧹 Clearing all status effects from battle...');
+        console.log('🧹 COMPLETE battle cleanup: Clearing ALL status effects from ALL targets...');
         
-        // Clear from all heroes
+        // Clear from all heroes with COMPLETE clearing
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
                 const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
                 const hero = heroes[position];
                 
                 if (hero) {
-                    this.clearAllStatusEffects(hero);
+                    // Use complete clearing for battle end
+                    this.clearAllStatusEffects(hero, true);
                     
-                    // Clear from hero's creatures
+                    // Clear from hero's creatures with COMPLETE clearing
                     if (hero.creatures) {
                         hero.creatures.forEach(creature => {
-                            this.clearAllStatusEffects(creature);
+                            // Use complete clearing for battle end
+                            this.clearAllStatusEffects(creature, true);
                         });
                     }
                 }
             });
         });
+        
+        console.log('✅ ALL status effects completely cleared from battle - fresh start for next battle!');
     }
 
     // Cleanup (called when battle ends)
@@ -1424,8 +1499,8 @@ export class StatusEffectsManager {
                 const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
                 const hero = heroes[position];
                 
-                // ✅ FIX: Only restore indicators for alive heroes
-                if (hero && hero.alive && hero.statusEffects) {
+                // SAFETY: Only restore indicators for alive heroes with status effects
+                if (hero && hero.alive && hero.statusEffects && hero.statusEffects.length > 0) {
                     hero.statusEffects.forEach(effect => {
                         this.createPersistentStatusIndicator(
                             this.getTargetElement(hero), hero, effect.name
@@ -1433,21 +1508,28 @@ export class StatusEffectsManager {
                     });
                 }
                 
-                // Restore for creatures
+                // Restore for creatures - ENHANCED SAFETY CHECKS
                 if (hero && hero.creatures) {
                     hero.creatures.forEach(creature => {
-                        // ✅ FIX: Only restore indicators for alive creatures
-                        if (creature.alive && creature.statusEffects) {
+                        // CRITICAL FIX: Only restore indicators for alive creatures with status effects
+                        if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
                             creature.statusEffects.forEach(effect => {
                                 this.createPersistentStatusIndicator(
                                     this.getTargetElement(creature), creature, effect.name
                                 );
                             });
+                        } else if (!creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                            // Log warning if dead creature has status effects (shouldn't happen after fix)
+                            console.warn(`⚠️ Dead creature ${creature.name} still has ${creature.statusEffects.length} status effects - clearing them now!`);
+                            // Emergency cleanup
+                            creature.statusEffects = [];
                         }
                     });
                 }
             });
         });
+        
+        console.log('✅ Status effect visual restoration completed with enhanced safety checks');
     }
 }
 

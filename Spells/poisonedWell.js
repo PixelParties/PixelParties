@@ -28,8 +28,8 @@ export class PoisonedWellSpell {
             return;
         }
         
-        // Check resistance for each target BEFORE animations
-        const resistanceResults = this.checkResistanceForAllTargets(targets);
+        // Check resistance for each target BEFORE animations (UPDATED to pass caster)
+        const resistanceResults = this.checkResistanceForAllTargets(targets, caster);
         
         // Log the spell effect with resistance info
         this.logSpellEffect(caster, poisonStacks, targets, resistanceResults);
@@ -44,20 +44,20 @@ export class PoisonedWellSpell {
     // RESISTANCE CHECKING
     // ============================================
 
-    // Check resistance for all targets upfront
-    checkResistanceForAllTargets(targets) {
+    // Check resistance for all targets upfront (UPDATED to pass caster)
+    checkResistanceForAllTargets(targets, caster) {
         const resistanceMap = new Map();
         
         targets.forEach(target => {
             let resisted = false;
             
-            // Check resistance based on target type
+            // Check resistance based on target type (UPDATED to pass caster)
             if (this.battleManager.resistanceManager) {
                 if (target.type === 'hero') {
-                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+                    resisted = this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
                 } else if (target.type === 'creature') {
                     // For area spells, shouldResistAreaSpell handles creatures differently
-                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName);
+                    resisted = this.battleManager.resistanceManager.shouldResistAreaSpell(target, this.spellName, caster);
                 }
             }
             
@@ -724,10 +724,11 @@ export class PoisonedWellSpell {
         return {
             name: this.spellName,
             displayName: this.displayName,
-            description: 'Creates a poisonous rain that falls across the entire enemy side, applying poison to all enemy targets',
+            description: 'Creates a poisonous rain that falls across the entire enemy side, applying poison to all enemy targets. When cast by Ida, applies additional flame damage to non-resisted targets.',
             effectFormula: 'DecayMagic level poison stacks (minimum 1) to all enemies',
             targetType: 'all_enemies',
-            spellSchool: 'DecayMagic'
+            spellSchool: 'DecayMagic',
+            specialEffects: ['Ida: +50 flame damage to non-resisted targets']
         };
     }
 

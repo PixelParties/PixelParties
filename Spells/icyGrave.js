@@ -32,7 +32,7 @@ export class IcyGraveSpell {
 
         // Check if target resists the spell (this automatically consumes resistance if present)
         const isResisted = this.battleManager.resistanceManager && 
-            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (!isResisted) {
             // Calculate and apply frozen stacks

@@ -33,9 +33,9 @@ export class OverheatSpell {
             return;
         }
 
-        // Check if target hero resists the spell
+        // 🔥 UPDATED: Pass caster to resistance check for Ida effect
         const isResisted = this.battleManager.resistanceManager && 
-            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+            this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (isResisted) {
             console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);

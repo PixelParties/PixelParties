@@ -175,7 +175,7 @@ export class IceAgeSpell {
     // ============================================
 
     // Apply frozen stacks to all targets (with individual resistance checks)
-    applyFrozenToAllTargets(targets, frozenStacks) {
+    applyFrozenToAllTargets(targets, frozenStacks, caster) {
         let successCount = 0;
         let resistedCount = 0;
         
@@ -190,7 +190,7 @@ export class IceAgeSpell {
             
             // Check if target resists the spell (individual resistance check)
             const isResisted = this.battleManager.resistanceManager && 
-                this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName);
+                this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
             
             if (isResisted) {
                 console.log(`🛡️ ${actualTarget.name} resisted ${this.displayName}!`);
@@ -249,7 +249,7 @@ export class IceAgeSpell {
         
         // Apply frozen effects at 1 second mark (middle of animation)
         setTimeout(() => {
-            const results = this.applyFrozenToAllTargets(targets, frozenStacks);
+            const results = this.applyFrozenToAllTargets(targets, frozenStacks, caster);
             console.log(`❄️🌨️ Frozen effects applied: ${results.successCount} affected, ${results.resistedCount} resisted`);
         }, 1000);
         

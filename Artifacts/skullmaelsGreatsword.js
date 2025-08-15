@@ -95,7 +95,7 @@ export class SkullmaelsGreatswordArtifact {
 
         // Send network update to guest
         battleManager.sendBattleUpdate('greatsword_skeleton_summon', {
-            attackerSide: attacker.side,
+            attackerAbsoluteSide: attacker.absoluteSide,
             attackerPosition: attacker.position,
             attackerName: attacker.name,
             skeletonName: skeletonCard.name,
@@ -402,14 +402,18 @@ export class SkullmaelsGreatswordArtifact {
      * @param {Object} battleManager - Battle manager instance
      */
     handleGuestSkeletonSummon(data, battleManager) {
-        const { attackerSide, attackerPosition, attackerName, skeletonName, skeletonHp, turn } = data;
+        const { attackerAbsoluteSide, attackerPosition, attackerName, skeletonName, skeletonHp, turn } = data;
         
-        // Find the hero
-        const heroes = attackerSide === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
+        // ✅ Convert absoluteSide to guest's local perspective
+        const myAbsoluteSide = battleManager.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Find the hero using the correct converted side
+        const heroes = attackerLocalSide === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
         const hero = heroes[attackerPosition];
         
         if (!hero) {
-            console.error(`Could not find hero at ${attackerSide} ${attackerPosition}`);
+            console.error(`Could not find hero at ${attackerLocalSide} ${attackerPosition}`);
             return;
         }
 
@@ -426,10 +430,10 @@ export class SkullmaelsGreatswordArtifact {
         // Create the skeleton (data model)
         this.createSkeletonForHero(hero, skeletonCard, turn);
 
-        // Log the summoning
+        // Log the summoning with correct side perspective
         battleManager.addCombatLog(
             `⚔️🦴 ${attackerName}'s Greatsword summons ${skeletonName}!`,
-            attackerSide === 'player' ? 'success' : 'error'
+            attackerLocalSide === 'player' ? 'success' : 'error'  // ✅ Use converted side
         );
 
         // Update visuals and THEN play animation

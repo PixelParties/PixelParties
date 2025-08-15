@@ -811,7 +811,7 @@ class CrusaderArtifactsHandler {
                             attackerSide: side.name,
                             target: target,
                             flintlockCount: flintlockCount,
-                            damage: 50 * flintlockCount
+                            damage: 60 * flintlockCount
                         });
                     } else {
                         console.log(`🔫 ${hero.name} has ${flintlockCount} Flintlock(s) but found no valid targets`);
@@ -1227,13 +1227,13 @@ class CrusaderArtifactsHandler {
 
         // Apply damage based on opponent's cannons (you take damage from opponent's cannons)
         if (opponentCannonCount > 0) {
-            const damagePerCannon = 40;
+            const damagePerCannon = 60;
             const totalDamage = damagePerCannon * opponentCannonCount;
             await this.applyCrusaderCannonBarrage('player', totalDamage, opponentCannonCount);
         }
 
         if (playerCannonCount > 0) {
-            const damagePerCannon = 40;
+            const damagePerCannon = 60;
             const totalDamage = damagePerCannon * playerCannonCount;
             await this.applyCrusaderCannonBarrage('opponent', totalDamage, playerCannonCount);
         }
@@ -1269,7 +1269,7 @@ class CrusaderArtifactsHandler {
                             attackerSide: side.name,
                             target: target,
                             cutlassCount: cutlassCount,
-                            damage: 50 * cutlassCount
+                            damage: 60 * cutlassCount
                         });
                     }
                 }
@@ -1584,8 +1584,8 @@ class CrusaderArtifactsHandler {
             return;
         }
 
-        // Calculate damage: 40 times the number of CrusadersCutlass on the attacking hero
-        const actualDamage = 40 * cutlassCount;
+        // Calculate damage: 60 times the number of CrusadersCutlass on the attacking hero
+        const actualDamage = 60 * cutlassCount;
         
         if (target.type === 'hero') {
             // Apply damage to hero

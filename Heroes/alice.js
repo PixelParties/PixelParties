@@ -45,6 +45,20 @@ export class AliceHeroEffect {
     async executeLaserEffect(alice) {
         if (!this.battleManager.isAuthoritative) return;
 
+        // Count living creatures in Alice's team first
+        const creatureCount = this.countTeamCreatures(alice);
+        const damage = this.DAMAGE_PER_CREATURE * creatureCount;
+
+        // NEW: Only trigger Alice's effect if she has living creatures (damage > 0)
+        if (creatureCount === 0) {
+            console.log(`🔴 Alice's laser effect cancelled - no living creatures on her team`);
+            this.battleManager.addCombatLog(
+                `🔴 Alice's targeting system remains dormant - no creatures to power it!`,
+                alice.side === 'player' ? 'info' : 'info'
+            );
+            return;
+        }
+
         this.battleManager.addCombatLog(
             `🔴 Alice's targeting system activates at the start of her turn!`,
             alice.side === 'player' ? 'success' : 'error'
@@ -60,10 +74,6 @@ export class AliceHeroEffect {
             );
             return;
         }
-
-        // Count living creatures in Alice's team
-        const creatureCount = this.countTeamCreatures(alice);
-        const damage = this.DAMAGE_PER_CREATURE * creatureCount;
 
         console.log(`🔴 Alice laser: ${creatureCount} creatures × ${this.DAMAGE_PER_CREATURE} = ${damage} damage`);
 

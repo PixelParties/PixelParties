@@ -1132,14 +1132,14 @@ export class BattleManager {
 
     // Apply damage to a creature
     async authoritative_applyDamageToCreature(damageData, context = {}) {
-        if (!this.battleManager.isAuthoritative) return;
+        if (!this.isAuthoritative) return; // FIXED: was this.battleManager.isAuthoritative
         
         const { hero, creature, creatureIndex, damage, position, side } = damageData;
         const { source, attacker } = context;
         
         // Validate damage is a number
         if (typeof damage !== 'number' || isNaN(damage)) {
-            console.error(`❌ Invalid damage value for creature: ${damage}, skipping damage application`);
+            console.error(`⛔ Invalid damage value for creature: ${damage}, skipping damage application`);
             return;
         }
         
@@ -1156,12 +1156,12 @@ export class BattleManager {
         
         // ⭐ FIXED: Check for Monia protection before applying damage (SYNCHRONOUS)
         let finalDamage = damage;
-        if (this.battleManager.isAuthoritative) {
-            finalDamage = MoniaHeroEffect.checkMoniaProtection(creature, damage, this.battleManager);
+        if (this.isAuthoritative) { // FIXED: was this.battleManager.isAuthoritative
+            finalDamage = MoniaHeroEffect.checkMoniaProtection(creature, damage, this); // FIXED: was this.battleManager
             
             // Validate that protection returned a valid number
             if (typeof finalDamage !== 'number' || isNaN(finalDamage)) {
-                console.error(`❌ Monia protection returned invalid damage for creature: ${finalDamage}, using original`);
+                console.error(`⛔ Monia protection returned invalid damage for creature: ${finalDamage}, using original`);
                 finalDamage = damage;
             }
         }
@@ -1170,26 +1170,26 @@ export class BattleManager {
         
         // Validate creature HP after damage
         if (typeof creature.currentHp !== 'number' || isNaN(creature.currentHp)) {
-            console.error(`❌ Creature HP became NaN after damage! Creature: ${creature.name}, Old HP: ${oldHp}, Damage: ${finalDamage}`);
+            console.error(`⛔ Creature HP became NaN after damage! Creature: ${creature.name}, Old HP: ${oldHp}, Damage: ${finalDamage}`);
             creature.currentHp = Math.max(0, oldHp - finalDamage); // Fallback calculation
         }
         
         const willDie = creature.currentHp <= 0;
         
         // Record kill IMMEDIATELY when creature HP drops to 0
-        if (willDie && wasAlive && attacker && this.battleManager.isAuthoritative) {
-            recordKillWithVisualFeedback(this.battleManager, attacker, creature, 'creature');
-            this.battleManager.addCombatLog(`${attacker.name} has slain ${creature.name}!`, 
+        if (willDie && wasAlive && attacker && this.isAuthoritative) { // FIXED: was this.battleManager.isAuthoritative
+            recordKillWithVisualFeedback(this, attacker, creature, 'creature'); // FIXED: was this.battleManager
+            this.addCombatLog(`${attacker.name} has slain ${creature.name}!`, // FIXED: was this.battleManager.addCombatLog
                             attacker.side === 'player' ? 'success' : 'error');
         }
         
         // Track damage dealt
-        if (!this.battleManager.totalDamageDealt[hero.absoluteSide]) {
-            this.battleManager.totalDamageDealt[hero.absoluteSide] = 0;
+        if (!this.totalDamageDealt[hero.absoluteSide]) { // FIXED: was this.battleManager.totalDamageDealt
+            this.totalDamageDealt[hero.absoluteSide] = 0; // FIXED: was this.battleManager.totalDamageDealt
         }
-        this.battleManager.totalDamageDealt[hero.absoluteSide] += finalDamage;
+        this.totalDamageDealt[hero.absoluteSide] += finalDamage; // FIXED: was this.battleManager.totalDamageDealt
         
-        this.battleManager.addCombatLog(
+        this.addCombatLog( // FIXED: was this.battleManager.addCombatLog
             `${creature.name} takes ${finalDamage} damage! (${oldHp} → ${creature.currentHp} HP)`,
             side === 'player' ? 'error' : 'success'
         );
@@ -1205,17 +1205,17 @@ export class BattleManager {
             creature.alive = false;
             
             // 1. Trigger death effects
-            this.battleManager.triggerCreatureDeathEffects(creature, hero, attacker, context);
-            this.battleManager.checkForSkeletonMageReactions(creature, hero.side, 'creature');
+            this.triggerCreatureDeathEffects(creature, hero, attacker, context); // FIXED: was this.battleManager.triggerCreatureDeathEffects
+            this.checkForSkeletonMageReactions(creature, hero.side, 'creature'); // FIXED: was this.battleManager.checkForSkeletonMageReactions
             
             // 2. Check for Furious Anger
             setTimeout(async () => {
-                await checkFuriousAngerReactions(creature, side, hero, this.battleManager);
+                await checkFuriousAngerReactions(creature, side, hero, this); // FIXED: was this.battleManager
             }, 100);
             
             // 3. Attempt necromancy revival
-            if (this.battleManager.necromancyManager) {
-                const revivalResult = this.battleManager.necromancyManager.attemptNecromancyRevival(
+            if (this.necromancyManager) { // FIXED: was this.battleManager.necromancyManager
+                const revivalResult = this.necromancyManager.attemptNecromancyRevival( // FIXED: was this.battleManager.necromancyManager
                     creature, hero, currentCreatureIndex, side, position
                 );
                 
@@ -1232,8 +1232,8 @@ export class BattleManager {
                     };
                     
                     // Update visuals for revived creature
-                    this.battleManager.updateCreatureHealthBar(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp);
-                    this.battleManager.addCombatLog(`${creature.name} rises again, but the kill still counts!`, 'info');
+                    this.updateCreatureHealthBar(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp); // FIXED: was this.battleManager.updateCreatureHealthBar
+                    this.addCombatLog(`${creature.name} rises again, but the kill still counts!`, 'info'); // FIXED: was this.battleManager.addCombatLog
                 }
             }
             
@@ -1241,7 +1241,7 @@ export class BattleManager {
             if (!revivedByNecromancy) {
                 const { attemptDarkGearStealing } = await import('./Artifacts/darkGear.js');
                 stolenByDarkGear = await attemptDarkGearStealing(
-                    creature, hero, currentCreatureIndex, side, this.battleManager
+                    creature, hero, currentCreatureIndex, side, this // FIXED: was this.battleManager
                 );
                 
                 if (stolenByDarkGear) {
@@ -1253,20 +1253,20 @@ export class BattleManager {
             
             // 5. Only apply death visuals if creature wasn't stolen or revived
             if (!revivedByNecromancy && !stolenByDarkGear) {
-                this.battleManager.handleCreatureDeathWithoutRevival(hero, creature, currentCreatureIndex, side, position);
+                this.handleCreatureDeathWithoutRevival(hero, creature, currentCreatureIndex, side, position); // FIXED: was this.battleManager.handleCreatureDeathWithoutRevival
             }
         } else if (!willDie) {
             // Creature survived, update health bar normally
-            this.battleManager.updateCreatureHealthBar(side, position, currentCreatureIndex, creature.currentHp, creature.maxHp);
+            this.updateCreatureHealthBar(side, position, currentCreatureIndex, creature.currentHp, creature.maxHp); // FIXED: was this.battleManager.updateCreatureHealthBar
         }
         
         // Only create damage number and send update if creature wasn't stolen
         if (!stolenByDarkGear) {
             const damageSource = context?.source || 'attack';
-            this.battleManager.animationManager.createDamageNumberOnCreature(side, position, finalCreatureIndex, finalDamage, creature.maxHp, damageSource);
+            this.animationManager.createDamageNumberOnCreature(side, position, finalCreatureIndex, finalDamage, creature.maxHp, damageSource); // FIXED: was this.battleManager.animationManager
             
             // Send update to guest
-            this.battleManager.sendBattleUpdate('creature_damage_applied', {
+            this.sendBattleUpdate('creature_damage_applied', { // FIXED: was this.battleManager.sendBattleUpdate
                 heroAbsoluteSide: hero.absoluteSide,
                 heroPosition: position,
                 originalCreatureIndex: creatureIndex,
@@ -1292,7 +1292,7 @@ export class BattleManager {
         }
         
         // Save state
-        this.battleManager.saveBattleStateToPersistence().catch(error => {
+        this.saveBattleStateToPersistence().catch(error => { // FIXED: was this.battleManager.saveBattleStateToPersistence
             console.error('Error saving state after creature damage:', error);
         });
     }

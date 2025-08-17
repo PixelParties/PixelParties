@@ -960,7 +960,7 @@ export class BattleNetworkManager {
             localTarget.alive = !died;
             
             bm.addCombatLog(
-                `Ã°Å¸â€™â€ ${targetName} takes ${damage} damage! (${oldHp} Ã¢â€ â€™ ${newHp} HP)`,
+                `${targetName} takes ${damage} damage!)`,
                 targetLocalSide === 'player' ? 'error' : 'success'
             );
 

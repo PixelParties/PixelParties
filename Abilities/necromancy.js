@@ -4,6 +4,7 @@ export class NecromancyManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.styleInjected = false;
+        this.injectNecromancyCSS();
     }
 
     // Initialize necromancy stacks for all heroes at battle start
@@ -68,11 +69,21 @@ export class NecromancyManager {
         return heroesWithStacks[randomIndex];
     }
 
-    // NEW: Animate necromancy revival with stunning visual effects
+    // Animate necromancy revival with stunning visual effects
     async animateNecromancyRevival(side, position, creatureIndex, creature) {
         const creatureElement = document.querySelector(
             `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
         );
+
+        if (!creatureElement) {
+            console.error(`❌ Necromancy animation failed: creature element not found`, {
+                selector: `.${side}-slot.${position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`,
+                side, position, creatureIndex, creatureName: creature.name
+            });
+            return;
+        }
+        
+        console.log(`🌟 Starting necromancy revival animation for ${creature.name}`);
         
         if (!creatureElement) return;
 
@@ -276,6 +287,13 @@ export class NecromancyManager {
     attemptNecromancyRevival(creature, heroOwner, creatureIndex, side, position) {
         if (!this.battleManager.isAuthoritative) return false;
         
+        // Check if creature has heal-block - if so, cannot be revived
+        if (this.battleManager.statusEffectsManager && 
+            this.battleManager.statusEffectsManager.hasStatusEffect(creature, 'healblock')) {
+            console.log(`🚫 ${creature.name} cannot be revived due to heal-block`);
+            return false;
+        }
+        
         // Check if any heroes on this side have necromancy stacks
         const heroesWithStacks = this.getHeroesWithNecromancyStacks(side);
         
@@ -315,6 +333,7 @@ export class NecromancyManager {
             );
         }
         
+            console.log("NECRO TEST!!!");
         // Console log: Array after changes
         console.log(`🔍 NECROMANCY REVIVAL - Array AFTER changes for ${heroOwner.name}:`, 
             heroOwner.creatures.map((c, i) => `${i}: ${c.name} (${c.alive ? 'alive' : 'dead'})`));
@@ -330,18 +349,19 @@ export class NecromancyManager {
             `🧙 ${necromancyHero.name} has ${necromancyHero.getNecromancyStacks()} Necromancy stacks remaining`,
             'info'
         );
-                
-        // ENHANCED: Trigger revival animations (non-blocking) - use new index
-        this.animateNecromancyRevival(side, position, finalCreatureIndex, creature);
         
-        // Update health bar with revival animation - use new index
-        this.updateCreatureHealthBarWithRevival(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp, true);
-        
-        // CRITICAL: Re-render creatures visually to reflect new array order
         this.rerenderCreaturesVisually(side, position, heroOwner);
         
         // Update necromancy stack display
         this.updateNecromancyStackDisplay(side, necromancyHero.position, necromancyHero.getNecromancyStacks());
+        
+        // Trigger revival animations on the newly rendered elements
+        setTimeout(() => {
+            this.animateNecromancyRevival(side, position, finalCreatureIndex, creature);
+        }, 50); 
+        
+        // Update health bar with revival animation - use new index  
+        this.updateCreatureHealthBarWithRevival(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp, true);
         
         // Send update to opponent - include both old and new indices for robust guest handling
         this.battleManager.sendBattleUpdate('necromancy_revival', {
@@ -356,10 +376,11 @@ export class NecromancyManager {
                 heroAbsoluteSide: heroOwner.absoluteSide
             }
         });
+        
         return true;
     }
 
-    // NEW: Re-render creatures visually to reflect array order changes
+    // Re-render creatures visually to reflect array order changes
     rerenderCreaturesVisually(side, position, heroOwner) {
         const heroSlot = document.querySelector(`.${side}-slot.${position}-slot`);
         if (!heroSlot) return;

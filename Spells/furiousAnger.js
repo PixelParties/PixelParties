@@ -139,8 +139,7 @@ export class FuriousAngerEffect {
             );
 
             // Execute the hero action (this will handle attack/spell casting automatically)
-            // Note: We pass null for opponent actor since this is a solo free action
-            await this.battleManager.executeHeroActions(heroActor, null, hero.position);
+            await this.battleManager.combatManager.executeAdditionalAction(hero, hero.position);
         }
 
         // Send sync data to guest

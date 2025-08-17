@@ -1,4 +1,6 @@
-// ./Abilities/resistance.js - Resistance Ability Implementation
+// ./Abilities/resistance.js - Resistance Ability Implementation with Ida Hook
+
+import { IdaHeroEffect } from '../Heroes/ida.js';
 
 export class ResistanceManager {
     constructor(battleManager) {
@@ -100,29 +102,46 @@ export class ResistanceManager {
     }
 
     // ============================================
-    // SPELL INTERCEPTION
+    // SPELL INTERCEPTION WITH IDA HOOK
     // ============================================
 
     // Check if a spell should be resisted
-    shouldResistSpell(target, spellName) {
-        // For single-target spells on heroes
+    shouldResistSpell(target, spellName, caster = null) {
+        // Check for resistance first
         if (target && target.hasAbility && this.canResistSpell(target, spellName)) {
             this.consumeResistanceStack(target, spellName);
             return true;
         }
         
+        // If spell was not resisted and we have a caster, check for Ida effect
+        if (caster && this.battleManager.isAuthoritative) {
+            // Create target object for Ida effect
+            const idaTarget = target.hasAbility ? target : { hero: target, type: 'hero' };
+            IdaHeroEffect.checkIdaSpellEffect(caster, idaTarget, spellName, this.battleManager);
+        }
+        
         return false;
     }
 
-    // Check if an area spell should be resisted for a specific target
-    shouldResistAreaSpell(target, spellName) {
+    // Check if an area spell should be resisted for a specific target (MODIFIED to include Ida hook)
+    shouldResistAreaSpell(target, spellName, caster = null) {
         // For area spells, check each individual target
         if (target.type === 'hero') {
-            return this.shouldResistSpell(target.hero, spellName);
+            // Check resistance for hero
+            const resisted = this.shouldResistSpell(target.hero, spellName, caster);
+            
+            // Note: Ida effect is already handled in shouldResistSpell for heroes
+            return resisted;
         } else if (target.type === 'creature') {
             // Creatures cannot use resistance themselves
-            // Resistance only protects the hero, not their creatures
-            return false;
+            // But they can still be affected by Ida's spell effect
+            
+            // 🔥 NEW: Check for Ida effect on creatures when spell is not resisted
+            if (caster && this.battleManager.isAuthoritative) {
+                IdaHeroEffect.checkIdaSpellEffect(caster, target, spellName, this.battleManager);
+            }
+            
+            return false; // Creatures never resist
         }
         
         return false;
@@ -336,6 +355,10 @@ export class ResistanceManager {
     // Cleanup when battle ends
     cleanup() {
         this.resistanceStacks = {};
+        
+        // Also cleanup Ida effects
+        IdaHeroEffect.cleanup();
+        
         console.log('🛡️ Resistance manager cleaned up');
     }
 }

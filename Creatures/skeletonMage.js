@@ -735,7 +735,7 @@ export class SkeletonMageCreature {
     // ============================================
 
     // Execute revenge ice when Skeleton Mage dies (ice projectile at attacker)
-    async executeRevengeIce(dyingMage, heroOwner, position, side, attacker) {
+    async executeRevengeIce(dyingMage, heroOwner, position, side, attacker, creatureIndex = null) {
         if (!this.battleManager.isAuthoritative) return;
 
         const mageCreature = dyingMage;
@@ -763,14 +763,17 @@ export class SkeletonMageCreature {
             'warning'
         );
 
+        // ✅ USE PRE-CALCULATED INDEX OR CALCULATE AS FALLBACK
+        const finalCreatureIndex = creatureIndex !== null ? creatureIndex : heroOwner.creatures.indexOf(mageCreature);
+
         // Send revenge ice data to guest for synchronization
-        this.sendRevengeIceUpdate(mageCreature, heroOwner, position, mageSide, target);
+        this.sendRevengeIceUpdate(mageCreature, heroOwner, position, mageSide, target, finalCreatureIndex);
 
         // Short delay to ensure guest receives the message
         await this.battleManager.delay(100);
 
         // Execute the revenge ice attack
-        await this.executeRevengeIceAttack(mageCreature, heroOwner, position, mageSide, target);
+        await this.executeRevengeIceAttack(mageCreature, heroOwner, position, mageSide, target, finalCreatureIndex);
     }
 
     // Create target object from attacker
@@ -821,16 +824,27 @@ export class SkeletonMageCreature {
     }
 
     // Execute the revenge ice attack (ice projectile with freeze)
-    async executeRevengeIceAttack(mageCreature, heroOwner, position, mageSide, target) {
-        // Get the mage element (even though it's dead, we need it for projectile origin)
-        const mageElement = this.getMageElement(
-            mageSide, 
-            position, 
-            heroOwner.creatures.indexOf(mageCreature)
-        );
+    async executeRevengeIceAttack(mageCreature, heroOwner, position, mageSide, target, creatureIndex) {
+        const mageElement = this.getMageElement(mageSide, position, creatureIndex);
         
         if (!mageElement) {
-            console.error('Skeleton Mage element not found for revenge ice');
+            console.error('Skeleton Mage element not found for revenge ice - using fallback approach');
+            // ✅ FALLBACK: Try to find ANY creature element in that position as the origin
+            const fallbackElement = document.querySelector(
+                `.${mageSide}-slot.${position}-slot .creature-icon:first-child`
+            );
+            if (!fallbackElement) {
+                console.error('No fallback element found, skipping revenge ice visual effect');
+                return;
+            }
+            // Use the hero slot as origin if no creature elements exist
+            const heroElement = document.querySelector(
+                `.${mageSide}-slot.${position}-slot .battle-hero-card`
+            ) || document.querySelector(`.${mageSide}-slot.${position}-slot`);
+            
+            if (heroElement) {
+                await this.executeRevengeIceFromElement(heroElement, target, mageCreature);
+            }
             return;
         }
 
@@ -867,6 +881,28 @@ export class SkeletonMageCreature {
 
         this.battleManager.addCombatLog(
             `❄️ The vengeful ice strikes and freezes ${target.hero?.name || target.creature?.name}!`, 
+            'warning'
+        );
+    }
+
+    async executeRevengeIceFromElement(originElement, target, mageCreature) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+        
+        const projectile = this.createIceProjectile(originElement, targetElement);
+        if (!projectile) return;
+
+        this.activeProjectiles.add(projectile);
+        const adjustedTravelTime = this.battleManager.getSpeedAdjustedDelay(this.PROJECTILE_TRAVEL_TIME);
+        
+        await this.battleManager.delay(adjustedTravelTime);
+        
+        this.applyRevengeFreeze(target);
+        this.createIceImpactEffect(targetElement);
+        this.removeProjectile(projectile);
+
+        this.battleManager.addCombatLog(
+            `❄️ ${mageCreature.name}'s vengeful spirit strikes from beyond!`, 
             'warning'
         );
     }
@@ -1051,12 +1087,12 @@ export class SkeletonMageCreature {
     }
 
     // Send revenge ice data to guest for synchronization
-    sendRevengeIceUpdate(mageCreature, heroOwner, position, mageSide, target) {
+    sendRevengeIceUpdate(mageCreature, heroOwner, position, mageSide, target, creatureIndex) {
         this.battleManager.sendBattleUpdate('skeleton_mage_revenge_ice', {
             mageData: {
                 side: mageSide,
                 position: position,
-                creatureIndex: heroOwner.creatures.indexOf(mageCreature),
+                creatureIndex: creatureIndex, // ✅ Use the provided index
                 name: mageCreature.name,
                 absoluteSide: heroOwner.absoluteSide
             },

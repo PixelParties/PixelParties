@@ -717,7 +717,8 @@ export class CheckpointSystem {
         
         // CRITICAL: Reinitialize kill tracker for the new perspective
         if (this.battleManager.killTracker) {
-            this.battleManager.killTracker.initializeKillTracking();
+            this.battleManager.killTracker.reset();
+            this.battleManager.killTracker.init(this.battleManager);
             console.log('🔄 Kill tracker reinitialized for perspective swap');
         }
         

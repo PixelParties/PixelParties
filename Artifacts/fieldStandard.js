@@ -54,6 +54,8 @@ export const fieldStandardArtifact = {
         
         // Save game state
         await heroSelection.saveGameState();
+
+        await heroSelection.sendFormationUpdate();
         
         console.log(`🎺 Field Standard consumed and added to permanent artifacts!`);
     },
@@ -108,16 +110,23 @@ export const fieldStandardArtifact = {
             return; // Only host applies these effects
         }
         
-        // Get permanent artifacts from battle manager (like SnowCannon does)
-        const permanentArtifacts = battleManager.battlePermanentArtifacts || [];
+        // Count Field Standards from each player
+        const playerStandards = (battleManager.playerPermanentArtifacts || [])
+            .filter(artifact => artifact.name === 'FieldStandard');
+        const opponentStandards = (battleManager.opponentPermanentArtifacts || [])
+            .filter(artifact => artifact.name === 'FieldStandard');
         
-        // Count total Field Standards
-        const totalStandards = permanentArtifacts.filter(artifact => 
-            artifact.name === 'FieldStandard'
-        ).length;
-        
-        console.log("FIELD STANDARD TEST!");
-        console.log("Total Field Standard Count: " + totalStandards);
+        const totalStandards = playerStandards.length + opponentStandards.length;
+
+        console.log("FIELD STANDARD DEBUG:");
+        console.log("playerPermanentArtifacts:", battleManager.playerPermanentArtifacts);
+        console.log("opponentPermanentArtifacts:", battleManager.opponentPermanentArtifacts);
+
+        // Check if artifacts exist but with different names
+        const allPlayerArtifacts = battleManager.playerPermanentArtifacts || [];
+        const allOpponentArtifacts = battleManager.opponentPermanentArtifacts || [];
+        console.log("All player artifact names:", allPlayerArtifacts.map(a => a.name || a));
+        console.log("All opponent artifact names:", allOpponentArtifacts.map(a => a.name || a));
         
         if (totalStandards === 0) {
             return; // No Field Standards to process
@@ -129,43 +138,39 @@ export const fieldStandardArtifact = {
             'info'
         );
         
-        // Apply standard effects - alternate between host and guest for "simultaneous" feel
-        for (let i = 0; i < totalStandards; i++) {
-            // Alternate between host and guest sides for variety
-            const side = (i % 2 === 0) ? 'host' : 'guest';
+        let standardIndex = 0;
+        
+        // Player's Field Standards rally player's creatures
+        for (let i = 0; i < playerStandards.length; i++) {
+            await this.rallyRandomCreatureForOwner(battleManager, 'player', standardIndex);
+            standardIndex++;
             
-            await this.rallyRandomCreature(battleManager, side, i);
+            // Small delay between standard activations
+            if (standardIndex < totalStandards) {
+                await battleManager.delay(500);
+            }
+        }
+        
+        // Opponent's Field Standards rally opponent's creatures
+        for (let i = 0; i < opponentStandards.length; i++) {
+            await this.rallyRandomCreatureForOwner(battleManager, 'opponent', standardIndex);
+            standardIndex++;
             
-            // Small delay between standard activations for visual clarity
-            if (i < totalStandards - 1) {
+            // Small delay between standard activations
+            if (standardIndex < totalStandards) {
                 await battleManager.delay(500);
             }
         }
         
         // Sync to guest
         battleManager.sendBattleUpdate('field_standard_effects_complete', {
+            playerStandards: playerStandards.length,
+            opponentStandards: opponentStandards.length,
             totalStandards: totalStandards,
             timestamp: Date.now()
         });
     },
     
-    /**
-     * Get the guest's Field Standard count from Firebase
-     * @param {BattleManager} battleManager - The battle manager instance
-     * @deprecated - Using simplified approach like SnowCannon
-     */
-    async getGuestFieldStandardCount(battleManager) {
-        // This method is no longer used - keeping for reference
-        return 0;
-    },
-    
-    /**
-     * Execute a pair of Field Standard activations (host + guest simultaneously)
-     * @deprecated - Using simplified approach
-     */
-    async executeStandardPair(battleManager, hostActivates, guestActivates, standardIndex) {
-        // This method is no longer used - keeping for reference
-    },
     
     /**
      * Rally a random creature for the specified side
@@ -173,9 +178,9 @@ export const fieldStandardArtifact = {
      * @param {string} side - 'host' or 'guest'
      * @param {number} standardIndex - Which standard this is (for logging)
      */
-    async rallyRandomCreature(battleManager, side, standardIndex = 0) {
-        // Get all alive creatures for this side
-        const heroes = side === 'host' ? battleManager.playerHeroes : battleManager.opponentHeroes;
+    async rallyRandomCreatureForOwner(battleManager, ownerSide, standardIndex = 0) {
+        // Field Standards rally the owner's creatures (not the enemy's)
+        const heroes = ownerSide === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
         const allCreatures = [];
         
         ['left', 'center', 'right'].forEach(position => {
@@ -188,7 +193,7 @@ export const fieldStandardArtifact = {
                             hero: hero,
                             position: position,
                             creatureIndex: index,
-                            side: side === 'host' ? 'player' : 'opponent' // Local battle side
+                            side: ownerSide // Use the owner side directly
                         });
                     }
                 });
@@ -196,8 +201,9 @@ export const fieldStandardArtifact = {
         });
         
         if (allCreatures.length === 0) {
-            console.log(`🎺 No creatures available to rally for ${side}`);
-            battleManager.addCombatLog(`🎺 ${side} Field Standard sounds, but no creatures respond!`, 'info');
+            const ownerName = ownerSide === 'player' ? 'Player' : 'Opponent';
+            console.log(`🎺 No creatures available to rally for ${ownerName}`);
+            battleManager.addCombatLog(`🎺 ${ownerName}'s Field Standard sounds, but no creatures respond!`, 'info');
             return;
         }
         
@@ -212,15 +218,16 @@ export const fieldStandardArtifact = {
         await this.executeCreatureRally(battleManager, chosenCreature);
         
         // Log the rally
-        const rallyLogSide = side === 'host' ? 'success' : 'error';
+        const ownerName = ownerSide === 'player' ? 'Player' : 'Opponent';
+        const rallyLogSide = ownerSide === 'player' ? 'success' : 'error';
         battleManager.addCombatLog(
-            `🎺 ${chosenCreature.creature.name} is rallied by the Field Standard!`,
+            `🎺 ${ownerName}'s Field Standard rallies ${chosenCreature.creature.name}!`,
             rallyLogSide
         );
         
         // Sync specific rally to guest
         battleManager.sendBattleUpdate('field_standard_rally', {
-            side: side,
+            ownerSide: ownerSide,
             creatureData: {
                 position: chosenCreature.position,
                 creatureIndex: chosenCreature.creatureIndex,
@@ -401,12 +408,19 @@ export const fieldStandardArtifact = {
      * @param {BattleManager} battleManager - The battle manager instance
      */
     handleGuestFieldStandardEffects(data, battleManager) {
-        const { totalStandards } = data;
+        const { playerStandards, opponentStandards, totalStandards } = data;
         
         battleManager.addCombatLog(
             `🎺 ${totalStandards} Field Standard${totalStandards > 1 ? 's' : ''} rally the troops!`,
             'info'
         );
+        
+        if (playerStandards > 0) {
+            battleManager.addCombatLog(`🎺 Player raises ${playerStandards} Field Standard${playerStandards > 1 ? 's' : ''}!`, 'success');
+        }
+        if (opponentStandards > 0) {
+            battleManager.addCombatLog(`🎺 Opponent raises ${opponentStandards} Field Standard${opponentStandards > 1 ? 's' : ''}!`, 'error');
+        }
     },
     
     /**
@@ -415,11 +429,11 @@ export const fieldStandardArtifact = {
      * @param {BattleManager} battleManager - The battle manager instance
      */
     async handleGuestFieldStandardRally(data, battleManager) {
-        const { side, creatureData } = data;
+        const { ownerSide, creatureData } = data;
         
-        // Convert host/guest side to local player/opponent side
+        // Convert owner side to local player/opponent side
         const myAbsoluteSide = battleManager.isHost ? 'host' : 'guest';
-        const localSide = (side === myAbsoluteSide) ? 'player' : 'opponent';
+        const localSide = (ownerSide === 'player') ? 'player' : 'opponent';
         
         // Find the creature element
         const targetElement = document.querySelector(
@@ -431,10 +445,11 @@ export const fieldStandardArtifact = {
             await this.createTrumpetAnimationGuest(battleManager, targetElement);
         }
         
-        // Log the rally
-        const rallyLogSide = (side === myAbsoluteSide) ? 'success' : 'error';
+        // Log the rally with proper owner identification
+        const ownerName = ownerSide === 'player' ? 'Player' : 'Opponent';
+        const rallyLogSide = (ownerSide === 'player') ? 'success' : 'error';
         battleManager.addCombatLog(
-            `🎺 ${creatureData.creatureName} is rallied by the Field Standard!`,
+            `🎺 ${ownerName}'s Field Standard rallies ${creatureData.creatureName}!`,
             rallyLogSide
         );
     },

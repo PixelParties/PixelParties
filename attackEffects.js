@@ -150,6 +150,8 @@ export class AttackEffectsManager {
                 await this.arrowSystem.processArrowAttackEffects(attacker, defender, damage, arrowEffects);
             }
         }
+
+        await this.processElixirOfColdFreeze(attacker, defender, damage);
         
         // Get all equipment-based attack effects from the attacker
         const attackEffects = this.getAttackerEffects(attacker);
@@ -245,6 +247,71 @@ export class AttackEffectsManager {
                 timestamp: Date.now()
             });
         }
+    }
+
+    async processElixirOfColdFreeze(attacker, defender, damage) {
+        // Check if attacker has elixirOfCold status effect
+        if (!this.battleManager.statusEffectsManager) return;
+        
+        const elixirStacks = this.battleManager.statusEffectsManager.getStatusEffectStacks(attacker, 'elixirOfCold');
+        if (elixirStacks === 0) return;
+        
+        // Roll for each stack independently (50% chance each)
+        let freezeSuccess = false;
+        for (let i = 0; i < elixirStacks; i++) {
+            const roll = this.battleManager.getRandom();
+            if (roll <= 0.50) { // 50% chance per stack
+                freezeSuccess = true;
+                break; // Only apply 1 stack of frozen max per attack
+            }
+        }
+        
+        if (freezeSuccess) {
+            console.log(`❄️ ElixirOfCold triggers! Freezing ${defender.name} (${elixirStacks} stacks checked)`);
+            
+            // Apply frozen status
+            this.battleManager.statusEffectsManager.applyStatusEffect(defender, 'frozen', 1);
+            
+            // Reuse the same visual effect as BladeOfTheFrostbringer
+            this.createIceBurstEffect(defender);
+            
+            // Add combat log message
+            this.battleManager.addCombatLog(
+                `❄️ ${attacker.name}'s Elixir of Cold freezes ${defender.name}!`,
+                attacker.side === 'player' ? 'success' : 'error'
+            );
+            
+            // Send update to guest if host
+            if (this.battleManager.isAuthoritative) {
+                this.battleManager.sendBattleUpdate('elixir_cold_freeze', {
+                    attackerAbsoluteSide: attacker.absoluteSide,
+                    attackerPosition: attacker.position,
+                    defenderInfo: this.getDefenderSyncInfo(defender),
+                    elixirStacks: elixirStacks,
+                    timestamp: Date.now()
+                });
+            }
+        }
+    }
+
+    handleGuestElixirColdFreeze(data) {
+        const { defenderInfo, elixirStacks } = data;
+        
+        // Find the defender
+        const defender = this.findDefenderFromSyncInfo(defenderInfo);
+        if (!defender) return;
+        
+        // Create the visual effect (reuse ice burst)
+        this.createIceBurstEffect(defender);
+        
+        // Add to combat log
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const attackerLocalSide = data.attackerAbsoluteSide === myAbsoluteSide ? 'player' : 'opponent';
+        
+        this.battleManager.addCombatLog(
+            `❄️ Elixir of Cold freezes the target! (${elixirStacks} stacks)`,
+            attackerLocalSide === 'player' ? 'success' : 'error'
+        );
     }
     
     // Handler for SkullmaelsGreatsword effect

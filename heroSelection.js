@@ -40,6 +40,7 @@ export class HeroSelection {
         this.roomManager = null; // Reference to room manager for Firebase access
         this.battleStateListener = null; // Firebase listener for battle state
         this.globalSpellManager = globalSpellManager;
+        this.opponentPermanentArtifactsData = null;
 
 
         // Guard Change mode tracking
@@ -155,7 +156,7 @@ export class HeroSelection {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'LootThePrincess', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
-            'Gon': ['BladeOfTheFrostbringer', 'Clone', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
+            'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Ida': ['BottledFlame', 'BurningSkeleton',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
@@ -1015,7 +1016,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1041,6 +1042,7 @@ export class HeroSelection {
             const goldRestored = this.goldManager.importGoldData(goldData);
         }
 
+        // ===== Restore potion state =====
         if (potionData && this.potionHandler) {
             const potionRestored = this.potionHandler.importPotionState(potionData, false);
             if (potionRestored) {
@@ -1051,11 +1053,10 @@ export class HeroSelection {
             // Initialize potion state for new game
             this.potionHandler.resetForNewGame(); // Use new method that clears any lingering effects
             this.potionHandler.updateAlchemyBonuses(this);
-            console.log('📝 No potion data found - initialized fresh for new game');
+            console.log('🔍 No potion data found - initialized fresh for new game');
         }
 
-
-        // Restore Hero effect states
+        // ===== Restore Hero effect states =====
         if (nicolasData && this.nicolasEffectManager) {
             const nicolasRestored = this.nicolasEffectManager.importNicolasState(nicolasData);
             if (nicolasRestored) {
@@ -1064,9 +1065,10 @@ export class HeroSelection {
         } else {
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.reset();
-                console.log('📝 No Nicolas data found - initialized fresh state');
+                console.log('🔍 No Nicolas data found - initialized fresh state');
             }
         }
+
         if (vacarnData && this.vacarnEffectManager) {
             const vacarnRestored = this.vacarnEffectManager.importVacarnState(vacarnData);
             if (vacarnRestored) {
@@ -1077,6 +1079,7 @@ export class HeroSelection {
                 this.vacarnEffectManager.reset();
             }
         }
+
         if (semiData && this.semiEffectManager) {
             const semiRestored = this.semiEffectManager.importSemiState(semiData);
             if (semiRestored) {
@@ -1086,12 +1089,9 @@ export class HeroSelection {
             // Initialize Semi state if no saved data
             if (this.semiEffectManager) {
                 this.semiEffectManager.reset();
-                console.log('📝 No Semi data found - initialized fresh state');
+                console.log('🔍 No Semi data found - initialized fresh state');
             }
         }
-
-
-
 
         // ===== Restore delayed artifact effects =====
         if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
@@ -1105,10 +1105,10 @@ export class HeroSelection {
         } else {
             // Initialize empty array if no saved data
             this.delayedArtifactEffects = [];
-            console.log('📝 No delayed artifact effects found - initialized empty array');
+            console.log('🔍 No delayed artifact effects found - initialized empty array');
         }
 
-        // ===== Restore permanent artifacts =====
+        // ===== Restore permanent artifacts for LOCAL player =====
         if (permanentArtifactsData && window.artifactHandler) {
             const restored = window.artifactHandler.importPermanentArtifactsState(permanentArtifactsData);
             if (restored) {
@@ -1120,8 +1120,37 @@ export class HeroSelection {
             console.log('🔍 No permanent artifacts data found - keeping current state');
         }
 
+        // ===== NEW: Restore OPPONENT's permanent artifacts data =====
+        if (opponentPermanentArtifactsData) {
+            // Store opponent's permanent artifacts for use when battle starts
+            // This data comes from Firebase and represents the other player's permanent artifacts
+            
+            // Handle both formats: direct array or object with permanentArtifacts property
+            if (Array.isArray(opponentPermanentArtifactsData)) {
+                this.opponentPermanentArtifactsData = opponentPermanentArtifactsData;
+                console.log(`✅ Restored ${opponentPermanentArtifactsData.length} opponent permanent artifacts (array format)`);
+            } else if (opponentPermanentArtifactsData.permanentArtifacts) {
+                this.opponentPermanentArtifactsData = opponentPermanentArtifactsData.permanentArtifacts;
+                console.log(`✅ Restored ${this.opponentPermanentArtifactsData.length} opponent permanent artifacts (object format)`);
+            } else {
+                this.opponentPermanentArtifactsData = [];
+                console.log('⚠️ Opponent permanent artifacts data format unrecognized, initialized empty');
+            }
+            
+            // Log what artifacts the opponent has
+            if (this.opponentPermanentArtifactsData.length > 0) {
+                console.log('📋 Opponent permanent artifacts:');
+                this.opponentPermanentArtifactsData.forEach(artifact => {
+                    console.log(`  - ${artifact.name} (used at: ${new Date(artifact.usedAt).toLocaleTimeString()})`);
+                });
+            }
+        } else {
+            // No opponent permanent artifacts data provided
+            this.opponentPermanentArtifactsData = [];
+            console.log('🔍 No opponent permanent artifacts data found - initialized empty');
+        }
         
-        // Restore player-specific global spell state (including Guard Change mode)
+        // ===== Restore player-specific global spell state (including Guard Change mode) =====
         if (globalSpellData && this.globalSpellManager) {
             console.log('🔄 Restoring player-specific global spell state:', globalSpellData);
             const globalSpellRestored = this.globalSpellManager.importGlobalSpellState(globalSpellData);
@@ -1151,7 +1180,7 @@ export class HeroSelection {
                 console.log('⚠️ No player-specific global spell state to restore');
             }
         } else {
-            console.log('📝 No global spell data found for this player - ensuring Guard Change is off');
+            console.log('🔍 No global spell data found for this player - ensuring Guard Change is off');
             
             // Ensure Guard Change mode is off if no data
             if (this.globalSpellManager) {
@@ -1162,6 +1191,7 @@ export class HeroSelection {
         // Initialize life manager with turn tracker after restoration
         this.initializeLifeManagerWithTurnTracker();
 
+        // Refresh hero stats after all data is restored
         setTimeout(() => this.refreshHeroStats(), 200);
     }
 
@@ -1390,6 +1420,10 @@ export class HeroSelection {
                 right: this.heroEquipmentManager.getHeroEquipment('right')
             };
             
+            // Gather permanent artifacts data
+            const permanentArtifactsData = window.artifactHandler ? 
+                window.artifactHandler.getPermanentArtifacts() : [];
+            
             // Send all data
             this.gameDataSender('formation_update', {
                 playerRole: this.isHost ? 'host' : 'guest',
@@ -1397,7 +1431,8 @@ export class HeroSelection {
                 abilities: abilitiesData,
                 spellbooks: spellbooksData,
                 creatures: creaturesData,
-                equipment: equipmentData 
+                equipment: equipmentData,
+                permanentArtifacts: permanentArtifactsData
             });
         }
     }
@@ -1430,11 +1465,17 @@ export class HeroSelection {
             this.opponentCreaturesData = data.creatures;
         }
         
-        // Store opponent equipment if included - THIS WAS MISSING!
+        // Store opponent equipment if included
         if (data.equipment) {
             // Store for later use when battle starts
             this.opponentEquipmentData = data.equipment;
             console.log('📦 Received opponent equipment data:', data.equipment);
+        }
+
+        // Store opponent permanent artifacts if included
+        if (data.permanentArtifacts) {
+            this.opponentPermanentArtifactsData = data.permanentArtifacts;
+            console.log('📦 Received opponent permanent artifacts:', data.permanentArtifacts);
         }
     }
 
@@ -2080,7 +2121,7 @@ export class HeroSelection {
             return false;
         }
         
-        // NEW: Calculate effective stats for all player heroes
+        // Calculate effective stats for all player heroes
         const playerEffectiveStats = {};
         ['left', 'center', 'right'].forEach(position => {
             const stats = this.calculateEffectiveHeroStats(position);
@@ -2097,10 +2138,22 @@ export class HeroSelection {
             right: this.heroAbilitiesManager.getHeroAbilities('right')
         };
 
-
-        // Get permanent artifacts list for battle
-        const permanentArtifacts = window.artifactHandler ? 
+        // Get player permanent artifacts
+        const playerPermanentArtifacts = window.artifactHandler ? 
             window.artifactHandler.getPermanentArtifacts() : [];
+
+        // Get opponent permanent artifacts (from stored data if available)
+        let opponentPermanentArtifacts = [];
+        if (this.opponentPermanentArtifactsData) {
+            if (Array.isArray(this.opponentPermanentArtifactsData)) {
+                opponentPermanentArtifacts = this.opponentPermanentArtifactsData;
+            } else if (this.opponentPermanentArtifactsData.permanentArtifacts) {
+                opponentPermanentArtifacts = this.opponentPermanentArtifactsData.permanentArtifacts;
+            }
+        }
+
+        console.log(`🎯 Player permanent artifacts: ${playerPermanentArtifacts.length}`);
+        console.log(`🎯 Opponent permanent artifacts: ${opponentPermanentArtifacts.length}`);
         
         // Verify player abilities
         let totalPlayerAbilities = 0;
@@ -2136,7 +2189,7 @@ export class HeroSelection {
                 }
             }
         });
-                    
+                        
         // Get opponent abilities (from stored data if available)
         let opponentAbilities = null;
         if (this.opponentAbilitiesData) {
@@ -2238,7 +2291,6 @@ export class HeroSelection {
         
         // Initialize battle screen with all data        
         try {
-            // Pass to battleScreen.init()
             this.battleScreen.init(
                 this.isHost,
                 this.formationManager.getBattleFormation(),
@@ -2260,10 +2312,11 @@ export class HeroSelection {
                 opponentEquipment,
                 playerEffectiveStats,
                 opponentEffectiveStats,
-                permanentArtifacts   
+                playerPermanentArtifacts,
+                opponentPermanentArtifacts 
             );
             
-            console.log('✅ Battle screen initialized with stat-enhanced Hero instances');
+            console.log('✅ Battle screen initialized with stat-enhanced Hero instances and both players\' permanent artifacts');
             return true;
             
         } catch (error) {
@@ -3403,6 +3456,14 @@ export class HeroSelection {
 // Global drag and drop functions (Hero formation only - hand drag/drop is now in HandManager)
 function onHeroDragStart(event, characterJson, slotPosition) {
     if (window.heroSelection) {
+        // NEW: Immediately hide any tooltips when drag starts
+        if (window.heroSelection.heroSelectionUI) {
+            window.heroSelection.heroSelectionUI.hideHeroSpellbookTooltip();
+        }
+        if (window.hideCardTooltip) {
+            window.hideCardTooltip();
+        }
+        
         try {
             const character = JSON.parse(characterJson.replace(/&quot;/g, '"'));
             window.heroSelection.startDrag(character, slotPosition, event.target.closest('.character-card'));

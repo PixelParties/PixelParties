@@ -55,6 +55,44 @@ class CrusaderArtifactsHandler {
         console.log('✅ All Crusader Artifacts effects applied');
     }
 
+    
+
+    // Helper method to count Crusader artifacts and check for Cecilia
+    countCrusaderArtifactWithCecilia(side, artifactName) {
+        let total = 0;
+        let ceciliaCount = 0;
+        
+        // Get the appropriate heroes based on side
+        let heroes;
+        if (side === 'player') {
+            heroes = this.battleManager.playerHeroes;
+        } else {
+            heroes = this.battleManager.opponentHeroes;
+        }
+
+        // Count artifacts across all hero positions
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = heroes[position];
+            if (hero && hero.equipment && hero.equipment.length > 0) {
+                let heroArtifactCount = 0;
+                hero.equipment.forEach(item => {
+                    const itemName = item.name || item.cardName;
+                    if (itemName === artifactName) {
+                        total++;
+                        heroArtifactCount++;
+                    }
+                });
+                
+                // Check if this hero is Cecilia and has the artifact
+                if (hero.name === 'Cecilia' && heroArtifactCount > 0) {
+                    ceciliaCount += heroArtifactCount;
+                }
+            }
+        });
+
+        return { total, ceciliaCount };
+    }
+
     // ============================================
     // CRUSADERS HOOKSHOT IMPLEMENTATION
     // ============================================
@@ -63,30 +101,33 @@ class CrusaderArtifactsHandler {
     async applyCrusadersHookshotEffect() {
         console.log('⚓ Checking CrusadersHookshot effects...');
 
-        // Count CrusadersHookshot artifacts for both players
-        const playerHookshotCount = this.countCrusaderArtifact('player', 'CrusadersHookshot');
-        const opponentHookshotCount = this.countCrusaderArtifact('opponent', 'CrusadersHookshot');
+        // Count CrusadersHookshot artifacts for both players WITH Cecilia check
+        const playerHookshotData = this.countCrusaderArtifactWithCecilia('player', 'CrusadersHookshot');
+        const opponentHookshotData = this.countCrusaderArtifactWithCecilia('opponent', 'CrusadersHookshot');
 
-        console.log(`⚓ Player has ${playerHookshotCount} CrusadersHookshot(s)`);
-        console.log(`⚓ Opponent has ${opponentHookshotCount} CrusadersHookshot(s)`);
+        console.log(`⚓ Player has ${playerHookshotData.total} CrusadersHookshot(s), ${playerHookshotData.ceciliaCount} on Cecilia`);
+        console.log(`⚓ Opponent has ${opponentHookshotData.total} CrusadersHookshot(s), ${opponentHookshotData.ceciliaCount} on Cecilia`);
 
         // Apply swaps based on player's hookshots (swap opponent's heroes)
-        if (playerHookshotCount > 0) {
-            await this.applyHookshotSwaps('opponent', playerHookshotCount, 'player');
+        if (playerHookshotData.total > 0) {
+            await this.applyHookshotSwaps('opponent', playerHookshotData.total, 'player', playerHookshotData.ceciliaCount);
         }
 
         // Apply swaps based on opponent's hookshots (swap player's heroes)
-        if (opponentHookshotCount > 0) {
-            await this.applyHookshotSwaps('player', opponentHookshotCount, 'opponent');
+        if (opponentHookshotData.total > 0) {
+            await this.applyHookshotSwaps('player', opponentHookshotData.total, 'opponent', opponentHookshotData.ceciliaCount);
         }
     }
 
-    // Apply hookshot swaps to target side
-    async applyHookshotSwaps(targetSide, hookshotCount, attackerSide) {
+    // Apply hookshot swaps to target side (UPDATED with Cecilia damage)
+    async applyHookshotSwaps(targetSide, hookshotCount, attackerSide, ceciliaHookshotCount) {
         const sideLabel = targetSide === 'player' ? 'Player' : 'Opponent';
         const attackerLabel = attackerSide === 'player' ? 'Player' : 'Opponent';
         
         console.log(`⚓ ${attackerLabel}'s Hookshots will swap ${sideLabel} heroes ${hookshotCount} time(s)`);
+        if (ceciliaHookshotCount > 0) {
+            console.log(`⚡ ${ceciliaHookshotCount} hookshot(s) are empowered by Cecilia!`);
+        }
 
         // Get living heroes on target side
         const heroes = targetSide === 'player' ? 
@@ -117,9 +158,13 @@ class CrusaderArtifactsHandler {
 
         // Track which positions have been swapped to avoid double-swapping
         const swappedPairs = new Set();
+        const swappedHeroes = new Set(); // Track heroes that have been swapped for Cecilia damage
 
         // Perform swaps SEQUENTIALLY with enhanced synchronization
         for (let i = 0; i < hookshotCount; i++) {
+            // Determine if this hookshot is from Cecilia
+            const isCeciliaHookshot = i < ceciliaHookshotCount;
+            
             // Find a valid pair to swap
             let attempts = 0;
             let position1 = null;
@@ -155,7 +200,8 @@ class CrusaderArtifactsHandler {
                     hookshotNumber: i + 1,
                     totalHookshots: hookshotCount,
                     attackerSide: attackerSide,
-                    swapId: swapId // NEW: Add unique ID
+                    swapId: swapId,
+                    isCeciliaHookshot: isCeciliaHookshot // NEW: Track if this is Cecilia's hookshot
                 };
                 
                 this.battleManager.sendBattleUpdate('crusader_hookshot_swap', swapData);
@@ -175,6 +221,51 @@ class CrusaderArtifactsHandler {
                     `⚓ Chains ensnare ${hero1Name} and ${hero2Name} - they swap positions!`,
                     targetSide === 'player' ? 'error' : 'success'
                 );
+                
+                // NEW: Apply Cecilia damage if this hookshot is from Cecilia
+                if (isCeciliaHookshot) {
+                    const ceciliaDamage = 80;
+                    
+                    // Apply damage to both swapped heroes (if they haven't been damaged yet)
+                    const hero1 = heroes[position2]; // After swap
+                    const hero2 = heroes[position1]; // After swap
+                    
+                    if (!swappedHeroes.has(hero1)) {
+                        swappedHeroes.add(hero1);
+                        this.battleManager.authoritative_applyDamage({
+                            target: hero1,
+                            damage: ceciliaDamage,
+                            newHp: Math.max(0, hero1.currentHp - ceciliaDamage),
+                            died: (hero1.currentHp - ceciliaDamage) <= 0
+                        }, {
+                            source: 'cecilia_hookshot',
+                            attacker: null
+                        });
+                        
+                        this.battleManager.addCombatLog(
+                            `⚡ Cecilia's empowered chains crush ${hero1.name} for ${ceciliaDamage} damage!`,
+                            targetSide === 'player' ? 'error' : 'success'
+                        );
+                    }
+                    
+                    if (!swappedHeroes.has(hero2)) {
+                        swappedHeroes.add(hero2);
+                        this.battleManager.authoritative_applyDamage({
+                            target: hero2,
+                            damage: ceciliaDamage,
+                            newHp: Math.max(0, hero2.currentHp - ceciliaDamage),
+                            died: (hero2.currentHp - ceciliaDamage) <= 0
+                        }, {
+                            source: 'cecilia_hookshot',
+                            attacker: null
+                        });
+                        
+                        this.battleManager.addCombatLog(
+                            `⚡ Cecilia's empowered chains crush ${hero2.name} for ${ceciliaDamage} damage!`,
+                            targetSide === 'player' ? 'error' : 'success'
+                        );
+                    }
+                }
                 
                 // Speed-aware delay between swaps
                 const swapDelay = this.getSwapDelay();
@@ -801,6 +892,9 @@ class CrusaderArtifactsHandler {
                 const flintlockCount = hero.countEquipment('CrusadersFlintlock');
 
                 if (flintlockCount > 0) {
+                    // Check if this hero is Cecilia
+                    const isCecilia = hero.name === 'Cecilia';
+                    
                     // Find a random target hero (purely random among living enemies)
                     const target = this.findRandomTargetHero(position, side.name);
 
@@ -811,7 +905,8 @@ class CrusaderArtifactsHandler {
                             attackerSide: side.name,
                             target: target,
                             flintlockCount: flintlockCount,
-                            damage: 60 * flintlockCount
+                            damage: isCecilia ? 150 * flintlockCount : 80 * flintlockCount, // Cecilia gets 150 damage
+                            isCecilia: isCecilia
                         });
                     } else {
                         console.log(`🔫 ${hero.name} has ${flintlockCount} Flintlock(s) but found no valid targets`);
@@ -846,7 +941,8 @@ class CrusaderArtifactsHandler {
                 },
                 targetInfo: this.getTargetSyncData(attack.target),
                 damage: attack.damage,
-                flintlockCount: attack.flintlockCount
+                flintlockCount: attack.flintlockCount,
+                isCecilia: attack.isCecilia
             };
 
             // Send flintlock attack to guest for visual sync
@@ -1041,12 +1137,15 @@ class CrusaderArtifactsHandler {
 
     // Apply flintlock damage to target hero and all creatures
     async applyFlintlockDamage(attack) {
-        const { target, damage, attacker } = attack;
+        const { target, damage, attacker, isCecilia } = attack;
         
         if (!target || !target.hero) {
             console.warn('⚠️ Invalid target for flintlock damage');
             return;
         }
+
+        // Add special message for Cecilia
+        const attackerName = isCecilia ? `⚡ Cecilia's empowered` : attacker.name + "'s";
 
         // Apply damage to the target hero if it's alive
         if (target.hero.alive) {
@@ -1056,12 +1155,12 @@ class CrusaderArtifactsHandler {
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
             }, {
-                source: 'crusader_flintlock',
+                source: isCecilia ? 'cecilia_flintlock' : 'crusader_flintlock',
                 attacker: attacker
             });
             
             this.battleManager.addCombatLog(
-                `🔫 ${attacker.name}'s Crusader Flintlock shoots ${target.hero.name} for ${damage} damage!`,
+                `🔫 ${attackerName} Crusader Flintlock shoots ${target.hero.name} for ${damage} damage!`,
                 target.hero.side === 'player' ? 'error' : 'success'
             );
         }
@@ -1082,12 +1181,12 @@ class CrusaderArtifactsHandler {
                                 position: target.position,
                                 side: target.side
                             }, {
-                                source: 'crusader_flintlock',
+                                source: isCecilia ? 'cecilia_flintlock' : 'crusader_flintlock',
                                 attacker: attacker
                             });
                             
                             this.battleManager.addCombatLog(
-                                `🔫 ${attacker.name}'s Crusader Flintlock shoots ${creature.name} for ${damage} damage!`,
+                                `🔫 ${attackerName} Crusader Flintlock shoots ${creature.name} for ${damage} damage!`,
                                 target.side === 'player' ? 'error' : 'success'
                             );
                             
@@ -1218,24 +1317,32 @@ class CrusaderArtifactsHandler {
     async applyCrusadersArmCannonEffect() {
         console.log('💥 Checking CrusadersArm-Cannon effects...');
 
-        // Count CrusadersArm-Cannon artifacts for both players
-        const playerCannonCount = this.countCrusaderArtifact('player', 'CrusadersArm-Cannon');
-        const opponentCannonCount = this.countCrusaderArtifact('opponent', 'CrusadersArm-Cannon');
+        // Count CrusadersArm-Cannon artifacts for both players WITH Cecilia check
+        const playerCannonData = this.countCrusaderArtifactWithCecilia('player', 'CrusadersArm-Cannon');
+        const opponentCannonData = this.countCrusaderArtifactWithCecilia('opponent', 'CrusadersArm-Cannon');
 
-        console.log(`🔫 Player has ${playerCannonCount} CrusadersArm-Cannon(s)`);
-        console.log(`🔫 Opponent has ${opponentCannonCount} CrusadersArm-Cannon(s)`);
+        console.log(`🔫 Player has ${playerCannonData.total} CrusadersArm-Cannon(s), ${playerCannonData.ceciliaCount} on Cecilia`);
+        console.log(`🔫 Opponent has ${opponentCannonData.total} CrusadersArm-Cannon(s), ${opponentCannonData.ceciliaCount} on Cecilia`);
 
         // Apply damage based on opponent's cannons (you take damage from opponent's cannons)
-        if (opponentCannonCount > 0) {
-            const damagePerCannon = 60;
-            const totalDamage = damagePerCannon * opponentCannonCount;
-            await this.applyCrusaderCannonBarrage('player', totalDamage, opponentCannonCount);
+        if (opponentCannonData.total > 0) {
+            // Calculate damage: 60 base + 40 extra per Cecilia cannon
+            const baseDamagePerCannon = 60;
+            const ceciliaBonus = 40;
+            const normalCannonCount = opponentCannonData.total - opponentCannonData.ceciliaCount;
+            const totalDamage = (normalCannonCount * baseDamagePerCannon) + (opponentCannonData.ceciliaCount * (baseDamagePerCannon + ceciliaBonus));
+            
+            await this.applyCrusaderCannonBarrage('player', totalDamage, opponentCannonData.total, opponentCannonData.ceciliaCount > 0);
         }
 
-        if (playerCannonCount > 0) {
-            const damagePerCannon = 60;
-            const totalDamage = damagePerCannon * playerCannonCount;
-            await this.applyCrusaderCannonBarrage('opponent', totalDamage, playerCannonCount);
+        if (playerCannonData.total > 0) {
+            // Calculate damage: 60 base + 40 extra per Cecilia cannon
+            const baseDamagePerCannon = 60;
+            const ceciliaBonus = 40;
+            const normalCannonCount = playerCannonData.total - playerCannonData.ceciliaCount;
+            const totalDamage = (normalCannonCount * baseDamagePerCannon) + (playerCannonData.ceciliaCount * (baseDamagePerCannon + ceciliaBonus));
+            
+            await this.applyCrusaderCannonBarrage('opponent', totalDamage, playerCannonData.total, playerCannonData.ceciliaCount > 0);
         }
     }
 
@@ -1259,6 +1366,9 @@ class CrusaderArtifactsHandler {
                 const cutlassCount = hero.countEquipment('CrusadersCutlass');
 
                 if (cutlassCount > 0) {
+                    // Check if this hero is Cecilia
+                    const isCecilia = hero.name === 'Cecilia';
+                    
                     // Find this hero's target using normal attack targeting
                     const target = this.battleManager.combatManager.authoritative_findTargetWithCreatures(position, side.name);
 
@@ -1269,7 +1379,8 @@ class CrusaderArtifactsHandler {
                             attackerSide: side.name,
                             target: target,
                             cutlassCount: cutlassCount,
-                            damage: 60 * cutlassCount
+                            damage: isCecilia ? 100 * cutlassCount : 60 * cutlassCount, // Cecilia gets 100 damage
+                            isCecilia: isCecilia
                         });
                     }
                 }
@@ -1297,8 +1408,9 @@ class CrusaderArtifactsHandler {
         for (const attack of cutlassAttacks) {
             // Track silenced stacks for this target
             const targetKey = this.getTargetKey(attack.target);
+            const silencedStacks = attack.isCecilia ? attack.cutlassCount * 3 : attack.cutlassCount; // Cecilia applies 3 stacks per cutlass
             const currentStacks = targetSilencedStacks.get(targetKey) || 0;
-            targetSilencedStacks.set(targetKey, currentStacks + attack.cutlassCount);
+            targetSilencedStacks.set(targetKey, currentStacks + silencedStacks);
 
             // Create cutlass attack data for network sync
             const cutlassData = {
@@ -1310,7 +1422,8 @@ class CrusaderArtifactsHandler {
                 },
                 targetInfo: this.getTargetSyncData(attack.target),
                 damage: attack.damage,
-                cutlassCount: attack.cutlassCount
+                cutlassCount: attack.cutlassCount,
+                isCecilia: attack.isCecilia
             };
 
             // Send cutlass attack to guest for visual sync
@@ -1577,15 +1690,19 @@ class CrusaderArtifactsHandler {
 
     // Apply cutlass damage to target
     async applyCutlassDamage(attack) {
-        const { target, cutlassCount, attacker } = attack;
+        const { target, cutlassCount, attacker, isCecilia } = attack;
         
         if (!target || !target.type) {
             console.warn('⚠️ Invalid target for cutlass damage');
             return;
         }
 
-        // Calculate damage: 60 times the number of CrusadersCutlass on the attacking hero
-        const actualDamage = 60 * cutlassCount;
+        // Calculate damage: 100 for Cecilia, 60 for others
+        const damagePerCutlass = isCecilia ? 100 : 60;
+        const actualDamage = damagePerCutlass * cutlassCount;
+        
+        // Add special message for Cecilia
+        const attackerName = isCecilia ? `⚡ Cecilia's empowered` : attacker.name + "'s";
         
         if (target.type === 'hero') {
             // Apply damage to hero
@@ -1595,12 +1712,12 @@ class CrusaderArtifactsHandler {
                 newHp: Math.max(0, target.hero.currentHp - actualDamage),
                 died: (target.hero.currentHp - actualDamage) <= 0
             }, {
-                source: 'crusader_cutlass',
+                source: isCecilia ? 'cecilia_cutlass' : 'crusader_cutlass',
                 attacker: attacker
             });
             
             this.battleManager.addCombatLog(
-                `⚔️ ${attacker.name}'s Crusader Cutlass strikes ${target.hero.name} for ${actualDamage} damage!`,
+                `⚔️ ${attackerName} Crusader Cutlass strikes ${target.hero.name} for ${actualDamage} damage!`,
                 target.hero.side === 'player' ? 'error' : 'success'
             );
             
@@ -1617,12 +1734,12 @@ class CrusaderArtifactsHandler {
                 position: target.position,
                 side: target.side
             }, {
-                source: 'crusader_cutlass',
+                source: isCecilia ? 'cecilia_cutlass' : 'crusader_cutlass',
                 attacker: attacker
             });
             
             this.battleManager.addCombatLog(
-                `⚔️ ${attacker.name}'s Crusader Cutlass strikes ${target.creature.name} for ${actualDamage} damage!`,
+                `⚔️ ${attackerName} Crusader Cutlass strikes ${target.creature.name} for ${actualDamage} damage!`,
                 target.side === 'player' ? 'error' : 'success'
             );
         }
@@ -1683,17 +1800,18 @@ class CrusaderArtifactsHandler {
     }
 
     // Apply cannon barrage to all targets on a side
-    async applyCrusaderCannonBarrage(targetSide, totalDamage, cannonCount) {
+    async applyCrusaderCannonBarrage(targetSide, totalDamage, cannonCount, hasCecilia) {
         if (totalDamage <= 0) return;
 
         const sideLabel = targetSide === 'player' ? 'Player' : 'Opponent';
         console.log(`💥 Applying ${totalDamage} Crusader Cannon damage to all ${sideLabel} targets...`);
 
         // Log the effect
-        this.battleManager.addCombatLog(
-            `💥 Crusaders Arm-Cannon barrage! ${cannonCount} cannon(s) fire for ${totalDamage} damage each!`, 
-            'warning'
-        );
+        let logMessage = `💥 Crusaders Arm-Cannon barrage! ${cannonCount} cannon(s) fire!`;
+        if (hasCecilia) {
+            logMessage += ` ⚡ Cecilia's cannons deal extra damage!`;
+        }
+        this.battleManager.addCombatLog(logMessage, 'warning');
 
         // Get all targets (heroes and creatures)
         const targets = this.getAllTargetsOnSide(targetSide);
@@ -1710,6 +1828,7 @@ class CrusaderArtifactsHandler {
             targetSide: targetSide,
             damage: totalDamage,
             cannonCount: cannonCount,
+            hasCecilia: hasCecilia,
             targets: targets.map(target => ({
                 type: target.type,
                 position: target.position,

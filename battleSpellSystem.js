@@ -18,6 +18,7 @@ import IceAgeSpell from './Spells/iceage.js';
 import ChallengeSpell from './Spells/challenge.js';
 import MountainTearRiverSpell from './Spells/mountainTearRiver.js';
 import VampireOnFireSpell from './Spells/vampireOnFire.js';
+import PhoenixBombardmentSpell from './Spells/phoenixBombardment.js';
 
 
 
@@ -110,6 +111,10 @@ export class BattleSpellSystem {
         const vampireOnFire = new VampireOnFireSpell(this.battleManager);
         this.spellImplementations.set('VampireOnFire', vampireOnFire);
         
+        // Register PhoenixBombardment
+        const phoenixBombardment = new PhoenixBombardmentSpell(this.battleManager);
+        this.spellImplementations.set('PhoenixBombardment', phoenixBombardment);
+
         console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
     }
 

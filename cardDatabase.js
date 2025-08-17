@@ -178,7 +178,7 @@ const CARD_DATABASE = {
         name: 'CrumTheClassPet',
         image: './Cards/All/CrumTheClassPet.png',
         cardType: 'Spell',
-        level: 2,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -230,7 +230,7 @@ const CARD_DATABASE = {
         name: 'PhoenixBombardment',
         image: './Cards/All/PhoenixBombardment.png',
         cardType: 'Spell',
-        level: 1,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -407,17 +407,6 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: 'Equip'
     },
-    'Clone': {
-        name: 'Clone',
-        image: './Cards/All/Clone.png',
-        cardType: 'Spell',
-        level: 2,
-        cost: 0,
-        action: true,
-        spellSchool: 'SummoningMagic',
-        subtype: 'Creature',
-        hp: 200
-    },
     'Cold-HeartedYuki-Onna': {
         name: 'Cold-HeartedYuki-Onna',
         image: './Cards/All/Cold-HeartedYuki-Onna.png',
@@ -429,11 +418,20 @@ const CARD_DATABASE = {
         subtype: 'Creature',
         hp: 1
     },
+    'ElixirOfCold': {
+        name: 'ElixirOfCold',
+        image: './Cards/All/ElixirOfCold.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
     'FrostRune': {
         name: 'FrostRune',
         image: './Cards/All/FrostRune.png',
         cardType: 'Spell',
-        level: 0,
+        level: 3,
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
@@ -443,7 +441,7 @@ const CARD_DATABASE = {
         name: 'HeartOfIce',
         image: './Cards/All/HeartOfIce.png',
         cardType: 'Artifact',
-        cost: 8,
+        cost: 0,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -472,7 +470,7 @@ const CARD_DATABASE = {
         name: 'SnowCannon',
         image: './Cards/All/SnowCannon.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 4,
         action: false,
         spellSchool: null,
         subtype: "Permanent"
@@ -952,7 +950,7 @@ const CARD_DATABASE = {
         name: 'FieldStandard',
         image: './Cards/All/FieldStandard.png',
         cardType: 'Artifact',
-        cost: 6,
+        cost: 4,
         action: false,
         spellSchool: null,
         subtype: 'Permanent'
@@ -1133,7 +1131,7 @@ const CARD_DATABASE = {
         name: 'SkeletonMage',
         image: './Cards/All/SkeletonMage.png',
         cardType: 'Spell',
-        level: 2,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1255,6 +1253,15 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: null,
         subtype: 'Permanent'
+    },
+    'DarkGear': {
+        name: 'DarkGear',
+        image: './Cards/All/DarkGear.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: "Permanent"
     },
 };
 

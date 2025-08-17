@@ -155,48 +155,53 @@ function applyAreaDamage(originalTarget, battleManager) {
     
     console.log(`💣 Bomb Arrow explosion affects ${targetsInSlot.length} targets in slot`);
     
-    // Apply 50 damage to each target (including the original target again for the explosion)
-    targetsInSlot.forEach(target => {
-        const explosionDamage = 50;
+    // DELAY the area damage to let the initial explosion animation start
+    // This prevents damage numbers from being immediately covered by explosion effects
+    setTimeout(() => {
+        // Apply 50 damage to each target (including the original target again for the explosion)
+        targetsInSlot.forEach(target => {
+            const explosionDamage = 50;
+            
+            if (target.type === 'hero') {
+                // Apply damage to hero
+                battleManager.authoritative_applyDamage({
+                    target: target.hero,
+                    damage: explosionDamage,
+                    newHp: Math.max(0, target.hero.currentHp - explosionDamage),
+                    died: (target.hero.currentHp - explosionDamage) <= 0
+                }, {
+                    source: 'bomb_explosion',
+                    attacker: null // No specific attacker for area damage
+                });
+                
+                console.log(`💥 Explosion deals ${explosionDamage} damage to ${target.hero.name}`);
+                
+            } else if (target.type === 'creature') {
+                // Apply damage to creature
+                battleManager.authoritative_applyDamageToCreature({
+                    hero: target.hero,
+                    creature: target.creature,
+                    creatureIndex: target.creatureIndex,
+                    damage: explosionDamage,
+                    position: target.position,
+                    side: target.side
+                }, {
+                    source: 'bomb_explosion',
+                    attacker: null // No specific attacker for area damage
+                });
+                
+                console.log(`💥 Explosion deals ${explosionDamage} damage to ${target.creature.name}`);
+            }
+        });
         
-        if (target.type === 'hero') {
-            // Apply damage to hero
-            battleManager.authoritative_applyDamage({
-                target: target.hero,
-                damage: explosionDamage,
-                newHp: Math.max(0, target.hero.currentHp - explosionDamage),
-                died: (target.hero.currentHp - explosionDamage) <= 0
-            }, {
-                source: 'bomb_explosion',
-                attacker: null // No specific attacker for area damage
-            });
-            
-            console.log(`💥 Explosion deals ${explosionDamage} damage to ${target.hero.name}`);
-            
-        } else if (target.type === 'creature') {
-            // Apply damage to creature
-            battleManager.authoritative_applyDamageToCreature({
-                hero: target.hero,
-                creature: target.creature,
-                creatureIndex: target.creatureIndex,
-                damage: explosionDamage,
-                position: target.position,
-                side: target.side
-            }, {
-                source: 'bomb_explosion',
-                attacker: null // No specific attacker for area damage
-            });
-            
-            console.log(`💥 Explosion deals ${explosionDamage} damage to ${target.creature.name}`);
-        }
-    });
-    
-    // Send explosion effect to guest for visual sync
-    battleManager.sendBattleUpdate('bomb_arrow_explosion', {
-        targetInfo: getTargetSyncInfo(originalTarget),
-        affectedTargets: targetsInSlot.length,
-        timestamp: Date.now()
-    });
+        // Send explosion effect to guest for visual sync
+        battleManager.sendBattleUpdate('bomb_arrow_explosion', {
+            targetInfo: getTargetSyncInfo(originalTarget, battleManager),
+            affectedTargets: targetsInSlot.length,
+            timestamp: Date.now()
+        });
+        
+    }, battleManager.getSpeedAdjustedDelay(200)); // 200ms delay to let explosion animation start
 }
 
 /**
@@ -307,9 +312,10 @@ function findCreatureInfo(creature, battleManager) {
 /**
  * Get target sync info for network updates
  * @param {Object} target - The target object
+ * @param {BattleManager} battleManager - Battle manager instance
  * @returns {Object} Sync info object
  */
-function getTargetSyncInfo(target) {
+function getTargetSyncInfo(target, battleManager) {
     if (target.type === 'hero' || !target.type) {
         return {
             type: 'hero',
@@ -318,7 +324,7 @@ function getTargetSyncInfo(target) {
             name: target.name
         };
     } else {
-        const creatureInfo = findCreatureInfo(target);
+        const creatureInfo = findCreatureInfo(target, battleManager);
         if (!creatureInfo) return null;
         
         return {
@@ -338,6 +344,7 @@ export function ensureBombArrowCSS() {
     const style = document.createElement('style');
     style.id = 'bombArrowCSS';
     style.textContent = `
+        /* Existing explosion animations... */
         @keyframes explosionParticleBlast {
             0% {
                 opacity: 0;
@@ -410,6 +417,15 @@ export function ensureBombArrowCSS() {
         .bomb-arrow-glow {
             will-change: transform, opacity;
             mix-blend-mode: screen;
+        }
+        
+        /* NEW: Ensure damage numbers appear above explosion effects */
+        .damage-number {
+            z-index: 600 !important; /* Higher than explosion effects (520-525) */
+        }
+        
+        .creature-damage-number {
+            z-index: 600 !important; /* Higher than explosion effects (520-525) */
         }
     `;
     

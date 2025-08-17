@@ -46,7 +46,7 @@ export class CardRewardManager {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'LootThePrincess', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
-            'Gon': ['BladeOfTheFrostbringer', 'Clone', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
+            'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Ida': ['BottledFlame', 'BurningSkeleton', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
@@ -246,6 +246,43 @@ export class CardRewardManager {
         
         // Store the gold breakdown in a local variable to ensure it's not lost
         const goldBreakdown = this.lastGoldBreakdown;
+
+        // Use cached Royal Corgi bonus cards (calculated before cleanup reset counters)
+        let royalCorgiBonusCards = this.cachedRoyalCorgiBonusCards || 0;
+        
+        // Clear the cached value to prevent reuse
+        this.cachedRoyalCorgiBonusCards = 0;
+        
+        console.log(`👑🐕 Using cached Royal Corgi bonus cards: ${royalCorgiBonusCards}`);
+
+        // Add bonus cards to hand if any
+        if (royalCorgiBonusCards > 0 && this.handManager) {
+            this.handManager.drawCards(royalCorgiBonusCards);
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.textContent = `👑🐕 Royal Corgi bonus: +${royalCorgiBonusCards} cards!`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 215, 0, 0.9);
+                color: black;
+                padding: 15px 25px;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: bold;
+                z-index: 10000;
+                animation: fadeIn 0.3s ease-out;
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
         
         // Check if this is a Hero reward turn
         const isHeroRewardTurn = currentTurn === 3 || currentTurn === 5;

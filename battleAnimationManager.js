@@ -210,6 +210,101 @@ export class BattleAnimationManager {
         await this.delay(80);
     }
 
+
+
+    // ============================================
+    // MONIA PROTECTION DASH ANIMATIONS
+    // ============================================
+
+    // Main Monia protection dash method
+    async animateMoniaProtectionDash(protectingMonia, target) {
+        if (!target) {
+            console.warn('animateMoniaProtectionDash called with null target, skipping animation');
+            return;
+        }
+        
+        console.log(`🛡️ Animating Monia protection dash: ${protectingMonia.name} → ${target.name || 'creature'}`);
+        
+        if (target.type === 'creature') {
+            await this.animateMoniaToCreatureDash(protectingMonia, target);
+        } else {
+            await this.animateMoniaToHeroDash(protectingMonia, target);
+        }
+        
+        // Return to position after dash (shorter return time for protection)
+        await this.animateReturn(protectingMonia, protectingMonia.side);
+    }
+
+    // Animate Monia dashing to protect a hero
+    async animateMoniaToHeroDash(protectingMonia, targetHero) {
+        const moniaElement = this.getHeroElement(protectingMonia.side, protectingMonia.position);
+        const targetElement = this.getHeroElement(targetHero.side, targetHero.position);
+        
+        if (!moniaElement || !targetElement) {
+            console.error(`Could not find elements for Monia protection dash: ${protectingMonia.name} -> ${targetHero.name}`);
+            return;
+        }
+
+        const moniaCard = moniaElement.querySelector('.battle-hero-card');
+        if (!moniaCard) return;
+
+        const moniaRect = moniaElement.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        
+        // Calculate movement - dash to 70% of the way to target (not all the way)
+        const deltaX = (targetRect.left - moniaRect.left) * 0.7;
+        const deltaY = (targetRect.top - moniaRect.top) * 0.7;
+
+        moniaCard.classList.add('attacking');
+        moniaCard.style.transition = `transform ${this.getSpeedAdjustedDelay(150)}ms ease-out`;
+        moniaCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1)`;
+        
+        // Add protection glow effect during dash
+        moniaCard.style.filter = 'brightness(1.3) drop-shadow(0 0 15px rgba(135, 206, 250, 0.8))';
+        
+        await this.delay(150);
+        
+        // Remove glow effect
+        moniaCard.style.filter = '';
+    }
+
+    // Animate Monia dashing to protect a creature
+    async animateMoniaToCreatureDash(protectingMonia, creatureTarget) {
+        const moniaElement = this.getHeroElement(protectingMonia.side, protectingMonia.position);
+        const creatureElement = document.querySelector(
+            `.${creatureTarget.side}-slot.${creatureTarget.position}-slot .creature-icon[data-creature-index="${creatureTarget.creatureIndex}"]`
+        );
+        
+        if (!moniaElement || !creatureElement) {
+            console.error(`Could not find elements for Monia creature protection dash: ${protectingMonia.name} -> creature`);
+            return;
+        }
+        
+        const moniaCard = moniaElement.querySelector('.battle-hero-card');
+        if (!moniaCard) return;
+        
+        const moniaRect = moniaElement.getBoundingClientRect();
+        const creatureRect = creatureElement.getBoundingClientRect();
+        
+        // Calculate movement to creature position (70% of the way)
+        const deltaX = (creatureRect.left + creatureRect.width/2 - (moniaRect.left + moniaRect.width/2)) * 0.7;
+        const deltaY = (creatureRect.top + creatureRect.height/2 - (moniaRect.top + moniaRect.height/2)) * 0.7;
+            
+        moniaCard.classList.add('attacking');
+        moniaCard.style.transition = `transform ${this.getSpeedAdjustedDelay(150)}ms ease-out`;
+        moniaCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1)`;
+        
+        // Add protection glow effect during dash
+        moniaCard.style.filter = 'brightness(1.3) drop-shadow(0 0 15px rgba(135, 206, 250, 0.8))';
+        
+        await this.delay(150);
+        
+        // Remove glow effect
+        moniaCard.style.filter = '';
+    }
+
+
+
     // ============================================
     // CREATURE ANIMATIONS
     // ============================================

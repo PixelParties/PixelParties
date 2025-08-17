@@ -1,4 +1,4 @@
-// heroSpellbook.js - Hero Spellbook Management Module
+// heroSpellbook.js - Hero Spellbook Management Module with Spell Toggle Functionality
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -82,10 +82,11 @@ export class HeroSpellbookManager {
             return false;
         }
 
-        // Add the full card info to the spellbook
+        // Add the full card info to the spellbook with enabled state
         this.heroSpellbooks[heroPosition].push({
             ...cardInfo,
-            addedAt: Date.now() // Track when the spell was added
+            addedAt: Date.now(), // Track when the spell was added
+            enabled: true // NEW: All spells start enabled by default
         });
         
         // Notify state change
@@ -94,6 +95,47 @@ export class HeroSpellbookManager {
         }
 
         return true;
+    }
+
+    // NEW: Toggle enabled state of a specific spell by index
+    toggleSpellEnabled(heroPosition, spellIndex) {
+        if (!this.heroSpellbooks.hasOwnProperty(heroPosition)) {
+            console.error(`Invalid hero position: ${heroPosition}`);
+            return false;
+        }
+
+        const spellbook = this.heroSpellbooks[heroPosition];
+        if (spellIndex < 0 || spellIndex >= spellbook.length) {
+            console.error(`Invalid spell index: ${spellIndex}`);
+            return false;
+        }
+
+        // Toggle the enabled state
+        spellbook[spellIndex].enabled = !spellbook[spellIndex].enabled;
+        
+        console.log(`🔀 Toggled spell ${spellbook[spellIndex].name} at ${heroPosition}[${spellIndex}] to ${spellbook[spellIndex].enabled ? 'enabled' : 'disabled'}`);
+        
+        // Notify state change for persistence
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
+
+        return spellbook[spellIndex].enabled;
+    }
+
+    // NEW: Check if a specific spell is enabled
+    isSpellEnabled(heroPosition, spellIndex) {
+        if (!this.heroSpellbooks.hasOwnProperty(heroPosition)) {
+            return false;
+        }
+
+        const spellbook = this.heroSpellbooks[heroPosition];
+        if (spellIndex < 0 || spellIndex >= spellbook.length) {
+            return false;
+        }
+
+        // Return enabled state (default to true for backward compatibility)
+        return spellbook[spellIndex].enabled !== false;
     }
 
     // Remove a spell from a hero's spellbook by index
@@ -193,7 +235,7 @@ export class HeroSpellbookManager {
 
     // Export state for saving
     exportSpellbooksState() {
-        // Deep copy the spellbooks
+        // Deep copy the spellbooks (enabled state will be included automatically)
         const exportState = {};
         for (const position in this.heroSpellbooks) {
             exportState[position] = this.heroSpellbooks[position].map(spell => ({ ...spell }));
@@ -214,7 +256,13 @@ export class HeroSpellbookManager {
         const validPositions = ['left', 'center', 'right'];
         for (const position of validPositions) {
             if (state.heroSpellbooks[position] && Array.isArray(state.heroSpellbooks[position])) {
-                this.heroSpellbooks[position] = state.heroSpellbooks[position].map(spell => ({ ...spell }));
+                this.heroSpellbooks[position] = state.heroSpellbooks[position].map(spell => {
+                    // Ensure backward compatibility for spells without enabled property
+                    return {
+                        ...spell,
+                        enabled: spell.enabled !== false // Default to true if not specified
+                    };
+                });
             } else {
                 this.heroSpellbooks[position] = [];
             }
@@ -240,6 +288,7 @@ export class HeroSpellbookManager {
         for (const position in this.heroSpellbooks) {
             const spellbook = this.heroSpellbooks[position];
             spellbook.forEach((spell, index) => {
+                console.log(`${position}[${index}]: ${spell.name} (${spell.enabled ? 'enabled' : 'disabled'})`);
             });
         }
     }

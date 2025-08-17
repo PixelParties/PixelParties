@@ -1,8 +1,14 @@
-// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, Nicolas Effect, Hero Stats Display, and Permanent Artifacts
+// heroSelectionUI.js - Hero Selection UI Generation Module with Enhanced Tooltip Management, Creature Drag & Drop, Nicolas Effect, Hero Stats Display, Permanent Artifacts, and Tooltip Hover Persistence
 
 export class HeroSelectionUI {
     constructor() {
         console.log('HeroSelectionUI initialized');
+        
+        // Add tooltip hover persistence tracking
+        this.tooltipHideTimeout = null;
+        this.currentTooltipPosition = null;
+        this.isTooltipHovered = false;
+        this.isHeroHovered = false;
     }
 
     // Helper method to format card names
@@ -134,10 +140,45 @@ export class HeroSelectionUI {
         }
     }
 
-    // ===== EXISTING METHODS =====
+    // ===== TOOLTIP HOVER PERSISTENCE METHODS =====
 
-    // Show spellbook tooltip for a hero in formation screen
+    // New method to schedule tooltip hiding with delay
+    scheduleTooltipHide() {
+        // Only hide if neither hero nor tooltip is hovered
+        if (!this.isHeroHovered && !this.isTooltipHovered) {
+            this.tooltipHideTimeout = setTimeout(() => {
+                this.hideHeroSpellbookTooltip();
+            }, 100); // Small delay to prevent flickering
+        }
+    }
+
+    // Method to handle hero hover leave (called from global handler)
+    handleHeroHoverLeave() {
+        this.isHeroHovered = false;
+        this.scheduleTooltipHide();
+    }
+
+    // Method to handle hero hover enter (called from global handler) 
+    handleHeroHoverEnter(position, element) {
+        this.isHeroHovered = true;
+        this.showHeroSpellbookTooltip(position, element);
+    }
+
+
+    // Updated showHeroSpellbookTooltip method with hover persistence
     showHeroSpellbookTooltip(position, heroElement) {
+        // Prevent tooltips during any drag operation
+        if (window.heroSelection?.formationManager?.isDragging()) {
+            console.log('🚫 Tooltip blocked - hero drag in progress');
+            return;
+        }
+        
+        // Clear any pending hide timeout
+        if (this.tooltipHideTimeout) {
+            clearTimeout(this.tooltipHideTimeout);
+            this.tooltipHideTimeout = null;
+        }
+        
         // Get hero data
         const hero = window.heroSelection?.formationManager?.getBattleFormation()?.[position];
         if (!hero) return;
@@ -145,7 +186,7 @@ export class HeroSelectionUI {
         // Get spellbook data
         const spellbook = window.heroSelection?.heroSpellbookManager?.getHeroSpellbook(position);
         
-        // NEW: Get equipment data
+        // Get equipment data
         const equipment = window.heroSelection?.heroEquipmentManager?.getHeroEquipment(position);
         
         // Don't show tooltip if no spells AND no equipment
@@ -156,7 +197,7 @@ export class HeroSelectionUI {
         
         // Create enhanced tooltip
         const tooltip = document.createElement('div');
-        tooltip.className = 'formation-spellbook-tooltip enhanced-hero-tooltip'; // NEW: Added class
+        tooltip.className = 'formation-spellbook-tooltip enhanced-hero-tooltip';
         tooltip.id = 'formationSpellbookTooltip';
         
         let tooltipHTML = `
@@ -183,7 +224,19 @@ export class HeroSelectionUI {
             `;
             
             let currentSchool = null;
-            sortedSpells.forEach(spell => {
+            let spellIndexInOriginal = 0; // Track original index for click handling
+            
+            sortedSpells.forEach((spell, sortedIndex) => {
+                // Find the original index of this spell in the unsorted spellbook
+                spellIndexInOriginal = spellbook.findIndex((originalSpell, idx) => {
+                    // Find the first occurrence of this spell that hasn't been used yet
+                    const usedIndices = sortedSpells.slice(0, sortedIndex)
+                        .map(usedSpell => spellbook.findIndex((s, i) => s === usedSpell && i >= 0))
+                        .filter(i => i !== -1);
+                    
+                    return originalSpell === spell && !usedIndices.includes(idx);
+                });
+                
                 const spellSchool = spell.spellSchool || 'Unknown';
                 
                 // Add school header if new school
@@ -228,9 +281,14 @@ export class HeroSelectionUI {
                 
                 const spellLevel = spell.level !== undefined ? spell.level : 0;
                 const spellName = this.formatCardName(spell.name);
+                const isEnabled = spell.enabled !== false; // Default to true for backward compatibility
+                
+                // NEW: Add click handler and disabled styling
+                const disabledClass = !isEnabled ? 'spell-disabled' : '';
+                const clickHandler = `onclick="window.toggleHeroSpell('${position}', ${spellIndexInOriginal})"`;
                 
                 tooltipHTML += `
-                    <div class="spell-entry">
+                    <div class="spell-entry ${disabledClass}" ${clickHandler} data-spell-index="${spellIndexInOriginal}" title="Click to ${isEnabled ? 'disable' : 'enable'} this spell">
                         <span class="spell-name">${spellName}</span>
                         <span class="spell-level">Lv${spellLevel}</span>
                     </div>
@@ -247,7 +305,7 @@ export class HeroSelectionUI {
             `;
         }
         
-        // NEW: Add separator and equipment section if equipment exists
+        // Add separator and equipment section if equipment exists
         if (equipment && equipment.length > 0) {
             // Add separator if there are spells above
             if (spellbook && spellbook.length > 0) {
@@ -285,24 +343,422 @@ export class HeroSelectionUI {
         
         // Add summary line
         const totalItems = (spellbook?.length || 0) + (equipment?.length || 0);
+        const enabledSpells = spellbook ? spellbook.filter(spell => spell.enabled !== false).length : 0;
+        const disabledSpells = spellbook ? spellbook.length - enabledSpells : 0;
+        
+        // Enhanced summary with enabled/disabled count
+        let summaryText = `Total Items: ${totalItems}`;
+        if (spellbook && spellbook.length > 0) {
+            if (disabledSpells > 0) {
+                summaryText += ` • Spells: ${enabledSpells} enabled, ${disabledSpells} disabled`;
+            } else {
+                summaryText += ` • All ${enabledSpells} spells enabled`;
+            }
+        }
+        
         tooltipHTML += `
-                <div class="arsenal-summary">Total Items: ${totalItems}</div>
+                <div class="arsenal-summary">${summaryText}</div>
+                <div class="spell-toggle-hint">💡 Click spells to enable/disable them</div>
             </div>
         `;
         
         tooltip.innerHTML = tooltipHTML;
+        
+        // Add hover event listeners to the tooltip itself
+        tooltip.addEventListener('mouseenter', () => {
+            this.isTooltipHovered = true;
+            // Clear any pending hide timeout
+            if (this.tooltipHideTimeout) {
+                clearTimeout(this.tooltipHideTimeout);
+                this.tooltipHideTimeout = null;
+            }
+        });
+        
+        tooltip.addEventListener('mouseleave', () => {
+            this.isTooltipHovered = false;
+            this.scheduleTooltipHide();
+        });
+        
+        // Add wheel event listener to the tooltip for direct scrolling
+        tooltip.addEventListener('wheel', (event) => {
+            this.handleTooltipScroll(event, tooltip);
+        });
+        
         document.body.appendChild(tooltip);
+        
+        // Update tracking state
+        this.currentTooltipPosition = position;
+        this.isHeroHovered = true;
+        this.isTooltipHovered = false;
         
         // Position tooltip to the left of the hero card
         this.positionSpellbookTooltip(tooltip, heroElement);
+        
+        // Add wheel event listener to the hero element for scroll forwarding
+        this.addHeroScrollSupport(heroElement, position);
+        
+        // Set up scroll indicators after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            this.updateScrollIndicators(tooltip);
+        }, 50);
     }
 
-    // Hide spellbook tooltip
+    handleTooltipScroll(event, tooltip) {
+        const spellbookList = tooltip.querySelector('.spellbook-list');
+        if (!spellbookList) return;
+        
+        // Check if the spellbook list is actually scrollable
+        if (spellbookList.scrollHeight <= spellbookList.clientHeight) {
+            return; // Not scrollable, ignore
+        }
+        
+        // Prevent default behavior
+        event.preventDefault();
+        
+        // Calculate scroll amount (adjust multiplier for smooth scrolling)
+        const scrollAmount = event.deltaY * 1.0;
+        
+        // Apply scroll
+        spellbookList.scrollTop += scrollAmount;
+        
+        // Add visual feedback
+        spellbookList.classList.add('scrolling');
+        clearTimeout(spellbookList.scrollTimeout);
+        spellbookList.scrollTimeout = setTimeout(() => {
+            spellbookList.classList.remove('scrolling');
+        }, 150);
+    }
+
+    refreshCurrentTooltip() {
+        if (!this.currentTooltipPosition) return;
+    
+        const existingTooltip = document.getElementById('formationSpellbookTooltip');
+        if (!existingTooltip) {
+            // No existing tooltip, fall back to regular refresh
+            this.refreshCurrentTooltip();
+            return;
+        }
+        
+        const position = this.currentTooltipPosition;
+        
+        // Get updated data
+        const hero = window.heroSelection?.formationManager?.getBattleFormation()?.[position];
+        if (!hero) return;
+        
+        const spellbook = window.heroSelection?.heroSpellbookManager?.getHeroSpellbook(position);
+        const equipment = window.heroSelection?.heroEquipmentManager?.getHeroEquipment(position);
+        
+        // Don't update if no spells AND no equipment
+        if ((!spellbook || spellbook.length === 0) && (!equipment || equipment.length === 0)) {
+            this.hideHeroSpellbookTooltip();
+            return;
+        }
+        
+        // Store the current dimensions to maintain stability
+        const currentWidth = existingTooltip.offsetWidth;
+        const currentHeight = existingTooltip.offsetHeight;
+        
+        // Temporarily freeze dimensions during update to prevent layout shift
+        existingTooltip.style.width = currentWidth + 'px';
+        existingTooltip.style.minWidth = currentWidth + 'px';
+        existingTooltip.style.maxWidth = currentWidth + 'px';
+        existingTooltip.style.height = currentHeight + 'px';
+        existingTooltip.style.overflow = 'hidden'; // Prevent any scrollbars during update
+        
+        // Generate new tooltip HTML (same logic as before)
+        let tooltipHTML = `
+            <div class="spellbook-tooltip-container">
+                <h4 class="spellbook-tooltip-title">📋 ${hero.name}'s Arsenal</h4>
+        `;
+        
+        // Add spellbook section if spells exist
+        if (spellbook && spellbook.length > 0) {
+            // Sort spells by school first, then by name
+            const sortedSpells = [...spellbook].sort((a, b) => {
+                const schoolCompare = (a.spellSchool || 'Unknown').localeCompare(b.spellSchool || 'Unknown');
+                if (schoolCompare !== 0) return schoolCompare;
+                return a.name.localeCompare(b.name);
+            });
+            
+            tooltipHTML += `
+                <div class="tooltip-section spellbook-section">
+                    <div class="section-header">
+                        <span class="section-icon">📜</span>
+                        <span class="section-title">Spellbook (${sortedSpells.length})</span>
+                    </div>
+                    <div class="spellbook-list">
+            `;
+            
+            let currentSchool = null;
+            let spellIndexInOriginal = 0;
+            
+            sortedSpells.forEach((spell, sortedIndex) => {
+                // Find the original index of this spell in the unsorted spellbook
+                spellIndexInOriginal = spellbook.findIndex((originalSpell, idx) => {
+                    const usedIndices = sortedSpells.slice(0, sortedIndex)
+                        .map(usedSpell => spellbook.findIndex((s, i) => s === usedSpell && i >= 0))
+                        .filter(i => i !== -1);
+                    
+                    return originalSpell === spell && !usedIndices.includes(idx);
+                });
+                
+                const spellSchool = spell.spellSchool || 'Unknown';
+                
+                // Add school header if new school
+                if (spellSchool !== currentSchool) {
+                    if (currentSchool !== null) {
+                        tooltipHTML += '</div>'; // Close previous school section
+                    }
+                    currentSchool = spellSchool;
+                    
+                    // School styling
+                    const schoolColors = {
+                        'DestructionMagic': '#ff6b6b',
+                        'SupportMagic': '#ffd43b',
+                        'DecayMagic': '#845ef7',
+                        'MagicArts': '#4dabf7',
+                        'SummoningMagic': '#51cf66',
+                        'Fighting': '#ff8c42',
+                        'Unknown': '#868e96'
+                    };
+                    const schoolColor = schoolColors[spellSchool] || '#868e96';
+                    
+                    const schoolIcons = {
+                        'DestructionMagic': '🔥',
+                        'SupportMagic': '✨',
+                        'DecayMagic': '💀',
+                        'MagicArts': '🔮',
+                        'SummoningMagic': '🌿',
+                        'Fighting': '⚔️',
+                        'Unknown': '❓'
+                    };
+                    const schoolIcon = schoolIcons[spellSchool] || '❓';
+                    
+                    const displaySchoolName = this.formatCardName(spellSchool);
+                    
+                    tooltipHTML += `
+                        <div class="spell-school-header" style="color: ${schoolColor};">
+                            <span class="school-icon">${schoolIcon}</span> ${displaySchoolName}
+                        </div>
+                        <div class="spell-school-section">
+                    `;
+                }
+                
+                const spellLevel = spell.level !== undefined ? spell.level : 0;
+                const spellName = this.formatCardName(spell.name);
+                const isEnabled = spell.enabled !== false;
+                
+                const disabledClass = !isEnabled ? 'spell-disabled' : '';
+                const clickHandler = `onclick="window.toggleHeroSpell('${position}', ${spellIndexInOriginal})"`;
+                
+                tooltipHTML += `
+                    <div class="spell-entry ${disabledClass}" ${clickHandler} data-spell-index="${spellIndexInOriginal}" title="Click to ${isEnabled ? 'disable' : 'enable'} this spell">
+                        <span class="spell-name">${spellName}</span>
+                        <span class="spell-level">Lv${spellLevel}</span>
+                    </div>
+                `;
+            });
+            
+            if (currentSchool !== null) {
+                tooltipHTML += '</div>'; // Close last school section
+            }
+            
+            tooltipHTML += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Add separator and equipment section if equipment exists
+        if (equipment && equipment.length > 0) {
+            // Add separator if there are spells above
+            if (spellbook && spellbook.length > 0) {
+                tooltipHTML += '<div class="tooltip-separator"></div>';
+            }
+            
+            tooltipHTML += `
+                <div class="tooltip-section equipment-section">
+                    <div class="section-header">
+                        <span class="section-icon">⚔️</span>
+                        <span class="section-title">Equipment (${equipment.length})</span>
+                    </div>
+                    <div class="equipment-list">
+            `;
+            
+            equipment.forEach((artifact, index) => {
+                const artifactName = artifact.name || artifact.cardName || 'Unknown Artifact';
+                const artifactCost = artifact.cost || 0;
+                const formattedName = this.formatCardName(artifactName);
+                
+                tooltipHTML += `
+                    <div class="equipment-item" data-equipment-index="${index}">
+                        <span class="equipment-name">${formattedName}</span>
+                        ${artifactCost > 0 ? `<span class="equipment-cost">💰${artifactCost}</span>` : ''}
+                    </div>
+                `;
+            });
+            
+            tooltipHTML += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Add summary line
+        const totalItems = (spellbook?.length || 0) + (equipment?.length || 0);
+        const enabledSpells = spellbook ? spellbook.filter(spell => spell.enabled !== false).length : 0;
+        const disabledSpells = spellbook ? spellbook.length - enabledSpells : 0;
+        
+        let summaryText = `Total Items: ${totalItems}`;
+        if (spellbook && spellbook.length > 0) {
+            if (disabledSpells > 0) {
+                summaryText += ` • Spells: ${enabledSpells} enabled, ${disabledSpells} disabled`;
+            } else {
+                summaryText += ` • All ${enabledSpells} spells enabled`;
+            }
+        }
+        
+        tooltipHTML += `
+                <div class="arsenal-summary">${summaryText}</div>
+                <div class="spell-toggle-hint">💡 Click spells to enable/disable them</div>
+            </div>
+        `;
+        
+        // Update the existing tooltip content
+        existingTooltip.innerHTML = tooltipHTML;
+        
+        // Use requestAnimationFrame to ensure DOM update is complete before restoring dimensions
+        requestAnimationFrame(() => {
+            // Restore flexible dimensions after content update
+            existingTooltip.style.width = '';
+            existingTooltip.style.minWidth = '';
+            existingTooltip.style.maxWidth = '';
+            existingTooltip.style.height = '';
+            existingTooltip.style.overflow = '';
+            
+            // Re-add event listeners for the updated tooltip
+            existingTooltip.addEventListener('mouseenter', () => {
+                this.isTooltipHovered = true;
+                if (this.tooltipHideTimeout) {
+                    clearTimeout(this.tooltipHideTimeout);
+                    this.tooltipHideTimeout = null;
+                }
+            });
+            
+            existingTooltip.addEventListener('mouseleave', () => {
+                this.isTooltipHovered = false;
+                this.scheduleTooltipHide();
+            });
+            
+            existingTooltip.addEventListener('wheel', (event) => {
+                this.handleTooltipScroll(event, existingTooltip);
+            });
+            
+            // Update scroll indicators after dimensions are restored
+            setTimeout(() => {
+                this.updateScrollIndicators(existingTooltip);
+            }, 50);
+        });
+    }
+
+    addHeroScrollSupport(heroElement, position) {
+        // Remove any existing wheel listener
+        if (heroElement.heroWheelListener) {
+            heroElement.removeEventListener('wheel', heroElement.heroWheelListener);
+        }
+        
+        // Create new wheel listener
+        heroElement.heroWheelListener = (event) => {
+            // Only handle if this hero's tooltip is currently visible
+            if (this.currentTooltipPosition !== position) return;
+            
+            const tooltip = document.getElementById('formationSpellbookTooltip');
+            if (!tooltip) return;
+            
+            // Forward the scroll event to the tooltip
+            this.handleTooltipScroll(event, tooltip);
+        };
+        
+        // Add the wheel listener with passive: false to allow preventDefault
+        heroElement.addEventListener('wheel', heroElement.heroWheelListener, { passive: false });
+    }
+
+    // Updated hideHeroSpellbookTooltip method
     hideHeroSpellbookTooltip() {
+        // Clear any pending timeout
+        if (this.tooltipHideTimeout) {
+            clearTimeout(this.tooltipHideTimeout);
+            this.tooltipHideTimeout = null;
+        }
+        
         const tooltip = document.getElementById('formationSpellbookTooltip');
         if (tooltip) {
             tooltip.remove();
         }
+        
+        // Clean up wheel listeners from hero elements
+        this.cleanupHeroScrollSupport();
+        
+        // Reset tracking state
+        this.currentTooltipPosition = null;
+        this.isTooltipHovered = false;
+        this.isHeroHovered = false;
+    }
+
+    updateScrollIndicators(tooltip) {
+        const spellbookList = tooltip.querySelector('.spellbook-list');
+        if (!spellbookList) return;
+        
+        // Check if content is scrollable
+        const isScrollable = spellbookList.scrollHeight > spellbookList.clientHeight;
+        
+        if (isScrollable) {
+            spellbookList.setAttribute('data-scrollable', 'true');
+            
+            // Add scroll event listener to detect when user can scroll more
+            spellbookList.addEventListener('scroll', () => {
+                const hasMoreContent = spellbookList.scrollTop < (spellbookList.scrollHeight - spellbookList.clientHeight - 5);
+                if (hasMoreContent) {
+                    spellbookList.classList.add('has-more-content');
+                } else {
+                    spellbookList.classList.remove('has-more-content');
+                }
+            });
+            
+            // Initial check
+            const hasMoreContent = spellbookList.scrollHeight > spellbookList.clientHeight;
+            if (hasMoreContent) {
+                spellbookList.classList.add('has-more-content');
+            }
+            
+            // Add visual hint to hero card
+            const heroElement = document.querySelector(`[data-slot-position="${this.currentTooltipPosition}"]`);
+            if (heroElement) {
+                heroElement.classList.add('tooltip-scrollable');
+            }
+        } else {
+            spellbookList.removeAttribute('data-scrollable');
+            spellbookList.classList.remove('has-more-content');
+            
+            // Remove visual hint from hero card
+            const heroElement = document.querySelector(`[data-slot-position="${this.currentTooltipPosition}"]`);
+            if (heroElement) {
+                heroElement.classList.remove('tooltip-scrollable');
+            }
+        }
+    }
+
+    cleanupHeroScrollSupport() {
+        // Find all hero elements that might have wheel listeners
+        const heroElements = document.querySelectorAll('.character-card[data-slot-position]');
+        heroElements.forEach(heroElement => {
+            if (heroElement.heroWheelListener) {
+                heroElement.removeEventListener('wheel', heroElement.heroWheelListener);
+                delete heroElement.heroWheelListener;
+            }
+            // Remove visual hints
+            heroElement.classList.remove('tooltip-scrollable');
+        });
     }
 
     // Position spellbook tooltip
@@ -811,7 +1267,7 @@ export class HeroSelectionUI {
     // Generate team building screen HTML
     generateTeamBuildingHTML(selectedCharacter, battleFormation, deckGrid, handDisplay, lifeDisplay, goldDisplay, createTeamSlotFn) {
         if (!selectedCharacter) {
-            return '<div class="loading-heroes"><h2>⌛ No character selected</h2></div>';
+            return '<div class="loading-heroes"><h2>⏱ No character selected</h2></div>';
         }
 
         const leftSlot = createTeamSlotFn('left', battleFormation.left);
@@ -984,7 +1440,7 @@ function onTeamSlotDragOver(event, position) {
             let existingTooltip = slot.querySelector('.ability-drop-tooltip');
             
             if (!existingTooltip) {
-                console.log('🔍 Creating new centered tooltip for', position);
+                console.log('🎯 Creating new centered tooltip for', position);
                 
                 // Validate the drag operation
                 const handled = window.onTeamSlotAbilityDragOver(event, position);
@@ -1026,7 +1482,7 @@ function onTeamSlotDragOver(event, position) {
                 currentTooltip = tooltip;
                 currentTooltipSlot = slot;
                 
-                console.log('🔍 Centered tooltip created:', {
+                console.log('🎯 Centered tooltip created:', {
                     message: tooltipInfo.message,
                     length: tooltipInfo.message.length,
                     longText: tooltipInfo.message.length > 30,
@@ -1356,7 +1812,7 @@ function onTeamSlotDragLeave(event) {
         if (currentTooltipSlot === slot) {
             const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip'); 
             if (tooltip) {
-                console.log('🔍 Removing tooltip on drag leave');
+                console.log('🎯 Removing tooltip on drag leave');
                 tooltip.remove();
             }
             currentTooltip = null;
@@ -1438,7 +1894,7 @@ if (typeof document !== 'undefined') {
     document.addEventListener('dragend', function(event) {
         // If we still have tooltips after a drag operation ends, clean them up
         if (currentTooltip || document.querySelector('.ability-drop-tooltip')) {
-            console.log('🔍 Global dragend cleanup triggered');
+            console.log('🎯 Global dragend cleanup triggered');
             cleanupAllAbilityTooltips();
             
             // Also clean up visual states
@@ -1642,7 +2098,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Handle the drop using the creature manager
     if (window.heroSelection && window.heroSelection.heroCreatureManager) {
-        console.log('🔍 About to call handleCreatureDrop...');
+        console.log('🎯 About to call handleCreatureDrop...');
         
         const success = window.heroSelection.heroCreatureManager.handleCreatureDrop(
             heroPosition,
@@ -1650,7 +2106,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
             container
         );
         
-        console.log('🔍 handleCreatureDrop returned:', success);
+        console.log('🎯 handleCreatureDrop returned:', success);
         
         if (success) {
             console.log('✅ Move successful, updating UI...');
@@ -1707,9 +2163,14 @@ window.showHeroSpellbookTooltip = function(position) {
     slot.appendChild(tooltip);
 };
 
-// Enhanced hover handlers for hero slots
+// Enhanced hover handlers for hero slots with tooltip persistence
 window.handleHeroHoverEnter = function(position, element) {
     if (!window.heroSelection) return;
+    
+    // NEW: Don't show any tooltips during drag operations
+    if (window.heroSelection.formationManager?.isDragging()) {
+        return;
+    }
     
     // Get hero data
     const hero = window.heroSelection.formationManager.getBattleFormation()[position];
@@ -1722,26 +2183,26 @@ window.handleHeroHoverEnter = function(position, element) {
             imagePath: hero.image,
             displayName: hero.name,
             cardType: 'character',
-            heroStats: heroStats, // Add stats to card data
-            heroPosition: position // Add position for context
+            heroStats: heroStats,
+            heroPosition: position
         };
         
         window.showCardTooltip(JSON.stringify(cardData), element);
     }
     
-    // Show spellbook tooltip if hero has spells
+    // Use the new hover persistence method
     if (window.heroSelection.heroSelectionUI) {
-        window.heroSelection.heroSelectionUI.showHeroSpellbookTooltip(position, element);
+        window.heroSelection.heroSelectionUI.handleHeroHoverEnter(position, element);
     }
 };
 
 window.handleHeroHoverLeave = function() {
-    // Hide card tooltip
+    // Hide card tooltip immediately
     window.hideCardTooltip();
     
-    // Hide spellbook tooltip
+    // Use the new hover persistence method for spellbook tooltip
     if (window.heroSelection?.heroSelectionUI) {
-        window.heroSelection.heroSelectionUI.hideHeroSpellbookTooltip();
+        window.heroSelection.heroSelectionUI.handleHeroHoverLeave();
     }
 };
 
@@ -1869,6 +2330,46 @@ if (typeof window !== 'undefined') {
         }
     };
 }
+
+// Global function to toggle hero spell enabled state
+window.toggleHeroSpell = function(heroPosition, spellIndex) {
+    console.log(`🎯 Toggling spell at ${heroPosition}[${spellIndex}]`);
+    
+    if (!window.heroSelection || !window.heroSelection.heroSpellbookManager) {
+        console.error('❌ Hero selection or spellbook manager not available');
+        return;
+    }
+    
+    // Toggle the spell
+    const newState = window.heroSelection.heroSpellbookManager.toggleSpellEnabled(heroPosition, spellIndex);
+    
+    if (newState !== false && newState !== true) {
+        console.error('❌ Failed to toggle spell');
+        return;
+    }
+    
+    console.log(`✅ Spell toggled to: ${newState ? 'enabled' : 'disabled'}`);
+    
+    // Refresh the tooltip to show the updated state
+    if (window.heroSelection.heroSelectionUI && window.heroSelection.heroSelectionUI.refreshCurrentTooltip) {
+        window.heroSelection.heroSelectionUI.refreshCurrentTooltip();
+    }
+    
+    // Save game state to persist the change
+    if (window.heroSelection.saveGameState) {
+        window.heroSelection.saveGameState();
+    }
+    
+    // Add visual feedback
+    const spellEntry = document.querySelector(`[data-spell-index="${spellIndex}"]`);
+    if (spellEntry) {
+        // Add a brief highlight effect
+        spellEntry.classList.add('spell-toggled');
+        setTimeout(() => {
+            spellEntry.classList.remove('spell-toggled');
+        }, 300);
+    }
+};
 
 // ===== CSS STYLES FOR PERMANENT ARTIFACTS =====
 if (typeof document !== 'undefined' && !document.getElementById('permanentArtifactsStyles')) {

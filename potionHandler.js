@@ -30,6 +30,7 @@ export class PotionHandler {
             'ExperimentalPotion',
             'ElixirOfStrength', 
             'ElixirOfImmortality',
+            'elixirOfCold',
             'LifeSerum',
             'PoisonVial',
             'BottledFlame',
@@ -308,6 +309,9 @@ export class PotionHandler {
         switch (potionName) {
             case 'ElixirOfStrength':
                 return await this.handleElixirOfStrengthEffects(effects, playerRole, battleManager);
+            
+            case 'ElixirOfCold':
+                return await this.handleElixirOfColdEffects(effects, playerRole, battleManager);
 
             case 'LifeSerum':
                 return await this.handleLifeSerumEffects(effects, playerRole, battleManager);
@@ -382,6 +386,26 @@ export class PotionHandler {
             
             battleManager.addCombatLog(`⚔️ Elixir of Strength effects applied (+${attackBonus} attack to ${fallbackTargets} heroes)`, 'info');
             return effectCount;
+        }
+    }
+
+    async handleElixirOfColdEffects(effects, playerRole, battleManager) {
+        try {
+            const { ElixirOfColdPotion } = await import('./Potions/elixirOfCold.js');
+            const elixirOfColdPotion = new ElixirOfColdPotion();
+            
+            const effectsProcessed = await elixirOfColdPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`❄️ ElixirOfCold delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating ElixirOfCold effects for ${playerRole}:`, error);
+            return 0;
         }
     }
 

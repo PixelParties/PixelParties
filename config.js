@@ -82,7 +82,7 @@ export const gameConfig = {
         'Monia.png', 'Nicolas.png', 'Semi.png', 'Sid.png', 'Tharx.png', 'Toras.png', 'Vacarn.png'
     ],
     charactersPath: './Cards/Characters/',
-    roomTimeout: 6000000, // 100 minutes
+    roomTimeout: 60000000, // 1000 minutes
     activityTimeout: 3000000, // 50 minutes
     activityInterval: 30000 // 30 seconds
 };

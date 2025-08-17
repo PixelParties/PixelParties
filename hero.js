@@ -264,28 +264,28 @@ export class Hero {
             if (Array.isArray(equipment)) {
                 this.equipment = equipment.filter(item => {
                     if (!item || typeof item !== 'object') {
-                        console.warn(`⚠️ Invalid equipment item for ${this.name}:`, item);
+                        console.warn(`âš ï¸ Invalid equipment item for ${this.name}:`, item);
                         return false;
                     }
                     
                     const itemName = item.name || item.cardName;
                     if (!itemName || typeof itemName !== 'string') {
-                        console.warn(`⚠️ Equipment item missing name for ${this.name}:`, item);
+                        console.warn(`âš ï¸ Equipment item missing name for ${this.name}:`, item);
                         return false;
                     }
                     
                     return true;
                 }).map(item => ({ ...item }));
                 
-                console.log(`✅ Set ${this.equipment.length} valid equipment items for ${this.name}`);
+                console.log(`âœ… Set ${this.equipment.length} valid equipment items for ${this.name}`);
             } else {
                 if (equipment !== undefined && equipment !== null) {
-                    console.warn(`⚠️ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
+                    console.warn(`âš ï¸ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
                 }
                 this.equipment = [];
             }
         } catch (error) {
-            console.error(`❌ Error setting equipment for ${this.name}:`, error);
+            console.error(`âŒ Error setting equipment for ${this.name}:`, error);
             this.equipment = [];
         }
     }
@@ -293,7 +293,7 @@ export class Hero {
     // Get equipment for this hero (sorted alphabetically)
     getEquipment() {
         if (!Array.isArray(this.equipment)) {
-            console.warn(`⚠️ Equipment is not an array for ${this.name}, resetting to empty array`);
+            console.warn(`âš ï¸ Equipment is not an array for ${this.name}, resetting to empty array`);
             this.equipment = [];
         }
         return [...this.equipment].sort((a, b) => {
@@ -418,27 +418,42 @@ export class Hero {
     }
     
     // Get spell by name
-    getSpell(spellName) {
+    getSpell(spellName, enabledOnly = false) {
+        if (enabledOnly) {
+            return this.spellbook.find(spell => spell.name === spellName && spell.enabled !== false);
+        }
         return this.spellbook.find(spell => spell.name === spellName);
     }
     
     // Check if hero has a specific spell
-    hasSpell(spellName) {
+    hasSpell(spellName, enabledOnly = false) {
+        if (enabledOnly) {
+            return this.spellbook.some(spell => spell.name === spellName && spell.enabled !== false);
+        }
         return this.spellbook.some(spell => spell.name === spellName);
     }
     
     // Get all spells
-    getAllSpells() {
+    getAllSpells(enabledOnly = false) {
+        if (enabledOnly) {
+            return this.spellbook.filter(spell => spell.enabled !== false);
+        }
         return [...this.spellbook];
     }
     
     // Get spell count
-    getSpellCount() {
+    getSpellCount(enabledOnly = false) {
+        if (enabledOnly) {
+            return this.spellbook.filter(spell => spell.enabled !== false).length;
+        }
         return this.spellbook.length;
     }
     
     // Get spell count for a specific spell
-    getSpecificSpellCount(spellName) {
+    getSpecificSpellCount(spellName, enabledOnly = false) {
+        if (enabledOnly) {
+            return this.spellbook.filter(spell => spell.name === spellName && spell.enabled !== false).length;
+        }
         return this.spellbook.filter(spell => spell.name === spellName).length;
     }
     
@@ -619,6 +634,16 @@ export class Hero {
             lastAction: this.lastAction,
             turnsTaken: this.turnsTaken
         };
+    }
+
+    // Get all enabled spells
+    getAllEnabledSpells() {
+        return this.spellbook.filter(spell => spell.enabled !== false);
+    }
+
+    // Check if hero has a specific enabled spell
+    hasEnabledSpell(spellName) {
+        return this.spellbook.some(spell => spell.name === spellName && spell.enabled !== false);
     }
     
     // Import hero state from persistence

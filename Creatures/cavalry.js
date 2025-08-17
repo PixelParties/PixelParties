@@ -40,21 +40,15 @@ export class CavalryCreature {
                 'info'
             );
 
-            // CRITICAL FIX: Sort movements by fromIndex in DESCENDING order
-            // This prevents index invalidation when removing multiple cavalry from same hero
-            cavalryMovements.sort((a, b) => b.fromIndex - a.fromIndex);
-
             // Send movement data to guest before executing
             this.sendCavalryMovementsUpdate(cavalryMovements);
             await this.battleManager.delay(50); // Brief delay for sync
 
-            // Execute movements in reverse index order
+            // Execute movements with real-time index lookup
             for (const movement of cavalryMovements) {
                 await this.executeCavalryMovement(movement);
             }
 
-            // NOTE: No longer calling renderCreaturesAfterInit here since 
-            // executeCavalryMovement now handles individual position re-renders
             console.log('🐇 All cavalry movements completed with individual visual updates');
         }
     }
@@ -65,16 +59,16 @@ export class CavalryCreature {
         
         if (!hero.creatures || hero.creatures.length === 0) return cavalryUnits;
 
-        hero.creatures.forEach((creature, index) => {
+        hero.creatures.forEach((creature) => {
             if (creature.alive && CavalryCreature.isCavalry(creature.name)) {
                 const nextPosition = this.getNextPosition(currentPosition, side);
                 
                 if (nextPosition) {
                     cavalryUnits.push({
-                        creature: creature,
+                        creature: creature, // Store creature reference, not index
+                        creatureId: creature.addedAt || `${creature.name}_${Date.now()}`, // Unique identifier
                         fromHero: hero,
                         fromPosition: currentPosition,
-                        fromIndex: index,
                         toPosition: nextPosition,
                         side: side,
                         absoluteSide: hero.absoluteSide
@@ -111,7 +105,7 @@ export class CavalryCreature {
 
     // Execute a single cavalry movement
     async executeCavalryMovement(movement) {
-        const { creature, fromHero, fromPosition, fromIndex, toPosition, side } = movement;
+        const { creature, creatureId, fromHero, fromPosition, toPosition, side } = movement;
         const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
         const toHero = heroes[toPosition];
 
@@ -120,15 +114,22 @@ export class CavalryCreature {
             return;
         }
 
-        // SAFETY CHECK: Verify the creature is still at the expected index
-        if (fromIndex >= fromHero.creatures.length || 
-            fromHero.creatures[fromIndex] !== creature ||
-            !CavalryCreature.isCavalry(fromHero.creatures[fromIndex].name)) {
-            console.error(`Cavalry movement failed: creature mismatch at index ${fromIndex}`, {
-                expectedCreature: creature.name,
-                actualCreature: fromHero.creatures[fromIndex]?.name,
-                arrayLength: fromHero.creatures.length
-            });
+        // CRITICAL FIX: Find current index of creature at movement time
+        const currentIndex = fromHero.creatures.findIndex(c => 
+            c === creature || // Direct reference match
+            (c.addedAt && c.addedAt === creature.addedAt) || // ID match
+            (c.name === creature.name && c.alive && CavalryCreature.isCavalry(c.name)) // Fallback name match
+        );
+
+        if (currentIndex === -1) {
+            console.warn(`Cavalry movement skipped: ${creature.name} no longer found in ${fromPosition}`);
+            return;
+        }
+
+        // Verify it's still the right creature
+        const currentCreature = fromHero.creatures[currentIndex];
+        if (!currentCreature.alive || !CavalryCreature.isCavalry(currentCreature.name)) {
+            console.warn(`Cavalry movement skipped: creature at index ${currentIndex} is no longer valid cavalry`);
             return;
         }
 
@@ -138,20 +139,17 @@ export class CavalryCreature {
             side === 'player' ? 'success' : 'error'
         );
 
-        // Remove from current position (VERIFIED correct index)
-        const removedCreature = fromHero.creatures.splice(fromIndex, 1)[0];
+        // Remove from current position using CURRENT index
+        const removedCreature = fromHero.creatures.splice(currentIndex, 1)[0];
         
         // Add to front of target position (pushes existing creatures back)
         toHero.creatures.unshift(removedCreature);
 
-        // CRITICAL FIX: Force complete visual re-render for both positions
-        // This ensures old cavalry visuals are completely removed
+        // Force complete visual re-render for both positions
         this.forceCompleteCreatureRerender(side, fromPosition, fromHero);
         this.forceCompleteCreatureRerender(side, toPosition, toHero);
 
-        console.log(`🐇 Cavalry moved from ${side} ${fromPosition} to ${side} ${toPosition}`);
-        console.log(`  From hero now has ${fromHero.creatures.length} creatures`);
-        console.log(`  To hero now has ${toHero.creatures.length} creatures`);
+        console.log(`🐇 Cavalry moved from ${side} ${fromPosition} to ${side} ${toPosition} (real-time index: ${currentIndex})`);
     }
 
     // Force complete creature re-rendering for a position
@@ -188,8 +186,8 @@ export class CavalryCreature {
     sendCavalryMovementsUpdate(movements) {
         const movementsData = movements.map(movement => ({
             creatureName: movement.creature.name,
+            creatureId: movement.creatureId,
             fromPosition: movement.fromPosition,
-            fromIndex: movement.fromIndex,
             toPosition: movement.toPosition,
             side: movement.side,
             absoluteSide: movement.absoluteSide
@@ -211,22 +209,18 @@ export class CavalryCreature {
             'info'
         );
 
-        // CRITICAL FIX: Sort guest movements by fromIndex in DESCENDING order too
-        const sortedMovements = [...movements].sort((a, b) => b.fromIndex - a.fromIndex);
-
-        sortedMovements.forEach(movementData => {
+        // Process movements without index sorting since we look up indices in real-time
+        movements.forEach(movementData => {
             const localSide = (movementData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
             this.executeGuestCavalryMovement(movementData, localSide);
         });
 
-        // NOTE: No longer calling renderCreaturesAfterInit here since 
-        // executeGuestCavalryMovement now handles individual position re-renders
-        console.log('🐇 Guest: All cavalry movements completed with individual visual updates');
+        console.log('🐇 Guest: All cavalry movements completed with real-time index lookups');
     }
 
     // Execute cavalry movement on guest side
     executeGuestCavalryMovement(movementData, localSide) {
-        const { creatureName, fromPosition, fromIndex, toPosition } = movementData;
+        const { creatureName, creatureId, fromPosition, toPosition } = movementData;
         const heroes = localSide === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
         
         const fromHero = heroes[fromPosition];
@@ -237,26 +231,26 @@ export class CavalryCreature {
             return;
         }
 
-        // ENHANCED SAFETY CHECK: Verify the creature at the expected position
-        if (fromIndex >= fromHero.creatures.length || 
-            !CavalryCreature.isCavalry(fromHero.creatures[fromIndex].name)) {
-            console.error(`Guest cavalry movement failed: creature mismatch at index ${fromIndex}`, {
-                expectedName: creatureName,
-                actualName: fromHero.creatures[fromIndex]?.name,
-                arrayLength: fromHero.creatures.length,
-                fullArray: fromHero.creatures.map(c => c.name)
-            });
+        // CRITICAL FIX: Find cavalry creature by identifier, not pre-calculated index
+        const cavalryIndex = fromHero.creatures.findIndex(creature => {
+            if (!creature.alive || !CavalryCreature.isCavalry(creature.name)) return false;
+            
+            // Try multiple identification methods
+            if (creatureId && creature.addedAt && creature.addedAt.toString() === creatureId) {
+                return true; // ID match (most reliable)
+            }
+            if (creature.name === creatureName) {
+                return true; // Name match (fallback)
+            }
+            return false;
+        });
+
+        if (cavalryIndex === -1) {
+            console.warn(`Guest cavalry movement skipped: ${creatureName} not found in ${fromPosition}`);
             return;
         }
 
-        // Additional verification that it's the right creature
-        if (fromHero.creatures[fromIndex].name !== creatureName) {
-            console.error(`Guest cavalry movement failed: wrong creature name`, {
-                expected: creatureName,
-                actual: fromHero.creatures[fromIndex].name
-            });
-            return;
-        }
+        const cavalryCreature = fromHero.creatures[cavalryIndex];
 
         // Log the movement
         this.battleManager.addCombatLog(
@@ -264,17 +258,17 @@ export class CavalryCreature {
             localSide === 'player' ? 'success' : 'error'
         );
 
-        // Remove from current position
-        const removedCreature = fromHero.creatures.splice(fromIndex, 1)[0];
+        // Remove from current position using FOUND index
+        const removedCreature = fromHero.creatures.splice(cavalryIndex, 1)[0];
         
         // Add to front of target position (pushes existing creatures back)
         toHero.creatures.unshift(removedCreature);
 
-        // CRITICAL FIX: Force complete visual re-render for both positions (guest side)
+        // Force complete visual re-render for both positions
         this.forceCompleteCreatureRerender(localSide, fromPosition, fromHero);
         this.forceCompleteCreatureRerender(localSide, toPosition, toHero);
 
-        console.log(`🐇 Guest: Cavalry moved from ${localSide} ${fromPosition} to ${localSide} ${toPosition}`);
+        console.log(`🐇 Guest: Cavalry moved from ${localSide} ${fromPosition} to ${localSide} ${toPosition} (found at index: ${cavalryIndex})`);
     }
 
     // Clean up (called on battle end/reset)

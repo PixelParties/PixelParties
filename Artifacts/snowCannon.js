@@ -55,6 +55,9 @@ export const snowCannonArtifact = {
         // Save game state
         await heroSelection.saveGameState();
         
+
+        await heroSelection.sendFormationUpdate();
+
         console.log(`❄️ Snow Cannon consumed and added to permanent artifacts!`);
     },
     
@@ -108,61 +111,84 @@ export const snowCannonArtifact = {
             return; // Only host applies these effects
         }
         
-        // Get permanent artifacts from battle manager
-        const permanentArtifacts = battleManager.battlePermanentArtifacts || [];
+        // Count Snow Cannons from each player
+        const playerSnowCannons = (battleManager.playerPermanentArtifacts || [])
+            .filter(artifact => artifact.name === 'SnowCannon');
+        const opponentSnowCannons = (battleManager.opponentPermanentArtifacts || [])
+            .filter(artifact => artifact.name === 'SnowCannon');
         
-        // Count Snow Cannons
-        const snowCannonCount = permanentArtifacts.filter(artifact => 
-            artifact.name === 'SnowCannon'
-        ).length;
+        const totalSnowCannons = playerSnowCannons.length + opponentSnowCannons.length;
         
-    console.log("SNOW CANNON TEST!");
-    console.log("Snow Cannon Count: " + snowCannonCount);
+        console.log("SNOW CANNON TEST!");
+        console.log(`Player Snow Cannons: ${playerSnowCannons.length}`);
+        console.log(`Opponent Snow Cannons: ${opponentSnowCannons.length}`);
+        console.log(`Total Snow Cannons: ${totalSnowCannons}`);
         
-        if (snowCannonCount === 0) {
+        if (totalSnowCannons === 0) {
             return; // No Snow Cannons to process
         }
         
-        console.log(`❄️ Activating ${snowCannonCount} Snow Cannon${snowCannonCount > 1 ? 's' : ''}!`);
+        console.log(`❄️ Activating ${totalSnowCannons} Snow Cannon${totalSnowCannons > 1 ? 's' : ''}!`);
         battleManager.addCombatLog(
-            `❄️ ${snowCannonCount} Snow Cannon${snowCannonCount > 1 ? 's' : ''} activate${snowCannonCount === 1 ? 's' : ''}!`,
+            `❄️ ${totalSnowCannons} Snow Cannon${totalSnowCannons > 1 ? 's' : ''} activate${totalSnowCannons === 1 ? 's' : ''}!`,
             'info'
         );
         
-        // Apply frozen to random enemies for each Snow Cannon
-        for (let i = 0; i < snowCannonCount; i++) {
-            await this.fireSnowCannon(battleManager, i);
+        let cannonIndex = 0;
+        
+        // Fire player's Snow Cannons at opponents
+        for (let i = 0; i < playerSnowCannons.length; i++) {
+            await this.fireSnowCannonAtEnemies(battleManager, cannonIndex, 'player');
+            cannonIndex++;
             
-            // Small delay between cannon shots for visual clarity
-            if (i < snowCannonCount - 1) {
+            // Small delay between cannon shots
+            if (cannonIndex < totalSnowCannons) {
+                await battleManager.delay(300);
+            }
+        }
+        
+        // Fire opponent's Snow Cannons at player
+        for (let i = 0; i < opponentSnowCannons.length; i++) {
+            await this.fireSnowCannonAtEnemies(battleManager, cannonIndex, 'opponent');
+            cannonIndex++;
+            
+            // Small delay between cannon shots  
+            if (cannonIndex < totalSnowCannons) {
                 await battleManager.delay(300);
             }
         }
         
         // Sync to guest
         battleManager.sendBattleUpdate('snow_cannon_effects_complete', {
-            cannonCount: snowCannonCount,
+            playerCannons: playerSnowCannons.length,
+            opponentCannons: opponentSnowCannons.length,
+            totalCannons: totalSnowCannons,
             timestamp: Date.now()
         });
     },
     
     /**
-     * Fire a single Snow Cannon at a random enemy
+     * Fire Snow Cannon at enemies (targeting the opposite side)
      * @param {BattleManager} battleManager - The battle manager instance
      * @param {number} cannonIndex - Which cannon is firing (for visual variety)
+     * @param {string} ownerSide - Who owns the cannon ('player' or 'opponent')
      */
-    async fireSnowCannon(battleManager, cannonIndex = 0) {
+    async fireSnowCannonAtEnemies(battleManager, cannonIndex = 0, ownerSide = 'player') {
+        // Determine target side (opposite of owner)
+        const targetSide = ownerSide === 'player' ? 'opponent' : 'player';
+        const targetHeroes = targetSide === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
+        
         // Get all possible enemy targets (heroes and creatures)
         const allTargets = [];
         
         // Add enemy heroes
         ['left', 'center', 'right'].forEach(position => {
-            const hero = battleManager.opponentHeroes[position];
+            const hero = targetHeroes[position];
             if (hero && hero.alive) {
                 allTargets.push({
                     target: hero,
                     type: 'hero',
-                    side: 'opponent',
+                    side: targetSide,
                     position: position
                 });
             }
@@ -174,7 +200,7 @@ export const snowCannonArtifact = {
                         allTargets.push({
                             target: creature,
                             type: 'creature',
-                            side: 'opponent',
+                            side: targetSide,
                             position: position,
                             creatureIndex: index
                         });
@@ -184,7 +210,7 @@ export const snowCannonArtifact = {
         });
         
         if (allTargets.length === 0) {
-            console.log('❄️ No valid targets for Snow Cannon');
+            console.log(`❄️ No valid targets for ${ownerSide}'s Snow Cannon`);
             return;
         }
         
@@ -202,13 +228,15 @@ export const snowCannonArtifact = {
         
         // Log the freeze
         const targetName = targetData.target.name || `${targetData.target.type} creature`;
+        const ownerName = ownerSide === 'player' ? 'Player' : 'Opponent';
         battleManager.addCombatLog(
-            `❄️ Snow Cannon freezes ${targetName}!`,
+            `❄️ ${ownerName}'s Snow Cannon freezes ${targetName}!`,
             'info'
         );
         
         // Sync specific freeze to guest for animation
         battleManager.sendBattleUpdate('snow_cannon_freeze', {
+            ownerSide: ownerSide,
             targetData: {
                 type: targetData.type,
                 side: targetData.side,
@@ -309,12 +337,19 @@ export const snowCannonArtifact = {
      * @param {BattleManager} battleManager - The battle manager instance
      */
     handleGuestSnowCannonEffects(data, battleManager) {
-        const { cannonCount } = data;
+        const { playerCannons, opponentCannons, totalCannons } = data;
         
         battleManager.addCombatLog(
-            `❄️ ${cannonCount} Snow Cannon${cannonCount > 1 ? 's' : ''} activate${cannonCount === 1 ? 's' : ''}!`,
+            `❄️ ${totalCannons} Snow Cannon${totalCannons > 1 ? 's' : ''} activate${totalCannons === 1 ? 's' : ''}!`,
             'info'
         );
+        
+        if (playerCannons > 0) {
+            battleManager.addCombatLog(`❄️ Player fires ${playerCannons} Snow Cannon${playerCannons > 1 ? 's' : ''}!`, 'success');
+        }
+        if (opponentCannons > 0) {
+            battleManager.addCombatLog(`❄️ Opponent fires ${opponentCannons} Snow Cannon${opponentCannons > 1 ? 's' : ''}!`, 'error');
+        }
     },
     
     /**
@@ -323,14 +358,15 @@ export const snowCannonArtifact = {
      * @param {BattleManager} battleManager - The battle manager instance
      */
     async handleGuestSnowCannonFreeze(data, battleManager) {
-        const { targetData, cannonIndex } = data;
+        const { ownerSide, targetData, cannonIndex } = data;
         
         // Create the animation
         await this.createSnowballBarrage(battleManager, targetData);
         
-        // Log the freeze
+        // Log the freeze with proper owner identification
+        const ownerName = ownerSide === 'player' ? 'Player' : 'Opponent';
         battleManager.addCombatLog(
-            `❄️ Snow Cannon freezes ${targetData.targetName}!`,
+            `❄️ ${ownerName}'s Snow Cannon freezes ${targetData.targetName}!`,
             'info'
         );
     }

@@ -22,6 +22,15 @@ export class StatusEffectsManager {
                 visual: 'taunt_shout',
                 description: 'Draws enemy attacks to this zone. Reduces by 1 stack each turn.'
             },
+            elixirOfCold: {
+                name: 'elixirOfCold',
+                displayName: 'Elixir of Cold',
+                type: 'buff',
+                targetTypes: ['hero'], // Only heroes can have this buff
+                persistent: true, // Lasts entire battle
+                visual: 'frost_aura',
+                description: 'Each stack gives 50% chance to freeze target on attack'
+            },
             silenced: {
                 name: 'silenced',
                 displayName: 'Silenced',
@@ -416,6 +425,62 @@ export class StatusEffectsManager {
 
         // Create new indicator with updated stack count
         this.createPersistentStatusIndicator(targetElement, target, effectName);
+    }
+
+    // Refresh all status effect visuals (for guest sync)
+    refreshAllStatusEffectVisuals() {
+        console.log('🔄 Refreshing all status effect visuals...');
+        
+        // Refresh player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            if (this.battleManager.playerHeroes[position]) {
+                const hero = this.battleManager.playerHeroes[position];
+                
+                // Restore status indicators for alive heroes
+                if (hero.alive && hero.statusEffects && hero.statusEffects.length > 0) {
+                    hero.statusEffects.forEach(effect => {
+                        this.updateStatusVisualIndicator(hero, effect.name);
+                    });
+                }
+                
+                // Refresh creature status effects
+                if (hero.creatures) {
+                    hero.creatures.forEach((creature, index) => {
+                        // Only restore indicators for alive creatures
+                        if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                            creature.statusEffects.forEach(effect => {
+                                this.updateStatusVisualIndicator(creature, effect.name);
+                            });
+                        }
+                    });
+                }
+            }
+            
+            if (this.battleManager.opponentHeroes[position]) {
+                const hero = this.battleManager.opponentHeroes[position];
+                
+                // Restore status indicators for alive heroes
+                if (hero.alive && hero.statusEffects && hero.statusEffects.length > 0) {
+                    hero.statusEffects.forEach(effect => {
+                        this.updateStatusVisualIndicator(hero, effect.name);
+                    });
+                }
+                
+                // Refresh creature status effects
+                if (hero.creatures) {
+                    hero.creatures.forEach((creature, index) => {
+                        // Only restore indicators for alive creatures
+                        if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                            creature.statusEffects.forEach(effect => {
+                                this.updateStatusVisualIndicator(creature, effect.name);
+                            });
+                        }
+                    });
+                }
+            }
+        });
+        
+        console.log('✅ Status effect visual refresh completed');
     }
 
     // Get status effect from target

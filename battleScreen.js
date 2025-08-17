@@ -51,7 +51,8 @@ export class BattleScreen {
     playerEquips = null, opponentEquips = null,
     playerEffectiveStats = null,
     opponentEffectiveStats = null,
-    permanentArtifacts = null) { 
+    playerPermanentArtifacts = null,
+    opponentPermanentArtifacts = null){
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -69,7 +70,8 @@ export class BattleScreen {
         this.opponentCreatures = opponentCreatures;
         this.playerEquips = playerEquips;
         this.opponentEquips = opponentEquips;
-        this.battlePermanentArtifacts = permanentArtifacts ? [...permanentArtifacts] : [];
+        this.playerPermanentArtifacts = playerPermanentArtifacts || [];
+        this.opponentPermanentArtifacts = opponentPermanentArtifacts || [];
 
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
@@ -92,7 +94,8 @@ export class BattleScreen {
             opponentEquips,
             playerEffectiveStats,
             opponentEffectiveStats,
-            this.battlePermanentArtifacts
+            this.playerPermanentArtifacts,
+            this.opponentPermanentArtifacts
         );
     }
 
@@ -342,8 +345,12 @@ export class BattleScreen {
                 this.battleManager.opponentEquips = data.hostEquipment;
                 console.log('✅ Synced opponent equipment from host');
             }
+
+            if (data.hostPermanentArtifacts) {
+                this.opponentPermanentArtifactsData = data.hostPermanentArtifacts;
+                console.log('✅ Synced opponent permanent artifacts from host');
+            }
             
-            // ★ SIMPLIFIED: Just store the effective stats - no calculation needed!
             if (data.hostEffectiveStats) {
                 this.opponentEffectiveStats = data.hostEffectiveStats;
                 this.battleManager.opponentEffectiveStats = data.hostEffectiveStats;

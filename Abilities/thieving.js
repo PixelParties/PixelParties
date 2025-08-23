@@ -2,7 +2,7 @@
 
 export class ThievingManager {
     constructor() {
-        console.log('ThievingManager initialized');
+
     }
 
     /**
@@ -47,17 +47,6 @@ export class ThievingManager {
         result.playerNetThieving = result.playerGoldStolen - result.opponentGoldStolen;
         result.opponentNetThieving = result.opponentGoldStolen - result.playerGoldStolen;
 
-        console.log('🏴‍☠️ Thieving calculation results:', {
-            playerThievingLevel: result.playerThievingLevel,
-            opponentThievingLevel: result.opponentThievingLevel,
-            playerCurrentGold,
-            opponentCurrentGold,
-            playerGoldStolen: result.playerGoldStolen,
-            opponentGoldStolen: result.opponentGoldStolen,
-            playerNetThieving: result.playerNetThieving,
-            opponentNetThieving: result.opponentNetThieving
-        });
-
         return result;
     }
 
@@ -73,14 +62,12 @@ export class ThievingManager {
         let totalThievingLevel = 0;
 
         if (!formation || !abilities) {
-            console.log(`${playerLabel} formation or abilities not available for thieving calculation`);
             return 0;
         }
 
         ['left', 'center', 'right'].forEach(position => {
             const hero = formation[position];
             if (hero && abilities[position]) {
-                console.log(`🔍 Checking ${playerLabel} ${hero.name} in ${position} position for Thieving`);
                 
                 let heroThievingLevel = 0;
                 
@@ -88,9 +75,6 @@ export class ThievingManager {
                 ['zone1', 'zone2', 'zone3'].forEach(zone => {
                     if (abilities[position][zone] && Array.isArray(abilities[position][zone])) {
                         const thievingCount = abilities[position][zone].filter(a => a && a.name === 'Thieving').length;
-                        if (thievingCount > 0) {
-                            console.log(`🏴‍☠️ Found ${thievingCount} Thieving abilities in ${hero.name}'s ${zone}`);
-                        }
                         heroThievingLevel += thievingCount;
                     }
                 });
@@ -102,12 +86,9 @@ export class ThievingManager {
                         position: position,
                         level: heroThievingLevel
                     });
-                    console.log(`🏴‍☠️ ${hero.name} contributes ${heroThievingLevel} Thieving levels`);
                 }
             }
         });
-
-        console.log(`${playerLabel} total thieving level: ${totalThievingLevel}`);
         return totalThievingLevel;
     }
 
@@ -183,31 +164,21 @@ export class ThievingManager {
         const playerNetEffect = thievingData.playerNetThieving;
         const opponentNetEffect = thievingData.opponentNetThieving;
 
-        console.log('🏴‍☠️ Applying thieving effects:', {
-            playerNetEffect,
-            opponentNetEffect,
-            isHost
-        });
-
         // Apply net thieving effects
         if (playerNetEffect > 0) {
             // Player gains gold from thieving
             playerGoldManager.addPlayerGold(playerNetEffect);
-            console.log(`Player gained ${playerNetEffect} gold from thieving`);
         } else if (playerNetEffect < 0) {
             // Player loses gold to opponent's thieving
             playerGoldManager.subtractPlayerGold(Math.abs(playerNetEffect));
-            console.log(`Player lost ${Math.abs(playerNetEffect)} gold to opponent's thieving`);
         }
 
         if (opponentNetEffect > 0) {
             // Opponent gains gold from thieving
             opponentGoldManager.addOpponentGold(opponentNetEffect);
-            console.log(`Opponent gained ${opponentNetEffect} gold from thieving`);
         } else if (opponentNetEffect < 0) {
             // Opponent loses gold to player's thieving
             opponentGoldManager.subtractOpponentGold(Math.abs(opponentNetEffect));
-            console.log(`Opponent lost ${Math.abs(opponentNetEffect)} gold to player's thieving`);
         }
     }
 
@@ -219,7 +190,6 @@ export class ThievingManager {
      */
     calculateForRewards(heroSelection, goldManager) {
         if (!heroSelection || !heroSelection.formationManager || !heroSelection.heroAbilitiesManager) {
-            console.log('⚠️ Cannot calculate thieving - missing required managers');
             return {
                 thievingGained: 0,
                 thievingLost: 0,
@@ -237,7 +207,6 @@ export class ThievingManager {
         // Get opponent data (cached from battle)
         const opponentData = this.getOpponentDataForThieving(heroSelection);
         if (!opponentData) {
-            console.log('⚠️ No opponent data available for thieving calculation');
             return {
                 thievingGained: 0,
                 thievingLost: 0,
@@ -250,11 +219,6 @@ export class ThievingManager {
         // Get current gold amounts BEFORE rewards
         const playerCurrentGold = goldManager.getPlayerGold();
         const opponentCurrentGold = goldManager.getOpponentGold();
-
-        console.log('🏴‍☠️ Calculating thieving for rewards with current gold:', {
-            playerCurrentGold,
-            opponentCurrentGold
-        });
 
         // Calculate thieving effects
         const thievingData = this.calculateThievingEffects(
@@ -364,8 +328,6 @@ export class ThievingManager {
                 opponentThievingDetails: thievingDetails.opponentThievingDetails,
                 timestamp: Date.now()
             });
-            
-            console.log('🏴‍☠️ Sent thieving update to opponent:', thievingDetails);
         }
     }
 
@@ -374,9 +336,7 @@ export class ThievingManager {
      * @param {Object} thievingData - Received thieving data from opponent
      * @param {Object} goldManager - Gold manager reference
      */
-    handleOpponentEffects(thievingData, goldManager) {
-        console.log('🏴‍☠️ Received opponent thieving effects:', thievingData);
-        
+    handleOpponentEffects(thievingData, goldManager) {       
         if (!goldManager) {
             console.warn('⚠️ No gold manager available for thieving effects');
             return;
@@ -386,13 +346,11 @@ export class ThievingManager {
         if (thievingData.opponentGoldStolen > 0) {
             // Opponent stole gold from us - reduce our gold
             goldManager.subtractPlayerGold(thievingData.opponentGoldStolen);
-            console.log(`💸 Opponent stole ${thievingData.opponentGoldStolen} gold from us`);
         }
         
         if (thievingData.playerGoldStolen > 0) {
             // We stole gold from opponent - reduce opponent's gold  
             goldManager.subtractOpponentGold(thievingData.playerGoldStolen);
-            console.log(`🏴‍☠️ We stole ${thievingData.playerGoldStolen} gold from opponent`);
         }
         
         // Show visual notification

@@ -8,7 +8,7 @@ export class SkeletonDeathKnightCreature {
         // Skeleton Death Knight stats
         this.SLASH_DAMAGE = 10;
         this.SLASH_ANIMATION_TIME = 800; // 0.8 second slash animation
-        this.SILENCED_STACKS = 1;
+        this.SILENCED_STACKS = 2;
         
         // Inject CSS styles
         this.injectSkeletonDeathKnightStyles();
@@ -717,7 +717,6 @@ export class SkeletonDeathKnightCreature {
             );
 
             // Create slash effect (don't await - let them all execute simultaneously)
-            // FIXED: Pass the attacking death knight creature
             slashPromises.push(this.executeDeathSlash(deathKnightElement, target, index, deathKnightCreature));
         });
 

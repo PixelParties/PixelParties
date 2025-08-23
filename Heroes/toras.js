@@ -1,8 +1,11 @@
 // ./Heroes/toras.js - Toras Hero Special Abilities
 
+
+const torasBonusPerEquip = 20;
+
 /**
  * Calculate Toras's unique equipment attack bonus
- * Toras gains +10 attack for each unique equipment (duplicates don't count)
+ * Toras gains +X attack for each unique equipment (duplicates don't count)
  * @param {Object} hero - The hero instance
  * @returns {number} The total attack bonus from unique equipment
  */
@@ -28,9 +31,9 @@ export function calculateTorasEquipmentBonus(hero) {
         }
     });
     
-    // Calculate bonus: +10 per unique equipment
+    // Calculate bonus: +20 per unique equipment
     const uniqueCount = uniqueEquipmentNames.size;
-    const bonus = uniqueCount * 10;
+    const bonus = uniqueCount * torasBonusPerEquip;
     
     return bonus;
 }
@@ -75,7 +78,7 @@ export function getTorasEquipmentBonusDescription(uniqueCount) {
         return '';
     }
     
-    return `Toras's Mastery (+${uniqueCount * 10} ATK from ${uniqueCount} unique equipment)`;
+    return `Toras's Mastery (+${uniqueCount * torasBonusPerEquip} ATK from ${uniqueCount} unique equipment)`;
 }
 
 /**

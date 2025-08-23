@@ -19,13 +19,33 @@ export const fieldStandardArtifact = {
             return;
         }
         
-        // Get hand manager
+        // Get managers
         const handManager = heroSelection.getHandManager();
+        const goldManager = heroSelection.getGoldManager();
         
-        if (!handManager) {
-            console.error('Hand manager not available');
+        if (!handManager || !goldManager) {
+            console.error('Required managers not available');
             return;
         }
+        
+        // Get cost from card database
+        const cardInfo = heroSelection.getCardInfo(this.cardName);
+        const cost = cardInfo?.cost || 3; // Fallback cost if not defined
+        
+        // Check if player has enough gold
+        const currentGold = goldManager.getPlayerGold();
+        if (currentGold < cost) {
+            this.showFieldStandardError(
+                `Need ${cost} Gold. Have ${currentGold} Gold.`,
+                cardIndex
+            );
+            return;
+        }
+        
+        // Spend the gold (use negative amount to subtract)
+        goldManager.addPlayerGold(-cost, 'FieldStandard');
+        
+        console.log(`FieldStandard: Spent ${cost} gold to activate`);
         
         // Remove card from hand
         const removedCard = handManager.removeCardFromHandByIndex(cardIndex);
@@ -47,21 +67,77 @@ export const fieldStandardArtifact = {
         }
         
         // Show visual feedback
-        this.showFieldStandardActivation(cardIndex);
+        this.showFieldStandardActivation(cardIndex, cost);
         
         // Update UI
         heroSelection.updateHandDisplay();
+        heroSelection.updateGoldDisplay();
         
         // Save game state
         await heroSelection.saveGameState();
-
         await heroSelection.sendFormationUpdate();
         
-        console.log(`🎺 Field Standard consumed and added to permanent artifacts!`);
+        console.log(`🎺 Field Standard consumed and added to permanent artifacts for ${cost} gold!`);
     },
     
-    // Show activation animation
-    showFieldStandardActivation(cardIndex) {
+    // Show error message when not enough gold
+    showFieldStandardError(message, cardIndex) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'field-standard-error';
+        errorDiv.innerHTML = `
+            <div class="field-standard-error-content">
+                <span class="field-standard-error-icon">⛔</span>
+                <span class="field-standard-error-text">${message}</span>
+            </div>
+        `;
+        
+        // Position near the card or center of hand
+        const handContainer = document.querySelector('.hand-cards');
+        if (handContainer) {
+            const handCards = handContainer.querySelectorAll('.hand-card');
+            if (handCards[cardIndex]) {
+                const cardRect = handCards[cardIndex].getBoundingClientRect();
+                errorDiv.style.left = `${cardRect.left + cardRect.width / 2}px`;
+                errorDiv.style.top = `${cardRect.top - 60}px`;
+            } else {
+                // Fallback to center of hand
+                const handRect = handContainer.getBoundingClientRect();
+                errorDiv.style.left = `${handRect.left + handRect.width / 2}px`;
+                errorDiv.style.top = `${handRect.top - 60}px`;
+            }
+        } else {
+            // Fallback to center of screen
+            errorDiv.style.left = '50%';
+            errorDiv.style.top = '50%';
+        }
+        
+        errorDiv.style.cssText += `
+            position: fixed;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #dc3545 0%, #ffd700 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10000;
+            pointer-events: none;
+            animation: fieldStandardErrorBounce 0.5s ease-out;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        `;
+        
+        document.body.appendChild(errorDiv);
+        
+        // Remove after showing
+        setTimeout(() => {
+            errorDiv.style.animation = 'fieldStandardErrorFade 0.3s ease-out forwards';
+            setTimeout(() => errorDiv.remove(), 300);
+        }, 2500);
+    },
+    
+    // Show activation animation (updated to include cost)
+    showFieldStandardActivation(cardIndex, cost) {
         const activationBurst = document.createElement('div');
         activationBurst.className = 'field-standard-activation';
         activationBurst.innerHTML = `
@@ -72,6 +148,7 @@ export const fieldStandardArtifact = {
             </div>
             <div class="standard-text">Field Standard Raised!</div>
             <div class="standard-subtext">Will rally creatures at battle start</div>
+            <div class="standard-cost">Cost: ${cost} Gold</div>
         `;
         
         // Position near the card
@@ -97,7 +174,7 @@ export const fieldStandardArtifact = {
     },
     
     // ============================================
-    // BATTLE START EFFECT
+    // BATTLE START EFFECT (unchanged)
     // ============================================
     
     /**
@@ -399,7 +476,7 @@ export const fieldStandardArtifact = {
     },
     
     // ============================================
-    // GUEST HANDLERS
+    // GUEST HANDLERS (unchanged)
     // ============================================
     
     /**
@@ -504,7 +581,7 @@ export const fieldStandardArtifact = {
     }
 };
 
-// Add styles for the animations
+// Add styles for the animations (updated to include error styles and cost display)
 if (typeof document !== 'undefined' && !document.getElementById('fieldStandardStyles')) {
     const style = document.createElement('style');
     style.id = 'fieldStandardStyles';
@@ -560,6 +637,66 @@ if (typeof document !== 'undefined' && !document.getElementById('fieldStandardSt
             text-align: center;
             opacity: 0;
             animation: fadeInUp 0.5s ease-out 0.3s forwards;
+            margin-bottom: 5px;
+        }
+        
+        .standard-cost {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 15px rgba(255, 215, 0, 0.7);
+            text-align: center;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out 0.6s forwards;
+        }
+        
+        /* Error styles */
+        .field-standard-error {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .field-standard-error-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .field-standard-error-icon {
+            font-size: 20px;
+        }
+        
+        .field-standard-error-text {
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        @keyframes fieldStandardErrorBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-5px) scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes fieldStandardErrorFade {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
         }
         
         /* Trumpet rally animation */

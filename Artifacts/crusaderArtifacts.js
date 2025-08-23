@@ -13,7 +13,6 @@ class CrusaderArtifactsHandler {
         this.heroSelection = null;
         this.battleManager = null;
         this.initialized = false;
-        console.log('🛡️ CrusaderArtifactsHandler initialized');
     }
 
     // Initialize with hero selection reference
@@ -23,24 +22,18 @@ class CrusaderArtifactsHandler {
         this.heroSelection = heroSelection;
         this.hookIntoTurnChanges();
         this.initialized = true;
-        
-        console.log('🛡️ Crusader Artifacts system hooked into turn changes');
     }
 
     // Initialize with battle manager for combat effects
     initBattleEffects(battleManager) {
         this.battleManager = battleManager;
-        console.log('⚔️ Crusader Artifacts battle effects initialized');
     }
 
     // Apply all start-of-battle Crusader effects
     async applyStartOfBattleEffects() {
         if (!this.battleManager || !this.battleManager.isAuthoritative) {
-            console.log('⚠️ Skipping Crusader effects - not authoritative or no battle manager');
             return;
         }
-
-        console.log('💥 Applying Crusader Artifacts start-of-battle effects...');
 
         // Apply effects in order
         // Hookshot goes first to swap positions before damage effects
@@ -51,8 +44,6 @@ class CrusaderArtifactsHandler {
         await this.applyCrusadersCutlassEffect();
 
         await this.applyCrusadersFlintlockEffect();
-
-        console.log('✅ All Crusader Artifacts effects applied');
     }
 
     
@@ -99,14 +90,9 @@ class CrusaderArtifactsHandler {
 
     // Apply CrusadersHookshot start-of-battle effect
     async applyCrusadersHookshotEffect() {
-        console.log('⚓ Checking CrusadersHookshot effects...');
-
         // Count CrusadersHookshot artifacts for both players WITH Cecilia check
         const playerHookshotData = this.countCrusaderArtifactWithCecilia('player', 'CrusadersHookshot');
         const opponentHookshotData = this.countCrusaderArtifactWithCecilia('opponent', 'CrusadersHookshot');
-
-        console.log(`⚓ Player has ${playerHookshotData.total} CrusadersHookshot(s), ${playerHookshotData.ceciliaCount} on Cecilia`);
-        console.log(`⚓ Opponent has ${opponentHookshotData.total} CrusadersHookshot(s), ${opponentHookshotData.ceciliaCount} on Cecilia`);
 
         // Apply swaps based on player's hookshots (swap opponent's heroes)
         if (playerHookshotData.total > 0) {
@@ -124,9 +110,8 @@ class CrusaderArtifactsHandler {
         const sideLabel = targetSide === 'player' ? 'Player' : 'Opponent';
         const attackerLabel = attackerSide === 'player' ? 'Player' : 'Opponent';
         
-        console.log(`⚓ ${attackerLabel}'s Hookshots will swap ${sideLabel} heroes ${hookshotCount} time(s)`);
         if (ceciliaHookshotCount > 0) {
-            console.log(`⚡ ${ceciliaHookshotCount} hookshot(s) are empowered by Cecilia!`);
+            // Cecilia hookshots are empowered
         }
 
         // Get living heroes on target side
@@ -142,7 +127,6 @@ class CrusaderArtifactsHandler {
 
         // Need at least 2 heroes to swap
         if (livingPositions.length < 2) {
-            console.log(`⚓ Not enough living heroes to swap (only ${livingPositions.length} alive)`);
             this.battleManager.addCombatLog(
                 `⚓ ${attackerLabel}'s Crusader Hookshot finds insufficient targets!`,
                 'warning'
@@ -187,8 +171,6 @@ class CrusaderArtifactsHandler {
             }
 
             if (position1 && position2 && position1 !== position2) {
-                console.log(`⚓ Hookshot #${i + 1}: Swapping ${position1} ↔ ${position2}`);
-                
                 // Generate unique swap ID for tracking
                 const swapId = `hookshot_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`;
                 
@@ -297,7 +279,6 @@ class CrusaderArtifactsHandler {
         const hero2 = heroes[position2];
         
         if (!hero1 || !hero2) {
-            console.error(`⚓ Cannot swap - missing heroes at ${position1} or ${position2}`);
             return;
         }
 
@@ -322,8 +303,6 @@ class CrusaderArtifactsHandler {
         formation[position1] = formation[position2];
         formation[position2] = tempFormationData;
         
-        console.log(`⚓ Updated formation - ${position1} now has ${formation[position1]?.name}, ${position2} now has ${formation[position2]?.name}`);
-        
         // ===== ALSO UPDATE FORMATION MANAGER =====
         if (this.battleManager.heroSelection && this.battleManager.heroSelection.formationManager) {
             const formationManager = this.battleManager.heroSelection.formationManager;
@@ -340,7 +319,6 @@ class CrusaderArtifactsHandler {
                 managerFormation[position2] = temp;
                 formationManager.opponentBattleFormation = managerFormation;
             }
-            console.log(`⚓ HOST: Updated FormationManager for ${side} side`);
         }
         
         // ===== ALSO UPDATE ABILITIES, SPELLBOOKS, CREATURES, AND EQUIPMENT DATA =====
@@ -407,7 +385,6 @@ class CrusaderArtifactsHandler {
         // Swap resistance stacks so they follow the heroes
         if (this.battleManager.resistanceManager) {
             this.battleManager.resistanceManager.swapResistanceStacks(side, position1, position2);
-            console.log(`⚓ Swapped resistance stacks between ${position1} and ${position2}`);
         }
         
         // ===== SWAP VISUAL ELEMENTS =====
@@ -434,10 +411,7 @@ class CrusaderArtifactsHandler {
         // Save the updated battle state with swapped formations
         if (this.battleManager.isAuthoritative) {
             await this.battleManager.saveBattleStateToPersistence();
-            console.log(`⚓ Saved swapped positions to persistence`);
         }
-        
-        console.log(`⚓ Swapped ${hero1.name} to ${position2} and ${hero2.name} to ${position1} (including formations)`);
     }
 
     // Animate hookshot chains between two heroes
@@ -450,7 +424,6 @@ class CrusaderArtifactsHandler {
         const heroElement2 = this.getHeroElement(side, position2);
         
         if (!heroElement1 || !heroElement2) {
-            console.warn('⚠️ Could not find hero elements for hookshot animation');
             return;
         }
 
@@ -622,7 +595,6 @@ class CrusaderArtifactsHandler {
         const slot2 = document.querySelector(`.${side}-slot.${position2}-slot`);
         
         if (!slot1 || !slot2) {
-            console.error('⚓ Could not find hero slots to swap visuals');
             return;
         }
 
@@ -659,11 +631,7 @@ class CrusaderArtifactsHandler {
                 slot2.classList.remove('hero-swapped');
             }, 400);
             
-            console.log(`⚓ Enhanced visual swap completed between ${position1} and ${position2}`);
-            
         } catch (error) {
-            console.error('❌ Error in enhanced visual swap, falling back to innerHTML method:', error);
-            
             // Fallback to original method
             const content1 = slot1.innerHTML;
             const content2 = slot2.innerHTML;
@@ -679,8 +647,6 @@ class CrusaderArtifactsHandler {
 
     // Handle guest hookshot swap animation
     handleGuestHookshotSwap(data) {
-        console.log('⚓ Guest handling hookshot swap:', data);
-        
         const { targetSide, position1, position2, hookshotNumber, totalHookshots, attackerSide } = data;
         
         // Log initial effect if first hookshot
@@ -712,7 +678,6 @@ class CrusaderArtifactsHandler {
         const hero2 = heroes[position2];
         
         if (!hero1 || !hero2) {
-            console.error(`⚓ GUEST: Cannot swap - missing heroes at ${position1} or ${position2}`);
             // Send acknowledgment even on error
             if (swapData && swapData.swapId) {
                 this.battleManager.sendAcknowledgment('hookshot_swap_' + swapData.swapId);
@@ -753,7 +718,6 @@ class CrusaderArtifactsHandler {
                 formation[position2] = temp;
                 formationManager.opponentBattleFormation = formation;
             }
-            console.log(`⚓ GUEST: Updated FormationManager for ${localSide} side`);
         }
         
         // ===== ENHANCED VISUAL SWAPPING =====
@@ -763,7 +727,6 @@ class CrusaderArtifactsHandler {
         // Use local swap to avoid triggering network messages
         if (this.battleManager.resistanceManager) {
             this.battleManager.resistanceManager.swapResistanceStacksLocal(localSide, position1, position2);
-            console.log(`⚓ GUEST: Swapped resistance stacks between ${position1} and ${position2}`);
         }
         
         // Update displays
@@ -786,8 +749,6 @@ class CrusaderArtifactsHandler {
         if (swapData && swapData.swapId) {
             this.battleManager.sendAcknowledgment('hookshot_swap_' + swapData.swapId);
         }
-        
-        console.log(`⚓ GUEST: Swapped ${hero1.name} to ${position2} and ${hero2.name} to ${position1}`);
     }
 
     // Ensure hookshot animation CSS
@@ -873,8 +834,6 @@ class CrusaderArtifactsHandler {
     // ============================================
 
     async applyCrusadersFlintlockEffect() {
-        console.log('🔫 Checking CrusadersFlintlock effects...');
-
         // Process each side and position
         const sides = [
             { name: 'player', heroes: this.battleManager.playerHeroes },
@@ -908,21 +867,16 @@ class CrusaderArtifactsHandler {
                             damage: isCecilia ? 150 * flintlockCount : 80 * flintlockCount, // Cecilia gets 150 damage
                             isCecilia: isCecilia
                         });
-                    } else {
-                        console.log(`🔫 ${hero.name} has ${flintlockCount} Flintlock(s) but found no valid targets`);
                     }
                 }
             }
         }
 
         if (flintlockAttacks.length === 0) {
-            console.log('🔫 No CrusadersFlintlock attacks to execute');
             return;
         }
 
         // Execute all flintlock attacks
-        console.log(`🔫 Executing ${flintlockAttacks.length} CrusadersFlintlock attacks...`);
-        
         // Log the overall effect
         this.battleManager.addCombatLog(
             `🔫 Crusaders Flintlock fires! ${flintlockAttacks.length} targeted shot(s)!`, 
@@ -957,8 +911,6 @@ class CrusaderArtifactsHandler {
             // Small delay between attacks
             await this.battleManager.delay(400);
         }
-
-        console.log('✅ All CrusadersFlintlock attacks completed');
     }
 
     // Find a random target hero
@@ -984,12 +936,10 @@ class CrusaderArtifactsHandler {
         // If there are living heroes, pick one randomly
         if (aliveEnemyHeroes.length > 0) {
             const target = this.battleManager.getRandomChoice(aliveEnemyHeroes);
-            console.log(`🎯 CrusadersFlintlock targeting random living hero: ${target.hero.name} at ${target.position}`);
             return target;
         }
         
         // No living heroes - no valid targets
-        console.log(`🎯 CrusadersFlintlock found no living heroes to target!`);
         return null;
     }
 
@@ -1008,7 +958,6 @@ class CrusaderArtifactsHandler {
         });
         
         if (!targetElement || !attackerElement) {
-            console.warn('⚠️ Could not find target or attacker element for flintlock animation');
             return;
         }
 
@@ -1140,7 +1089,6 @@ class CrusaderArtifactsHandler {
         const { target, damage, attacker, isCecilia } = attack;
         
         if (!target || !target.hero) {
-            console.warn('⚠️ Invalid target for flintlock damage');
             return;
         }
 
@@ -1271,8 +1219,6 @@ class CrusaderArtifactsHandler {
 
     // Handle guest flintlock attack
     handleGuestFlintlockAttack(data) {
-        console.log('🔫 Guest handling flintlock attack:', data);
-        
         const { attackerInfo, targetInfo, damage, flintlockCount } = data;
         
         // Add to battle log
@@ -1309,25 +1255,80 @@ class CrusaderArtifactsHandler {
         if (mockAttack.target.hero) {
             this.createFlintlockAttackAnimation(mockAttack);
         }
+    }
+
+    handleGuestCutlassAttack(data) {
+        const { attackerInfo, targetInfo, damage, cutlassCount, isCecilia } = data;
         
-        console.log(`🔫 GUEST: ${attackerInfo.name} used Crusader Flintlock on ${targetInfo.name}`);
+        // Add to battle log
+        const attackerName = isCecilia ? `⚡ ${attackerInfo.name}'s empowered` : `${attackerInfo.name}'s`;
+        this.battleManager.addCombatLog(
+            `⚔️ ${attackerName} Crusader Cutlass strikes for ${damage} damage!`,
+            'warning'
+        );
+
+        // Create mock objects for guest-side animation
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerInfo.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const targetLocalSide = (targetInfo.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Find target based on type
+        let targetObject = null;
+        if (targetInfo.type === 'hero') {
+            const targetHeroes = targetLocalSide === 'player' 
+                ? this.battleManager.playerHeroes 
+                : this.battleManager.opponentHeroes;
+            targetObject = {
+                type: 'hero',
+                hero: targetHeroes[targetInfo.position],
+                position: targetInfo.position,
+                side: targetLocalSide
+            };
+        } else if (targetInfo.type === 'creature') {
+            const targetHeroes = targetLocalSide === 'player' 
+                ? this.battleManager.playerHeroes 
+                : this.battleManager.opponentHeroes;
+            const hero = targetHeroes[targetInfo.position];
+            if (hero && hero.creatures && hero.creatures[targetInfo.creatureIndex]) {
+                targetObject = {
+                    type: 'creature',
+                    hero: hero,
+                    creature: hero.creatures[targetInfo.creatureIndex],
+                    creatureIndex: targetInfo.creatureIndex,
+                    position: targetInfo.position,
+                    side: targetLocalSide
+                };
+            }
+        }
+        
+        const mockAttack = {
+            attacker: {
+                name: attackerInfo.name
+            },
+            attackerPosition: attackerInfo.position,
+            attackerSide: attackerLocalSide,
+            target: targetObject,
+            cutlassCount: cutlassCount,
+            damage: damage,
+            isCecilia: isCecilia
+        };
+        
+        // Play visual effects on guest side (no damage application)
+        if (mockAttack.target) {
+            this.createCutlassAttackAnimation(mockAttack);
+        }
     }
 
     // Apply CrusadersArm-Cannon start-of-battle effect
     async applyCrusadersArmCannonEffect() {
-        console.log('💥 Checking CrusadersArm-Cannon effects...');
-
         // Count CrusadersArm-Cannon artifacts for both players WITH Cecilia check
         const playerCannonData = this.countCrusaderArtifactWithCecilia('player', 'CrusadersArm-Cannon');
         const opponentCannonData = this.countCrusaderArtifactWithCecilia('opponent', 'CrusadersArm-Cannon');
 
-        console.log(`🔫 Player has ${playerCannonData.total} CrusadersArm-Cannon(s), ${playerCannonData.ceciliaCount} on Cecilia`);
-        console.log(`🔫 Opponent has ${opponentCannonData.total} CrusadersArm-Cannon(s), ${opponentCannonData.ceciliaCount} on Cecilia`);
-
         // Apply damage based on opponent's cannons (you take damage from opponent's cannons)
         if (opponentCannonData.total > 0) {
-            // Calculate damage: 60 base + 40 extra per Cecilia cannon
-            const baseDamagePerCannon = 60;
+            // Calculate damage: 40 base + 40 extra per Cecilia cannon
+            const baseDamagePerCannon = 40;
             const ceciliaBonus = 40;
             const normalCannonCount = opponentCannonData.total - opponentCannonData.ceciliaCount;
             const totalDamage = (normalCannonCount * baseDamagePerCannon) + (opponentCannonData.ceciliaCount * (baseDamagePerCannon + ceciliaBonus));
@@ -1347,8 +1348,6 @@ class CrusaderArtifactsHandler {
     }
 
     async applyCrusadersCutlassEffect() {
-        console.log('⚔️ Checking CrusadersCutlass effects...');
-
         // Process each side and position
         const sides = [
             { name: 'player', heroes: this.battleManager.playerHeroes },
@@ -1388,13 +1387,10 @@ class CrusaderArtifactsHandler {
         }
 
         if (cutlassAttacks.length === 0) {
-            console.log('⚔️ No CrusadersCutlass attacks to execute');
             return;
         }
 
         // Execute all cutlass attacks
-        console.log(`⚔️ Executing ${cutlassAttacks.length} CrusadersCutlass attacks...`);
-        
         // Log the overall effect
         this.battleManager.addCombatLog(
             `⚔️ Crusaders Cutlass strikes! ${cutlassAttacks.length} targeted attack(s)!`, 
@@ -1456,8 +1452,6 @@ class CrusaderArtifactsHandler {
                 );
             }
         }
-
-        console.log('✅ All CrusadersCutlass attacks completed');
     }
 
     // Create a unique key for a target (for grouping attacks)
@@ -1526,7 +1520,6 @@ class CrusaderArtifactsHandler {
         });
         
         if (!targetElement) {
-            console.warn('⚠️ Could not find target element for cutlass animation');
             return;
         }
 
@@ -1693,7 +1686,6 @@ class CrusaderArtifactsHandler {
         const { target, cutlassCount, attacker, isCecilia } = attack;
         
         if (!target || !target.type) {
-            console.warn('⚠️ Invalid target for cutlass damage');
             return;
         }
 
@@ -1804,7 +1796,6 @@ class CrusaderArtifactsHandler {
         if (totalDamage <= 0) return;
 
         const sideLabel = targetSide === 'player' ? 'Player' : 'Opponent';
-        console.log(`💥 Applying ${totalDamage} Crusader Cannon damage to all ${sideLabel} targets...`);
 
         // Log the effect
         let logMessage = `💥 Crusaders Arm-Cannon barrage! ${cannonCount} cannon(s) fire!`;
@@ -1817,11 +1808,8 @@ class CrusaderArtifactsHandler {
         const targets = this.getAllTargetsOnSide(targetSide);
         
         if (targets.length === 0) {
-            console.log('⚠️ No targets found for cannon barrage');
             return;
         }
-
-        console.log(`🎯 Found ${targets.length} targets for cannon barrage`);
 
         // Create cannonball animation data for network sync
         const cannonballData = {
@@ -1854,8 +1842,6 @@ class CrusaderArtifactsHandler {
 
         // Wait for animations to complete
         await animationPromise;
-
-        console.log('✅ Crusader Cannon barrage complete');
     }
 
     // Get all valid targets on a side (heroes + creatures)
@@ -1934,8 +1920,6 @@ class CrusaderArtifactsHandler {
 
     // Create cannonball barrage animation
     async createCannonballBarrageAnimation(targets, cannonCount) {
-        console.log(`🎬 Creating cannonball animation for ${targets.length} targets with ${cannonCount} cannons`);
-        
         // Ensure CSS is loaded
         this.ensureCannonballAnimationCSS();
 
@@ -1958,7 +1942,6 @@ class CrusaderArtifactsHandler {
     async createSingleCannonballAnimation(targetData) {
         const targetElement = this.getTargetElement(targetData);
         if (!targetElement) {
-            console.warn('⚠️ Could not find target element for cannonball animation');
             return;
         }
 
@@ -2089,8 +2072,6 @@ class CrusaderArtifactsHandler {
 
     // Handle guest cannonball animation
     handleGuestCannonBarrage(data) {
-        console.log('🎬 Guest handling cannonball barrage animation:', data);
-        
         const { targetSide, damage, cannonCount, targets } = data;
         
         // Log the effect for guest
@@ -2209,7 +2190,6 @@ class CrusaderArtifactsHandler {
     // Hook into the turn change system (existing functionality)
     hookIntoTurnChanges() {
         if (!this.heroSelection || !this.heroSelection.onTurnChange) {
-            console.error('❌ Cannot hook into turn changes - heroSelection not available');
             return;
         }
 
@@ -2229,7 +2209,6 @@ class CrusaderArtifactsHandler {
     // Main handler for crusader artifacts transformation (existing functionality)
     async handleCrusaderArtifactsTransformation() {
         if (!this.heroSelection || !this.heroSelection.heroEquipmentManager) {
-            console.error('❌ Equipment manager not available for crusader transformation');
             return;
         }
 
@@ -2239,9 +2218,8 @@ class CrusaderArtifactsHandler {
 
         // Scan all hero positions for crusader artifacts
         for (const position of positions) {
-            const equipment = equipmentManager.getHeroEquipment(position);
-            
-            console.log(`🔍 Scanning ${position} hero equipment:`, equipment.map(e => e.name || e.cardName));
+            // Use the raw unsorted equipment array to get correct indices
+            const equipment = equipmentManager.heroEquipment[position] || [];
             
             for (let i = 0; i < equipment.length; i++) {
                 const item = equipment[i];
@@ -2256,15 +2234,12 @@ class CrusaderArtifactsHandler {
                         oldArtifact: itemName,
                         newArtifact
                     });
-                    console.log(`📋 Planned transformation: ${itemName} (index ${i}) → ${newArtifact} on ${position} hero`);
                 }
             }
         }
 
         // Execute all transformations
         if (transformations.length > 0) {
-            console.log(`🛡️ Transforming ${transformations.length} Crusader artifacts`);
-            
             // Collect affected positions for animation
             const affectedPositions = [...new Set(transformations.map(t => t.position))];
             
@@ -2284,12 +2259,6 @@ class CrusaderArtifactsHandler {
             for (const transformation of transformations) {
                 await this.executeCrusaderTransformationSilent(transformation);
             }
-            
-            // Debug: Final summary of all transformations
-            console.log('🛡️ CRUSADER TRANSFORMATION SUMMARY:');
-            transformations.forEach((t, i) => {
-                console.log(`  ${i + 1}. ${t.position} hero: ${t.oldArtifact} → ${t.newArtifact}`);
-            });
             
             // Play single unified animation for all transformations
             await this.playCrusaderTransformationAnimation(affectedPositions);
@@ -2314,35 +2283,22 @@ class CrusaderArtifactsHandler {
         const equipmentManager = this.heroSelection.heroEquipmentManager;
 
         try {
-            // Debug: show current equipment before removal
-            const beforeEquipment = equipmentManager.getHeroEquipment(position);
-            console.log(`🔄 Before removing index ${index} from ${position}:`, beforeEquipment.map(e => e.name || e.cardName));
-            
             // Remove the old artifact
             const removedItem = equipmentManager.removeArtifactFromHero(position, index);
             if (!removedItem) {
-                console.error(`❌ Failed to remove ${oldArtifact} from ${position} hero at index ${index}`);
                 return;
             }
-
-            console.log(`🗑️ Successfully removed: ${removedItem.name || removedItem.cardName} from ${position} at index ${index}`);
 
             // Add the new artifact (without cost)
             const success = await this.addCrusaderArtifactWithoutCost(position, newArtifact);
             if (!success) {
-                console.error(`❌ Failed to add ${newArtifact} to ${position} hero`);
                 // Try to restore the old artifact
                 equipmentManager.heroEquipment[position].splice(index, 0, removedItem);
                 return;
             }
 
-            // Debug: show final equipment after addition
-            const afterEquipment = equipmentManager.getHeroEquipment(position);
-            console.log(`✅ After adding ${newArtifact} to ${position}:`, afterEquipment.map(e => e.name || e.cardName));
-            console.log(`🔄 Transformation complete: ${oldArtifact} → ${newArtifact} on ${position} hero`);
-
         } catch (error) {
-            console.error(`❌ Error during crusader transformation:`, error);
+            // Error during transformation
         }
     }
 
@@ -2402,7 +2358,6 @@ class CrusaderArtifactsHandler {
         }
         
         if (heroSlots.length === 0) {
-            console.warn('⚠️ No hero slots found for crusader transformation animation');
             return;
         }
 
@@ -2640,7 +2595,6 @@ class CrusaderArtifactsHandler {
     reset() {
         this.battleManager = null;
         this.initialized = false;
-        console.log('🛡️ CrusaderArtifactsHandler reset');
     }
 }
 

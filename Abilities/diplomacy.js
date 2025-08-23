@@ -17,7 +17,7 @@ export class DiplomacyManager {
             return; // Only host processes Diplomacy effects
         }
 
-        console.log('🤝 Processing Diplomacy effects at battle start...');
+        console.log('ðŸ¤ Processing Diplomacy effects at battle start...');
         
         // Inject visual effect CSS
         this.injectDiplomacyAnimationCSS();
@@ -26,11 +26,11 @@ export class DiplomacyManager {
         const diplomacyHeroes = this.findHeroesWithDiplomacy();
         
         if (diplomacyHeroes.length === 0) {
-            console.log('🤝 No heroes with Diplomacy found');
+            console.log('ðŸ¤ No heroes with Diplomacy found');
             return;
         }
 
-        console.log(`🤝 Found ${diplomacyHeroes.length} heroes with Diplomacy ability`);
+        console.log(`ðŸ¤ Found ${diplomacyHeroes.length} heroes with Diplomacy ability`);
         
         // Collect all diplomacy operations before executing them
         const allDiplomacyOperations = [];
@@ -54,16 +54,16 @@ export class DiplomacyManager {
             // Wait for guest acknowledgment
             try {
                 await this.battleManager.waitForGuestAcknowledgment('diplomacy_complete', 1000);
-                console.log('🤝 Guest acknowledged diplomacy effects');
+                console.log('ðŸ¤ Guest acknowledged diplomacy effects');
             } catch (error) {
-                console.warn('🤝 Guest did not acknowledge diplomacy effects:', error);
+                console.warn('ðŸ¤ Guest did not acknowledge diplomacy effects:', error);
             }
         }
         
         // Summary log
         if (this.diplomacyThefts.size > 0) {
             this.battleManager.addCombatLog(
-                `🤝 Diplomacy effects complete! ${this.stolenCreatures.size} creatures recruited`,
+                `ðŸ¤ Diplomacy effects complete! ${this.stolenCreatures.size} creatures recruited`,
                 'info'
             );
         }
@@ -107,14 +107,14 @@ export class DiplomacyManager {
     async processDiplomacyForHero(diplomacyHero) {
         const { hero, stacks, side, position } = diplomacyHero;
         
-        console.log(`🤝 Processing Diplomacy for ${hero.name} (${stacks} stacks)`);
+        console.log(`ðŸ¤ Processing Diplomacy for ${hero.name} (${stacks} stacks)`);
         
         // Get all eligible enemy creatures (not already stolen)
         const eligibleTargets = this.getEligibleEnemyCreatures(hero);
         
         if (eligibleTargets.length === 0) {
             this.battleManager.addCombatLog(
-                `🤝 ${hero.name}'s Diplomacy finds no creatures to recruit`,
+                `ðŸ¤ ${hero.name}'s Diplomacy finds no creatures to recruit`,
                 side === 'player' ? 'info' : 'info'
             );
             return [];
@@ -126,7 +126,7 @@ export class DiplomacyManager {
         // Randomly select creatures to steal
         const selectedTargets = this.battleManager.getRandomChoices(eligibleTargets, creaturesToSteal);
         
-        console.log(`🤝 ${hero.name} will recruit ${selectedTargets.length} creatures`);
+        console.log(`ðŸ¤ ${hero.name} will recruit ${selectedTargets.length} creatures`);
         
         const operations = [];
         
@@ -144,7 +144,7 @@ export class DiplomacyManager {
         // Log the diplomacy action
         const logType = side === 'player' ? 'success' : 'error';
         this.battleManager.addCombatLog(
-            `🤝 ${hero.name} recruits ${selectedTargets.length} enemy creature(s) through Diplomacy!`,
+            `ðŸ¤ ${hero.name} recruits ${selectedTargets.length} enemy creature(s) through Diplomacy!`,
             logType
         );
         
@@ -231,6 +231,46 @@ export class DiplomacyManager {
         // Remove creature from original owner
         const stolenCreature = ownerHero.creatures.splice(creatureIndex, 1)[0];
         
+        // **NEW: Immediate DOM cleanup (like DarkGear does)**
+        // STEP 1: Remove ALL visual elements for this creature
+        const creatureElements = document.querySelectorAll(
+            `.${ownerHero.side}-slot.${ownerHero.position}-slot .creature-icon[data-creature-index="${creatureIndex}"]`
+        );
+        creatureElements.forEach(el => el.remove());
+        
+        // Also remove any floating damage numbers or effects related to this creature
+        const damageNumbers = document.querySelectorAll(
+            `.${ownerHero.side}-slot.${ownerHero.position}-slot .damage-number`
+        );
+        damageNumbers.forEach(el => {
+            if (el.textContent.includes(creature.name)) {
+                el.remove();
+            }
+        });
+        
+        // STEP 2: Update all remaining creature indices in the DOM
+        const remainingCreatures = document.querySelectorAll(
+            `.${ownerHero.side}-slot.${ownerHero.position}-slot .creature-icon`
+        );
+        remainingCreatures.forEach((el, index) => {
+            el.setAttribute('data-creature-index', index);
+        });
+        
+        // STEP 3: Force complete re-render of original hero's creatures to prevent ghost creatures
+        if (this.battleManager.battleScreen && this.battleManager.battleScreen.renderCreaturesAfterInit) {
+            // Clear and re-render to ensure no ghost creatures
+            const heroSlot = document.querySelector(`.${ownerHero.side}-slot.${ownerHero.position}-slot`);
+            if (heroSlot) {
+                const creaturesContainer = heroSlot.querySelector('.battle-hero-creatures');
+                if (creaturesContainer) {
+                    creaturesContainer.remove();
+                }
+            }
+            this.battleManager.battleScreen.renderCreaturesAfterInit();
+        } else {
+            this.battleManager.updateCreatureVisuals(ownerHero.side, ownerHero.position, ownerHero.creatures);
+        }
+        
         // Add special properties to track diplomacy recruitment
         stolenCreature.recruitedByDiplomacy = true;
         stolenCreature.originalOwner = ownerHero.name;
@@ -238,6 +278,13 @@ export class DiplomacyManager {
         
         // Add creature to diplomacy hero's army
         diplomacyHero.creatures.push(stolenCreature);
+        
+        // **NEW: Force re-render of diplomacy hero's creatures to show new creature**
+        if (this.battleManager.battleScreen && this.battleManager.battleScreen.renderCreaturesAfterInit) {
+            this.battleManager.battleScreen.renderCreaturesAfterInit();
+        } else {
+            this.battleManager.updateCreatureVisuals(diplomacyHero.side, diplomacyHero.position, diplomacyHero.creatures);
+        }
         
         // Update necromancy stacks if applicable
         if (diplomacyHero.hasAbility('Necromancy')) {
@@ -293,13 +340,13 @@ export class DiplomacyManager {
      * @param {Object} data - Diplomacy operations data from host
      */
     handleGuestDiplomacyEffects(data) {
-        console.log('🤝 GUEST: Processing diplomacy effects from host');
+        console.log('ðŸ¤ GUEST: Processing diplomacy effects from host');
         
         const { operations } = data;
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         
         if (!operations || !Array.isArray(operations)) {
-            console.error('🤝 GUEST: Invalid diplomacy operations received');
+            console.error('ðŸ¤ GUEST: Invalid diplomacy operations received');
             return;
         }
         
@@ -307,13 +354,7 @@ export class DiplomacyManager {
         for (const operation of operations) {
             this.processGuestDiplomacyOperation(operation, myAbsoluteSide);
         }
-        
-        // Re-render creature displays after all operations
-        if (this.battleManager.battleScreen && this.battleManager.battleScreen.renderCreaturesAfterInit) {
-            this.battleManager.battleScreen.renderCreaturesAfterInit();
-            console.log('🤝 GUEST: Re-rendered creatures after diplomacy effects');
-        }
-        
+                
         // Update necromancy displays if applicable
         if (this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.initializeNecromancyStackDisplays();
@@ -322,7 +363,7 @@ export class DiplomacyManager {
         // Send acknowledgment back to host
         this.battleManager.sendAcknowledgment('diplomacy_complete');
         
-        console.log(`🤝 GUEST: Processed ${operations.length} diplomacy operations`);
+        console.log(`ðŸ¤ GUEST: Processed ${operations.length} diplomacy operations`);
     }
 
     /**
@@ -349,15 +390,62 @@ export class DiplomacyManager {
             return;
         }
         
-        // Remove creature from original owner
+        // **NEW: Explicit DOM cleanup BEFORE array modification (like DarkGear does)**
+        // STEP 1: Remove ALL visual elements for this creature
+        const creatureElements = document.querySelectorAll(
+            `.${ownerLocalSide}-slot.${ownerData.position}-slot .creature-icon[data-creature-index="${originalIndex}"]`
+        );
+        creatureElements.forEach(el => {
+            console.log(`🤝 GUEST: Removing DOM element for ${creatureData.name}`);
+            el.remove();
+        });
+        
+        // Also remove any floating damage numbers or effects related to this creature
+        const damageNumbers = document.querySelectorAll(
+            `.${ownerLocalSide}-slot.${ownerData.position}-slot .damage-number`
+        );
+        damageNumbers.forEach(el => {
+            if (el.textContent.includes(creatureData.name)) {
+                el.remove();
+            }
+        });
+        
+        // STEP 2: Remove creature from original owner's array
         if (ownerHero.creatures && ownerHero.creatures.length > originalIndex) {
             const removedCreature = ownerHero.creatures.splice(originalIndex, 1)[0];
             console.log(`🤝 GUEST: Removed ${removedCreature.name} from ${ownerHero.name}`);
         } else {
             console.warn(`🤝 GUEST: Could not find creature at index ${originalIndex} for ${ownerHero.name}`);
+            // Fallback: remove from end if index is out of bounds
+            if (ownerHero.creatures && ownerHero.creatures.length > 0) {
+                ownerHero.creatures.splice(-1, 1);
+            }
         }
         
-        // Add creature to diplomat hero
+        // STEP 3: Update all remaining creature indices in the DOM
+        const remainingCreatures = document.querySelectorAll(
+            `.${ownerLocalSide}-slot.${ownerData.position}-slot .creature-icon`
+        );
+        remainingCreatures.forEach((el, index) => {
+            el.setAttribute('data-creature-index', index);
+        });
+        
+        // STEP 4: Force complete re-render of original hero's creatures to prevent ghost creatures
+        if (this.battleManager.battleScreen && this.battleManager.battleScreen.renderCreaturesAfterInit) {
+            // Clear and re-render to ensure no ghost creatures
+            const heroSlot = document.querySelector(`.${ownerLocalSide}-slot.${ownerData.position}-slot`);
+            if (heroSlot) {
+                const creaturesContainer = heroSlot.querySelector('.battle-hero-creatures');
+                if (creaturesContainer) {
+                    creaturesContainer.remove();
+                }
+            }
+            this.battleManager.battleScreen.renderCreaturesAfterInit();
+        } else {
+            this.battleManager.updateCreatureVisuals(ownerLocalSide, ownerData.position, ownerHero.creatures);
+        }
+        
+        // STEP 5: Add creature to diplomat hero
         const recruitedCreature = {
             ...creatureData,
             type: 'creature'
@@ -365,6 +453,13 @@ export class DiplomacyManager {
         
         diplomatHero.creatures.push(recruitedCreature);
         console.log(`🤝 GUEST: Added ${recruitedCreature.name} to ${diplomatHero.name}`);
+        
+        // STEP 6: Force re-render of diplomacy hero's creatures to show new creature
+        if (this.battleManager.battleScreen && this.battleManager.battleScreen.renderCreaturesAfterInit) {
+            this.battleManager.battleScreen.renderCreaturesAfterInit();
+        } else {
+            this.battleManager.updateCreatureVisuals(diplomatLocalSide, diplomatData.position, diplomatHero.creatures);
+        }
         
         // Update necromancy stacks if applicable
         if (diplomatHero.hasAbility && diplomatHero.hasAbility('Necromancy')) {
@@ -626,7 +721,7 @@ export class DiplomacyManager {
                 recruitedCreaturesFound += recruited.length;
                 
                 if (recruited.length > 0) {
-                    console.log(`🤝 ${hero.name} keeps ${recruited.length} recruited creature(s) from this battle`);
+                    console.log(`ðŸ¤ ${hero.name} keeps ${recruited.length} recruited creature(s) from this battle`);
                     
                     // Clear diplomacy flags for next battle
                     recruited.forEach(creature => {
@@ -639,7 +734,7 @@ export class DiplomacyManager {
         }
 
         if (recruitedCreaturesFound > 0) {
-            console.log(`🤝 Total: ${recruitedCreaturesFound} creatures remain with their new owners after battle`);
+            console.log(`ðŸ¤ Total: ${recruitedCreaturesFound} creatures remain with their new owners after battle`);
         }
 
         return recruitedCreaturesFound;
@@ -675,7 +770,7 @@ export class DiplomacyManager {
     reset() {
         this.stolenCreatures.clear();
         this.diplomacyThefts.clear();
-        console.log('🤝 Diplomacy manager reset for new battle');
+        console.log('ðŸ¤ Diplomacy manager reset for new battle');
     }
 
     /**

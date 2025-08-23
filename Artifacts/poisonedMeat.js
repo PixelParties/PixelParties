@@ -36,7 +36,7 @@ export const poisonedMeatArtifact = {
             return;
         }
         
-        // 🔧 FIX 1: Check gold cost and deduct it
+        // Check gold cost and deduct it
         const cardInfo = heroSelection.getCardInfo(this.cardName);
         const cost = cardInfo?.cost || 0;
         const playerGold = heroSelection.getGoldManager().getPlayerGold();
@@ -60,7 +60,7 @@ export const poisonedMeatArtifact = {
             return;
         }
         
-        // 🔧 FIX 1: Deduct gold cost if applicable
+        //  Deduct gold cost if applicable
         if (cost > 0) {
             heroSelection.getGoldManager().addPlayerGold(-cost, 'poisoned_meat_use');
             console.log(`🥩 Deducted ${cost} gold for PoisonedMeat use`);

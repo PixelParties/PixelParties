@@ -252,7 +252,7 @@ export class TheStormbladeEffect {
 
         // Animate the wind effect (this takes about 1600ms total)
         await this.animateWindSwap(side, position1, position2);
-        
+
         // ===== SWAP IN HERO REFERENCES =====
         heroes[position1] = hero2;
         heroes[position2] = hero1;
@@ -338,10 +338,10 @@ export class TheStormbladeEffect {
             this.battleManager.resistanceManager.swapResistanceStacks(side, position1, position2);
             console.log(`🌪️ Swapped resistance stacks between ${position1} and ${position2}`);
         }
-        
-        // ===== SWAP VISUAL ELEMENTS =====
+
+        // ===== SWAP VISUAL ELEMENTS ===== (MOVED TO AFTER ANIMATION)
         this.swapHeroVisuals(side, position1, position2);
-        
+                
         // ===== UPDATE DISPLAYS =====
         this.battleManager.updateHeroHealthBar(side, position1, hero2.currentHp, hero2.maxHp);
         this.battleManager.updateHeroHealthBar(side, position2, hero1.currentHp, hero1.maxHp);
@@ -531,23 +531,39 @@ export class TheStormbladeEffect {
     
     // Animate hero spinning movement to new position
     async animateSpinningMovement(heroElement, fromRect, toRect, duration = 1200) {
-        const deltaX = toRect.left - fromRect.left;
-        const deltaY = toRect.top - fromRect.top;
+        // Always target the battle-hero-card, which is the standard for battle animations
+        const heroCard = heroElement.querySelector('.battle-hero-card');
+        if (!heroCard) {
+            console.warn('Could not find .battle-hero-card element for wind animation');
+            return; // Skip animation if card element not found
+        }
         
-        // Apply spinning transition and transform
-        heroElement.style.transition = `transform ${duration}ms ease-in-out`;
-        heroElement.style.transform = `translate(${deltaX}px, ${deltaY}px) rotate(720deg) scale(1.1)`;
-        heroElement.style.zIndex = '550';
-        heroElement.style.filter = 'drop-shadow(0 0 15px rgba(135, 206, 250, 0.8))';
+        // Calculate relative movement between the two slots
+        const slot1Center = {
+            x: fromRect.left + fromRect.width / 2,
+            y: fromRect.top + fromRect.height / 2
+        };
+        const slot2Center = {
+            x: toRect.left + toRect.width / 2, 
+            y: toRect.top + toRect.height / 2
+        };
         
-        // Wait for animation
+        const deltaX = slot2Center.x - slot1Center.x;
+        const deltaY = slot2Center.y - slot1Center.y;
+        
+        // Apply animation consistently to the hero card
+        heroCard.style.transition = `transform ${duration}ms ease-in-out`;
+        heroCard.style.transform = `translate(${deltaX}px, ${deltaY}px) rotate(720deg) scale(1.1)`;
+        heroCard.style.zIndex = '1000';
+        heroCard.style.filter = 'drop-shadow(0 0 15px rgba(135, 206, 250, 0.8))';
+        
         await this.battleManager.delay(duration);
         
-        // Reset transform (actual position swap happens separately)
-        heroElement.style.transition = '';
-        heroElement.style.transform = '';
-        heroElement.style.zIndex = '';
-        heroElement.style.filter = '';
+        // Reset all styles on the same element
+        heroCard.style.transition = '';
+        heroCard.style.transform = '';
+        heroCard.style.zIndex = '';
+        heroCard.style.filter = '';
     }
     
     // Animate wind flow to follow hero movement

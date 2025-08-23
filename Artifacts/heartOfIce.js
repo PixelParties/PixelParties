@@ -22,7 +22,7 @@ export const heartOfIceArtifact = {
     // Metadata for the effect
     effectData: {
         trigger: 'on_damage_taken',
-        chance: 0.99,
+        chance: 0.2,
         statusEffect: 'frozen',
         stacks: 1,
         description: '20% chance to freeze random enemy when taking damage'
@@ -79,7 +79,7 @@ export function checkHeartOfIceEffects(battleManager, damagedHero, damage, damag
     // Each Heart of Ice rolls independently using seeded randomness
     let triggeredCount = 0;
     for (let i = 0; i < heartOfIceCount; i++) {
-        if (battleManager.randomnessManager.checkChance(99)) { // 20% chance using seeded randomness
+        if (battleManager.randomnessManager.checkChance(20)) { // 20% chance using seeded randomness
             triggeredCount++;
         }
     }

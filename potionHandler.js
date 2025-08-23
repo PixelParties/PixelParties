@@ -36,7 +36,8 @@ export class PotionHandler {
             'BottledFlame',
             'bottledLightning',
             'BoulderInABottle',
-            'SwordInABottle'
+            'SwordInABottle',
+            'AcidVial',
         ];
         
         return knownPotions.includes(cardName);
@@ -328,13 +329,20 @@ export class PotionHandler {
             case 'BoulderInABottle':
                 return await this.handleBoulderInABottleEffects(effects, playerRole, battleManager);
 
-            case 'SwordInABottle':  // <-- INDIVIDUAL FALLBACK PROCESSING
+            case 'SwordInABottle':  
                 return await this.handleSwordInABottleEffects(effects, playerRole, battleManager);
 
+            case 'AcidVial': 
+                return await this.handleAcidVialEffects(effects, playerRole, battleManager);
+                
+            case 'ExperimentalPotion':
+                return await this.handleExperimentalPotionEffects(effects, playerRole, battleManager);
+
             case 'ElixirOfImmortality':
-                // TODO: Implement when ElixirOfImmortality battle effects are added
-                console.log(`ElixirOfImmortality effects not yet implemented for battle`);
-                return 0;
+                return await this.handleElixirOfImmortality(effects, playerRole, battleManager);
+
+            case 'MonsterInABottle':
+                return await this.handleMonsterInABottleEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
@@ -342,6 +350,165 @@ export class PotionHandler {
                 return 0;
         }
     }
+
+    async handleMonsterInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the MonsterInABottle module
+            const { MonsterInABottlePotion } = await import('./Potions/monsterInABottle.js');
+            const monsterInABottlePotion = new MonsterInABottlePotion();
+            
+            // Delegate everything to the MonsterInABottle module
+            const effectsProcessed = await monsterInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ MonsterInABottle delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating MonsterInABottle effects for ${playerRole}:`, error);
+            
+            // Fallback: add generic creatures to player heroes
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive) {
+                    // Add a basic level 0 creature as fallback
+                    const fallbackCreature = {
+                        name: 'SkeletonMage',
+                        currentHp: 50,
+                        maxHp: 50,
+                        atk: 0,
+                        alive: true,
+                        type: 'creature',
+                        addedAt: Date.now(),
+                        statusEffects: [],
+                        temporaryModifiers: {},
+                        isMonsterInABottle: true,
+                        createdFromPotion: true
+                    };
+                    
+                    hero.creatures.unshift(fallbackCreature);
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`🎲 MonsterInABottle summoned creatures (fallback mode)`, 'info');
+            return effectCount;
+        }
+    }
+
+    async handleElixirOfImmortality(effects, playerRole, battleManager) {
+        try {
+            const { ElixirOfImmortality } = await import('./Potions/elixirOfImmortality.js');
+            const elixirOfImmortality = new ElixirOfImmortality();
+            
+            const effectsProcessed = await elixirOfImmortality.handlePotionEffectsForPlayer(
+                effects, playerRole, battleManager
+            );
+            
+            console.log(`✅ ElixirOfImmortality delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating ElixirOfImmortality effects for ${playerRole}:`, error);
+            return 0;
+        }
+    }
+
+    async handleExperimentalPotionEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the ExperimentalPotion module
+            const { ExperimentalPotionPotion } = await import('./Potions/experimentalPotion.js');
+            const experimentalPotionPotion = new ExperimentalPotionPotion();
+            
+            // Delegate everything to the ExperimentalPotion module
+            const effectsProcessed = await experimentalPotionPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ ExperimentalPotion delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating ExperimentalPotion effects for ${playerRole}:`, error);
+            
+            // Fallback: add a generic log message
+            const playerName = playerRole === 'host' ? 'Host' : 'Guest';
+            battleManager.addCombatLog(
+                `🧪 ${playerName}'s Experimental Potion failed to activate properly`, 
+                'warning'
+            );
+            
+            return effects.length;
+        }
+    }
+
+    async handleAcidVialEffects(effects, playerRole, battleManager) {
+    try {
+        // Import and use the AcidVial module
+        const { AcidVialPotion } = await import('./Potions/acidVial.js');
+        const acidVialPotion = new AcidVialPotion();
+        
+        // Delegate everything to the AcidVial module
+        const effectsProcessed = await acidVialPotion.handlePotionEffectsForPlayer(
+            effects, 
+            playerRole, 
+            battleManager
+        );
+        
+        console.log(`✅ AcidVial delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+        return effectsProcessed;
+        
+    } catch (error) {
+        console.error(`Error delegating AcidVial effects for ${playerRole}:`, error);
+        
+        // Fallback: try basic damage and heal-block application
+        const enemyHeroes = playerRole === 'host' ? 
+            Object.values(battleManager.opponentHeroes) : 
+            Object.values(battleManager.playerHeroes);
+            
+        const effectCount = effects.length;
+        const damagePerVial = 100;
+        const healBlockPerVial = 3;
+        const totalDamage = damagePerVial * effectCount;
+        const totalHealBlock = healBlockPerVial * effectCount;
+        let fallbackTargets = 0;
+        
+        for (const hero of enemyHeroes) {
+            if (hero && hero.alive) {
+                // Apply damage
+                if (battleManager.isAuthoritative) {
+                    await battleManager.authoritative_applyDamage({
+                        target: hero,
+                        damage: totalDamage,
+                        newHp: Math.max(0, hero.currentHp - totalDamage),
+                        died: (hero.currentHp - totalDamage) <= 0
+                    }, { source: 'acid' });
+                }
+                
+                // Apply heal-block
+                if (battleManager.statusEffectsManager) {
+                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'healblock', totalHealBlock);
+                }
+                
+                fallbackTargets++;
+            }
+        }
+        
+        battleManager.addCombatLog(`🧪 Acid Vial effects applied (+${totalDamage} damage, +${totalHealBlock} heal-block to ${fallbackTargets} heroes)`, 'info');
+        return effectCount;
+    }
+}
 
     async handleElixirOfStrengthEffects(effects, playerRole, battleManager) {
         try {

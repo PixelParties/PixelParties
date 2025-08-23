@@ -83,6 +83,6 @@ export const gameConfig = {
     ],
     charactersPath: './Cards/Characters/',
     roomTimeout: 60000000, // 1000 minutes
-    activityTimeout: 3000000, // 50 minutes
+    activityTimeout: 300000, // 5 minutes
     activityInterval: 30000 // 30 seconds
 };

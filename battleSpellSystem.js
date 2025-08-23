@@ -19,6 +19,16 @@ import ChallengeSpell from './Spells/challenge.js';
 import MountainTearRiverSpell from './Spells/mountainTearRiver.js';
 import VampireOnFireSpell from './Spells/vampireOnFire.js';
 import PhoenixBombardmentSpell from './Spells/phoenixBombardment.js';
+import UltimateDestroyerPunchSpell from './Spells/ultimateDestroyerPunch.js';
+import GloriousRebirthSpell from './Spells/gloriousRebirth.js';
+import CrashLandingSpell from './Spells/crashLanding.js';
+import StoneskinSpell from './Spells/stoneskin.js';
+import HealingMelodySpell from './Spells/healingMelody.js'; 
+import ThievingStrikeSpell from './Spells/thievingStrike.js';
+import BurningFingerSpell from './Spells/burningFinger.js';
+import CoolnessOverchargeSpell from './Spells/coolnessOvercharge.js';
+import { TrialOfCoolnessSpell } from './Spells/trialOfCoolness.js';
+import CurseSpell from './Spells/curse.js';
 
 
 
@@ -33,8 +43,6 @@ export class BattleSpellSystem {
         // Spell implementations registry
         this.spellImplementations = new Map();
         this.initializeSpellImplementations();
-        
-        console.log('🔮 BattleSpellSystem initialized with spell implementations');
     }
 
     initializeSpellImplementations() {
@@ -115,7 +123,45 @@ export class BattleSpellSystem {
         const phoenixBombardment = new PhoenixBombardmentSpell(this.battleManager);
         this.spellImplementations.set('PhoenixBombardment', phoenixBombardment);
 
-        console.log(`🔮 Registered ${this.spellImplementations.size} spell implementations`);
+        // Register UltimateDestroyerPunch (Fighting spell)
+        const ultimateDestroyerPunch = new UltimateDestroyerPunchSpell(this.battleManager);
+        this.spellImplementations.set('UltimateDestroyerPunch', ultimateDestroyerPunch);
+
+        // Register GloriousRebirth
+        const gloriousRebirth = new GloriousRebirthSpell(this.battleManager);
+        this.spellImplementations.set('GloriousRebirth', gloriousRebirth);
+
+        // Register CrashLanding (Fighting spell)
+        const crashLanding = new CrashLandingSpell(this.battleManager);
+        this.spellImplementations.set('CrashLanding', crashLanding);
+
+        // Register Stoneskin
+        const stoneskin = new StoneskinSpell(this.battleManager);
+        this.spellImplementations.set('Stoneskin', stoneskin);
+
+        // Register HealingMelody
+        const healingMelody = new HealingMelodySpell(this.battleManager);
+        this.spellImplementations.set('HealingMelody', healingMelody);
+
+        // Register ThievingStrike (Fighting spell)
+        const thievingStrike = new ThievingStrikeSpell(this.battleManager);
+        this.spellImplementations.set('ThievingStrike', thievingStrike);
+
+        // Register BurningFinger
+        const burningFinger = new BurningFingerSpell(this.battleManager);
+        this.spellImplementations.set('BurningFinger', burningFinger);
+
+        // Register CoolnessOvercharge (Fighting spell)
+        const coolnessOvercharge = new CoolnessOverchargeSpell(this.battleManager);
+        this.spellImplementations.set('CoolnessOvercharge', coolnessOvercharge);
+
+        // Register TrialOfCoolness (Fighting spell)
+        const trialOfCoolness = new TrialOfCoolnessSpell(this.battleManager);
+        this.spellImplementations.set('TrialOfCoolness', trialOfCoolness);
+
+        // Register Curse
+        const curse = new CurseSpell(this.battleManager);
+        this.spellImplementations.set('Curse', curse);
     }
 
     // ============================================
@@ -130,7 +176,6 @@ export class BattleSpellSystem {
         
         if (this.battleManager.statusEffectsManager && 
             !this.battleManager.statusEffectsManager.canCastSpells(hero)) {
-            console.log(`🔇 ${hero.name} is silenced and cannot cast spells!`);
             return null;
         }
         
@@ -147,7 +192,6 @@ export class BattleSpellSystem {
         });
 
         if (castableSpells.length === 0) {
-            console.log(`🔮 ${hero.name} has ${allSpells.length} spells, but none are castable in combat (all Equip/Trap)`);
             return null; // No castable spells
         }
 
@@ -161,7 +205,6 @@ export class BattleSpellSystem {
                 if (spellImpl.canCast && typeof spellImpl.canCast === 'function') {
                     const canCast = spellImpl.canCast(hero);
                     if (!canCast) {
-                        console.log(`🚫 ${hero.name} cannot cast ${spell.name} - conditions not met`);
                         return false;
                     }
                 }
@@ -171,11 +214,8 @@ export class BattleSpellSystem {
         });
 
         if (availableSpells.length === 0) {
-            console.log(`🔮 ${hero.name} has ${castableSpells.length} castable spells, but none can be used right now (conditions not met)`);
             return null; // No spells can be cast right now
         }
-
-        console.log(`🔮 ${hero.name} has ${availableSpells.length}/${castableSpells.length} available spells, checking for casting...`);
 
         // Sort spells by level (higher level first)
         const sortedSpells = this.sortSpellsByLevel(availableSpells);
@@ -190,17 +230,13 @@ export class BattleSpellSystem {
             // Roll for spell casting using battleManager's deterministic randomness
             const roll = this.battleManager.getRandom();
             
-            console.log(`🎲 ${hero.name} rolling for ${spell.name}: ${roll.toFixed(3)} vs ${castingChance.toFixed(3)}`);
-            
             if (roll <= castingChance) {
                 // Hero casts this spell!
-                console.log(`✨ ${hero.name} will cast ${spell.name}!`);
                 return spell;
             }
         }
         
         // No spell was cast
-        console.log(`⚔️ ${hero.name} will attack normally (no spells cast)`);
         return null;
     }
 
@@ -233,8 +269,6 @@ export class BattleSpellSystem {
             
             // Add to final list
             sortedSpells.push(...shuffledSpells);
-            
-            console.log(`📊 Level ${level}: ${shuffledSpells.map(s => s.name).join(', ')}`);
         });
         
         return sortedSpells;
@@ -257,14 +291,10 @@ export class BattleSpellSystem {
             for (let i = 0; i < abilityLevel; i++) {
                 chance *= 0.9;
             }
-            
-            console.log(`🎯 ${hero.name} has ${spellSchool} level ${abilityLevel}, reduced chance to ${chance.toFixed(4)}`);
         }
         
         // Invert the chance (0.9 becomes 0.1, 0.81 becomes 0.19, etc.)
         const finalChance = 1 - chance;
-        
-        console.log(`🔄 Final casting chance for ${spell.name}: ${finalChance.toFixed(4)} (${(finalChance * 100).toFixed(2)}%)`);
         
         return finalChance;
     }
@@ -274,7 +304,7 @@ export class BattleSpellSystem {
     // ============================================
 
     // Execute spell casting (for now just adds to battle log)
-    executeSpellCasting(hero, spell) {
+    async executeSpellCasting(hero, spell) {
         const heroSide = hero.side;
         const logType = heroSide === 'player' ? 'success' : 'error';
         
@@ -311,8 +341,7 @@ export class BattleSpellSystem {
             timestamp: Date.now()
         });
         
-        // Add actual spell effects here in the future
-        this.executeSpellEffects(hero, spell);
+        await this.executeSpellEffects(hero, spell);
     }
 
     // Placeholder for future spell effects implementation
@@ -323,26 +352,21 @@ export class BattleSpellSystem {
         if (this.spellImplementations.has(spellName)) {
             const spellImpl = this.spellImplementations.get(spellName);
             
-            console.log(`🪄 Executing ${spellName} with dedicated implementation`);
-            
             try {
                 // Execute the spell with its specific implementation
                 await spellImpl.executeSpell(hero, spell);
             } catch (error) {
-                console.error(`Error executing ${spellName}:`, error);
                 // Fallback to generic spell behavior
                 this.executeGenericSpellEffect(hero, spell);
             }
         } else {
             // No specific implementation - use generic behavior
-            console.log(`🪄 ${spellName} using generic spell behavior (no implementation yet)`);
             this.executeGenericSpellEffect(hero, spell);
         }
     }
 
     executeGenericSpellEffect(hero, spell) {
         // Generic spell behavior - just consume the turn for now
-        console.log(`⭐ ${hero.name} casts ${spell.name} (generic effect)`);
         
         // Could add basic visual effect here
         const heroElement = this.battleManager.getHeroElement(hero.side, hero.position);
@@ -407,34 +431,41 @@ export class BattleSpellSystem {
         }
         
         // Filter for Fighting spells only
-        const fightingSpells = allSpells.filter(spell => spell.spellSchool === 'Fighting');
+        const fightingSpells = allSpells.filter(spell => spell.spellSchool === 'Fighting' && spell.name !== 'CrashLanding');
         if (fightingSpells.length === 0) {
             return;
         }
         
-        console.log(`⚔️ ${attacker.name} checking ${fightingSpells.length} Fighting spells for triggers...`);
-        
         // Check each Fighting spell for triggers and execute immediately
         for (const spell of fightingSpells) {
-            // Calculate trigger chance using existing logic
-            const triggerChance = this.calculateSpellCastingChance(attacker, spell);
+            let triggerChance;
             
-            // Roll for trigger
-            const roll = this.battleManager.getRandom();
+            // Check if spell implementation has custom trigger logic
+            const spellImpl = this.spellImplementations.get(spell.name);
+            if (spellImpl && spellImpl.getTriggerChance && typeof spellImpl.getTriggerChance === 'function') {
+                // Use custom trigger chance from spell implementation
+                triggerChance = spellImpl.getTriggerChance(attacker, target, damage);
+            } else {
+                // Use default trigger chance calculation
+                triggerChance = this.calculateSpellCastingChance(attacker, spell);
+            }
             
-            if (roll <= triggerChance) {
-                console.log(`✨ ${attacker.name}'s ${spell.name} triggered!`);
-                
+            // Skip if no chance to trigger
+            if (triggerChance <= 0) {
+                continue;
+            }
+            
+            // Roll for trigger (unless it's 100% chance)
+            const shouldTrigger = triggerChance >= 1.0 || this.battleManager.getRandom() <= triggerChance;
+            
+            if (shouldTrigger) {
                 // Find the spell implementation and execute its effect
-                const spellImpl = this.spellImplementations.get(spell.name);
                 if (spellImpl && spellImpl.executeEffect) {
                     try {
                         await spellImpl.executeEffect(attacker, target, damage);
                     } catch (error) {
-                        console.error(`Error executing Fighting spell ${spell.name}:`, error);
+                        // Error handled silently
                     }
-                } else {
-                    console.warn(`⚠️ No implementation found for Fighting spell: ${spell.name}`);
                 }
                 
                 // Track statistics
@@ -488,8 +519,6 @@ export class BattleSpellSystem {
             timestamp: Date.now(),
             isGuestSide: true
         });
-        
-        console.log(`🪄 GUEST: ${heroName} cast ${spellName} (Level ${spellLevel}, ${spellSchool})`);
     }
 
     handleGuestSpellEffect(data) {
@@ -499,21 +528,14 @@ export class BattleSpellSystem {
         if (this.spellImplementations.has(spellName)) {
             const spellImpl = this.spellImplementations.get(spellName);
             
-            console.log(`🪄 GUEST: Handling ${spellName} effect with dedicated implementation`);
-            
             try {
                 // Let the spell implementation handle the guest-side effect
                 if (spellImpl.handleGuestSpellEffect) {
                     spellImpl.handleGuestSpellEffect(data);
-                } else {
-                    console.log(`🪄 GUEST: ${spellName} has no guest-side effect handler`);
                 }
             } catch (error) {
-                console.error(`GUEST: Error handling ${spellName} effect:`, error);
+                // Error handled silently
             }
-        } else {
-            console.log(`🪄 GUEST: ${spellName} has no specific implementation`);
-            // Could add generic guest-side effect here
         }
     }
 
@@ -565,13 +587,11 @@ export class BattleSpellSystem {
     // Test spell casting probabilities (development only)
     testSpellCastingProbabilities(hero, iterations = 1000) {
         if (!this.battleManager.randomnessInitialized) {
-            console.warn('Randomness not initialized for testing');
             return null;
         }
         
         const allSpells = hero.getAllSpells();
         if (!allSpells || allSpells.length === 0) {
-            console.log(`${hero.name} has no spells to test`);
             return null;
         }
         
@@ -625,17 +645,7 @@ export class BattleSpellSystem {
 
     // Log current spell system status
     logSystemStatus() {
-        console.log('🔮 Battle Spell System Status:');
-        console.log(`- Spells cast this battle: ${this.spellsCastThisBattle}`);
-        console.log(`- Battle manager connected: ${!!this.battleManager}`);
-        console.log(`- Randomness initialized: ${this.battleManager?.randomnessInitialized || false}`);
-        
-        if (this.spellCastHistory.length > 0) {
-            console.log('- Recent spell casts:');
-            this.spellCastHistory.slice(-5).forEach(entry => {
-                console.log(`  ${entry.hero} cast ${entry.spell} (Turn ${entry.turn})`);
-            });
-        }
+        // Status logging removed
     }
 
     // ============================================
@@ -646,7 +656,6 @@ export class BattleSpellSystem {
     reset() {
         this.spellsCastThisBattle = 0;
         this.spellCastHistory = [];
-        console.log('🔮 BattleSpellSystem reset');
     }
 
     // Cleanup (called when battle manager is destroyed)
@@ -665,7 +674,6 @@ export class BattleSpellSystem {
         
         this.battleManager = null;
         this.reset();
-        console.log('🔮 BattleSpellSystem cleaned up');
     }
 
     getRegisteredSpells() {
@@ -700,7 +708,6 @@ export class BattleSpellSystem {
         this.spellsCastThisBattle = state.spellsCastThisBattle || 0;
         this.spellCastHistory = state.spellCastHistory || [];
         
-        console.log(`🔮 BattleSpellSystem state restored: ${this.spellsCastThisBattle} spells cast`);
         return true;
     }
 

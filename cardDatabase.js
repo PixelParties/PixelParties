@@ -178,7 +178,7 @@ const CARD_DATABASE = {
         name: 'CrumTheClassPet',
         image: './Cards/All/CrumTheClassPet.png',
         cardType: 'Spell',
-        level: 0,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -203,17 +203,20 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 80
+        hp: 80,
+        physicalAttack: false
     },
-    'LootThePrincess': {
-        name: 'LootThePrincess',
-        image: './Cards/All/LootThePrincess.png',
+    'GrinningCat': {
+        name: 'GrinningCat',
+        image: './Cards/All/GrinningCat.png',
         cardType: 'Spell',
         level: 1,
         cost: 0,
         action: true,
-        spellSchool: 'Fighting',
-        subtype: null
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 120,
+        physicalAttack: false
     },
     'MoonlightButterfly': {
         name: 'MoonlightButterfly',
@@ -224,13 +227,14 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 10
+        hp: 10,
+        physicalAttack: false
     },
     'PhoenixBombardment': {
         name: 'PhoenixBombardment',
         image: './Cards/All/PhoenixBombardment.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -390,7 +394,7 @@ const CARD_DATABASE = {
         name: 'RainOfArrows',
         image: './Cards/All/RainOfArrows.png',
         cardType: 'Spell',
-        level: 1,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
@@ -416,7 +420,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 1
+        hp: 1,
+        physicalAttack: false
     },
     'ElixirOfCold': {
         name: 'ElixirOfCold',
@@ -441,7 +446,7 @@ const CARD_DATABASE = {
         name: 'HeartOfIce',
         image: './Cards/All/HeartOfIce.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 4,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -495,7 +500,18 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: true
+    },
+    'BurningFinger': {
+        name: 'BurningFinger',
+        image: './Cards/All/BurningFinger.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
+        subtype: null
     },
     'Fireball': {
         name: 'Fireball',
@@ -541,7 +557,7 @@ const CARD_DATABASE = {
         name: 'VampireOnFire',
         image: './Cards/All/VampireOnFire.png',
         cardType: 'Spell',
-        level: 1,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -632,7 +648,7 @@ const CARD_DATABASE = {
         name: 'CoolCheese',
         image: './Cards/All/CoolCheese.png',
         cardType: 'Artifact',
-        cost: 4,
+        cost: 10,
         action: false,
         spellSchool: null,
         subtype: null
@@ -643,15 +659,15 @@ const CARD_DATABASE = {
         cardType: 'Spell',
         level: 0,
         cost: 0,
-        action: false,
-        spellSchool: 'DecayMagic',
-        subtype: 'Quick'
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
     },
     'CoolPresents': {
         name: 'CoolPresents',
         image: './Cards/All/CoolPresents.png',
         cardType: 'Artifact',
-        cost: 4,
+        cost: 6,
         action: false,
         spellSchool: null,
         subtype: null
@@ -659,20 +675,21 @@ const CARD_DATABASE = {
     'CrashLanding': {
         name: 'CrashLanding',
         image: './Cards/All/CrashLanding.png',
-        cardType: 'Artifact',
-        cost: 4,
-        action: false,
-        spellSchool: null,
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
         subtype: null
     },
     'GloriousRebirth': {
         name: 'GloriousRebirth',
         image: './Cards/All/GloriousRebirth.png',
         cardType: 'Spell',
-        level: 0,
+        level: 4,
         cost: 0,
         action: true,
-        spellSchool: 'SummoningMagic',
+        spellSchool: 'SupportMagic',
         subtype: null
     },
     'LifeSerum': {
@@ -688,17 +705,17 @@ const CARD_DATABASE = {
         name: 'TrialOfCoolness',
         image: './Cards/All/TrialOfCoolness.png',
         cardType: 'Spell',
-        level: 1,
+        level: 2,
         cost: 0,
         action: true,
-        spellSchool: 'SummoningMagic',
+        spellSchool: 'Fighting',
         subtype: null
     },
     'UltimateDestroyerPunch': {
         name: 'UltimateDestroyerPunch',
         image: './Cards/All/UltimateDestroyerPunch.png',
         cardType: 'Spell',
-        level: 2,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
@@ -760,9 +777,9 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: null
     },
-    'PressedSkill': {
-        name: 'PressedSkill',
-        image: './Cards/All/PressedSkill.png',
+    'AcidVial': {
+        name: 'AcidVial',
+        image: './Cards/All/AcidVial.png',
         cardType: 'Potion',
         cost: 0,
         action: false,
@@ -837,13 +854,23 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: null
     },
+    'Wheels': {
+        name: 'Wheels',
+        image: './Cards/All/Wheels.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        exclusive: true
+    },
 
     // Sid's Cards
     'MagicAmethyst': {
         name: 'MagicAmethyst',
         image: './Cards/All/MagicAmethyst.png',
         cardType: 'Artifact',
-        cost: 10,
+        cost: 2,
         action: false,
         spellSchool: null,
         subtype: null
@@ -852,7 +879,7 @@ const CARD_DATABASE = {
         name: 'MagicCobalt',
         image: './Cards/All/MagicCobalt.png',
         cardType: 'Artifact',
-        cost: 1,
+        cost: 2,
         action: false,
         spellSchool: null,
         subtype: null
@@ -861,16 +888,17 @@ const CARD_DATABASE = {
         name: 'MagicEmerald',
         image: './Cards/All/MagicEmerald.png',
         cardType: 'Artifact',
-        cost: 6,
+        cost: 4,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        exclusive: true
     },
     'MagicRuby': {
         name: 'MagicRuby',
         image: './Cards/All/MagicRuby.png',
         cardType: 'Artifact',
-        cost: 10,
+        cost: 4,
         action: false,
         spellSchool: null,
         subtype: null
@@ -879,7 +907,7 @@ const CARD_DATABASE = {
         name: 'MagicSapphire',
         image: './Cards/All/MagicSapphire.png',
         cardType: 'Artifact',
-        cost: 10,
+        cost: 4,
         action: false,
         spellSchool: null,
         subtype: null
@@ -888,10 +916,11 @@ const CARD_DATABASE = {
         name: 'MagicTopaz',
         image: './Cards/All/MagicTopaz.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 2,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        exclusive: true
     },
     'Thieving': {
         name: 'Thieving',
@@ -923,13 +952,14 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: true
     },
     'Cavalry': {
         name: 'Cavalry',
         image: './Cards/All/Cavalry.png',
         cardType: 'Spell',
-        level: 0,
+        level: 3,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -964,13 +994,14 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: true
     },
     'FuriousAnger': {
         name: 'FuriousAnger',
         image: './Cards/All/FuriousAnger.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
@@ -1014,7 +1045,7 @@ const CARD_DATABASE = {
         name: 'LegendarySwordOfABarbarianKing',
         image: './Cards/All/LegendarySwordOfABarbarianKing.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 10,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -1051,7 +1082,7 @@ const CARD_DATABASE = {
         name: 'TheMastersSword',
         image: './Cards/All/TheMastersSword.png',
         cardType: 'Artifact',
-        cost: 5,
+        cost: 8,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -1060,7 +1091,7 @@ const CARD_DATABASE = {
         name: 'TheStormblade',
         image: './Cards/All/TheStormblade.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 10,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -1103,7 +1134,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: true
     },
     'SkeletonBard': {
         name: 'SkeletonBard',
@@ -1125,24 +1157,26 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: true
     },
     'SkeletonMage': {
         name: 'SkeletonMage',
         image: './Cards/All/SkeletonMage.png',
         cardType: 'Spell',
-        level: 0,
+        level: 2,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: false
     },
     'SkeletonNecromancer': {
         name: 'SkeletonNecromancer',
         image: './Cards/All/SkeletonNecromancer.png',
         cardType: 'Spell',
-        level: 5,
+        level: 4,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1158,7 +1192,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 50
+        hp: 50,
+        physicalAttack: true
     },
 
 
@@ -1235,11 +1270,30 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: null
     },
+    'Training': {
+        name: 'Training',
+        image: './Cards/All/Training.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
     'Iceage': {
         name: 'Iceage',
         image: './Cards/All/Iceage.png',
         cardType: 'Spell',
-        level: 0,
+        level: 5,
+        cost: 0,
+        action: true,
+        spellSchool: 'DecayMagic',
+        subtype: null
+    },
+    'Curse': {
+        name: 'Curse',
+        image: './Cards/All/Curse.png',
+        cardType: 'Spell',
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
@@ -1258,7 +1312,7 @@ const CARD_DATABASE = {
         name: 'DarkGear',
         image: './Cards/All/DarkGear.png',
         cardType: 'Artifact',
-        cost: 4,
+        cost: 6,
         action: false,
         spellSchool: null,
         subtype: "Permanent"
@@ -1312,6 +1366,11 @@ export function getCardInfo(cardName) {
     // Only add exclusive if it exists (for spell cards)
     if (cardInfo.exclusive !== undefined) {
         baseInfo.exclusive = cardInfo.exclusive;
+    }
+    
+    // Only add isPhysical if it exists (for spell cards)
+    if (cardInfo.isPhysical !== undefined) {
+        baseInfo.isPhysical = cardInfo.isPhysical;
     }
 
     // Add hero-specific properties if this is a hero card

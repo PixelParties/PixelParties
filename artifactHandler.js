@@ -22,16 +22,12 @@ export class ArtifactHandler {
 
     // Set an exclusive artifact as active
     setExclusiveArtifactActive(cardName) {
-        console.log(`🔐 Setting exclusive artifact active: ${cardName}`);
         this.exclusiveArtifactActive = cardName;
         this.exclusiveActivatedAt = Date.now();
     }
 
     // Clear the active exclusive artifact
     clearExclusiveArtifactActive() {
-        if (this.exclusiveArtifactActive) {
-            console.log(`🔓 Clearing exclusive artifact: ${this.exclusiveArtifactActive}`);
-        }
         this.exclusiveArtifactActive = null;
         this.exclusiveActivatedAt = null;
     }
@@ -141,7 +137,6 @@ export class ArtifactHandler {
         };
         
         this.permanentArtifacts.push(permanentArtifact);
-        console.log(`📋 Added permanent artifact: ${cardName}. Total: ${this.permanentArtifacts.length}`);
     }
 
     // Generate unique ID for permanent artifacts
@@ -163,7 +158,6 @@ export class ArtifactHandler {
     resetPermanentArtifacts() {
         const count = this.permanentArtifacts.length;
         this.permanentArtifacts = [];
-        console.log(`🗑️ Reset ${count} permanent artifacts for new game`);
     }
 
 
@@ -262,6 +256,7 @@ export class ArtifactHandler {
     async handleGenericArtifactClick(cardIndex, cardName, heroSelection) {
         try {
             const moduleName = this.cardNameToModuleName(cardName);
+            
             const artifact = await this.loadArtifact(moduleName);
             
             if (artifact && artifact.handleClick) {
@@ -290,10 +285,6 @@ export class ArtifactHandler {
         if (stateData) {
             this.exclusiveArtifactActive = stateData.exclusiveArtifactActive || null;
             this.exclusiveActivatedAt = stateData.exclusiveActivatedAt || null;
-            
-            if (this.exclusiveArtifactActive) {
-                console.log(`🔐 Restored exclusive artifact state: ${this.exclusiveArtifactActive}`);
-            }
         }
     }
 
@@ -309,7 +300,6 @@ export class ArtifactHandler {
     importPermanentArtifactsState(stateData) {
         if (stateData && Array.isArray(stateData.permanentArtifacts)) {
             this.permanentArtifacts = [...stateData.permanentArtifacts];
-            console.log(`📋 Restored ${this.permanentArtifacts.length} permanent artifacts`);
             return true;
         }
         return false;
@@ -346,7 +336,7 @@ export class ArtifactHandler {
     }
 
     cardNameToModuleName(cardName) {
-        return cardName.charAt(0).toLowerCase() + cardName.slice(1);
+        return (cardName.charAt(0).toLowerCase() + cardName.slice(1));
     }
 
     formatCardName(cardName) {
@@ -357,7 +347,7 @@ export class ArtifactHandler {
     }
 
     isDraggableArtifact(cardName) {
-        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat'];
+        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald'];
         return draggableArtifacts.includes(cardName);
     }
 
@@ -366,7 +356,7 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat'];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald'];
         return clickableArtifacts.includes(cardName);
     }
 
@@ -376,7 +366,7 @@ export class ArtifactHandler {
     }
 
     async preloadAllArtifacts() {
-        const knownArtifacts = ['treasureChest', 'magneticGlove', 'poisonedMeat'];
+        const knownArtifacts = ['treasureChest', 'magneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald'];
         
         const loadPromises = knownArtifacts.map(async (moduleName) => {
             try {
@@ -413,7 +403,6 @@ export class ArtifactHandler {
     reset() {
         this.resetExclusiveState();
         this.resetPermanentArtifacts();
-        console.log('🗑️ ArtifactHandler reset for new game');
     }
 
     validateArtifactModule(artifact, moduleName) {

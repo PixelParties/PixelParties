@@ -1,14 +1,12 @@
-// cardPreviewManager.js - Enhanced with Reward Screen Dedicated Tooltip Support (Fixed Layout)
+// cardPreviewManager.js - Enhanced with Reward Screen Dedicated Tooltip Support (Fixed Layout) and Deck Tooltip Positioning
 
 export class CardPreviewManager {
     constructor() {
         this.cardPreviewVisible = false;
         this.currentlyPreviewedCharacter = null;
-        
-        console.log('CardPreviewManager initialized');
     }
 
-    // Enhanced showCardTooltip with reward screen detection
+    // Enhanced showCardTooltip with reward screen detection and deck card positioning
     showCardTooltip(cardData, cardElement) {
         // Check if we're in reward screen first
         const isRewardScreen = document.getElementById('cardRewardOverlay');
@@ -23,6 +21,18 @@ export class CardPreviewManager {
         const isTeamBuilding = document.querySelector('.team-building-container');
         
         if (isDeckTooltip && isTeamBuilding) {
+            // Check if this is a deck card specifically
+            const isDeckCard = cardElement && cardElement.closest('.deck-grid-container');
+            
+            // Apply deck card specific positioning
+            if (isDeckCard) {
+                // Deck cards: far to the left (30% + base offset)
+                isDeckTooltip.style.setProperty('right', 'calc(50px + 30vw)', 'important');
+            } else {
+                // Hand/Hero cards: slightly to the left (5% + base offset)
+                isDeckTooltip.style.setProperty('right', 'calc(50px + 3.4vw)', 'important');
+            }
+            
             // Use the dedicated deck tooltip container
             this.showDeckTooltip(cardData);
             return;
@@ -107,14 +117,11 @@ export class CardPreviewManager {
         
         // Position the tooltip
         this.positionCardTooltipFixed(tooltipContainer, tooltipContent);
-        
-        console.log(`Showing large card tooltip for: ${cardData.displayName} (z-index: ${tooltipContainer.style.zIndex})`);
     }
 
     showDeckTooltip(cardData) {
         const tooltipContent = document.getElementById('deckTooltipContent');
         if (!tooltipContent) {
-            console.warn('Deck tooltip content container not found!');
             return;
         }
         
@@ -154,8 +161,6 @@ export class CardPreviewManager {
         
         tooltipContent.innerHTML = cardHTML;
         tooltipContent.style.display = 'flex';
-        
-        console.log(`Showing deck tooltip for: ${cardData.displayName}`);
     }
 
     forceLayoutRecalculation() {
@@ -245,11 +250,9 @@ export class CardPreviewManager {
                 <p style="font-size: 14px; margin: 0; font-style: italic; color: rgba(255, 255, 255, 0.6);">Hover over any card to preview</p>
             </div>
         `;
-        
-        console.log('Hiding reward screen preview (stable layout)');
     }
 
-    // Enhanced hideCardTooltip with reward screen support
+    // Enhanced hideCardTooltip with reward screen support and deck positioning reset
     hideCardTooltip() {
         // Check if we're in reward screen first
         const isRewardScreen = document.getElementById('cardRewardOverlay');
@@ -257,6 +260,12 @@ export class CardPreviewManager {
         if (isRewardScreen) {
             this.hideRewardScreenPreview();
             return;
+        }
+        
+        // Reset deck tooltip positioning when hiding (default to hand/hero positioning)
+        const isDeckTooltip = document.getElementById('deckTooltipAnchor');
+        if (isDeckTooltip) {
+            isDeckTooltip.style.setProperty('right', 'calc(50px + 5vw)', 'important');
         }
         
         // Hide deck tooltip if it exists
@@ -317,7 +326,7 @@ export class CardPreviewManager {
         }
     }
 
-    // FIXED position tooltip for battle screen with measured dimensions
+    // position tooltip for battle screen with measured dimensions
     positionTooltipForGameScreenFixed(tooltipContent, tooltipWidth, tooltipHeight) {
         const deckColumn = document.querySelector('.team-building-right');
         if (!deckColumn) {
@@ -344,8 +353,6 @@ export class CardPreviewManager {
             
             const width = deckColumn.offsetWidth;
             const height = deckColumn.offsetHeight;
-            
-            console.log('Deck position via offset:', { left, top, width, height });
             
             if (width === 0 || left === 0) {
                 // Still invalid, use fallback
@@ -417,7 +424,6 @@ export class CardPreviewManager {
         const finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2));
 
         this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false);
-        console.log('Using fallback tooltip positioning (centered) with measurements');
     }
 
     // FIXED apply tooltip styles without changing dimensions
@@ -474,8 +480,6 @@ export class CardPreviewManager {
 
     // Comprehensive tooltip cleanup - removes ALL possible tooltips
     clearAllTooltips() {
-        console.log('Clearing all tooltips...');
-    
         // Clear deck tooltip
         const deckTooltip = document.getElementById('deckTooltipContent');
         if (deckTooltip) {
@@ -491,21 +495,18 @@ export class CardPreviewManager {
         if (tooltipContainer) {
             tooltipContainer.style.display = 'none';
             tooltipContainer.remove();
-            console.log('Removed main tooltip container');
         }
         
         // Clear any floating card tooltips with class
         const floatingTooltips = document.querySelectorAll('.large-card-tooltip, .card-tooltip-container');
         floatingTooltips.forEach(tooltip => {
             tooltip.remove();
-            console.log('Removed floating tooltip');
         });
         
         // Clear any battle card preview tooltips
         const battleTooltips = document.querySelectorAll('.preview-card-display, .battle-card-tooltip');
         battleTooltips.forEach(tooltip => {
             tooltip.remove();
-            console.log('Removed battle tooltip');
         });
         
         // Clear any card preview content
@@ -515,7 +516,6 @@ export class CardPreviewManager {
             previews.forEach(preview => {
                 if (preview.querySelector('.large-card-tooltip')) {
                     preview.remove();
-                    console.log('Removed preview content with tooltip');
                 }
             });
         });
@@ -542,15 +542,12 @@ export class CardPreviewManager {
                 element.id.includes('preview')
             )) {
                 element.remove();
-                console.log('Removed potential orphaned tooltip element');
             }
         });
         
         // Reset card preview state
         this.cardPreviewVisible = false;
         this.currentlyPreviewedCharacter = null;
-        
-        console.log('All tooltips cleared');
     }
 
     // Show card preview for character in right sidebar
@@ -578,8 +575,6 @@ export class CardPreviewManager {
             const cardGrid = this.createCardGrid(character, cards, formatCardNameFunction);
             previewColumn.innerHTML = cardGrid;
         }
-        
-        console.log(`Toggled card preview to show ${characterName}'s cards`);
     }
 
     // Hide card preview and show placeholder
@@ -696,6 +691,5 @@ export class CardPreviewManager {
     reset() {
         this.clearAllTooltips();
         this.hideCardPreview();
-        console.log('CardPreviewManager reset');
     }
 }

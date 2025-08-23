@@ -12,6 +12,7 @@ export class GameStateMachine {
             TRANSITIONING_TO_BATTLE: 'transitioning_to_battle',
             IN_BATTLE: 'in_battle',
             VIEWING_REWARDS: 'viewing_rewards',
+            VICTORY: 'victory',
             
             // Special states
             RECONNECTING: 'reconnecting',
@@ -55,6 +56,7 @@ export class GameStateMachine {
             ],
             [this.states.IN_BATTLE]: [
                 this.states.VIEWING_REWARDS,
+                this.states.VICTORY,
                 this.states.RECONNECTING,
                 this.states.CLEANING_UP,
                 this.states.ERROR
@@ -63,8 +65,12 @@ export class GameStateMachine {
                 this.states.TEAM_BUILDING,
                 this.states.RECONNECTING,
                 this.states.ERROR,
-                // ↓ ADD THESE - Allow staying in VIEWING_REWARDS and transitioning back from RECONNECTING
-                this.states.VIEWING_REWARDS  // Allow staying in this state
+                this.states.VIEWING_REWARDS,
+                this.states.VICTORY 
+            ],
+            [this.states.VICTORY]: [
+                this.states.INITIALIZING,  // Reset to room
+                this.states.ERROR
             ],
             [this.states.RECONNECTING]: [
                 // Can go to any state after reconnecting
@@ -80,6 +86,7 @@ export class GameStateMachine {
                 // Can recover to any state from error
                 ...Object.values(this.states).filter(s => s !== this.states.ERROR)
             ]
+            
         };
 
         // State change listeners

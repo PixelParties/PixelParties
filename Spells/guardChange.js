@@ -22,7 +22,10 @@ export const guardChangeSpell = {
         
         // Check if player has any heroes
         const formation = heroSelection.formationManager.getBattleFormation();
-        const heroPositions = ['left', 'center', 'right'].filter(pos => formation[pos] !== null);
+        
+        const heroPositions = ['left', 'center', 'right'].filter(pos => 
+            formation[pos] !== null && formation[pos] !== undefined
+        );
         
         if (heroPositions.length <= 1) {
             result.reason = 'Guard Change requires at least 2 Heroes to be effective!';

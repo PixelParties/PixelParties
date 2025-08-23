@@ -29,8 +29,6 @@ export class AttackEffectsManager {
 
         // Register built-in handlers
         this.registerBuiltInHandlers();
-        
-        console.log('⚔️ AttackEffectsManager initialized');
     }
     
     // Register built-in effect handlers
@@ -88,7 +86,6 @@ export class AttackEffectsManager {
                     multiplier: multiplier,
                     target: target
                 });
-                console.log(`⚔️ TheMastersSword: ${swordCount} sword(s) → ×${multiplier} damage (${baseDamage} → ${modifiedDamage})`);
             }
         }
         
@@ -146,7 +143,6 @@ export class AttackEffectsManager {
         if (this.arrowSystem && effectsTriggered && effectsTriggered.length > 0) {
             const arrowEffects = effectsTriggered.filter(effect => effect.arrowType);
             if (arrowEffects.length > 0) {
-                console.log(`🏹 Processing ${arrowEffects.length} arrow effects`);
                 await this.arrowSystem.processArrowAttackEffects(attacker, defender, damage, arrowEffects);
             }
         }
@@ -157,9 +153,7 @@ export class AttackEffectsManager {
         const attackEffects = this.getAttackerEffects(attacker);
         
         if (attackEffects.length === 0) return;
-        
-        console.log(`🎯 Processing ${attackEffects.length} equipment attack effects for ${attacker.name}`);
-        
+                
         // Process each effect
         for (const effect of attackEffects) {
             await this.processIndividualEffect(effect, attacker, defender, damage);
@@ -222,8 +216,7 @@ export class AttackEffectsManager {
         }
         
         // Apply 1 stack of frozen
-        console.log(`â„ï¸ BladeOfTheFrostbringer triggers! Freezing ${defender.name}`);
-        
+
         // Apply frozen status
         if (this.battleManager.statusEffectsManager) {
             this.battleManager.statusEffectsManager.applyStatusEffect(defender, 'frozen', 1);
@@ -234,7 +227,7 @@ export class AttackEffectsManager {
         
         // Add combat log message
         this.battleManager.addCombatLog(
-            `â„ï¸ ${attacker.name}'s Blade of the Frostbringer freezes ${defender.name}!`,
+            `${attacker.name}'s Blade of the Frostbringer freezes ${defender.name}!`,
             'info'
         );
         
@@ -266,9 +259,7 @@ export class AttackEffectsManager {
             }
         }
         
-        if (freezeSuccess) {
-            console.log(`❄️ ElixirOfCold triggers! Freezing ${defender.name} (${elixirStacks} stacks checked)`);
-            
+        if (freezeSuccess) {            
             // Apply frozen status
             this.battleManager.statusEffectsManager.applyStatusEffect(defender, 'frozen', 1);
             
@@ -330,15 +321,12 @@ export class AttackEffectsManager {
         // Check if we've already summoned a skeleton this attack
         // (Multiple swords can be equipped but only one skeleton summons)
         if (this._skeletonSummonedThisAttack) {
-            console.log(`âš”ï¸ðŸ¦´ Additional Greatsword triggered but skeleton already summoned this attack`);
             return;
         }
         
         // Mark that we're summoning a skeleton for this attack
         this._skeletonSummonedThisAttack = true;
-        
-        console.log(`âš”ï¸ðŸ¦´ SkullmaelsGreatsword triggers! Summoning skeleton for ${attacker.name}`);
-        
+                
         // Execute the skeleton summon
         if (this.skullmaelsGreatswordArtifact) {
             // Get a random skeleton and summon it
@@ -603,7 +591,6 @@ export class AttackEffectsManager {
         // Initialize the arrow system after AttackEffectsManager is ready
         if (this.arrowSystem) {
             this.arrowSystem.init();
-            console.log('🏹 ArrowSystem initialized via AttackEffectsManager');
         }
     }
     
@@ -641,8 +628,6 @@ export class AttackEffectsManager {
         
         const css = document.getElementById('attackEffectsCSS');
         if (css) css.remove();
-        
-        console.log('⚔️ AttackEffectsManager cleaned up');
     }
 }
 

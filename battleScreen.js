@@ -43,16 +43,20 @@ export class BattleScreen {
 
     // Initialize battle screen with abilities
     init(isHost, playerFormation, opponentFormation, gameDataSender, roomManager, 
-    lifeManager, goldManager, turnTracker, roomManagerForPersistence = null,
-    playerAbilities = null, opponentAbilities = null,
-    playerSpellbooks = null, opponentSpellbooks = null,
-    actionManager = null,
-    playerCreatures = null, opponentCreatures = null,
-    playerEquips = null, opponentEquips = null,
-    playerEffectiveStats = null,
-    opponentEffectiveStats = null,
-    playerPermanentArtifacts = null,
-    opponentPermanentArtifacts = null){
+        lifeManager, goldManager, turnTracker, roomManagerForPersistence = null,
+        playerAbilities = null, opponentAbilities = null,
+        playerSpellbooks = null, opponentSpellbooks = null,
+        actionManager = null,
+        playerCreatures = null, opponentCreatures = null,
+        playerEquips = null, opponentEquips = null,
+        playerEffectiveStats = null,
+        opponentEffectiveStats = null,
+        playerPermanentArtifacts = null,
+        opponentPermanentArtifacts = null,
+        playerHand = null,
+        opponentHand = null,
+        playerDeck = null,
+        opponentDeck = null) {
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -72,6 +76,10 @@ export class BattleScreen {
         this.opponentEquips = opponentEquips;
         this.playerPermanentArtifacts = playerPermanentArtifacts || [];
         this.opponentPermanentArtifacts = opponentPermanentArtifacts || [];
+        this.playerHand = playerHand || [];
+        this.opponentHand = opponentHand || [];
+        this.playerDeck = playerDeck || [];
+        this.opponentDeck = opponentDeck || [];
 
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
@@ -95,7 +103,11 @@ export class BattleScreen {
             playerEffectiveStats,
             opponentEffectiveStats,
             this.playerPermanentArtifacts,
-            this.opponentPermanentArtifacts
+            this.opponentPermanentArtifacts,
+            this.playerHand,
+            this.opponentHand,
+            this.playerDeck,
+            this.opponentDeck
         );
     }
 
@@ -112,7 +124,14 @@ export class BattleScreen {
     }
 
     // Start the battle directly with speed-aware delays and ability synchronization
-    startBattle() {        
+    async startBattle() {        
+        // Send current formation to opponent BEFORE battle initialization
+        if (!this.isHost && window.heroSelection && window.heroSelection.sendFormationUpdate) {
+            await window.heroSelection.sendFormationUpdate();
+            // Add a small delay to ensure host receives the update
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
         // Only the host should initiate the battle
         if (this.isHost) {
             // Set game phase to Battle when battle starts
@@ -153,9 +172,11 @@ export class BattleScreen {
                 const latestPlayerCreatures = this.getLatestPlayerCreatures();
                 const latestPlayerEquipment = this.getLatestPlayerEquipment();
                 const latestPlayerEffectiveStats = this.getLatestPlayerEffectiveStats();
+                const latestPlayerHand = this.getLatestPlayerHand();
+                const latestPlayerDeck = this.getLatestPlayerDeck();
 
                 // Update battle manager with latest player data
-                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment);
+                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment, latestPlayerHand, latestPlayerDeck);
 
                 // Also update effective stats
                 this.playerEffectiveStats = latestPlayerEffectiveStats;
@@ -173,12 +194,28 @@ export class BattleScreen {
                         hostSpellbooks: latestPlayerSpellbooks,
                         hostCreatures: latestPlayerCreatures,
                         hostEquipment: latestPlayerEquipment,
-                        hostEffectiveStats: latestPlayerEffectiveStats, // ← NOW CURRENT!
-                        hostFormation: this.playerFormation
+                        hostEffectiveStats: latestPlayerEffectiveStats,
+                        hostFormation: this.playerFormation,
+                        hostHand: latestPlayerHand,
+                        hostDeck: latestPlayerDeck
                     });
                 }
             }, this.getSpeedAdjustedDelay(500));
         }
+    }
+
+    getLatestPlayerHand() {
+        if (window.heroSelection && window.heroSelection.handManager) {
+            return window.heroSelection.handManager.getHand();
+        }
+        return this.playerHand || [];
+    }
+
+    getLatestPlayerDeck() {
+        if (window.heroSelection && window.heroSelection.deckManager) {
+            return window.heroSelection.deckManager.getDeck();
+        }
+        return this.playerDeck || [];
     }
 
     // Helper method to get current player abilities from heroSelection
@@ -194,12 +231,9 @@ export class BattleScreen {
                     latestAbilities[position] = heroAbilities;
                 }
             });
-            
-            console.log('📋 Retrieved latest player abilities:', latestAbilities);
             return latestAbilities;
         }
         
-        console.warn('⚠️ Could not retrieve latest abilities, using cached version');
         return this.playerAbilities;
     }
 
@@ -216,12 +250,9 @@ export class BattleScreen {
                     latestSpellbooks[position] = heroSpellbook;
                 }
             });
-            
-            console.log('📜 Retrieved latest player spellbooks:', latestSpellbooks);
             return latestSpellbooks;
         }
         
-        console.warn('⚠️ Could not retrieve latest spellbooks, using cached version');
         return this.playerSpellbooks;
     }
 
@@ -239,11 +270,9 @@ export class BattleScreen {
                 }
             });
             
-            console.log('🐾 Retrieved latest player creatures:', latestCreatures);
             return latestCreatures;
         }
         
-        console.warn('⚠️ Could not retrieve latest creatures, using cached version');
         return this.playerCreatures;
     }
 
@@ -261,17 +290,14 @@ export class BattleScreen {
                 }
             });
             
-            console.log('⚔️ Retrieved latest player equipment:', latestEquipment);
             return latestEquipment;
         }
         
-        console.warn('⚠️ Could not retrieve latest equipment, using cached version');
         return this.playerEquips;
     }
 
     getLatestPlayerEffectiveStats() {
         if (!window.heroSelection) {
-            console.warn('⚠️ HeroSelection not available for stats');
             return {};
         }
         
@@ -283,12 +309,10 @@ export class BattleScreen {
                 const stats = window.heroSelection.calculateEffectiveHeroStats(position);
                 if (stats) {
                     effectiveStats[position] = stats;
-                    console.log(`📊 Retrieved effective stats for ${position}: HP ${stats.maxHp}, ATK ${stats.attack}`);
                 }
             }
         });
         
-        console.log('✅ All player effective stats retrieved (pre-calculated, ready for battle)');
         return effectiveStats;
     }
 
@@ -298,78 +322,99 @@ export class BattleScreen {
     }
 
     // Helper method to update battle manager with latest player data
-    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment) {
+    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment, hand = null, deck = null) {
         if (this.battleManager) {
             // Update stored data
             this.playerAbilities = abilities;
             this.playerSpellbooks = spellbooks;
             this.playerCreatures = creatures;
             this.playerEquips = equipment;
+            if (hand !== null) {
+                this.playerHand = hand;
+            }
+            if (deck !== null) {
+                this.playerDeck = deck;
+            }
             
             // Update battle manager references
             this.battleManager.playerAbilities = abilities;
             this.battleManager.playerSpellbooks = spellbooks;
             this.battleManager.playerCreatures = creatures;
             this.battleManager.playerEquips = equipment;
-            
-            console.log('🔄 Updated battle manager with latest player data including equipment');
+            if (hand !== null) {
+                this.battleManager.playerHand = hand;
+            }
+            if (deck !== null) {
+                this.battleManager.playerDeck = deck;
+            }
         }
     }
 
     // Updated receiveBattleStart method to handle ability synchronization
     receiveBattleStart(data) {
         if (!this.isHost && this.battleManager) {
-            console.log('🎯 Guest receiving battle start with host data');
             
             // Sync all host data as opponent data
             if (data.hostAbilities) {
                 this.opponentAbilities = data.hostAbilities;
                 this.battleManager.opponentAbilities = data.hostAbilities;
-                console.log('✅ Synced opponent abilities from host');
             }
             
             if (data.hostSpellbooks) {
                 this.opponentSpellbooks = data.hostSpellbooks;
                 this.battleManager.opponentSpellbooks = data.hostSpellbooks;
-                console.log('✅ Synced opponent spellbooks from host');
             }
             
             if (data.hostCreatures) {
                 this.opponentCreatures = data.hostCreatures;
                 this.battleManager.opponentCreatures = data.hostCreatures;
-                console.log('✅ Synced opponent creatures from host');
             }
             
             if (data.hostEquipment) {
                 this.opponentEquips = data.hostEquipment;
                 this.battleManager.opponentEquips = data.hostEquipment;
-                console.log('✅ Synced opponent equipment from host');
             }
 
             if (data.hostPermanentArtifacts) {
                 this.opponentPermanentArtifactsData = data.hostPermanentArtifacts;
-                console.log('✅ Synced opponent permanent artifacts from host');
             }
             
             if (data.hostEffectiveStats) {
                 this.opponentEffectiveStats = data.hostEffectiveStats;
                 this.battleManager.opponentEffectiveStats = data.hostEffectiveStats;
-                console.log('✅ Synced opponent effective stats from host (pre-calculated, ready to use)');
             }
             
             if (data.hostFormation) {
                 this.opponentFormation = data.hostFormation;
                 this.battleManager.opponentFormation = data.hostFormation;
-                console.log('✅ Synced opponent formation from host');
             }
             
+            if (data.hostHand) {
+                this.opponentHand = data.hostHand;
+                this.battleManager.opponentHand = data.hostHand;
+            }
+
+            if (data.hostDeck) {
+                this.opponentDeck = data.hostDeck;
+                this.battleManager.opponentDeck = data.hostDeck;
+            }
+            
+            
             // Send our pre-calculated data back to host
-            console.log('📤 Sending guest data back to host...');
             const guestStats = this.getLatestPlayerEffectiveStats();
             const guestAbilities = this.getLatestPlayerAbilities();
             const guestSpellbooks = this.getLatestPlayerSpellbooks();
             const guestCreatures = this.getLatestPlayerCreatures();
             const guestEquipment = this.getLatestPlayerEquipment();
+            const guestHand = this.getLatestPlayerHand();
+            const guestDeck = this.getLatestPlayerDeck();
+
+            this.playerDeck = guestDeck;
+            this.battleManager.playerDeck = guestDeck;
+
+            const guestFormationWithPersistentData = this.preservePersistentDataInFormation(
+                window.heroSelection.formationManager.getBattleFormation()
+            );
 
             if (this.gameDataSender) {
                 this.gameDataSender('battle_data', {
@@ -380,6 +425,9 @@ export class BattleScreen {
                         guestCreatures,
                         guestEquipment,
                         guestEffectiveStats: guestStats, 
+                        guestBattleFormation: guestFormationWithPersistentData,
+                        guestHand,
+                        guestDeck,
                         timestamp: Date.now()
                     }
                 });
@@ -389,7 +437,6 @@ export class BattleScreen {
             if (this.battleManager.opponentAbilities || this.battleManager.opponentSpellbooks || 
                 this.battleManager.opponentCreatures || this.battleManager.opponentEquips ||
                 this.battleManager.opponentEffectiveStats) {
-                console.log('🔄 Re-initializing opponent heroes with synced data...');
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
                     this.battleManager.opponentFormation, 
@@ -416,6 +463,26 @@ export class BattleScreen {
         }
     }
 
+    preservePersistentDataInFormation(formation) {
+        if (!formation || !window.heroSelection) return formation;
+        
+        // Get the current formation with persistent data from heroSelection
+        const currentFormation = window.heroSelection.formationManager.getBattleFormation();
+        
+        // Preserve persistent properties like burningFingerStack
+        ['left', 'center', 'right'].forEach(position => {
+            if (formation[position] && currentFormation[position]) {
+                // Copy persistent properties
+                if (currentFormation[position].burningFingerStack !== undefined) {
+                    formation[position].burningFingerStack = currentFormation[position].burningFingerStack;
+                }
+                // Add other persistent properties here as needed
+            }
+        });
+        
+        return formation;
+    }
+
     // Receive battle data from opponent with acknowledgment support
     receiveBattleData(data) {
         // Handle battle start message
@@ -427,6 +494,16 @@ export class BattleScreen {
         // Handle guest abilities sync message at battleScreen level
         if (data.type === 'guest_abilities_sync') {
             this.receiveGuestAbilitiesSync(data.data || data);
+            return;
+        }
+
+        // Handle Sid card theft
+        if (data.type === 'sid_card_theft') {
+            if (window.heroSelection) {
+                import('./Heroes/sid.js').then(({ sidHeroEffect }) => {
+                    sidHeroEffect.handleOpponentTheft(data.data || data, window.heroSelection);
+                });
+            }
             return;
         }
         
@@ -459,16 +536,28 @@ export class BattleScreen {
                 this.battleManager.opponentEquips = data.guestEquipment;
             }
 
-            // Just store the effective stats
             if (data.guestEffectiveStats) {
                 this.opponentEffectiveStats = data.guestEffectiveStats;
                 this.battleManager.opponentEffectiveStats = data.guestEffectiveStats;
-                console.log('✅ HOST: Stored guest effective stats as opponent data');
+            }
+
+            if (data.guestHand) {
+                this.opponentHand = data.guestHand;
+                this.battleManager.opponentHand = data.guestHand;
+            }
+
+            if (data.guestDeck) {
+                this.opponentDeck = data.guestDeck;
+                this.battleManager.opponentDeck = data.guestDeck;
+            }
+
+            if (data.guestBattleFormation) {
+                this.opponentFormation = data.guestBattleFormation;
+                this.battleManager.opponentFormation = data.guestBattleFormation;
             }
             
             // Re-initialize opponent heroes with all synced data
             if (this.battleManager) {
-                console.log('🔄 HOST: Re-initializing opponent heroes with guest data...');
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
                     this.battleManager.opponentFormation, 
@@ -481,45 +570,52 @@ export class BattleScreen {
                     this.battleManager.opponentEffectiveStats
                 );
                 
-                // Re-apply FlameArrow counters for opponent heroes after equipment sync
+                // Re-initialize arrow counters for all arrow types after equipment sync
                 if (this.battleManager.attackEffectsManager && 
-                    this.battleManager.attackEffectsManager.flameArrowEffect) {
-                    console.log('🔥🏹 Re-initializing FlameArrow counters for opponent after equipment sync');
-                    
-                    // Re-initialize counters only for opponent heroes
-                    const flameArrowEffect = this.battleManager.attackEffectsManager.flameArrowEffect;
-                    ['left', 'center', 'right'].forEach(position => {
-                        const hero = this.battleManager.opponentHeroes[position];
-                        if (hero && hero.alive) {
-                            const flameArrowCount = flameArrowEffect.countFlameArrows(hero);
-                            if (flameArrowCount > 0) {
-                                hero.flameArrowCounters = flameArrowCount;
-                                console.log(`🔥🏹 ${hero.name} receives ${flameArrowCount} Flame Arrow Counter(s) (late sync)`);
-                                this.battleManager.addCombatLog(
-                                    `🔥🏹 ${hero.name} receives ${flameArrowCount} Flame Arrow Counter${flameArrowCount > 1 ? 's' : ''}!`,
-                                    'info'
-                                );
-                            }
-                        }
-                    });
-                    
-                    // Update visual displays
-                    flameArrowEffect.updateAllFlameArrowDisplays();
+                    this.battleManager.attackEffectsManager.arrowSystem) {
+                    this.battleManager.attackEffectsManager.arrowSystem.initializeArrowCounters();
                 }
-                
-                console.log('✅ HOST: All opponent data synced and heroes initialized');
             }
         }
     }
 
     // Handle battle end
-    onBattleEnd(result) {
-        console.log('🏆 Battle ended with result:', result);
-        
+    async onBattleEnd(result) {      
+        // THIS METHOD IS ONLY CALLED BY HOST!!!
+          
         // Show card rewards with the battle result
         setTimeout(() => {
             this.showCardRewardsAndReturn(result);
         }, 0);
+    }
+
+    transferBurningFingerStacksToPermanent() {
+        
+        if (!window.heroSelection || !window.heroSelection.formationManager) {
+            return;
+        }
+        
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        
+        ['left', 'center', 'right'].forEach(position => {
+            const battleHero = this.battleManager.playerHeroes[position];
+            const permanentHero = formation[position];
+            
+            if (battleHero && permanentHero && battleHero.burningFingerStack !== undefined) {
+                const oldPermanentStacks = permanentHero.burningFingerStack || 0;
+                permanentHero.burningFingerStack = battleHero.burningFingerStack;
+            }
+        });
+        
+        // Save the updated permanent hero state
+        if (window.heroSelection.saveGameState) {
+            window.heroSelection.saveGameState().then(async () => {
+                // Send updated formation to opponent
+                if (window.heroSelection.sendFormationUpdate) {
+                    await window.heroSelection.sendFormationUpdate();
+                }
+            });
+        }
     }
     
     // Increment turn after battle
@@ -531,7 +627,6 @@ export class BattleScreen {
                 // Reset ability tracking for the new turn
                 if (window.heroSelection && window.heroSelection.heroAbilitiesManager) {
                     window.heroSelection.heroAbilitiesManager.resetTurnBasedTracking();
-                    console.log('✅ Reset ability tracking after turn increment');
                 }
             } catch (error) {
                 // Silently handle error
@@ -541,7 +636,6 @@ export class BattleScreen {
     
     // Show card rewards then return to formation with speed-aware delays
     async showCardRewardsAndReturn(result) {
-        console.log('🎁 Showing card rewards for battle result:', result);
         
         if (window.heroSelection && window.heroSelection.cardRewardManager) {
             try {
@@ -552,11 +646,9 @@ export class BattleScreen {
                     result // Ensure battle result is passed
                 );
             } catch (error) {
-                console.error('Error showing card rewards:', error);
                 this.returnToFormationScreen();
             }
         } else {
-            console.warn('Card reward manager not available');
             this.returnToFormationScreen();
         }
     }
@@ -691,15 +783,11 @@ export class BattleScreen {
         setTimeout(() => {
             const logInitialized = this.battleLog.init();
             if (logInitialized) {
-                console.log('✅ BattleLog initialized successfully');
-                
                 // Add initial welcome messages
                 this.battleLog.addMessage('🎯 Battle ready with abilities!', 'success');
                 this.battleLog.addMessage('⚔️ Heroes are empowered!', 'info');
                 this.battleLog.addMessage('🛡️ Abilities will affect combat!', 'info');
                 this.battleLog.addMessage('🔄 Real-time synchronization active', 'system');
-            } else {
-                console.warn('⚠️ BattleLog failed to initialize, falling back to basic logging');
             }
         }, 100);
         
@@ -815,13 +903,13 @@ export class BattleScreen {
         // Initialize speed manager UI
         const success = this.battleManager.speedManager.initializeUI(battleCenter);
         
-        // NEW: Initialize log control buttons
+        // Initialize log control buttons
         this.initializeLogControls();
         
         return success;
     }
 
-    // NEW: Initialize log control buttons
+    // Initialize log control buttons
     initializeLogControls() {
         // Set up log control buttons
         setTimeout(() => {
@@ -890,8 +978,6 @@ export class BattleScreen {
                     // Use the hero's current attack value (already includes all bonuses)
                     displayAttack = heroInstance.getCurrentAttack();
                     attackBonus = displayAttack - heroInstance.baseAtk;
-                    
-                    console.log(`📊 ${side} ${position} ${heroInstance.name}: Base ${heroInstance.baseAtk} + Bonuses ${attackBonus} = Total ${displayAttack}`);
                 } else {
                     // Fallback: Get base stats from card database
                     const heroInfo = getCardInfo(hero.name);
@@ -916,7 +1002,6 @@ export class BattleScreen {
             }
             
         } catch (error) {
-            console.error(`❌ Error getting hero stats for ${side} ${position}:`, error);
             // Fallback to basic display
             const heroInfo = getCardInfo(hero.name);
             if (heroInfo && heroInfo.cardType === 'hero') {
@@ -1131,10 +1216,6 @@ export class BattleScreen {
         // Also update the battle manager's references for consistency
         this.battleManager.playerAbilities = playerAbilities;
         this.battleManager.opponentAbilities = opponentAbilities;
-        
-        console.log('🔄 BattleScreen synced abilities from restored heroes');
-        console.log('Player abilities:', playerAbilities);
-        console.log('Opponent abilities:', opponentAbilities);
     }
 
     // Initialize card preview functionality
@@ -1228,9 +1309,6 @@ export class BattleScreen {
         
         // Get equipment from the hero (sorted alphabetically)
         const equipment = hero.getEquipment ? hero.getEquipment() : [];
-
-        console.log("--- TEST EQUIPMENT ---")
-        console.log(equipment);
                     
         // Create a floating tooltip to show abilities
         const existingTooltip = document.querySelector('.hero-abilities-debug');
@@ -1376,7 +1454,6 @@ export class BattleScreen {
                 equipmentHTML = '<div style="color: #999;">No equipment</div>';
             }
         } catch (error) {
-            console.error(`❌ Error getting equipment for tooltip ${side} ${position}:`, error);
             equipmentHTML = '<div style="color: #999;">Equipment data unavailable</div>';
         }
         
@@ -1722,9 +1799,6 @@ export class BattleScreen {
     getHeroElement(side, position) {
         const selector = `.${side}-slot.${position}-slot`;
         const element = document.querySelector(selector);
-        if (!element) {
-            console.error(`Could not find hero element with selector: ${selector}`);
-        }
         return element;
     }
 
@@ -1774,7 +1848,7 @@ export class BattleScreen {
         `;
     }
 
-    // NEW: Updated to use BattleLog instead of manual DOM manipulation
+    // Updated to use BattleLog instead of manual DOM manipulation
     addCombatLogMessage(message, type = 'info') {
         if (this.battleLog && this.battleLog.isInitialized) {
             // Use the new BattleLog system
@@ -1834,7 +1908,6 @@ export class BattleScreen {
 
     // Show surrender button (called when returning to formation screen)
     showSurrenderButton() {
-        console.log('🛡️ Showing surrender button after battle');
         
         // Remove battle-active class that might hide the surrender button
         document.body.classList.remove('battle-active');
@@ -1845,9 +1918,6 @@ export class BattleScreen {
             surrenderButton.style.display = '';
             surrenderButton.style.visibility = 'visible';
             surrenderButton.disabled = false;
-            console.log('✅ Surrender button shown and enabled');
-        } else {
-            console.warn('⚠️ Surrender button not found in DOM');
         }
         
         // Also try common surrender button selectors as fallbacks
@@ -1856,13 +1926,11 @@ export class BattleScreen {
             surrenderButtonAlt.style.display = '';
             surrenderButtonAlt.style.visibility = 'visible';
             surrenderButtonAlt.disabled = false;
-            console.log('✅ Alternative surrender button shown');
         }
     }
 
     // Add static method as well for global access
     static showSurrenderButton() {
-        console.log('🛡️ Static method: Showing surrender button');
         
         document.body.classList.remove('battle-active');
         
@@ -1871,7 +1939,6 @@ export class BattleScreen {
             surrenderButton.style.display = '';
             surrenderButton.style.visibility = 'visible';
             surrenderButton.disabled = false;
-            console.log('✅ Static: Surrender button shown');
         }
     }
 

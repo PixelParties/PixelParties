@@ -3,7 +3,8 @@
 import { CardPreviewManager } from './cardPreviewManager.js';
 import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js';
 import { killTracker } from './killTracker.js';
-
+import CharmeManager from './Abilities/charme.js';
+import { SidHeroEffect } from './Heroes/sid.js';
 
 import { calculateFormationWantedPosterBonuses, generateWantedPosterBonusHTML, getWantedPosterStyles } from './Artifacts/wantedPoster.js';
 
@@ -24,6 +25,8 @@ export class CardRewardManager {
         
         // Initialize thieving manager
         this.thievingManager = new ThievingManager();
+
+        this.sidHeroEffect = null;
         
         // Define all available heroes and their card sets
         this.allHeroes = [
@@ -43,15 +46,15 @@ export class CardRewardManager {
         ];
         
         this.heroCardSets = {
-            'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'LootThePrincess', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
+            'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
-            'Ida': ['BottledFlame', 'BurningSkeleton', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
+            'Ida': ['BottledFlame', 'BurningFinger', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
-            'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'PressedSkill'],
-            'Semi': ['Adventurousness', 'ElixirOfImmortality', 'ElixirOfStrength', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
+            'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
+            'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
             'Tharx': ['Archer', 'Cavalry', 'Challenge', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
@@ -68,7 +71,9 @@ export class CardRewardManager {
         // View mode system
         this.viewMode = 'rewards'; // 'rewards' or 'battlefield'
 
-        console.log('CardRewardManager initialized with enhanced redraw, gold display, and Thieving system');
+        // Initialize Charme manager
+        this.charmeManager = new CharmeManager();
+        this.charmeManager.init(this);
     }
 
     // Calculate and store gold breakdown for current battle result
@@ -88,7 +93,8 @@ export class CardRewardManager {
             thievingDetails: [],
             wantedPosterBonus: 0,
             wantedPosterDetails: [],
-            swordBonuses: [],  // NEW: Array of sword bonus objects
+            swordBonuses: [],
+            sapphireBonus: 0,  
             total: 0
         };
 
@@ -175,14 +181,14 @@ export class CardRewardManager {
             
             breakdown.wantedPosterBonus = wantedPosterData.totalBonus;
             breakdown.wantedPosterDetails = wantedPosterData.details;
-            
-            // Log for debugging
-            if (wantedPosterData.totalBonus > 0) {
-                console.log('💰 Wanted Poster bonuses calculated:', wantedPosterData);
-            }
+        }
+
+        // Calculate Magic Sapphire bonus
+        if (this.heroSelection && this.heroSelection.magicSapphiresUsed) {
+            breakdown.sapphireBonus = this.heroSelection.magicSapphiresUsed;
         }
         
-        // NEW: Calculate LegendarySwordOfABarbarianKing bonuses
+        // Calculate LegendarySwordOfABarbarianKing bonuses
         if (this.heroSelection && this.heroSelection.heroEquipmentManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
             
@@ -202,9 +208,9 @@ export class CardRewardManager {
                         const killCount = killTracker.getKillCount('player', position);
                         
                         if (killCount > 0) {
-                            // Calculate bonuses: swordCount * killCount * 5 attack, * 20 HP
-                            const attackGain = swordCount * killCount * 5;
-                            const hpGain = swordCount * killCount * 20;
+                            // Calculate bonuses: swordCount * killCount * 3 attack, * 10 HP
+                            const attackGain = swordCount * killCount * 3;
+                            const hpGain = swordCount * killCount * 10;
                             
                             breakdown.swordBonuses.push({
                                 heroName: hero.name,
@@ -214,8 +220,6 @@ export class CardRewardManager {
                                 attackGain: attackGain,
                                 hpGain: hpGain
                             });
-                            
-                            console.log(`⚔️ ${hero.name}: ${swordCount} sword(s) × ${killCount} kills = +${attackGain} ATK, +${hpGain} HP`);
                         }
                     }
                 }
@@ -225,7 +229,7 @@ export class CardRewardManager {
         // Calculate total
         breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
                         breakdown.semiBonus + breakdown.thievingGained - breakdown.thievingLost +
-                        breakdown.wantedPosterBonus;
+                        breakdown.wantedPosterBonus + breakdown.sapphireBonus;
         
         return breakdown;
     }
@@ -238,7 +242,7 @@ export class CardRewardManager {
         this.heroSelection = heroSelection;
         const currentTurn = turnTracker.getCurrentTurn();
         
-        // IMPORTANT: Set game phase to Reward when showing rewards
+        // Set game phase to Reward when showing rewards
         await this.heroSelection.setGamePhase('Reward');
         
         // Calculate gold breakdown for this battle BEFORE generating rewards
@@ -247,13 +251,49 @@ export class CardRewardManager {
         // Store the gold breakdown in a local variable to ensure it's not lost
         const goldBreakdown = this.lastGoldBreakdown;
 
+        // Charme counters
+        this.charmeManager.setCharmeCounters(heroSelection);
+
+        // Sid card theft
+        let sidTheftData = null;
+
+        // Check formation
+        const formation = heroSelection.formationManager.getBattleFormation();
+
+        const hasSid = ['left', 'center', 'right'].some(position => {
+            const hero = formation[position];
+            const isSid = hero && hero.name === 'Sid';
+            return isSid;
+        });
+
+        if (hasSid) {            
+            try {
+                // Import Sid effect if not already loaded
+                if (!this.sidHeroEffect) {
+                    const module = await import('./Heroes/sid.js');
+                    this.sidHeroEffect = module.sidHeroEffect || new module.SidHeroEffect();
+                }
+                
+                // Perform card theft
+                sidTheftData = await this.sidHeroEffect.performCardTheft(heroSelection, this);
+                
+                if (sidTheftData) {
+                    // Refresh display if already shown
+                    const breakdownContainer = document.querySelector('.gold-breakdown-container');
+                    if (breakdownContainer) {
+                        breakdownContainer.outerHTML = this.createGoldBreakdownHTML();
+                    }
+                }
+            } catch (error) {
+                // Silent error handling
+            }
+        }
+
         // Use cached Royal Corgi bonus cards (calculated before cleanup reset counters)
         let royalCorgiBonusCards = this.cachedRoyalCorgiBonusCards || 0;
         
         // Clear the cached value to prevent reuse
         this.cachedRoyalCorgiBonusCards = 0;
-        
-        console.log(`👑🐕 Using cached Royal Corgi bonus cards: ${royalCorgiBonusCards}`);
 
         // Add bonus cards to hand if any
         if (royalCorgiBonusCards > 0 && this.handManager) {
@@ -261,7 +301,7 @@ export class CardRewardManager {
             
             // Show notification
             const notification = document.createElement('div');
-            notification.textContent = `👑🐕 Royal Corgi bonus: +${royalCorgiBonusCards} cards!`;
+            notification.textContent = `Royal Corgi bonus: +${royalCorgiBonusCards} cards!`;
             notification.style.cssText = `
                 position: fixed;
                 top: 20%;
@@ -308,13 +348,12 @@ export class CardRewardManager {
         return true;
     }
 
-    // Create gold breakdown display HTML with total gold display - FIXED with debug logging
+    // Create gold breakdown display HTML with total gold display
     createGoldBreakdownHTML() {
         if (!this.lastGoldBreakdown) {
             return `
                 <div class="gold-breakdown-container">
                     <div class="gold-breakdown-header">
-                        <div class="gold-icon">💰</div>  
                         <h3>Gold Earned</h3>
                     </div>
                     <div class="gold-breakdown-content-scrollable">
@@ -338,7 +377,6 @@ export class CardRewardManager {
         return `
             <div class="gold-breakdown-container">
                 <div class="gold-breakdown-header">
-                    <div class="gold-icon">💰</div>  
                     <h3>Battle Rewards</h3>
                 </div>
                 
@@ -399,13 +437,34 @@ export class CardRewardManager {
                         totalBonus: breakdown.wantedPosterBonus, 
                         details: breakdown.wantedPosterDetails 
                     })}
+
+                    <!-- Magic Sapphire Section -->
+                    ${breakdown.sapphireBonus > 0 ? `
+                        <div class="gold-line-item sapphire-bonus">
+                            <span class="gold-source">Magic Sapphires (${breakdown.sapphireBonus} used)</span>
+                            <span class="gold-arrow">→</span>
+                            <span class="gold-amount">${breakdown.sapphireBonus}</span>
+                        </div>
+                    ` : ''}
+
+                    <!-- Sid Card Theft Section -->
+                    ${(() => {                        
+                        if (this.sidHeroEffect && this.heroSelection && this.heroSelection.formationManager) {
+                            const formation = this.heroSelection.formationManager.getBattleFormation();
+                            const hasSid = ['left', 'center', 'right'].some(position => 
+                                formation[position] && formation[position].name === 'Sid'
+                            );
+                            const html = this.sidHeroEffect.generateStolenCardsHTML(hasSid);
+                            return html;
+                        }
+                        return '';
+                    })()}
                     
                     <!-- Legendary Sword Bonuses Section -->
                     ${breakdown.swordBonuses && breakdown.swordBonuses.length > 0 ? `
                         <div class="sword-bonuses-section-header">
                             <div class="gold-line-item sword-bonuses-header-item">
                                 <span class="gold-source">
-                                    <span class="sword-icon">⚔️</span>
                                     Legendary Sword Bonuses
                                 </span>
                                 <span class="gold-arrow">→</span>
@@ -418,7 +477,7 @@ export class CardRewardManager {
                             <div class="sword-bonus-detail-line">
                                 <div class="sword-hero-info">
                                     <span class="sword-hero-name">${bonus.heroName}</span>
-                                    <span class="sword-calculation">${bonus.swordCount} sword${bonus.swordCount > 1 ? 's' : ''} × ${bonus.killCount} kills</span>
+                                    <span class="sword-calculation">${bonus.swordCount} Sword${bonus.swordCount > 1 ? 's' : ''} × ${bonus.killCount} kills</span>
                                 </div>
                                 <div class="sword-gains">
                                     <span class="attack-gain">+${bonus.attackGain} ATK</span>
@@ -450,7 +509,6 @@ export class CardRewardManager {
                 <!-- Your Total Gold Display (non-scrollable) -->
                 <div class="total-gold-display">
                     <div class="total-gold-header">
-                        <span class="total-gold-icon">🏆</span>
                         <span class="total-gold-label">Your Total Gold</span>
                     </div>
                     <div class="total-gold-amount" id="totalGoldAmount">${totalGold}</div>
@@ -478,7 +536,7 @@ export class CardRewardManager {
     createViewBattlefieldButtonHTML() {
         const isShowingRewards = this.viewMode === 'rewards';
         const buttonText = isShowingRewards ? 'View Battlefield' : 'View Rewards';
-        const buttonIcon = isShowingRewards ? '🔍' : '🎁';
+        const buttonIcon = isShowingRewards ? '⚔️' : '🪙';
         
         return `
             <div class="view-battlefield-button-container">
@@ -495,13 +553,17 @@ export class CardRewardManager {
         const currentGold = this.goldManager.getPlayerGold();
         const pendingGold = this.lastGoldBreakdown ? (this.lastGoldBreakdown.total - (this.lastGoldBreakdown.redrawDeduction || 0)) : 0;
         const totalAvailableGold = currentGold + pendingGold;
-        const canAfford = totalAvailableGold >= this.redrawCost;
+        
+        // Use Charme manager to get effective cost
+        const effectiveRedrawCost = this.charmeManager.getEffectiveRedrawCost(this.redrawCost);
+        const canAfford = totalAvailableGold >= effectiveRedrawCost;
         
         return `
             <div class="enhanced-redraw-container">
                 <button class="enhanced-redraw-button ${!canAfford ? 'disabled' : ''}" 
                         onclick="window.handleRewardRedraw()"
                         ${!canAfford ? 'disabled' : ''}>
+                    ${this.charmeManager.createCharmeCountersHTML()}
                     <div class="redraw-button-inner">
                         <div class="redraw-icon-container">
                             <span class="redraw-icon">🔄</span>
@@ -513,19 +575,17 @@ export class CardRewardManager {
                         <div class="redraw-cost-container">
                             <div class="cost-label">Cost</div>
                             <div class="cost-amount">
-                                <span class="gold-icon">💰</span>
-                                <span class="cost-number">${this.redrawCost}</span>
+                                ${this.charmeManager.createRedrawCostHTML(this.redrawCost)}
                             </div>
                         </div>
                     </div>
                 </button>
-                ${!canAfford ? `
+                ${!canAfford && !this.charmeManager.shouldRedrawBeFree() ? `
                     <div class="redraw-insufficient-funds">
                         <span class="warning-icon">⚠️</span>
                         Need ${this.redrawCost - totalAvailableGold} more gold
                     </div>
-                ` : `
-                `}
+                ` : ''}
             </div>
         `;
     }
@@ -567,11 +627,14 @@ export class CardRewardManager {
         `;
     }
 
-    // Updated handleRedraw method to work with total gold - FIXED double deduction and timing
+    // Updated handleRedraw method to work with total gold
     async handleRedraw() {
         if (this.isRedrawing || this.selectionMade) {
             return;
         }
+        
+        // Get effective cost from Charme manager
+        const effectiveRedrawCost = this.charmeManager.getEffectiveRedrawCost(this.redrawCost);
         
         // Calculate total available gold
         const currentGold = this.goldManager.getPlayerGold();
@@ -585,23 +648,28 @@ export class CardRewardManager {
         
         this.isRedrawing = true;
         
-        // Show total gold change animation BEFORE making changes
-        this.showTotalGoldChange(-this.redrawCost);
-        
-        // Deduct from current gold first, then from pending
-        let goldToDeductFromCurrent = Math.min(currentGold, this.redrawCost);
-        let goldToDeductFromPending = this.redrawCost - goldToDeductFromCurrent;
-        
-        // Update current gold if needed
-        if (goldToDeductFromCurrent > 0) {
-            const newGoldAmount = currentGold - goldToDeductFromCurrent;
-            this.goldManager.setPlayerGold(newGoldAmount, 'redraw');
-        }
-        
-        // Update pending gold ONLY if we needed to use pending gold
-        if (goldToDeductFromPending > 0 && this.lastGoldBreakdown) {
-            // Only track redraw deduction for the amount taken from pending gold
-            this.lastGoldBreakdown.redrawDeduction = (this.lastGoldBreakdown.redrawDeduction || 0) + goldToDeductFromPending;
+         // Handle payment - either use Charme counter or gold
+        if (this.charmeManager.shouldRedrawBeFree()) {
+            // Use Charme counter
+            this.charmeManager.consumeCharmeCounter();
+        } else {
+            // Use gold (existing logic)
+            this.showTotalGoldChange(-effectiveRedrawCost);
+            
+            let goldToDeductFromCurrent = Math.min(currentGold, effectiveRedrawCost);
+            let goldToDeductFromPending = effectiveRedrawCost - goldToDeductFromCurrent;
+            
+            if (goldToDeductFromCurrent > 0) {
+                const newGoldAmount = currentGold - goldToDeductFromCurrent;
+                this.goldManager.setPlayerGold(newGoldAmount, 'redraw');
+            }
+            
+            if (goldToDeductFromPending > 0 && this.lastGoldBreakdown) {
+                this.lastGoldBreakdown.redrawDeduction = (this.lastGoldBreakdown.redrawDeduction || 0) + goldToDeductFromPending;
+            }
+            
+            // Only increment redraw cost if not using Charme counters
+            this.redrawCost++;
         }
         
         // Generate new rewards
@@ -625,8 +693,6 @@ export class CardRewardManager {
             this.updateCardRewardDisplay(newRewards);
         }
         
-        // Increment redraw cost
-        this.redrawCost++;
         this.totalRedraws++;
         
         // Update both gold breakdown and redraw button
@@ -643,7 +709,7 @@ export class CardRewardManager {
         this.isRedrawing = false;
     }
 
-    // New method to show total gold change animation - FIXED calculation
+    // New method to show total gold change animation
     showTotalGoldChange(amount) {
         const totalGoldElement = document.getElementById('totalGoldAmount');
         if (!totalGoldElement) return;
@@ -730,7 +796,7 @@ export class CardRewardManager {
                 <div class="reward-content-wrapper">
                     <div class="reward-left-section">
                         <div class="reward-header">
-                            <h2>🎉 Battle Rewards</h2>
+                            <h2>⚔️ Battle Rewards</h2>
                             <p>Choose one card to add to your deck (Turn ${currentTurn})</p>
                             ${this.createViewBattlefieldButtonHTML()}
                         </div>
@@ -824,10 +890,10 @@ export class CardRewardManager {
                 <div class="reward-content-wrapper">
                     <div class="reward-left-section">
                         <div class="reward-header">
-                            <h2>🦸 Epic Hero Rewards!</h2>
+                            <h2>Hero Reward!</h2>
                             <p>Choose one Hero to join your roster (Turn ${currentTurn})</p>
-                            ${currentTurn === 3 ? '<div class="special-reward-indicator turn-3">⚔️ Turn 3 Special Reward</div>' : ''}
-                            ${currentTurn === 5 ? '<div class="special-reward-indicator turn-5">🏆 Turn 5 Epic Reward</div>' : ''}
+                            ${currentTurn === 3 ? '<div class="special-reward-indicator turn-3"> Turn 3 Special Reward</div>' : ''}
+                            ${currentTurn === 5 ? '<div class="special-reward-indicator turn-5"> Turn 5 Epic Reward</div>' : ''}
                             ${this.createViewBattlefieldButtonHTML()}
                         </div>
                         
@@ -907,8 +973,6 @@ export class CardRewardManager {
         const previousMode = this.viewMode;
         this.viewMode = this.viewMode === 'rewards' ? 'battlefield' : 'rewards';
         
-        console.log(`🔄 Toggling view from ${previousMode} to ${this.viewMode}`);
-        
         // Update button
         this.updateViewToggleButton();
         
@@ -917,8 +981,6 @@ export class CardRewardManager {
         const overlay = document.getElementById('cardRewardOverlay');
         
         if (this.viewMode === 'battlefield') {
-            console.log('🔍 Switching to battlefield view...');
-            
             // Hide reward elements and make overlay transparent
             toggleableElements.forEach(el => {
                 el.style.display = 'none';
@@ -927,51 +989,33 @@ export class CardRewardManager {
                 overlay.classList.add('battlefield-mode');
             }
             
-            // ✅ ENHANCED: Try to show battle arena with recovery
+            // Try to show battle arena with recovery
             const battleArena = document.getElementById('battleArena');
             if (battleArena) {
                 battleArena.style.display = 'block';
-                console.log('🔍 Battle arena found and shown for battlefield view');
-                console.log('🔍 Battle arena innerHTML length:', battleArena.innerHTML.length);
-                console.log('🔍 Battle arena classes:', battleArena.className);
             } else {
-                console.warn('⚠️ Battle arena not found - attempting recovery...');
-                console.log('🔍 Available elements with battle-related IDs:');
-                ['battleArena', 'gameScreen', 'battleField', 'battle-arena'].forEach(id => {
-                    const element = document.getElementById(id);
-                    console.log(`🔍 ${id}:`, element ? 'EXISTS' : 'NOT FOUND');
-                });
-                
                 // Try to find battle arena by class name
                 const battleArenaByClass = document.querySelector('.battle-arena');
                 if (battleArenaByClass) {
-                    console.log('🔍 Found battle arena by class name');
                     battleArenaByClass.style.display = 'block';
                 } else {
-                    console.log('🔍 No battle arena found by class name either');
-                    
-                    // ✅ NEW: Attempt to recover by initializing battle screen
+                    // Attempt to recover by initializing battle screen
                     const recoverySuccess = await this.attemptBattleScreenRecovery();
                     
                     if (recoverySuccess) {
                         const recoveredArena = document.getElementById('battleArena');
                         if (recoveredArena) {
                             recoveredArena.style.display = 'block';
-                            console.log('✅ Battle screen recovery successful!');
                         } else {
-                            console.error('❌ Battle screen recovery failed - no arena found after recovery');
                             this.showBattleViewError();
                         }
                     } else {
-                        console.error('❌ Could not recover battle screen');
                         this.showBattleViewError();
                     }
                 }
             }
             
         } else {
-            console.log('🎁 Switching to rewards view...');
-            
             // Show reward elements and restore overlay
             toggleableElements.forEach(el => {
                 el.style.display = '';
@@ -984,24 +1028,16 @@ export class CardRewardManager {
             const battleArena = document.getElementById('battleArena');
             if (battleArena) {
                 battleArena.style.display = 'none';
-                console.log('🎁 Battle arena hidden for rewards view');
-            } else {
-                console.log('🎁 No battle arena to hide (not found)');
             }
         }
         
         // Save the view mode state
         this.saveViewModeState();
-        
-        console.log(`✅ Successfully switched to ${this.viewMode} view`);
     }
 
     // Attempt to recover battle screen when missing
     async attemptBattleScreenRecovery() {
-        console.log('🔧 Attempting to recover missing battle screen...');
-        
         if (!this.heroSelection) {
-            console.error('❌ No heroSelection available for recovery');
             return false;
         }
         
@@ -1010,15 +1046,12 @@ export class CardRewardManager {
             const recoverySuccess = await this.ensureBattleScreenInitialized(this.heroSelection);
             
             if (recoverySuccess) {
-                console.log('✅ Battle screen recovery completed');
                 return true;
             } else {
-                console.error('❌ Battle screen recovery failed');
                 return false;
             }
             
         } catch (error) {
-            console.error('❌ Error during battle screen recovery:', error);
             return false;
         }
     }
@@ -1128,7 +1161,7 @@ export class CardRewardManager {
         
         const isShowingRewards = this.viewMode === 'rewards';
         const buttonText = isShowingRewards ? 'View Battlefield' : 'View Rewards';
-        const buttonIcon = isShowingRewards ? '🔍' : '🎁';
+        const buttonIcon = isShowingRewards ? '⚔️' : '🪙';
         
         const iconElement = button.querySelector('.view-button-icon');
         const textElement = button.querySelector('.view-button-text');
@@ -1150,11 +1183,8 @@ export class CardRewardManager {
     // Apply battlefield mode without toggling (for restoration)
     applyBattlefieldMode() {
         if (this.viewMode !== 'battlefield') {
-            console.log('🔍 Not applying battlefield mode - current mode is:', this.viewMode);
             return;
         }
-        
-        console.log('🔍 Applying battlefield mode from saved state...');
         
         // Update button
         this.updateViewToggleButton();
@@ -1163,54 +1193,26 @@ export class CardRewardManager {
         const toggleableElements = document.querySelectorAll('.toggleable-content');
         const overlay = document.getElementById('cardRewardOverlay');
         
-        console.log('🔍 Found', toggleableElements.length, 'toggleable elements to hide');
-        
         toggleableElements.forEach(el => {
             el.style.display = 'none';
         });
         
         if (overlay) {
             overlay.classList.add('battlefield-mode');
-            console.log('🔍 Added battlefield-mode class to overlay');
-        } else {
-            console.warn('⚠️ Reward overlay not found when applying battlefield mode');
         }
         
         // Show the battle arena for battlefield mode
         const battleArena = document.getElementById('battleArena');
         if (battleArena) {
             battleArena.style.display = 'block';
-            console.log('✅ Applied battlefield mode - battle arena shown');
-            console.log('🔍 Battle arena innerHTML length:', battleArena.innerHTML.length);
         } else {
-            console.warn('⚠️ Battle arena not found when applying battlefield mode');
-            console.log('🔍 Searching for battle arena alternatives...');
-            
             // Search for battle arena by class
             const battleArenaByClass = document.querySelector('.battle-arena');
             if (battleArenaByClass) {
                 battleArenaByClass.id = 'battleArena'; // Ensure it has the right ID
                 battleArenaByClass.style.display = 'block';
-                console.log('✅ Found and showed battle arena by class name');
-            } else {
-                console.error('❌ No battle arena found by ID or class name');
-                
-                // List all elements that might be the battle arena
-                const gameScreen = document.getElementById('gameScreen');
-                if (gameScreen) {
-                    console.log('🔍 Children of gameScreen:', 
-                        Array.from(gameScreen.children).map(child => ({
-                            tagName: child.tagName,
-                            id: child.id,
-                            className: child.className,
-                            display: child.style.display
-                        }))
-                    );
-                }
             }
         }
-        
-        console.log('✅ Battlefield mode application completed');
     }
 
     // Save view mode state to local storage and pending rewards
@@ -1219,7 +1221,7 @@ export class CardRewardManager {
         try {
             localStorage.setItem('rewardViewMode', this.viewMode);
         } catch (error) {
-            console.warn('Could not save view mode to localStorage:', error);
+            // Silent error handling
         }
         
         // Save to Firebase with pending rewards
@@ -1233,10 +1235,9 @@ export class CardRewardManager {
                 
                 // Update the viewMode in existing pending rewards
                 await roomRef.child('gameState').child(rewardKey).child('viewMode').set(this.viewMode);
-                console.log(`Saved view mode "${this.viewMode}" to Firebase`);
                 
             } catch (error) {
-                console.warn('Could not save view mode to Firebase:', error);
+                // Silent error handling
             }
         }
     }
@@ -1248,10 +1249,9 @@ export class CardRewardManager {
             const savedMode = localStorage.getItem('rewardViewMode');
             if (savedMode && (savedMode === 'rewards' || savedMode === 'battlefield')) {
                 this.viewMode = savedMode;
-                console.log(`Restored view mode "${this.viewMode}" from localStorage`);
             }
         } catch (error) {
-            console.warn('Could not restore view mode from localStorage:', error);
+            // Silent error handling
         }
         
         // Apply the restored view mode
@@ -1343,11 +1343,11 @@ export class CardRewardManager {
                 border: 3px solid #667eea;
                 border-radius: 20px;
                 padding: 40px;
-                max-width: 1600px; /* INCREASED to accommodate preview area */
+                max-width: 1600px;
                 width: 98%;
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
                 max-height: 95vh;
-                overflow: hidden; /* Changed from overflow-y: auto to prevent scrolling */
+                overflow: hidden;
                 display: flex;
                 flex-direction: column;
             }
@@ -1355,7 +1355,7 @@ export class CardRewardManager {
             .reward-container[data-reward-type="hero"].enhanced-with-gold-and-preview {
                 border: 3px solid rgba(40, 167, 69, 0.6);
                 background: linear-gradient(135deg, rgba(40, 167, 69, 0.02), rgba(32, 201, 151, 0.02));
-                max-width: 1800px; /* EXTRA WIDTH for hero rewards with preview */
+                max-width: 1800px;
             }
             
             .reward-content-wrapper {
@@ -1372,21 +1372,21 @@ export class CardRewardManager {
             
             .reward-main-content {
                 display: flex;
-                gap: 25px; /* Reduced gap to fit 3 sections */
+                gap: 25px;
                 align-items: flex-start;
                 margin-bottom: 30px;
                 justify-content: space-between;
                 flex: 1;
-                min-height: 0; /* Allow flexbox to shrink */
+                min-height: 0;
                 overflow: hidden;
             }
             
             /* Gold and Redraw Section Layout */
             .gold-and-redraw-section {
-                flex: 0 0 320px; /* Increased width to accommodate larger redraw button */
+                flex: 0 0 320px;
                 display: flex;
                 flex-direction: column;
-                gap: 0; /* Remove gap since redraw button is now inside gold container */
+                gap: 0;
             }
             
             /* Gold Breakdown Styles */
@@ -1397,6 +1397,10 @@ export class CardRewardManager {
                 padding: 18px;
                 backdrop-filter: blur(10px);
                 box-shadow: 0 8px 25px rgba(255, 193, 7, 0.2);
+                max-height: 900px;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
             }
             
             .gold-breakdown-header {
@@ -1406,6 +1410,7 @@ export class CardRewardManager {
                 margin-bottom: 18px;
                 padding-bottom: 12px;
                 border-bottom: 2px solid rgba(255, 193, 7, 0.3);
+                flex-shrink: 0;
             }
             
             .gold-breakdown-header .gold-icon {
@@ -1419,6 +1424,16 @@ export class CardRewardManager {
                 font-weight: 800;
                 color: #ffd700;
                 text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            }
+            
+            .gold-breakdown-content-scrollable {
+                flex: 1;
+                overflow-y: auto;
+                padding-right: 5px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                min-height: 0;
             }
             
             .gold-breakdown-content {
@@ -1460,7 +1475,7 @@ export class CardRewardManager {
             }
 
             .gold-line-item.semi-bonus {
-                background: rgba(64, 224, 208, 0.1);  /* Turquoise background for Semi */
+                background: rgba(64, 224, 208, 0.1);
                 border-color: rgba(64, 224, 208, 0.4);
             }
             
@@ -1528,9 +1543,15 @@ export class CardRewardManager {
                 color: #ffd700;
             }
             
-            /* Total Line */
+            /* Gold Breakdown Totals */
+            .gold-breakdown-totals {
+                margin-top: auto;
+                padding-top: 12px;
+                border-top: 2px solid rgba(255, 193, 7, 0.3);
+                flex-shrink: 0;
+            }
+            
             .gold-total-line {
-                margin-top: 12px;
                 padding: 10px 12px;
                 background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 152, 0, 0.2));
                 border: 2px solid rgba(255, 193, 7, 0.6);
@@ -1563,13 +1584,14 @@ export class CardRewardManager {
             
             /* Total Gold Display Styles */
             .total-gold-display {
-                margin-top: 20px;
+                margin-top: 12px;
                 padding: 15px;
                 background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 193, 7, 0.15));
                 border: 2px solid rgba(255, 215, 0, 0.6);
                 border-radius: 12px;
                 backdrop-filter: blur(10px);
                 box-shadow: 0 6px 20px rgba(255, 215, 0, 0.25);
+                flex-shrink: 0;
             }
             
             .total-gold-header {
@@ -1643,7 +1665,7 @@ export class CardRewardManager {
                 transition: all 0.3s ease;
                 box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
                 position: relative;
-                overflow: hidden;
+                overflow: visible;
                 min-height: 80px;
             }
             
@@ -1651,21 +1673,27 @@ export class CardRewardManager {
                 content: '';
                 position: absolute;
                 top: 0;
-                left: -100%;
-                width: 100%;
+                left: -20%; 
+                width: 23%; 
                 height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
                 transition: left 0.6s ease;
+                border-radius: 16px;
+                z-index: 1;
             }
             
             .enhanced-redraw-button:hover:not(.disabled)::before {
-                left: 100%;
+                left: 80%;
             }
             
             .enhanced-redraw-button:hover:not(.disabled) {
                 transform: translateY(-2px);
                 box-shadow: 0 12px 35px rgba(102, 126, 234, 0.5);
                 background: linear-gradient(135deg, #7c8cff 0%, #8b5fbf 100%);
+            }
+            
+            .enhanced-redraw-button:hover:not(.disabled) .charme-counter-badge {
+                transform: scale(1.1);
             }
             
             .enhanced-redraw-button:active:not(.disabled) {
@@ -1685,7 +1713,7 @@ export class CardRewardManager {
                 justify-content: space-between;
                 padding: 16px 20px;
                 position: relative;
-                z-index: 1;
+                z-index: 2;
             }
             
             .redraw-icon-container {
@@ -1807,7 +1835,7 @@ export class CardRewardManager {
             
             /* Enhanced Card Layout - CENTER SECTION */
             .reward-cards.enhanced-cards {
-                flex: 1; /* Take available space between gold and preview */
+                flex: 1;
                 display: flex;
                 gap: 15px;
                 justify-content: center;
@@ -1817,7 +1845,7 @@ export class CardRewardManager {
             }
             
             .hero-reward-selection.enhanced-hero-selection {
-                flex: 1; /* Take available space between gold and preview */
+                flex: 1;
                 display: flex;
                 gap: 12px;
                 justify-content: center;
@@ -1829,13 +1857,13 @@ export class CardRewardManager {
             
             /* Card Preview Section (RIGHT) */
             .reward-card-preview-section {
-                flex: 0 0 380px; /* INCREASED width from 280px to 380px */
+                flex: 0 0 380px;
                 background: linear-gradient(135deg, 
                     rgba(255, 255, 255, 0.05) 0%, 
                     rgba(102, 126, 234, 0.1) 100%);
                 border: 2px solid rgba(102, 126, 234, 0.3);
                 border-radius: 15px;
-                padding: 8px; /* REDUCED padding to maximize card space */
+                padding: 8px;
                 backdrop-filter: blur(10px);
                 display: flex;
                 flex-direction: column;
@@ -1844,7 +1872,7 @@ export class CardRewardManager {
             .reward-card-preview-area {
                 flex: 1;
                 display: flex;
-                align-items: flex-start; /* CHANGED from center to flex-start */
+                align-items: flex-start;
                 justify-content: center;
                 padding-top: 0%; 
                 border-radius: 10px;
@@ -1852,7 +1880,7 @@ export class CardRewardManager {
                     rgba(0, 0, 0, 0.2) 0%, 
                     rgba(0, 0, 0, 0.1) 100%);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                min-height: 500px; /* INCREASED from 400px to 500px */
+                min-height: 500px;
             }
             
             .reward-card-preview-area .preview-placeholder {
@@ -1879,7 +1907,7 @@ export class CardRewardManager {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                padding: 8px; /* REDUCED padding to maximize card size */
+                padding: 8px;
                 justify-content: center;
             }
             
@@ -1894,7 +1922,6 @@ export class CardRewardManager {
                 border: 3px solid rgba(102, 126, 234, 0.6);
                 transition: transform 0.2s ease;
             }
-                
             
             .reward-card-preview-area .preview-card-image:hover {
                 transform: scale(1.02);
@@ -1902,13 +1929,13 @@ export class CardRewardManager {
             
             /* NORMAL Hand Display Section Styles */
             .reward-hand-display-section-normal {
-                margin: 20px 0 15px 0; /* Position after main content */
-                padding: 15px 20px; /* Normal padding */
+                margin: 20px 0 15px 0;
+                padding: 15px 20px;
                 background: linear-gradient(135deg, 
                     rgba(255, 255, 255, 0.03) 0%, 
                     rgba(76, 175, 80, 0.08) 100%);
-                border: 2px solid rgba(76, 175, 80, 0.3); /* Normal border */
-                border-radius: 15px; /* Normal border radius */
+                border: 2px solid rgba(76, 175, 80, 0.3);
+                border-radius: 15px;
                 backdrop-filter: blur(10px);
             }
             
@@ -1926,51 +1953,51 @@ export class CardRewardManager {
             }
             
             .reward-hand-display-section-normal .hand-container {
-                background: rgba(0, 0, 0, 0.2); /* Normal transparency */
+                background: rgba(0, 0, 0, 0.2);
                 border: 1px solid rgba(76, 175, 80, 0.2);
-                border-radius: 10px; /* Normal border radius */
-                padding: 15px; /* Normal padding */
+                border-radius: 10px;
+                padding: 15px;
                 margin: 0;
             }
             
             .reward-hand-display-section-normal .hand-cards {
-                display: flex !important; /* Force horizontal layout */
-                flex-direction: row !important; /* Ensure row direction */
+                display: flex !important;
+                flex-direction: row !important;
                 justify-content: center !important;
                 align-items: center !important;
-                gap: 8px !important; /* Normal gap between cards */
-                flex-wrap: wrap !important; /* Allow wrapping if needed */
+                gap: 8px !important;
+                flex-wrap: wrap !important;
             }
             
             /* NORMAL SIZE hand cards for reward screen */
             .reward-hand-display-section-normal .hand-card {
-                width: 120px !important; /* Direct width control */
+                width: 120px !important;
                 height: auto !important;
                 min-width: 120px !important;
                 max-width: 120px !important;
                 opacity: 0.9;
                 transition: all 0.3s ease;
-                margin: 0 4px; /* Small margin between cards */
+                margin: 0 4px;
                 display: inline-block !important;
                 flex-shrink: 0;
             }
             
             .reward-hand-display-section-normal .hand-card:hover {
                 opacity: 1;
-                transform: translateY(-5px); /* Only lift on hover, no scaling */
+                transform: translateY(-5px);
                 box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
                 z-index: 10;
             }
             
             .reward-hand-display-section-normal .hand-card-image {
                 width: 100% !important;
-                height: 168px !important; /* Direct height control */
+                height: 168px !important;
                 object-fit: cover !important;
                 border-radius: 8px !important;
             }
             
             .reward-hand-display-section-normal .hand-card-name {
-                font-size: 12px !important; /* Direct font size control */
+                font-size: 12px !important;
                 padding: 4px !important;
                 line-height: 1.2 !important;
                 text-align: center;
@@ -2144,12 +2171,12 @@ export class CardRewardManager {
                 color: rgba(255, 255, 255, 0.8);
             }
             
-            /* View Battlefield Button Styles - Centered between hero rows */
+            /* View Battlefield Button Styles */
             .view-battlefield-button-container {
                 position: fixed;
                 top: 2%;
                 left: 9.5%;
-                z-index: 10001;  /* Ensure it's above the overlay */
+                z-index: 10001;
             }
             
             .view-battlefield-button {
@@ -2249,6 +2276,106 @@ export class CardRewardManager {
                 0% { transform: scale(1); color: #ffd700; }
                 50% { transform: scale(1.1); color: #ff6b6b; }
                 100% { transform: scale(1); color: #ffd700; }
+            }
+            
+            /* Legendary Sword Bonuses Styles */
+            .sword-bonuses-section-header {
+                margin-top: 15px;
+            }
+
+            .sword-bonuses-header-item {
+                background: linear-gradient(135deg, rgba(255, 69, 0, 0.1), rgba(255, 140, 0, 0.1));
+                border-color: rgba(255, 69, 0, 0.4);
+            }
+
+            .sword-icon {
+                font-size: 16px;
+                margin-right: 8px;
+                animation: swordIconGlow 3s ease-in-out infinite;
+            }
+
+            .sword-bonus-detail-line {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 8px 12px;
+                margin-left: 12px;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 69, 0, 0.2);
+                margin-top: 5px;
+                transition: all 0.3s ease;
+            }
+
+            .sword-bonus-detail-line:hover {
+                background: rgba(255, 69, 0, 0.1);
+                border-color: rgba(255, 69, 0, 0.4);
+                transform: translateX(3px);
+            }
+
+            .sword-hero-info {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+            }
+
+            .sword-hero-name {
+                font-weight: 700;
+                color: rgba(255, 255, 255, 0.95);
+                font-size: 0.9rem;
+            }
+
+            .sword-calculation {
+                font-size: 0.8rem;
+                color: rgba(255, 140, 0, 0.8);
+                font-style: italic;
+            }
+
+            .sword-gains {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+
+            .attack-gain {
+                font-weight: 700;
+                color: #ff6b6b;
+                font-size: 0.9rem;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+                padding: 2px 6px;
+                background: rgba(255, 107, 107, 0.1);
+                border-radius: 4px;
+                border: 1px solid rgba(255, 107, 107, 0.3);
+            }
+
+            .hp-gain {
+                font-weight: 700;
+                color: #4caf50;
+                font-size: 0.9rem;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+                padding: 2px 6px;
+                background: rgba(76, 175, 80, 0.1);
+                border-radius: 4px;
+                border: 1px solid rgba(76, 175, 80, 0.3);
+            }
+
+            @keyframes swordIconGlow {
+                0%, 100% { 
+                    transform: rotate(0deg) scale(1); 
+                    filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.6));
+                }
+                25% { 
+                    transform: rotate(-5deg) scale(1.05); 
+                    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
+                }
+                50% { 
+                    transform: rotate(0deg) scale(1.1); 
+                    filter: drop-shadow(0 0 10px rgba(255, 69, 0, 1));
+                }
+                75% { 
+                    transform: rotate(5deg) scale(1.05); 
+                    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
+                }
             }
             
             /* Animations */
@@ -2484,159 +2611,13 @@ export class CardRewardManager {
                 }
             }
 
-            .sword-bonuses-container {
-                margin-top: 15px;
-                padding: 15px;
-                background: linear-gradient(135deg, rgba(255, 69, 0, 0.1), rgba(255, 140, 0, 0.1));
-                border: 2px solid rgba(255, 69, 0, 0.4);
-                border-radius: 12px;
-                backdrop-filter: blur(10px);
-                box-shadow: 0 6px 20px rgba(255, 69, 0, 0.25);
+            .gold-line-item.sapphire-bonus {
+                background: rgba(0, 102, 204, 0.1);
+                border-color: rgba(0, 102, 204, 0.4);
             }
 
-            .sword-bonuses-header {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-bottom: 12px;
-                padding-bottom: 8px;
-                border-bottom: 2px solid rgba(255, 69, 0, 0.3);
-            }
-
-            .sword-bonuses-header .sword-icon {
-                font-size: 20px;
-                animation: swordIconGlow 3s ease-in-out infinite;
-            }
-
-            .sword-bonuses-header h4 {
-                margin: 0;
-                font-size: 1.1rem;
-                font-weight: 800;
-                color: #ff4500;
-                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-            }
-
-            .sword-bonuses-content {
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .sword-bonus-line {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 8px 12px;
-                border-radius: 8px;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 69, 0, 0.2);
-                transition: all 0.3s ease;
-            }
-
-            .sword-bonus-line:hover {
-                background: rgba(255, 69, 0, 0.1);
-                border-color: rgba(255, 69, 0, 0.4);
-                transform: translateX(3px);
-            }
-
-            .sword-hero-info {
-                display: flex;
-                flex-direction: column;
-                gap: 2px;
-            }
-
-            .sword-hero-name {
-                font-weight: 700;
-                color: rgba(255, 255, 255, 0.95);
-                font-size: 0.9rem;
-            }
-
-            .sword-calculation {
-                font-size: 0.8rem;
-                color: rgba(255, 140, 0, 0.8);
-                font-style: italic;
-            }
-
-            .sword-gains {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-            }
-
-            .attack-gain {
-                font-weight: 700;
-                color: #ff6b6b;
-                font-size: 0.9rem;
-                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-                padding: 2px 6px;
-                background: rgba(255, 107, 107, 0.1);
-                border-radius: 4px;
-                border: 1px solid rgba(255, 107, 107, 0.3);
-            }
-
-            .hp-gain {
-                font-weight: 700;
-                color: #4caf50;
-                font-size: 0.9rem;
-                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-                padding: 2px 6px;
-                background: rgba(76, 175, 80, 0.1);
-                border-radius: 4px;
-                border: 1px solid rgba(76, 175, 80, 0.3);
-            }
-
-            /* Sword icon glow animation */
-            @keyframes swordIconGlow {
-                0%, 100% { 
-                    transform: rotate(0deg) scale(1); 
-                    filter: drop-shadow(0 0 5px rgba(255, 69, 0, 0.6));
-                }
-                25% { 
-                    transform: rotate(-5deg) scale(1.05); 
-                    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
-                }
-                50% { 
-                    transform: rotate(0deg) scale(1.1); 
-                    filter: drop-shadow(0 0 10px rgba(255, 69, 0, 1));
-                }
-                75% { 
-                    transform: rotate(5deg) scale(1.05); 
-                    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.8));
-                }
-            }
-
-            /* Responsive adjustments for sword bonuses */
-            @media (max-width: 1200px) {
-                .sword-bonus-line {
-                    flex-direction: column;
-                    align-items: flex-start;
-                    gap: 6px;
-                }
-                
-                .sword-gains {
-                    align-self: flex-end;
-                }
-            }
-
-            @media (max-width: 768px) {
-                .sword-bonuses-header h4 {
-                    font-size: 1rem;
-                }
-                
-                .sword-hero-name {
-                    font-size: 0.85rem;
-                }
-                
-                .sword-calculation {
-                    font-size: 0.75rem;
-                }
-                
-                .attack-gain,
-                .hp-gain {
-                    font-size: 0.8rem;
-                    padding: 1px 4px;
-                }
-            }
+            ${SidHeroEffect.getSidStyles()}
+            ${CharmeManager.getCharmeStyles()}
         `;
 
         // Add Wanted Poster styles
@@ -2803,20 +2784,14 @@ export class CardRewardManager {
             .filter(hero => hero !== null)
             .map(hero => hero.name);
         
-        console.log('Heroes already in formation:', usedHeroNames);
-        
         // Filter out already used heroes
         const availableHeroes = this.allHeroes.filter(hero => !usedHeroNames.includes(hero.name));
         
-        console.log(`Filtered heroes: ${this.allHeroes.length} total -> ${availableHeroes.length} available`);
-        
         if (availableHeroes.length === 0) {
-            console.warn('No available heroes for rewards - all heroes already in formation!');
             return [];
         }
         
         if (availableHeroes.length < count) {
-            console.warn(`Only ${availableHeroes.length} available heroes, but need ${count} rewards`);
             count = availableHeroes.length;
         }
         
@@ -2832,7 +2807,6 @@ export class CardRewardManager {
             }
         }
         
-        console.log('Generated filtered hero rewards:', rewardHeroes.map(h => h.name));
         return rewardHeroes;
     }
 
@@ -2844,8 +2818,6 @@ export class CardRewardManager {
         const currentDeckCardNames = currentDeck.map(card => 
             typeof card === 'string' ? card : card.name
         );
-        
-        console.log('Current deck cards:', currentDeckCardNames);
         
         // Separate cards by type and whether they're in deck
         const abilityCards = allCards.filter(card => card.cardType === 'Ability');
@@ -2865,29 +2837,24 @@ export class CardRewardManager {
         const otherCardsInDeck = otherCards.filter(card => currentDeckCardNames.includes(card.name));
         const otherCardsNotInDeck = otherCards.filter(card => !currentDeckCardNames.includes(card.name));
         
-        console.log(`Available cards - Abilities: ${abilityCards.length} (${abilityCardsInDeck.length} in deck), Spells: ${spellCards.length} (${spellCardsInDeck.length} in deck), Others: ${otherCards.length} (${otherCardsInDeck.length} in deck)`);
-        
         const rewardCards = [];
         
         // First card: Always an Ability
         const firstCard = this.selectCardByType(abilityCardsInDeck, abilityCardsNotInDeck, 'Ability');
         if (firstCard) {
             rewardCards.push(firstCard);
-            console.log(`First reward (Ability): ${firstCard.name}`);
         }
         
         // Second card: Always a Spell
         const secondCard = this.selectCardByType(spellCardsInDeck, spellCardsNotInDeck, 'Spell');
         if (secondCard) {
             rewardCards.push(secondCard);
-            console.log(`Second reward (Spell): ${secondCard.name}`);
         }
         
         // Third card: Anything except Ability, Spell, or Hero (so Artifacts, Potions, etc.)
         const thirdCard = this.selectCardByType(otherCardsInDeck, otherCardsNotInDeck, 'Other');
         if (thirdCard) {
             rewardCards.push(thirdCard);
-            console.log(`Third reward (${thirdCard.cardType}): ${thirdCard.name}`);
         }
         
         // Fallback: if we don't have enough cards, fill with random available cards
@@ -2895,11 +2862,9 @@ export class CardRewardManager {
             const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
             if (!rewardCards.some(card => card.name === randomCard.name)) {
                 rewardCards.push(randomCard);
-                console.log(`Fallback reward: ${randomCard.name}`);
             }
         }
         
-        console.log('Generated reward cards with new specific ratios:', rewardCards.map(c => `${c.name} (${c.cardType})`));
         return rewardCards;
     }
 
@@ -2914,25 +2879,20 @@ export class CardRewardManager {
             // Pick random card from deck
             const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
             selectedCard = cardsInDeck[randomIndex];
-            console.log(`Selected existing ${typeName}: ${selectedCard.name}`);
         } else if (cardsNotInDeck.length > 0) {
             // Pick random card not in deck
             const randomIndex = Math.floor(Math.random() * cardsNotInDeck.length);
             selectedCard = cardsNotInDeck[randomIndex];
-            console.log(`Selected new ${typeName}: ${selectedCard.name}`);
         } else if (cardsInDeck.length > 0) {
             // Fallback: pick from existing cards if no new cards available
             const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
             selectedCard = cardsInDeck[randomIndex];
-            console.log(`Selected existing ${typeName} (fallback): ${selectedCard.name}`);
         }
         
         return selectedCard;
     }
 
     generateFallbackRewards(allCards, count) {
-        console.log('Using fallback reward generation');
-        
         const rewardCards = [];
         const usedIndices = new Set();
         
@@ -2995,7 +2955,7 @@ export class CardRewardManager {
         `;
     }
 
-    // Handle hero selection - REMOVED duplicate restriction, allows duplicates
+    // Handle hero selection
     async handleHeroSelection(heroName) {
         // Prevent multiple selections
         if (this.selectionMade) {
@@ -3022,7 +2982,7 @@ export class CardRewardManager {
             // Add all hero cards to deck (USING addCardReward to allow duplicates)
             let addedCardsCount = 0;
             heroCards.forEach(cardName => {
-                const success = this.deckManager.addCardReward(cardName);  // CHANGED: Allow duplicates
+                const success = this.deckManager.addCardReward(cardName);
                 if (success) {
                     addedCardsCount++;
                 }
@@ -3125,15 +3085,14 @@ export class CardRewardManager {
                 // Clear pending rewards from Firebase
                 await this.clearPendingRewards();
                 
-                // NEW: Clear final battle state
+                // Clear final battle state
                 await this.clearFinalBattleState();
                 
                 // Save game state with new cards and hero
                 if (this.heroSelection) {
                     await this.heroSelection.saveGameState();
                 }
-                
-                // Reset actions for the new turn after selecting reward
+            // Reset actions for the new turn after selecting reward
                 if (window.heroSelection && window.heroSelection.actionManager) {
                     window.heroSelection.actionManager.resetActions();
                     
@@ -3192,7 +3151,7 @@ export class CardRewardManager {
         }
     }
 
-    // Handle card selection - REMOVED duplicate restriction, allows duplicates
+    // Handle card selection
     async handleCardSelection(cardName) {
         // Prevent multiple selections
         if (this.selectionMade) {
@@ -3211,7 +3170,7 @@ export class CardRewardManager {
         
         try {
             // Add the selected card to deck (USING addCardReward to allow duplicates)
-            const success = this.deckManager.addCardReward(cardName);  // CHANGED: Allow duplicates
+            const success = this.deckManager.addCardReward(cardName);
             
             if (success) {
                 this.awardCalculatedGold();
@@ -3246,7 +3205,7 @@ export class CardRewardManager {
                 // Clear pending rewards from Firebase
                 await this.clearPendingRewards();
                 
-                // NEW: Clear final battle state
+                // Clear final battle state
                 await this.clearFinalBattleState();
                 
                 // Save game state with new card
@@ -3349,12 +3308,6 @@ export class CardRewardManager {
             }
         }
         
-        if (heroInfo) {
-            console.log(`Found hero info for ${heroName}:`, heroInfo);
-        } else {
-            console.warn(`Could not find hero info for ${heroName} - abilities may not be initialized`);
-        }
-        
         return heroInfo;
     }
 
@@ -3397,14 +3350,13 @@ export class CardRewardManager {
         try {
             localStorage.removeItem('rewardViewMode');
         } catch (error) {
-            console.warn('Could not clear view mode from localStorage:', error);
+            // Silent error handling
         }
         
         // Hide battle arena if it was shown during battlefield view
         const battleArena = document.getElementById('battleArena');
         if (battleArena) {
             battleArena.style.display = 'none';
-            console.log('🎁 Hidden battle arena when closing reward overlay');
         }
         
         // Show surrender button when returning to formation
@@ -3431,7 +3383,6 @@ export class CardRewardManager {
         // Method 1: Use battle screen static method if available
         if (typeof window !== 'undefined' && window.BattleScreen && window.BattleScreen.showSurrenderButton) {
             window.BattleScreen.showSurrenderButton();
-            console.log('🛡️ Showed surrender button via BattleScreen static method');
             return;
         }
         
@@ -3439,7 +3390,6 @@ export class CardRewardManager {
         if (this.heroSelection && this.heroSelection.battleScreen && 
             typeof this.heroSelection.battleScreen.showSurrenderButton === 'function') {
             this.heroSelection.battleScreen.showSurrenderButton();
-            console.log('🛡️ Showed surrender button via heroSelection battle screen');
             return;
         }
         
@@ -3448,17 +3398,12 @@ export class CardRewardManager {
         const surrenderButton = document.querySelector('.surrender-button');
         if (surrenderButton) {
             surrenderButton.style.display = '';
-            console.log('🛡️ Showed surrender button via direct DOM manipulation');
-        } else {
-            console.warn('⚠️ Surrender button not found when trying to show it');
         }
     }
-
 
     // Save pending rewards to Firebase (updated to handle hero rewards and gold breakdown)
     async savePendingRewards(rewards, isHeroReward = false) {
         if (!this.heroSelection || !this.heroSelection.roomManager) {
-            console.log('No room manager available to save rewards');
             return;
         }
         
@@ -3474,20 +3419,18 @@ export class CardRewardManager {
                 rewards: rewards,
                 turn: currentTurn,
                 isHeroReward: isHeroReward,
-                goldBreakdown: this.lastGoldBreakdown, // Include gold breakdown
-                // Add redraw state
+                goldBreakdown: this.lastGoldBreakdown,
                 redrawCost: this.redrawCost,
                 totalRedraws: this.totalRedraws,
-                // Add view mode state
+                charmeState: this.charmeManager.exportCharmeState(),
                 viewMode: this.viewMode,
                 timestamp: Date.now()
             };
             
             await roomRef.child('gameState').child(rewardKey).set(rewardData);
-            console.log(`Saved pending ${isHeroReward ? 'hero' : 'card'} rewards with gold breakdown and redraw state to Firebase`);
             
         } catch (error) {
-            console.error('Error saving pending rewards:', error);
+            // Silent error handling
         }
     }
 
@@ -3496,7 +3439,6 @@ export class CardRewardManager {
         this.heroSelection = heroSelection;
         
         if (!heroSelection || !heroSelection.roomManager) {
-            console.log('No room manager available to check rewards');
             return false;
         }
         
@@ -3511,40 +3453,39 @@ export class CardRewardManager {
             const pendingRewards = snapshot.val();
             
             if (pendingRewards && pendingRewards.rewards && pendingRewards.rewards.length > 0) {
-                console.log('Found pending rewards:', pendingRewards);
-                
-                // ✅ CRITICAL FIX: Initialize battle screen BEFORE restoring rewards
-                console.log('🔥 Ensuring battle screen is initialized for reward restoration...');
+                // Initialize battle screen BEFORE restoring rewards
                 const battleScreenInitialized = await this.ensureBattleScreenInitialized(heroSelection);
                 if (!battleScreenInitialized) {
-                    console.warn('⚠️ Failed to initialize battle screen for reward restoration');
                     // Still show rewards but warn user that battlefield view may not work
-                } else {
-                    console.log('✅ Battle screen successfully initialized for reward restoration');
                 }
                 
                 // Restore gold breakdown if available
                 if (pendingRewards.goldBreakdown) {
                     this.lastGoldBreakdown = pendingRewards.goldBreakdown;
-                    console.log('Restored gold breakdown:', this.lastGoldBreakdown);
                 }
                 
                 // Restore redraw state
                 if (pendingRewards.redrawCost !== undefined) {
                     this.redrawCost = pendingRewards.redrawCost;
                     this.totalRedraws = pendingRewards.totalRedraws || 0;
-                    console.log('Restored redraw state:', { redrawCost: this.redrawCost, totalRedraws: this.totalRedraws });
                 }
                 
                 // Restore view mode state
                 if (pendingRewards.viewMode) {
                     this.viewMode = pendingRewards.viewMode;
-                    console.log('Restored view mode:', this.viewMode);
                 } else {
                     // Fallback to localStorage
                     this.restoreViewModeState();
                 }
-                
+
+                // Restore Charme state
+                if (pendingRewards.charmeState) {
+                    this.charmeManager.importCharmeState(pendingRewards.charmeState, heroSelection);
+                } else {
+                    // Backward compatibility - recalculate
+                    this.charmeManager.importCharmeState(null, heroSelection);
+                }
+
                 // Check if these are hero rewards or card rewards
                 if (pendingRewards.isHeroReward) {
                     this.displayHeroRewardUI(pendingRewards.rewards, pendingRewards.turn || 1);
@@ -3566,19 +3507,15 @@ export class CardRewardManager {
             
             return false;
         } catch (error) {
-            console.error('Error checking pending rewards:', error);
             return false;
         }
     }
 
     // Ensure battle screen is initialized for reward reconnection
     async ensureBattleScreenInitialized(heroSelection) {
-        console.log('🔥 Ensuring battle screen is initialized for reward reconnection...');
-        
         try {
             // Check if we have the required data
             if (!heroSelection.selectedCharacter || !heroSelection.opponentSelectedCharacter) {
-                console.warn('⚠️ Missing character data for battle screen initialization');
                 return false;
             }
             
@@ -3586,14 +3523,12 @@ export class CardRewardManager {
             const opponentFormation = heroSelection.formationManager.getOpponentBattleFormation();
             
             if (!playerFormation || !opponentFormation) {
-                console.warn('⚠️ Missing formation data for battle screen initialization');
                 return false;
             }
             
             // Check if battle screen already exists and is properly initialized
             const existingBattleArena = document.getElementById('battleArena');
             if (existingBattleArena && existingBattleArena.innerHTML.trim() !== '') {
-                console.log('✅ Battle arena already exists and has content');
                 existingBattleArena.style.display = 'none'; // Ensure it's hidden initially
                 
                 // Wait a bit to ensure DOM is ready
@@ -3608,8 +3543,6 @@ export class CardRewardManager {
                 return true;
             }
             
-            console.log('🎮 Initializing battle screen for reward reconnection...');
-            
             // Initialize battle screen if not already done
             if (!heroSelection.battleScreen) {
                 const { BattleScreen } = await import('./battleScreen.js');
@@ -3620,7 +3553,6 @@ export class CardRewardManager {
             let battleInitialized = heroSelection.initBattleScreen();
             
             if (battleInitialized && heroSelection.battleScreen) {
-                console.log('🏗️ Creating battle screen HTML...');
                 heroSelection.battleScreen.createBattleScreen();
                 
                 // Wait for DOM to be ready
@@ -3636,24 +3568,20 @@ export class CardRewardManager {
                         await heroSelection.battleScreen.battleManager.restoreFinalBattleState(finalBattleState);
                     }
                     
-                    console.log('✅ Battle screen initialized successfully for reward reconnection');
                     return true;
                 } else {
-                    console.error('❌ Battle arena not found after initialization');
                     battleInitialized = false;
                 }
             }
             
             // Fallback: Manual battle screen setup
             if (!battleInitialized) {
-                console.log('🔧 Attempting manual battle screen setup...');
                 return await this.manualBattleScreenSetup(heroSelection);
             }
             
             return battleInitialized;
             
         } catch (error) {
-            console.error('❌ Error ensuring battle screen initialization:', error);
             return false;
         }
     }
@@ -3671,7 +3599,6 @@ export class CardRewardManager {
                 .once('value');
             return snapshot.val();
         } catch (error) {
-            console.error('Error loading final battle state:', error);
             return null;
         }
     }
@@ -3687,17 +3614,14 @@ export class CardRewardManager {
                 .child('gameState')
                 .child('finalBattleState')
                 .remove();
-            console.log('🧹 Cleared final battle state after reward selection');
         } catch (error) {
-            console.error('Error clearing final battle state:', error);
+            // Silent error handling
         }
     }
 
     // Manual battle screen setup as fallback
     async manualBattleScreenSetup(heroSelection) {
         try {
-            console.log('🔧 Manual battle screen setup starting...');
-            
             // Get all required data
             const playerAbilities = {
                 left: heroSelection.heroAbilitiesManager.getHeroAbilities('left'),
@@ -3744,15 +3668,12 @@ export class CardRewardManager {
             const battleArena = document.getElementById('battleArena');
             if (battleArena) {
                 battleArena.style.display = 'none'; // Hide initially
-                console.log('✅ Manual battle screen setup successful');
                 return true;
             } else {
-                console.error('❌ Manual battle screen setup failed - no arena created');
                 return false;
             }
             
         } catch (error) {
-            console.error('❌ Error in manual battle screen setup:', error);
             return false;
         }
     }
@@ -3771,7 +3692,7 @@ export class CardRewardManager {
         try {
             localStorage.removeItem('rewardViewMode');
         } catch (error) {
-            console.warn('Could not clear view mode from localStorage:', error);
+            // Silent error handling
         }
         
         const existingOverlay = document.getElementById('cardRewardOverlay');
@@ -3808,8 +3729,6 @@ export class CardRewardManager {
 
     // Handle opponent hero selection notification
     handleOpponentHeroSelection(heroSelection, data) {
-        console.log(`Opponent recruited ${data.heroName}!`);
-        
         // Show visual notification
         const notification = document.createElement('div');
         notification.className = 'opponent-hero-notification';
@@ -3835,10 +3754,39 @@ export class CardRewardManager {
         }, 4000);
     }
 
+    async handleOpponentSidTheft(data, heroSelection) {
+        if (!this.sidHeroEffect) {
+            // Import if not loaded
+            import('./Heroes/sid.js').then(({ sidHeroEffect }) => {
+                this.sidHeroEffect = sidHeroEffect;
+                this.sidHeroEffect.handleOpponentTheft(data, heroSelection);
+                
+                // UPDATE: Refresh reward screen hand display after theft
+                setTimeout(() => {
+                    this.updateRewardScreenHandDisplay();
+                }, 100);
+            });
+        } else {
+            await this.sidHeroEffect.handleOpponentTheft(data, heroSelection);
+            
+            // UPDATE: Refresh reward screen hand display after theft
+            setTimeout(() => {
+                this.updateRewardScreenHandDisplay();
+            }, 100);
+        }
+    }
+
+    updateRewardScreenHandDisplay() {
+        const rewardHandSection = document.querySelector('.reward-hand-display-section-normal');
+        if (rewardHandSection && this.heroSelection && this.heroSelection.handManager) {
+            // Recreate the hand display section with current hand
+            const updatedHandDisplay = this.createHandDisplaySection();
+            rewardHandSection.outerHTML = updatedHandDisplay;
+        }
+    }
+
     // Handle opponent bonus card draw notification
     handleOpponentBonusCardDraw(heroSelection) {
-        console.log('Opponent selected their reward card');
-        
         const notification = document.createElement('div');
         notification.className = 'opponent-reward-notification';
         notification.textContent = '🎯 Opponent selected their reward card!';
@@ -3866,7 +3814,6 @@ export class CardRewardManager {
     // Clear pending rewards from Firebase
     async clearPendingRewards() {
         if (!this.heroSelection || !this.heroSelection.roomManager) {
-            console.log('No room manager available to clear rewards');
             return;
         }
         
@@ -3878,10 +3825,9 @@ export class CardRewardManager {
             const rewardKey = isHost ? 'hostPendingRewards' : 'guestPendingRewards';
             
             await roomRef.child('gameState').child(rewardKey).remove();
-            console.log('Cleared pending rewards from Firebase');
             
         } catch (error) {
-            console.error('Error clearing pending rewards:', error);
+            // Silent error handling
         }
     }
 
@@ -3909,7 +3855,6 @@ export class CardRewardManager {
     // Award the calculated gold to the player
     awardCalculatedGold() {
         if (!this.lastGoldBreakdown) {
-            console.error('No gold breakdown available to award');
             return false;
         }
         
@@ -3923,8 +3868,6 @@ export class CardRewardManager {
                 // If total is negative due to thieving, subtract the gold
                 this.goldManager.subtractPlayerGold(Math.abs(totalGold));
             }
-            
-            console.log(`✅ Applied ${totalGold} net gold change to player from battle rewards (including thieving)`);
             
             // Send thieving update to opponent
             if (this.lastGoldBreakdown.thievingDetails) {
@@ -3954,7 +3897,6 @@ export class CardRewardManager {
 
     applySwordBonuses(swordBonuses) {
         if (!this.heroSelection || !this.heroSelection.formationManager) {
-            console.error('Cannot apply sword bonuses - missing heroSelection or formationManager');
             return;
         }
         
@@ -3973,8 +3915,6 @@ export class CardRewardManager {
                     
                     hero.attackBonusses += bonus.attackGain;
                     hero.hpBonusses += bonus.hpGain;
-                    
-                    console.log(`⚔️ ${hero.name}: Applied sword bonuses - ATK +${bonus.attackGain} (total: +${hero.attackBonusses}), HP +${bonus.hpGain} (total: +${hero.hpBonusses})`);
                 }
             }
         });
@@ -3983,8 +3923,6 @@ export class CardRewardManager {
         if (this.heroSelection.refreshHeroStats) {
             this.heroSelection.refreshHeroStats();
         }
-        
-        console.log('⚔️ All LegendarySwordOfABarbarianKing bonuses applied successfully!');
     }
 
     handleOpponentThievingEffects(thievingData) {
@@ -3997,7 +3935,6 @@ export class CardRewardManager {
                 opponentFormation: opponentFormation,
                 opponentAbilities: opponentAbilities
             };
-            console.log('📦 Cached opponent data for thieving calculations');
         }
     }
 }

@@ -14,6 +14,7 @@ export class BattleNetworkManager {
         this.connectionListener = null;
         this.reconnectionHandshakeTimeout = null;
         this.tabWasHidden = false;
+        this.battleLoopRunning = false;
 
         this.swapMessageQueue = [];
         this.isProcessingSwaps = false;
@@ -36,7 +37,6 @@ export class BattleNetworkManager {
     queueSwapMessage(messageType, data) {
         // Prevent queue overflow
         if (this.swapMessageQueue.length >= this.maxQueueSize) {
-            console.warn('Swap message queue is full, dropping oldest message');
             this.swapMessageQueue.shift();
         }
         
@@ -47,7 +47,6 @@ export class BattleNetworkManager {
             id: data.swapId || `swap_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
         });
         
-        console.log(`Ã°Å¸â€œâ€¹ Queued ${messageType} (Queue size: ${this.swapMessageQueue.length})`);
         this.processSwapQueue();
     }
 
@@ -57,7 +56,6 @@ export class BattleNetworkManager {
         }
 
         this.isProcessingSwaps = true;
-        console.log(`Ã°Å¸â€â€ž Processing ${this.swapMessageQueue.length} queued swap messages...`);
 
         while (this.swapMessageQueue.length > 0) {
             const message = this.swapMessageQueue.shift();
@@ -67,12 +65,10 @@ export class BattleNetworkManager {
             const timeSinceLastSwap = now - this.lastSwapProcessTime;
             if (timeSinceLastSwap < this.minSwapInterval) {
                 const waitTime = this.minSwapInterval - timeSinceLastSwap;
-                console.log(`Ã¢ÂÂ±Ã¯Â¸Â Waiting ${waitTime}ms before next swap to prevent visual overlap`);
                 await this.battleManager.delay(waitTime);
             }
 
             // Process the swap message
-            console.log(`Ã°Å¸Å½Â¬ Processing ${message.type} (ID: ${message.id})`);
             await this.handleSwapMessage(message);
             this.lastSwapProcessTime = Date.now();
             
@@ -101,10 +97,10 @@ export class BattleNetworkManager {
                     break;
                     
                 default:
-                    console.warn(`Unknown swap message type: ${message.type}`);
+                    break;
             }
         } catch (error) {
-            console.error(`Error processing ${message.type}:`, error);
+            // Error occurred processing swap message
         }
     }
 
@@ -112,7 +108,6 @@ export class BattleNetworkManager {
         this.swapMessageQueue = [];
         this.isProcessingSwaps = false;
         this.lastSwapProcessTime = 0;
-        console.log('Ã°Å¸Â§Â¹ Swap message queue cleared');
     }
 
     getSwapQueueStatus() {
@@ -127,7 +122,6 @@ export class BattleNetworkManager {
             }))
         };
     }
-
 
     // ============================================
     // CONNECTION MONITORING
@@ -179,7 +173,6 @@ export class BattleNetworkManager {
             if (wasConnected && !guestConnected) {
                 // Don't pause immediately if this might be a tab switch
                 if (this.tabWasHidden) {
-                    console.log('Opponent appears disconnected but our tab was hidden - waiting before pausing');
                     setTimeout(() => {
                         if (!this.opponentConnected && bm.battleActive) {
                             this.pauseBattle('Guest disconnected');
@@ -203,9 +196,6 @@ export class BattleNetworkManager {
         this.battlePaused = true;
         this.pauseStartTime = Date.now();
         
-        bm.addCombatLog(`Ã¢ÂÂ¸Ã¯Â¸Â Battle paused: ${reason}`, 'warning');
-        bm.addCombatLog('Ã¢ÂÂ³ Waiting for opponent to reconnect...', 'info');
-        
         bm.saveBattleStateToPersistence();
         
         this.sendBattleUpdate('battle_paused', {
@@ -226,9 +216,6 @@ export class BattleNetworkManager {
             this.totalPauseTime += Date.now() - this.pauseStartTime;
             this.pauseStartTime = null;
         }
-        
-        bm.addCombatLog(`Ã¢â€“Â¶Ã¯Â¸Â Battle resumed: ${reason}`, 'success');
-        bm.addCombatLog('Ã¢Å¡â€Ã¯Â¸Â Continuing from where we left off...', 'info');
         
         await bm.saveBattleStateToPersistence();
         
@@ -260,14 +247,14 @@ export class BattleNetworkManager {
         pauseOverlay.className = 'battle-pause-overlay';
         pauseOverlay.innerHTML = `
             <div class="battle-pause-content">
-                <div class="pause-icon">Ã¢ÂÂ¸Ã¯Â¸Â</div>
+                <div class="pause-icon">⏸️</div>
                 <h2>Battle Paused</h2>
                 <p>${reason}</p>
                 <div class="pause-spinner"></div>
                 <div class="pause-details">
-                    <p>Ã¢â‚¬Â¢ Battle state is preserved</p>
-                    <p>Ã¢â‚¬Â¢ Waiting for opponent to return</p>
-                    <p>Ã¢â‚¬Â¢ Will resume automatically</p>
+                    <p>✅ Battle state is preserved</p>
+                    <p>✅ Waiting for opponent to return</p>
+                    <p>✅ Will resume automatically</p>
                 </div>
             </div>
         `;
@@ -355,7 +342,6 @@ export class BattleNetworkManager {
     clearStuckPauseOverlay() {
         const pauseOverlay = document.getElementById('battlePauseOverlay');
         if (pauseOverlay) {
-            console.log('Removing stuck pause overlay');
             pauseOverlay.remove();
         }
         this.battlePaused = false;
@@ -368,17 +354,12 @@ export class BattleNetworkManager {
     handleGuestReconnecting() {
         this.guestReconnecting = true;
         const bm = this.battleManager;
-        bm.addCombatLog('Ã¢Å¡ Ã¯Â¸Â Guest reconnecting - checking for desync...', 'warning');
 
         // Pause battle immediately when guest starts reconnecting
         if (bm.battleActive && !this.battlePaused) {
             this.pauseBattle('Guest reconnecting - preventing desync');
         }
-
-        console.log('Ã°Å¸â€â€ž HOST: Guest is reconnecting...');
-        
-        bm.addCombatLog('Ã°Å¸â€â€ž Opponent is reconnecting...', 'info');
-        
+                
         // Set a timeout for reconnection handshake
         this.reconnectionHandshakeTimeout = setTimeout(() => {
             this.handleGuestReconnectionTimeout();
@@ -389,8 +370,6 @@ export class BattleNetworkManager {
         const bm = this.battleManager;
         if (!bm.isAuthoritative) return;
         
-        console.log('Ã¢Å“â€¦ HOST: Guest signaled ready after reconnection');
-        
         // Clear timeout
         if (this.reconnectionHandshakeTimeout) {
             clearTimeout(this.reconnectionHandshakeTimeout);
@@ -400,14 +379,11 @@ export class BattleNetworkManager {
         // Add a small delay to ensure guest is fully ready
         setTimeout(async () => {
             if (this.opponentConnected && !bm.checkBattleEnd()) {
-                console.log('Ã°Å¸â€â€ž HOST: Resyncing guest after reconnection...');
                 const resyncSuccess = await this.resyncGuest();
                 
                 if (resyncSuccess) {
-                    console.log('Ã¢Å“â€¦ HOST: Guest resync completed, resuming battle');
                     // Battle resumes automatically in resyncGuest if successful
                 } else {
-                    console.warn('Ã¢Å¡ Ã¯Â¸Â HOST: Guest resync failed, but resuming anyway');
                     this.resumeBattle('Guest reconnected (resync failed but attempting to continue)');
                 }
             }
@@ -442,8 +418,6 @@ export class BattleNetworkManager {
                 data: data,
                 timestamp: Date.now()
             });
-        } else {
-            console.error('Ã¢ÂÅ’ HOST: gameDataSender is not available!');
         }
     }
 
@@ -467,7 +441,7 @@ export class BattleNetworkManager {
         const startTime = Date.now();
         
         // Apply speed adjustment to the timeout
-        const adjustedTimeout = 1; // Minimal timeout as in original
+        const adjustedTimeout = 1000;
         
         return new Promise((resolve) => {
             const timeoutId = setTimeout(() => {
@@ -513,7 +487,7 @@ export class BattleNetworkManager {
     // RECEIVING DATA (GUEST)
     // ============================================
 
-    receiveBattleData(message) {
+    async receiveBattleData(message) {
         const bm = this.battleManager;
         
         // Handle host-specific messages first
@@ -602,10 +576,14 @@ export class BattleNetworkManager {
             case 'battle_stat_bonus':
                 this.guest_handleBattleStatBonus(data);
                 break;
-            
 
+            case 'hand_update':
+                this.guest_handleHandUpdate(data);
+                break;
 
-
+            case 'deck_update':
+                this.handleDeckUpdate(data);
+                break;
 
             case 'necromancy_revival':
                 bm.guest_handleNecromancyRevival(data);
@@ -616,9 +594,6 @@ export class BattleNetworkManager {
                     this.battleManager.guest_handleDiplomacyEffectsComplete(data);
                 }
                 break;
-
-
-
 
             case 'jiggles_special_attack':
                 if (bm.jigglesManager) {
@@ -728,6 +703,12 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'grinning_cat_card_gift':
+                if (bm.grinningCatManager) {
+                    bm.grinningCatManager.handleGuestCardGift(data);
+                }
+                break;
+
             case 'crum_extra_action':
                 bm.guest_handleCrumExtraAction(data);
                 break;
@@ -745,9 +726,6 @@ export class BattleNetworkManager {
             case 'monia_protection_effect':
                 bm.guest_handleMoniaProtectionEffect(data);
                 break;
-
-
-
             
             case 'field_standard_effects_complete':
                 import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardEffects }) => {
@@ -764,9 +742,6 @@ export class BattleNetworkManager {
             case 'furious_anger_action':
                 bm.guest_handleFuriousAngerAction(data);
                 break;
-
-
-
 
             case 'blade_frost_triggered':
                 bm.guest_handleBladeFrostTriggered(data);
@@ -798,6 +773,42 @@ export class BattleNetworkManager {
 
             case 'frost_rune_applied':
                 bm.guest_handleFrostRuneApplied(data);
+                break;
+
+            case 'stoneskin_applied':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('Stoneskin')) {
+                    const stoneskinSpell = this.battleManager.spellSystem.spellImplementations.get('Stoneskin');
+                    stoneskinSpell.handleGuestStoneskinApplied(data);
+                }
+                break;
+
+            case 'stoneskin_damage_reduction':
+                this.battleManager.guest_handleStoneskinDamageReduction(data);
+                break;
+
+            case 'healing_melody_effect':
+                await bm.guest_handleHealingMelodyEffect(data);
+                break;
+
+            case 'healing_melody_start':
+                bm.guest_handleHealingMelodyStart(data);
+                break;
+
+            case 'hero_healed':
+                this.guest_handleHeroHealed(data);
+                break;
+                
+            case 'creature_healed':
+                this.guest_handleCreatureHealed(data);
+                break;
+
+            case 'burning_finger_stack_added':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('BurningFinger')) {
+                    const burningFingerSpell = this.battleManager.spellSystem.spellImplementations.get('BurningFinger');
+                    burningFingerSpell.guest_handleStackUpdate(data);
+                }
                 break;
 
             case 'crusader_cannon_barrage':
@@ -841,7 +852,6 @@ export class BattleNetworkManager {
                     handleGuestDarkGearStealing(data, this.battleManager);
                 });
                 break;
-                
 
             case 'flame_arrow_impact':
                 bm.guest_handleFlameArrowImpact(data);
@@ -879,9 +889,13 @@ export class BattleNetworkManager {
                 bm.attackEffectsManager.handleGuestElixirColdFreeze(data);
                 break;
 
+            case 'immortal_revival':
+                bm.guest_handleImmortalRevival(data);
+                break;
 
-
-
+            case 'monster_bottle_creatures_created':
+                bm.guest_handleMonsterBottleCreaturesCreated(data);
+                break;
 
             case 'heavy_hit_triggered':
                 if (this.battleManager.spellSystem && 
@@ -907,9 +921,38 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'ultimate_destroyer_punch_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('UltimateDestroyerPunch')) {
+                    const ultimateDestroyerPunchSpell = this.battleManager.spellSystem.spellImplementations.get('UltimateDestroyerPunch');
+                    ultimateDestroyerPunchSpell.handleGuestEffect(data);
+                }
+                break;
 
+            case 'crash_landing_triggered':
+                if (this.battleManager.spellSystem?.spellImplementations.has('CrashLanding')) {
+                    const crashLandingSpell = this.battleManager.spellSystem.spellImplementations.get('CrashLanding');
+                    crashLandingSpell.handleGuestCrashLandingEffect(data);
+                }
+                break;
 
+            case 'thieving_strike_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('ThievingStrike')) {
+                    const thievingStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('ThievingStrike');
+                    thievingStrikeSpell.handleGuestEffect(data);
+                }
+                break;
+
+            case 'trial_of_coolness_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('TrialOfCoolness')) {
+                    const trialOfCoolnessSpell = this.battleManager.spellSystem.spellImplementations.get('TrialOfCoolness');
+                    trialOfCoolnessSpell.handleGuestEffect(data);
+                }
+                break;
                 
+
                 
             case 'resistance_used':
                 if (bm.resistanceManager) {
@@ -938,7 +981,7 @@ export class BattleNetworkManager {
     guest_handleTurnStart(data) {
         const bm = this.battleManager;
         bm.currentTurn = data.turn;
-        bm.addCombatLog(`Ã°Å¸â€œÂ Turn ${bm.currentTurn} begins`, 'info');
+        bm.addCombatLog(`🔄 Turn ${bm.currentTurn} begins`, 'info');
         
         // REMOVED: Manual equipment count clearing - stats are pre-calculated
         // No need to manage synced equipment counts anymore
@@ -960,7 +1003,7 @@ export class BattleNetworkManager {
             localTarget.alive = !died;
             
             bm.addCombatLog(
-                `${targetName} takes ${damage} damage!)`,
+                `💥 ${targetName} takes ${damage} damage!)`,
                 targetLocalSide === 'player' ? 'error' : 'success'
             );
 
@@ -986,7 +1029,6 @@ export class BattleNetworkManager {
         
         // If creature was stolen, skip normal damage handling
         if (stolenByDarkGear) {
-            console.log(`⚙️ Guest: Creature ${creatureName} was stolen by Dark Gear, skipping damage visuals`);
             return;
         }
         
@@ -998,7 +1040,6 @@ export class BattleNetworkManager {
             : bm.opponentHeroes[heroPosition];
 
         if (!localHero || !localHero.creatures) {
-            console.error(`Guest: Hero not found for creature damage`, { heroLocalSide, heroPosition });
             return;
         }
 
@@ -1012,7 +1053,6 @@ export class BattleNetworkManager {
             if (candidateCreature && candidateCreature.name === creatureName) {
                 targetCreature = candidateCreature;
                 targetCreatureIndex = currentCreatureIndex;
-                console.log(`âœ… Guest: Found creature using currentCreatureIndex ${currentCreatureIndex}`);
             }
         }
 
@@ -1022,7 +1062,6 @@ export class BattleNetworkManager {
             if (candidateCreature && candidateCreature.name === creatureName) {
                 targetCreature = candidateCreature;
                 targetCreatureIndex = originalCreatureIndex;
-                console.log(`âš ï¸ Guest: Using originalCreatureIndex ${originalCreatureIndex} as fallback`);
             }
         }
 
@@ -1037,43 +1076,21 @@ export class BattleNetworkManager {
                         if (expectedId === creatureId) {
                             targetCreature = creature;
                             targetCreatureIndex = i;
-                            console.log(`ðŸ” Guest: Found creature by unique ID ${creatureId} at index ${i}`);
                             break;
                         }
                     } else {
                         // No unique ID available, use first match by name
                         targetCreature = creature;
                         targetCreatureIndex = i;
-                        console.log(`ðŸ” Guest: Found creature by name ${creatureName} at index ${i}`);
                         break;
                     }
                 }
             }
         }
 
-        // SAFETY CHECK: If we still can't find the creature, log detailed debug info
+        // SAFETY CHECK: If we still can't find the creature, exit
         if (!targetCreature) {
-            console.error(`âŒ Guest: Could not find creature for damage application!`, {
-                creatureName,
-                creatureId,
-                originalCreatureIndex,
-                currentCreatureIndex,
-                heroLocalSide,
-                heroPosition,
-                availableCreatures: localHero.creatures.map((c, i) => ({ 
-                    index: i, 
-                    name: c.name, 
-                    id: c.addedAt ? `${c.name}_${c.addedAt}` : 'no-id',
-                    alive: c.alive 
-                })),
-                debugInfo
-            });
             return;
-        }
-
-        // DEBUG LOGGING: Show index resolution
-        if (debugInfo && !debugInfo.wasOriginalIndexCorrect) {
-            console.log(`ðŸŽ Guest: Creature moved! Original: ${originalCreatureIndex} â†’ Current: ${currentCreatureIndex} (shift: ${debugInfo.indexShift})`);
         }
 
         // Apply necromancy array manipulation if needed (unchanged)
@@ -1095,18 +1112,18 @@ export class BattleNetworkManager {
                 // Creature died but was revived
                 targetCreature.alive = true;
                 bm.addCombatLog(
-                    `${creatureName} takes ${damage} damage and dies!`,
+                    `💀 ${creatureName} takes ${damage} damage and dies!`,
                     heroLocalSide === 'player' ? 'error' : 'success'
                 );
                 bm.addCombatLog(
-                    `But ${creatureName} is revived by Necromancy!`,
+                    `✨ But ${creatureName} is revived by Necromancy!`,
                     'info'
                 );
             } else {
                 // Creature died and stayed dead
                 targetCreature.alive = false;
                 bm.addCombatLog(
-                    `${creatureName} takes ${damage} damage!`,
+                    `💀 ${creatureName} takes ${damage} damage and dies!`,
                     heroLocalSide === 'player' ? 'error' : 'success'
                 );
             }
@@ -1114,7 +1131,7 @@ export class BattleNetworkManager {
             // Creature survived
             targetCreature.alive = true;
             bm.addCombatLog(
-                `${creatureName} takes ${damage} damage!)`,
+                `💥 ${creatureName} takes ${damage} damage!)`,
                 heroLocalSide === 'player' ? 'error' : 'success'
             );
         }
@@ -1138,11 +1155,9 @@ export class BattleNetworkManager {
                 const hpText = creatureElement.querySelector('.creature-hp-text');
                 if (healthBar) {
                     healthBar.remove();
-                    console.log(`GUEST: Removed health bar for defeated ${creatureName}`);
                 }
                 if (hpText) {
                     hpText.remove();
-                    console.log(`GUEST: Removed HP text for defeated ${creatureName}`);
                 }
             }
         }
@@ -1164,7 +1179,6 @@ export class BattleNetworkManager {
                 // Restore health bars for revived creatures
                 setTimeout(() => {
                     bm.updateCreatureVisuals(heroLocalSide, heroPosition, localHero.creatures);
-                    console.log(`GUEST: Restored health bar for revived ${creatureName}`);
                 }, 100);
             }
         }
@@ -1174,8 +1188,6 @@ export class BattleNetworkManager {
         // Get cavalry manager from flow manager
         if (this.battleManager.flowManager && this.battleManager.flowManager.cavalryManager) {
             this.battleManager.flowManager.cavalryManager.handleGuestCavalryMovements(data);
-        } else {
-            console.warn('Received cavalry movements but cavalry manager not available');
         }
     }
 
@@ -1183,8 +1195,8 @@ export class BattleNetworkManager {
         const bm = this.battleManager;
         this.battlePaused = true;
         
-        bm.addCombatLog(`Battle paused: ${data.reason}`, 'warning');
-        bm.addCombatLog('Host is waiting for stable connection...', 'info');
+        bm.addCombatLog(`⏸️ Battle paused: ${data.reason}`, 'warning');
+        bm.addCombatLog(`⏳ Host is waiting for stable connection...`, 'info');
         
         this.showBattlePauseUI(data.reason || 'Connection issue');
     }
@@ -1193,27 +1205,56 @@ export class BattleNetworkManager {
         const bm = this.battleManager;
         this.battlePaused = false;
         
-        bm.addCombatLog(`Battle resumed: ${data.reason}`, 'success');
-        bm.addCombatLog('Battle continues...', 'info');
+        bm.addCombatLog(`▶️ Battle resumed: ${data.reason}`, 'success');
+        bm.addCombatLog(`⚔️ Battle continues...`, 'info');
         
         this.hideBattlePauseUI();
+    }
+
+    guest_handleHandUpdate(data) {
+        const bm = this.battleManager;
+        const { absoluteSide, hand } = data;
+        
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const isMyHand = (absoluteSide === myAbsoluteSide);
+        
+        if (isMyHand) {
+            bm.playerHand = hand;
+        } else {
+            bm.opponentHand = hand;
+        }
+    }
+
+    handleDeckUpdate(data) {
+        const { absoluteSide, deck } = data;
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const localSide = (absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        if (localSide === 'player') {
+            this.battleManager.playerDeck = deck;
+        } else {
+            this.battleManager.opponentDeck = deck;
+        }
     }
 
     async guest_handleBattleEnd(data) {
         const bm = this.battleManager;
         bm.battleActive = false;
+
+        // Transfer guest-side permanent effects from battle
+        if (bm.battleScreen && bm.battleScreen.transferBurningFingerStacksToPermanent) {
+            bm.battleScreen.transferBurningFingerStacksToPermanent();
+        }
         
         const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn } = data;
         
         // Update turn from the battle_end message BEFORE showing rewards
         if (newTurn && bm.battleScreen && bm.battleScreen.turnTracker) {
             bm.battleScreen.turnTracker.setCurrentTurn(newTurn);
-            console.log(`Guest updated turn to ${newTurn} from battle_end message`);
             
             // Reset ability tracking for the new turn
             if (window.heroSelection && window.heroSelection.heroAbilitiesManager) {
                 window.heroSelection.heroAbilitiesManager.resetTurnBasedTracking();
-                console.log('Guest reset ability tracking after turn update');
             }
         }
         
@@ -1241,12 +1282,25 @@ export class BattleNetworkManager {
             try {
                 window.potionHandler.clearPotionEffects();
             } catch (error) {
-                console.error('Guest error clearing potion effects after battle:', error);
+                // Error clearing potion effects
             }
         }
         
         if (window.heroSelection) {
             window.heroSelection.clearProcessedDelayedEffects();
+        }
+
+        // Update guest's deck manager with modified deck
+        if (window.heroSelection && window.heroSelection.deckManager) {
+            const playerDeck = bm.getPlayerDeck();
+            
+            // Update the main deck manager with the modified player deck
+            window.heroSelection.deckManager.importDeck({
+                cards: playerDeck,
+                size: playerDeck.length,
+                uniqueCards: [...new Set(playerDeck)].length,
+                timestamp: Date.now()
+            });
         }
         
         const myMessage = bm.getResultMessage(myResult);
@@ -1264,8 +1318,6 @@ export class BattleNetworkManager {
         }
     }
 
-    
-
     // ============================================
     // RESYNC AFTER DC
     // ============================================
@@ -1279,7 +1331,6 @@ export class BattleNetworkManager {
         const bm = this.battleManager;
         
         if (!bm.isAuthoritative) {
-            console.error('nly host can initiate guest resync');
             return false;
         }
         
@@ -1287,24 +1338,21 @@ export class BattleNetworkManager {
             return false;
         }
         
-        console.log('HOST: Starting guest resynchronization...');
-        
         try {
             // 1. Pause battle simulation during sync
             const wasPaused = this.battlePaused;
             if (!wasPaused) {
-                bm.addCombatLog('Pausing battle for guest synchronization...', 'system');
+                bm.addCombatLog('⏸️ Pausing battle for guest synchronization...', 'system');
                 this.pauseBattle('Guest resynchronization in progress');
             }
             
             // 2. Capture complete current battle state (like checkpoint but for right now)
             const currentState = this.captureCurrentBattleState();
             if (!currentState) {
-                console.error('Failed to capture current battle state for resync');
                 return false;
             }
             
-            bm.addCombatLog('Sending current battle state to guest...', 'system');
+            bm.addCombatLog('📤 Sending current battle state to guest...', 'system');
             
             // 3. Send complete state to guest
             this.sendBattleData('resync_battle_state', {
@@ -1316,12 +1364,10 @@ export class BattleNetworkManager {
             });
             
             // 4. Wait for guest acknowledgment (longer timeout for full state restore)
-            console.log('HOST: Waiting for guest to acknowledge resync...');
             const ackReceived = await this.waitForGuestAcknowledgment('resync_complete', 10000); // 10 second timeout
             
             if (!ackReceived) {
-                console.error('Guest failed to acknowledge resynchronization');
-                bm.addCombatLog('Guest resync failed - no acknowledgment received', 'error');
+                bm.addCombatLog('❌ Guest resync failed - no acknowledgment received', 'error');
                 
                 // Resume battle anyway if it wasn't originally paused
                 if (!wasPaused && this.opponentConnected) {
@@ -1331,8 +1377,7 @@ export class BattleNetworkManager {
             }
             
             // 5. Resync successful
-            console.log('HOST: Guest resynchronization completed successfully');
-            bm.addCombatLog('Guest successfully resynchronized to current battle state', 'success');
+            bm.addCombatLog('✅ Guest successfully resynchronized to current battle state', 'success');
             
             // 6. Resume battle if it wasn't originally paused
             if (!wasPaused && this.opponentConnected) {
@@ -1344,8 +1389,7 @@ export class BattleNetworkManager {
             return true;
             
         } catch (error) {
-            console.error('Error during guest resynchronization:', error);
-            bm.addCombatLog('Guest resync failed due to error', 'error');
+            bm.addCombatLog('❌ Guest resync failed due to error', 'error');
             return false;
         }
     }
@@ -1362,16 +1406,13 @@ export class BattleNetworkManager {
             if (bm.checkpointSystem) {
                 const currentCheckpoint = bm.checkpointSystem.createCheckpoint('resync');
                 if (currentCheckpoint) {
-                    console.log('Ã°Å¸â€œÂ¸ Captured current battle state for guest resync');
                     return currentCheckpoint;
                 }
             }
             
-            console.error('Ã¢ÂÅ’ Failed to create resync checkpoint');
             return null;
             
         } catch (error) {
-            console.error('Ã¢ÂÅ’ Error capturing current battle state:', error);
             return null;
         }
     }
@@ -1384,43 +1425,36 @@ export class BattleNetworkManager {
         const bm = this.battleManager;
         
         if (bm.isAuthoritative) {
-            console.warn('Ã¢Å¡ Ã¯Â¸Â Host should not receive resync messages');
             return;
         }
         
-        console.log('Ã°Å¸â€â€ž GUEST: Received resync request from host');
-        bm.addCombatLog('Ã°Å¸â€â€ž Receiving updated battle state from host...', 'system');
+        bm.addCombatLog('📥 Receiving updated battle state from host...', 'system');
         
         try {
             const { battleState, resyncId, hostTurn, message } = data;
             
             if (!battleState) {
-                console.error('Ã¢ÂÅ’ GUEST: No battle state in resync message');
                 return;
             }
             
-            bm.addCombatLog(`Ã°Å¸â€œÂ¡ ${message}`, 'info');
-            bm.addCombatLog(`Ã°Å¸Å½Â¯ Syncing to host turn ${hostTurn}...`, 'system');
+            bm.addCombatLog(`ℹ️ ${message}`, 'info');
+            bm.addCombatLog(`🔄 Syncing to host turn ${hostTurn}...`, 'system');
             
             // Apply the complete battle state (like checkpoint restoration)
             const restored = await this.applyResyncBattleState(battleState);
             
             if (restored) {
-                console.log('Ã¢Å“â€¦ GUEST: Successfully applied resync battle state');
-                bm.addCombatLog('Ã¢Å“â€¦ Battle state synchronized with host!', 'success');
+                bm.addCombatLog('✅ Battle state synchronized with host!', 'success');
                 
                 // Send acknowledgment to host
                 this.sendAcknowledgment('resync_complete');
-                console.log('Ã°Å¸â€œÂ¤ GUEST: Sent resync complete acknowledgment to host');
                 
             } else {
-                console.error('Ã¢ÂÅ’ GUEST: Failed to apply resync battle state');
-                bm.addCombatLog('Ã¢ÂÅ’ Failed to synchronize with host state', 'error');
+                bm.addCombatLog('❌ Failed to synchronize with host state', 'error');
             }
             
         } catch (error) {
-            console.error('Ã¢ÂÅ’ GUEST: Error handling resync:', error);
-            bm.addCombatLog('Ã¢ÂÅ’ Error during resynchronization', 'error');
+            bm.addCombatLog('❌ Error during resynchronization', 'error');
         }
     }
 
@@ -1435,13 +1469,11 @@ export class BattleNetworkManager {
         try {
             // Use checkpoint system to restore the state
             if (bm.checkpointSystem && battleState) {
-                console.log('Ã°Å¸â€â€ž GUEST: Applying resync state via checkpoint system...');
                 
                 // The battleState should be a complete checkpoint
                 const restored = await bm.checkpointSystem.restoreFromCheckpoint(battleState);
                 
                 if (restored) {
-                    console.log('Ã¢Å“â€¦ GUEST: Resync state applied successfully');
                     
                     // Force update all visuals to match new state
                     bm.updateAllHeroVisuals();
@@ -1464,11 +1496,9 @@ export class BattleNetworkManager {
                 }
             }
             
-            console.error('Ã¢ÂÅ’ GUEST: Failed to apply resync state');
             return false;
             
         } catch (error) {
-            console.error('Ã¢ÂÅ’ GUEST: Error applying resync state:', error);
             return false;
         }
     }
@@ -1482,8 +1512,6 @@ export class BattleNetworkManager {
         
         if (bm.isAuthoritative) return; // Only guest can signal desync
         
-        console.log('Ã°Å¸â€œÂ¡ GUEST: Signaling desync to host - requesting resynchronization');
-        
         if (bm.gameDataSender) {
             bm.gameDataSender('battle_data', {
                 type: 'guest_desync_signal',
@@ -1496,7 +1524,7 @@ export class BattleNetworkManager {
             });
         }
         
-        bm.addCombatLog('Ã°Å¸â€œÂ¡ Requesting battle state sync from host...', 'system');
+        bm.addCombatLog('🔄 Requesting battle state sync from host...', 'system');
     }
 
     /**
@@ -1507,30 +1535,21 @@ export class BattleNetworkManager {
         const bm = this.battleManager;
         
         if (!bm.isAuthoritative) {
-            console.warn('Ã¢Å¡ Ã¯Â¸Â Guest should not receive desync signals');
             return;
         }
         
-        console.log('Ã¢Å¡ Ã¯Â¸Â HOST: Guest reports desync - initiating resynchronization');
-        bm.addCombatLog('Ã¢Å¡ Ã¯Â¸Â Guest detected desync - resynchronizing...', 'warning');
+        bm.addCombatLog('⚠️ Guest detected desync - resynchronizing...', 'warning');
         
         const { guestTurn, message, reason } = data;
         
         if (guestTurn !== bm.currentTurn) {
-            console.log(`Ã°Å¸Å½Â¯ HOST: Turn mismatch detected - Host: ${bm.currentTurn}, Guest: ${guestTurn}`);
-            bm.addCombatLog(`Ã°Å¸Å½Â¯ Turn mismatch: Host(${bm.currentTurn}) vs Guest(${guestTurn})`, 'warning');
+            bm.addCombatLog(`🔄 Turn mismatch: Host(${bm.currentTurn}) vs Guest(${guestTurn})`, 'warning');
         }
         
-        bm.addCombatLog(`Ã°Å¸â€œÂ¡ ${message}`, 'info');
+        bm.addCombatLog(`ℹ️ ${message}`, 'info');
         
         // Immediately resync the guest
         const success = await this.resyncGuest();
-        
-        if (success) {
-            console.log('Ã¢Å“â€¦ HOST: Guest desync resolved successfully');
-        } else {
-            console.error('Ã¢ÂÅ’ HOST: Failed to resolve guest desync');
-        }
     }
 
     guest_handleBattleStatBonus(data) {
@@ -1548,7 +1567,6 @@ export class BattleNetworkManager {
         const hero = heroes[heroPosition];
         
         if (!hero) {
-            console.error(`Guest: Hero not found for stat bonus: ${heroLocalSide} ${heroPosition}`);
             return;
         }
         
@@ -1562,11 +1580,10 @@ export class BattleNetworkManager {
             // Add to combat log
             const logType = heroLocalSide === 'player' ? 'success' : 'info';
             bm.addCombatLog(
-                `âš”ï¸ ${heroName} gains +${bonusAmount} attack from ${source}!`,
+                `💪 ${heroName} gains +${bonusAmount} attack from ${source}!`,
                 logType
             );
             
-            console.log(`Guest: Applied +${bonusAmount} attack bonus to ${heroLocalSide} ${heroName}`);
         } else if (bonusType === 'hp') {
             hero.addBattleHpBonus(bonusAmount);
             
@@ -1576,11 +1593,62 @@ export class BattleNetworkManager {
             // Add to combat log
             const logType = heroLocalSide === 'player' ? 'success' : 'info';
             bm.addCombatLog(
-                `â¤ï¸ ${heroName} gains +${bonusAmount} HP from ${source}!`,
+                `❤️ ${heroName} gains +${bonusAmount} HP from ${source}!`,
                 logType
             );
+        }
+    }
+
+    guest_handleHeroHealed(data) {
+        const bm = this.battleManager;
+        const { targetAbsoluteSide, targetPosition, healing, oldHp, newHp, maxHp, targetName } = data;
+        
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        const localTarget = targetLocalSide === 'player' 
+            ? bm.playerHeroes[targetPosition]
+            : bm.opponentHeroes[targetPosition];
+
+        if (localTarget) {
+            localTarget.currentHp = newHp;
             
-            console.log(`Guest: Applied +${bonusAmount} HP bonus to ${heroLocalSide} ${heroName}`);
+            bm.addCombatLog(
+                `💚✨💊 ${targetName} healed for ${healing} HP! (${oldHp} → ${newHp})`,
+                targetLocalSide === 'player' ? 'success' : 'info'
+            );
+
+            bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
+            bm.animationManager.createDamageNumber(targetLocalSide, targetPosition, healing, maxHp, 'healing');
+        }
+    }
+
+    guest_handleCreatureHealed(data) {
+        const bm = this.battleManager;
+        const { 
+            heroAbsoluteSide, heroPosition, 
+            creatureIndex, creatureName,
+            healing, oldHp, newHp, maxHp
+        } = data;
+        
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const heroLocalSide = (heroAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        const localHero = heroLocalSide === 'player' 
+            ? bm.playerHeroes[heroPosition]
+            : bm.opponentHeroes[heroPosition];
+
+        if (localHero && localHero.creatures && localHero.creatures[creatureIndex]) {
+            const creature = localHero.creatures[creatureIndex];
+            creature.currentHp = newHp;
+            
+            bm.addCombatLog(
+                `💚✨💊 ${creatureName} healed for ${healing} HP! (${oldHp} → ${newHp})`,
+                heroLocalSide === 'player' ? 'success' : 'info'
+            );
+
+            bm.updateCreatureHealthBar(heroLocalSide, heroPosition, creatureIndex, newHp, maxHp);
+            bm.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, creatureIndex, healing, maxHp, 'healing');
         }
     }
 
@@ -1662,6 +1730,9 @@ export class BattleNetworkManager {
         this.totalPauseTime = 0;
         this.connectionLatency = 100;
         this.tabWasHidden = false;
+        
+        // ADDED: Reset battle loop tracking
+        this.battleLoopRunning = false;
         
         this.clearSwapQueue();
     }

@@ -4,11 +4,9 @@ export class HeroSelectionUI {
     constructor() {
         console.log('HeroSelectionUI initialized');
         
-        // Add tooltip hover persistence tracking
+        // Add tooltip hover persistence tracking (hero only)
         this.tooltipHideTimeout = null;
         this.currentTooltipPosition = null;
-        this.isTooltipHovered = false;
-        this.isHeroHovered = false;
     }
 
     // Helper method to format card names
@@ -140,12 +138,12 @@ export class HeroSelectionUI {
         }
     }
 
-    // ===== TOOLTIP HOVER PERSISTENCE METHODS =====
+    // ===== TOOLTIP HOVER PERSISTENCE METHODS (HERO ONLY) =====
 
     // New method to schedule tooltip hiding with delay
     scheduleTooltipHide() {
-        // Only hide if neither hero nor tooltip is hovered
-        if (!this.isHeroHovered && !this.isTooltipHovered) {
+        // Only hide if hero is not hovered
+        if (!this.isHeroHovered) {
             this.tooltipHideTimeout = setTimeout(() => {
                 this.hideHeroSpellbookTooltip();
             }, 100); // Small delay to prevent flickering
@@ -165,7 +163,7 @@ export class HeroSelectionUI {
     }
 
 
-    // Updated showHeroSpellbookTooltip method with hover persistence
+    // Updated showHeroSpellbookTooltip method with hero-only persistence
     showHeroSpellbookTooltip(position, heroElement) {
         // Prevent tooltips during any drag operation
         if (window.heroSelection?.formationManager?.isDragging()) {
@@ -203,6 +201,12 @@ export class HeroSelectionUI {
         let tooltipHTML = `
             <div class="spellbook-tooltip-container">
                 <h4 class="spellbook-tooltip-title">📋 ${hero.name}'s Arsenal</h4>
+                <div class="tooltip-section arsenal-section">
+                    <div class="section-header">
+                        <span class="section-icon">📜</span>
+                        <span class="section-title">Complete Arsenal (${(spellbook?.length || 0) + (equipment?.length || 0)} items)</span>
+                    </div>
+                    <div class="spellbook-list">
         `;
         
         // Add spellbook section if spells exist
@@ -213,15 +217,6 @@ export class HeroSelectionUI {
                 if (schoolCompare !== 0) return schoolCompare;
                 return a.name.localeCompare(b.name);
             });
-            
-            tooltipHTML += `
-                <div class="tooltip-section spellbook-section">
-                    <div class="section-header">
-                        <span class="section-icon">📜</span>
-                        <span class="section-title">Spellbook (${sortedSpells.length})</span>
-                    </div>
-                    <div class="spellbook-list">
-            `;
             
             let currentSchool = null;
             let spellIndexInOriginal = 0; // Track original index for click handling
@@ -298,27 +293,16 @@ export class HeroSelectionUI {
             if (currentSchool !== null) {
                 tooltipHTML += '</div>'; // Close last school section
             }
-            
-            tooltipHTML += `
-                    </div>
-                </div>
-            `;
         }
         
-        // Add separator and equipment section if equipment exists
+        // Add equipment section if equipment exists (no separator, same scrollable area)
         if (equipment && equipment.length > 0) {
-            // Add separator if there are spells above
-            if (spellbook && spellbook.length > 0) {
-                tooltipHTML += '<div class="tooltip-separator"></div>';
-            }
-            
+            // Add equipment header
             tooltipHTML += `
-                <div class="tooltip-section equipment-section">
-                    <div class="section-header">
-                        <span class="section-icon">⚔️</span>
-                        <span class="section-title">Equipment (${equipment.length})</span>
-                    </div>
-                    <div class="equipment-list">
+                <div class="spell-school-header equipment-header" style="color: #ffc107;">
+                    <span class="school-icon">⚔️</span> Equipment
+                </div>
+                <div class="spell-school-section">
             `;
             
             // Equipment is already sorted alphabetically by getHeroEquipment()
@@ -328,18 +312,20 @@ export class HeroSelectionUI {
                 const formattedName = this.formatCardName(artifactName);
                 
                 tooltipHTML += `
-                    <div class="equipment-item" data-equipment-index="${index}">
+                    <div class="equipment-entry" data-equipment-index="${index}">
                         <span class="equipment-name">${formattedName}</span>
                         ${artifactCost > 0 ? `<span class="equipment-cost">💰${artifactCost}</span>` : ''}
                     </div>
                 `;
             });
             
-            tooltipHTML += `
+            tooltipHTML += '</div>'; // Close equipment school section
+        }
+        
+        tooltipHTML += `
                     </div>
                 </div>
-            `;
-        }
+        `;
         
         // Add summary line
         const totalItems = (spellbook?.length || 0) + (equipment?.length || 0);
@@ -364,32 +350,18 @@ export class HeroSelectionUI {
         
         tooltip.innerHTML = tooltipHTML;
         
-        // Add hover event listeners to the tooltip itself
-        tooltip.addEventListener('mouseenter', () => {
-            this.isTooltipHovered = true;
-            // Clear any pending hide timeout
-            if (this.tooltipHideTimeout) {
-                clearTimeout(this.tooltipHideTimeout);
-                this.tooltipHideTimeout = null;
-            }
-        });
+        // REMOVED: tooltip hover event listeners - tooltip no longer keeps itself visible
         
-        tooltip.addEventListener('mouseleave', () => {
-            this.isTooltipHovered = false;
-            this.scheduleTooltipHide();
-        });
-        
-        // Add wheel event listener to the tooltip for direct scrolling
+        // KEEP: Add wheel event listener to the tooltip for direct scrolling
         tooltip.addEventListener('wheel', (event) => {
             this.handleTooltipScroll(event, tooltip);
         });
         
         document.body.appendChild(tooltip);
         
-        // Update tracking state
+        // Update tracking state - only track hero hover
         this.currentTooltipPosition = position;
         this.isHeroHovered = true;
-        this.isTooltipHovered = false;
         
         // Position tooltip to the left of the hero card
         this.positionSpellbookTooltip(tooltip, heroElement);
@@ -416,7 +388,7 @@ export class HeroSelectionUI {
         event.preventDefault();
         
         // Calculate scroll amount (adjust multiplier for smooth scrolling)
-        const scrollAmount = event.deltaY * 1.0;
+        const scrollAmount = event.deltaY * 1.05;
         
         // Apply scroll
         spellbookList.scrollTop += scrollAmount;
@@ -469,6 +441,12 @@ export class HeroSelectionUI {
         let tooltipHTML = `
             <div class="spellbook-tooltip-container">
                 <h4 class="spellbook-tooltip-title">📋 ${hero.name}'s Arsenal</h4>
+                <div class="tooltip-section arsenal-section">
+                    <div class="section-header">
+                        <span class="section-icon">📜</span>
+                        <span class="section-title">Complete Arsenal (${(spellbook?.length || 0) + (equipment?.length || 0)} items)</span>
+                    </div>
+                    <div class="spellbook-list">
         `;
         
         // Add spellbook section if spells exist
@@ -479,15 +457,6 @@ export class HeroSelectionUI {
                 if (schoolCompare !== 0) return schoolCompare;
                 return a.name.localeCompare(b.name);
             });
-            
-            tooltipHTML += `
-                <div class="tooltip-section spellbook-section">
-                    <div class="section-header">
-                        <span class="section-icon">📜</span>
-                        <span class="section-title">Spellbook (${sortedSpells.length})</span>
-                    </div>
-                    <div class="spellbook-list">
-            `;
             
             let currentSchool = null;
             let spellIndexInOriginal = 0;
@@ -562,27 +531,16 @@ export class HeroSelectionUI {
             if (currentSchool !== null) {
                 tooltipHTML += '</div>'; // Close last school section
             }
-            
-            tooltipHTML += `
-                    </div>
-                </div>
-            `;
         }
         
-        // Add separator and equipment section if equipment exists
+        // Add equipment section if equipment exists (no separator, same scrollable area)
         if (equipment && equipment.length > 0) {
-            // Add separator if there are spells above
-            if (spellbook && spellbook.length > 0) {
-                tooltipHTML += '<div class="tooltip-separator"></div>';
-            }
-            
+            // Add equipment header
             tooltipHTML += `
-                <div class="tooltip-section equipment-section">
-                    <div class="section-header">
-                        <span class="section-icon">⚔️</span>
-                        <span class="section-title">Equipment (${equipment.length})</span>
-                    </div>
-                    <div class="equipment-list">
+                <div class="spell-school-header equipment-header" style="color: #ffc107;">
+                    <span class="school-icon">⚔️</span> Equipment
+                </div>
+                <div class="spell-school-section">
             `;
             
             equipment.forEach((artifact, index) => {
@@ -591,18 +549,20 @@ export class HeroSelectionUI {
                 const formattedName = this.formatCardName(artifactName);
                 
                 tooltipHTML += `
-                    <div class="equipment-item" data-equipment-index="${index}">
+                    <div class="equipment-entry" data-equipment-index="${index}">
                         <span class="equipment-name">${formattedName}</span>
                         ${artifactCost > 0 ? `<span class="equipment-cost">💰${artifactCost}</span>` : ''}
                     </div>
                 `;
             });
             
-            tooltipHTML += `
+            tooltipHTML += '</div>'; // Close equipment school section
+        }
+        
+        tooltipHTML += `
                     </div>
                 </div>
-            `;
-        }
+        `;
         
         // Add summary line
         const totalItems = (spellbook?.length || 0) + (equipment?.length || 0);
@@ -636,20 +596,9 @@ export class HeroSelectionUI {
             existingTooltip.style.height = '';
             existingTooltip.style.overflow = '';
             
-            // Re-add event listeners for the updated tooltip
-            existingTooltip.addEventListener('mouseenter', () => {
-                this.isTooltipHovered = true;
-                if (this.tooltipHideTimeout) {
-                    clearTimeout(this.tooltipHideTimeout);
-                    this.tooltipHideTimeout = null;
-                }
-            });
+            // REMOVED: tooltip hover event listeners - no longer needed
             
-            existingTooltip.addEventListener('mouseleave', () => {
-                this.isTooltipHovered = false;
-                this.scheduleTooltipHide();
-            });
-            
+            // KEEP: wheel event listener for scrolling functionality
             existingTooltip.addEventListener('wheel', (event) => {
                 this.handleTooltipScroll(event, existingTooltip);
             });
@@ -683,7 +632,7 @@ export class HeroSelectionUI {
         heroElement.addEventListener('wheel', heroElement.heroWheelListener, { passive: false });
     }
 
-    // Updated hideHeroSpellbookTooltip method
+    // Updated hideHeroSpellbookTooltip method - hero only tracking
     hideHeroSpellbookTooltip() {
         // Clear any pending timeout
         if (this.tooltipHideTimeout) {
@@ -699,9 +648,8 @@ export class HeroSelectionUI {
         // Clean up wheel listeners from hero elements
         this.cleanupHeroScrollSupport();
         
-        // Reset tracking state
+        // Reset tracking state - hero only
         this.currentTooltipPosition = null;
-        this.isTooltipHovered = false;
         this.isHeroHovered = false;
     }
 
@@ -823,7 +771,7 @@ export class HeroSelectionUI {
     getHeroStats(slotPosition) {
         if (!window.heroSelection || !slotPosition) return null;
         
-        // NEW: Use the enhanced stat calculation that includes ability bonuses
+        // Use the enhanced stat calculation that includes ability bonuses
         const effectiveStats = window.heroSelection.calculateEffectiveHeroStats(slotPosition);
         if (effectiveStats) {
             // Log the stat bonuses for debugging if there are any
@@ -1279,7 +1227,7 @@ export class HeroSelectionUI {
             <div class="team-building-container">
                 <!-- Left Column - Team Formation -->
                 <div class="team-building-left">
-                    <div class="team-header">
+                    <div class="team-header" style="text-align: center;">
                         <h2>🛡️ Your Battle Formation</h2>
                         <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
                         <p class="drag-hint">🎯 Drag Abilities to a Hero slot to attach them!</p>
@@ -1924,27 +1872,67 @@ function onCreatureDragStart(event, creatureDataJson) {
         // Create a custom drag image showing only the middle frame
         const originalImg = event.target.closest('.creature-icon').querySelector('.creature-sprite');
         if (originalImg && originalImg.complete && originalImg.naturalWidth > 0) {
-            // Create a canvas to extract just the middle frame
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Set canvas size to match the sprite container
-            canvas.width = 32;
-            canvas.height = 32;
-            
-            // Calculate frame width (each frame is 1/3 of total width)
-            const frameWidth = originalImg.naturalWidth / 3;
-            const frameHeight = originalImg.naturalHeight;
-            
-            // Draw only the middle frame (frame index 1, which is the second frame)
-            ctx.drawImage(
-                originalImg,
-                frameWidth, 0, frameWidth, frameHeight, // Source: middle frame
-                0, 0, canvas.width, canvas.height       // Destination: full canvas
-            );
-            
-            // Set the custom drag image
-            event.dataTransfer.setDragImage(canvas, 16, 16); // Center the drag image
+            try {
+                // Create a canvas to extract just the middle frame
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size to match the sprite container
+                canvas.width = 32;
+                canvas.height = 32;
+                
+                // Calculate frame width (each frame is 1/3 of total width)
+                const frameWidth = originalImg.naturalWidth / 3;
+                const frameHeight = originalImg.naturalHeight;
+                
+                // Draw only the middle frame (frame index 1, which is the second frame)
+                ctx.drawImage(
+                    originalImg,
+                    frameWidth, 0, frameWidth, frameHeight, // Source: middle frame
+                    0, 0, canvas.width, canvas.height       // Destination: full canvas
+                );
+                
+                // Verify canvas has content
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const hasContent = imageData.data.some(pixel => pixel !== 0);
+                
+                if (hasContent) {
+                    // Create a temporary img element from the canvas
+                    const tempImg = document.createElement('img');
+                    tempImg.src = canvas.toDataURL('image/png');
+                    tempImg.width = 32;
+                    tempImg.height = 32;
+                    
+                    // Style the temp image (off-screen and with proper sizing)
+                    tempImg.style.cssText = `
+                        position: absolute;
+                        top: -1000px;
+                        left: -1000px;
+                        width: 32px;
+                        height: 32px;
+                        pointer-events: none;
+                    `;
+                    
+                    // Add to DOM temporarily (required for setDragImage to work in some browsers)
+                    document.body.appendChild(tempImg);
+                    
+                    // Set the custom drag image using the temp img element
+                    event.dataTransfer.setDragImage(tempImg, 16, 16);
+                    
+                    // Clean up the temporary element after drag completes
+                    setTimeout(() => {
+                        if (tempImg.parentNode) {
+                            document.body.removeChild(tempImg);
+                        }
+                    }, 100);
+                } else {
+                    console.warn('Canvas appears to be empty, using fallback drag image');
+                }
+                
+            } catch (canvasError) {
+                console.warn('Failed to create custom drag image:', canvasError);
+                // Fallback will use the original element (showing full spritesheet)
+            }
         }
         
         // Set up drag data
@@ -2072,7 +2060,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Only handle creature drags
     if (!creatureDragState.isDragging) {
-        console.log('❌ Global creatureDragState.isDragging is false, returning');
+        console.log('⌐ Global creatureDragState.isDragging is false, returning');
         return false;
     }
     
@@ -2082,7 +2070,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Allow drops within same hero OR if Guard Change mode is active
     if (!isSameHero && !isGuardChangeActive) {
-        console.log('❌ Cannot move creature to different hero - Guard Change mode not active');
+        console.log('⌐ Cannot move creature to different hero - Guard Change mode not active');
         return false;
     }
     
@@ -2091,7 +2079,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
         const hasTargetHero = window.heroSelection.heroCreatureManager.hasHeroAtPosition(heroPosition);
         console.log('🔍 hasTargetHero:', hasTargetHero);
         if (!hasTargetHero) {
-            console.log(`❌ Cannot move creature to ${heroPosition} - no hero at that position`);
+            console.log(`⌐ Cannot move creature to ${heroPosition} - no hero at that position`);
             return false;
         }
     }
@@ -2131,13 +2119,13 @@ async function onCreatureContainerDrop(event, heroPosition) {
                 console.log(`🛡️ Guard Change: Successfully moved creature from ${creatureDragState.draggedFromHero} to ${heroPosition}`);
             }
         } else {
-            console.log('❌ Move failed');
+            console.log('⌐ Move failed');
         }
         
         return success;
     }
     
-    console.log('❌ No heroSelection or heroCreatureManager found');
+    console.log('⌐ No heroSelection or heroCreatureManager found');
     return false;
 }
 
@@ -2163,7 +2151,7 @@ window.showHeroSpellbookTooltip = function(position) {
     slot.appendChild(tooltip);
 };
 
-// Enhanced hover handlers for hero slots with tooltip persistence
+// Enhanced hover handlers for hero slots with tooltip persistence - HERO ONLY
 window.handleHeroHoverEnter = function(position, element) {
     if (!window.heroSelection) return;
     
@@ -2336,7 +2324,7 @@ window.toggleHeroSpell = function(heroPosition, spellIndex) {
     console.log(`🎯 Toggling spell at ${heroPosition}[${spellIndex}]`);
     
     if (!window.heroSelection || !window.heroSelection.heroSpellbookManager) {
-        console.error('❌ Hero selection or spellbook manager not available');
+        console.error('⌐ Hero selection or spellbook manager not available');
         return;
     }
     
@@ -2344,7 +2332,7 @@ window.toggleHeroSpell = function(heroPosition, spellIndex) {
     const newState = window.heroSelection.heroSpellbookManager.toggleSpellEnabled(heroPosition, spellIndex);
     
     if (newState !== false && newState !== true) {
-        console.error('❌ Failed to toggle spell');
+        console.error('⌐ Failed to toggle spell');
         return;
     }
     
@@ -2811,6 +2799,10 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
             color: #4dabf7;
         }
         
+        .arsenal-section .section-header {
+            color: #4dabf7;
+        }
+        
         .equipment-section .section-header {
             color: #ffc107;
         }
@@ -2841,6 +2833,47 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
             font-size: 11px;
             color: #ffc107;
             font-weight: bold;
+        }
+        
+        /* Equipment entries in the unified scrollable list */
+        .equipment-entry {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin: 4px 0;
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.2);
+            border-radius: 6px;
+            border-left: 3px solid #ffc107;
+            transition: all 0.2s ease;
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+        }
+        
+        .equipment-entry:hover {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: rgba(255, 193, 7, 0.3);
+            transform: translateX(2px);
+        }
+        
+        .equipment-entry .equipment-name {
+            font-size: 14px;
+            color: #fff;
+            font-weight: 600;
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+            letter-spacing: 0.5px;
+        }
+        
+        .equipment-entry .equipment-cost {
+            font-size: 12px;
+            padding: 2px 8px;
+            background: rgba(255, 193, 7, 0.3);
+            border-radius: 12px;
+            color: #ffc107;
+            font-weight: bold;
+            white-space: nowrap;
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+            letter-spacing: 0.5px;
         }
         
         .arsenal-summary {

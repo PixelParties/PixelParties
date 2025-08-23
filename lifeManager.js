@@ -5,9 +5,10 @@ export class LifeManager {
         this.maxLives = 10;
         this.playerLives = this.maxLives;
         this.opponentLives = this.maxLives;
+        this.playerTrophies = 0;        
+        this.opponentTrophies = 0;      
+        this.maxTrophies = 10;          
         this.onLifeChangeCallback = null;
-        
-        // Reference to centralized turn tracker (injected via init)
         this.turnTracker = null;
     }
 
@@ -48,7 +49,19 @@ export class LifeManager {
         this.playerLives = Math.max(0, this.playerLives - amount);
         
         if (previousLives !== this.playerLives) {
+            // Check if player just reached 0 lives (opponent wins this battle)
+            if (this.playerLives === 0 && previousLives > 0) {
+                this.opponentTrophies = Math.min(this.maxTrophies, this.opponentTrophies + 1);
+            }
+            
             this.notifyLifeChange('player', previousLives, this.playerLives);
+            
+            // Check for victory condition after any life change
+            const victoryResult = this.checkVictoryCondition();
+            if (victoryResult) {
+                this.notifyVictoryCondition(victoryResult);
+            }
+            
             return true;
         }
         return false;
@@ -60,7 +73,19 @@ export class LifeManager {
         this.opponentLives = Math.max(0, this.opponentLives - amount);
         
         if (previousLives !== this.opponentLives) {
+            // Check if opponent just reached 0 lives (player wins this battle)
+            if (this.opponentLives === 0 && previousLives > 0) {
+                this.playerTrophies = Math.min(this.maxTrophies, this.playerTrophies + 1);
+            }
+            
             this.notifyLifeChange('opponent', previousLives, this.opponentLives);
+            
+            // Check for victory condition after any life change
+            const victoryResult = this.checkVictoryCondition();
+            if (victoryResult) {
+                this.notifyVictoryCondition(victoryResult);
+            }
+            
             return true;
         }
         return false;
@@ -244,6 +269,34 @@ export class LifeManager {
         }
         
         return true;
+    }
+
+    checkVictoryCondition() {
+        if (this.opponentLives <= 0) {
+            return { winner: 'player', trophies: this.playerTrophies };
+        } else if (this.playerLives <= 0) {
+            return { winner: 'opponent', trophies: this.opponentTrophies };
+        }
+        return null;
+    }
+
+    notifyVictoryCondition(victoryResult) {
+        if (this.onLifeChangeCallback) {
+            this.onLifeChangeCallback({
+                type: 'victory',
+                winner: victoryResult.winner,
+                trophies: victoryResult.trophies,
+                currentTurn: this.getCurrentTurn()
+            });
+        }
+    }
+
+    getPlayerTrophies() {
+        return this.playerTrophies;
+    }
+
+    getOpponentTrophies() {
+        return this.opponentTrophies;
     }
 
     // Reset lives to initial state (TurnTracker handles turn reset)

@@ -90,10 +90,10 @@ export class FlameAvalancheSpell {
     // DAMAGE CALCULATION
     // ============================================
 
-    // Calculate FlameAvalanche damage: 60 + 30X (X = DestructionMagic level)
+    // Calculate FlameAvalanche damage: 40 + 20X (X = DestructionMagic level)
     calculateDamage(caster) {
-        const baseDamage = 60;
-        const perLevelDamage = 30;
+        const baseDamage = 40;
+        const perLevelDamage = 20;
         
         // Get DestructionMagic level
         const destructionLevel = caster.hasAbility('DestructionMagic') 

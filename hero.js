@@ -24,7 +24,6 @@ export class Hero {
             this.currentHp = heroInfo.hp;      // Will be adjusted proportionally when maxHp changes
             this.atk = heroInfo.atk;           // Will be overridden by pre-calculated values
         } else {
-            console.error(`Hero info not found for ${this.name}`);
             this.baseMaxHp = 100;
             this.baseAtk = 10;
             this.maxHp = 100;
@@ -52,13 +51,16 @@ export class Hero {
         this.attackBonusses = 0;  // Permanent attack bonuses
         this.hpBonusses = 0;      // Permanent HP bonuses
         
-        // NEW: Battle-duration temporary bonuses (persist until battle ends)
+        // Battle-duration temporary bonuses (persist until battle ends)
         this.battleAttackBonus = 0;  // Temporary attack bonus for this battle only
         this.battleHpBonus = 0;      // Temporary HP bonus for this battle only
         
         // Necromancy stacks tracking
         this.necromancyStacks = 0;
         this.maxNecromancyStacks = 0;
+
+        // Other stacks
+        this.burningFingerStack = 0;
         
         // Extensible state for future features
         this.statusEffects = [];
@@ -70,12 +72,18 @@ export class Hero {
         // Battle-specific state
         this.lastAction = null;
         this.turnsTaken = 0;
+
+        // Add burning finger stack initialization
+        if (heroData.burningFingerStack !== undefined) {
+            this.burningFingerStack = heroData.burningFingerStack;
+        } else {
+            this.burningFingerStack = 0;
+        }
     }
 
     addPermanentStatBonuses(attackBonus, hpBonus) {
         this.attackBonusses += attackBonus;
         this.hpBonusses += hpBonus;
-        console.log(`${this.name}: Added permanent bonuses - ATK +${attackBonus} (total: +${this.attackBonusses}), HP +${hpBonus} (total: +${this.hpBonusses})`);
     }
     
     // NEW: Battle bonus system - these bonuses last for the entire battle
@@ -83,11 +91,9 @@ export class Hero {
         if (amount <= 0) return;
         
         this.battleAttackBonus += amount;
-        console.log(`${this.name}: Added battle attack bonus +${amount} (total battle bonus: +${this.battleAttackBonus})`);
         
-        // Log new total attack
+        // Get new total attack
         const newAttack = this.getCurrentAttack();
-        console.log(`${this.name}: New total attack: ${newAttack} (base: ${this.atk}, battle bonus: +${this.battleAttackBonus})`);
     }
     
     addBattleHpBonus(amount) {
@@ -99,16 +105,11 @@ export class Hero {
         
         // Increase current HP by the same amount (maintains HP ratio)
         this.currentHp += amount;
-        
-        console.log(`${this.name}: Added battle HP bonus +${amount} (total battle bonus: +${this.battleHpBonus})`);
-        console.log(`${this.name}: HP increased from ${oldMaxHp} to ${this.maxHp} (current: ${this.currentHp})`);
     }
     
     // Clear battle bonuses (called when battle ends)
     clearBattleBonuses() {
         if (this.battleAttackBonus > 0 || this.battleHpBonus > 0) {
-            console.log(`${this.name}: Clearing battle bonuses (ATK: -${this.battleAttackBonus}, HP: -${this.battleHpBonus})`);
-            
             // Remove HP bonus from max and current HP
             if (this.battleHpBonus > 0) {
                 this.maxHp -= this.battleHpBonus;
@@ -165,8 +166,6 @@ export class Hero {
             const hpRatio = this.currentHp / oldMaxHp;
             this.currentHp = Math.floor(this.maxHp * hpRatio);
             this.currentHp = Math.min(this.currentHp, this.maxHp);
-            
-            console.log(`${this.name}: Stats updated - HP: ${this.currentHp}/${this.maxHp}, ATK: ${this.atk}`);
         } else if (oldMaxHp === this.maxHp) {
             // If max HP didn't change, keep current HP as is
             this.currentHp = Math.min(this.currentHp, this.maxHp);
@@ -211,8 +210,6 @@ export class Hero {
                 });
             }
         }
-        
-        console.log(`${this.name} abilities set (stats calculated in heroSelection)`);
     }
     
     // Initialize necromancy stacks based on ability level
@@ -221,7 +218,6 @@ export class Hero {
             const necromancyLevel = this.getAbilityStackCount('Necromancy');
             this.necromancyStacks = necromancyLevel;
             this.maxNecromancyStacks = necromancyLevel;
-            console.log(`${this.name} initialized with ${this.necromancyStacks} Necromancy stacks`);
         } else {
             this.necromancyStacks = 0;
             this.maxNecromancyStacks = 0;
@@ -242,7 +238,6 @@ export class Hero {
     consumeNecromancyStack() {
         if (this.necromancyStacks > 0) {
             this.necromancyStacks--;
-            console.log(`${this.name} consumed necromancy stack, ${this.necromancyStacks} remaining`);
             return true;
         }
         return false;
@@ -256,7 +251,6 @@ export class Hero {
     // Set necromancy stacks (for restoration)
     setNecromancyStacks(stacks) {
         this.necromancyStacks = Math.max(0, stacks);
-        console.log(`${this.name} necromancy stacks set to ${this.necromancyStacks}`);
     }
     
     setEquipment(equipment) {
@@ -264,28 +258,20 @@ export class Hero {
             if (Array.isArray(equipment)) {
                 this.equipment = equipment.filter(item => {
                     if (!item || typeof item !== 'object') {
-                        console.warn(`âš ï¸ Invalid equipment item for ${this.name}:`, item);
                         return false;
                     }
                     
                     const itemName = item.name || item.cardName;
                     if (!itemName || typeof itemName !== 'string') {
-                        console.warn(`âš ï¸ Equipment item missing name for ${this.name}:`, item);
                         return false;
                     }
                     
                     return true;
                 }).map(item => ({ ...item }));
-                
-                console.log(`âœ… Set ${this.equipment.length} valid equipment items for ${this.name}`);
             } else {
-                if (equipment !== undefined && equipment !== null) {
-                    console.warn(`âš ï¸ Invalid equipment data for ${this.name}, expected array but got:`, typeof equipment);
-                }
                 this.equipment = [];
             }
         } catch (error) {
-            console.error(`âŒ Error setting equipment for ${this.name}:`, error);
             this.equipment = [];
         }
     }
@@ -293,7 +279,6 @@ export class Hero {
     // Get equipment for this hero (sorted alphabetically)
     getEquipment() {
         if (!Array.isArray(this.equipment)) {
-            console.warn(`âš ï¸ Equipment is not an array for ${this.name}, resetting to empty array`);
             this.equipment = [];
         }
         return [...this.equipment].sort((a, b) => {
@@ -345,31 +330,25 @@ export class Hero {
         
         this.creatures = [];
         this.creatures = creaturesData.map(creature => ({ ...creature }));
-        
-        console.log(`${this.name} creatures set with ${this.creatures.length} creatures`);
     }
 
     // Add a creature
     addCreature(creatureCard) {
         if (!creatureCard || creatureCard.subtype !== 'Creature') {
-            console.error('Invalid creature card provided');
             return false;
         }
         
         this.creatures.push({ ...creatureCard });
-        console.log(`Added creature ${creatureCard.name} to ${this.name}`);
         return true;
     }
 
     // Remove a creature by index
     removeCreature(index) {
         if (index < 0 || index >= this.creatures.length) {
-            console.error(`Invalid creature index: ${index}`);
             return null;
         }
         
         const removedCreature = this.creatures.splice(index, 1)[0];
-        console.log(`Removed creature ${removedCreature.name} from ${this.name}`);
         return removedCreature;
     }
 
@@ -389,31 +368,25 @@ export class Hero {
         
         this.spellbook = [];
         this.spellbook = spellbookData.map(spell => ({ ...spell }));
-        
-        console.log(`${this.name} spellbook set with ${this.spellbook.length} spells`);
     }
     
     // Add a spell to the spellbook
     addSpell(spellCard) {
         if (!spellCard || spellCard.cardType !== 'Spell') {
-            console.error('Invalid spell card provided');
             return false;
         }
         
         this.spellbook.push({ ...spellCard });
-        console.log(`Added spell ${spellCard.name} to ${this.name}'s spellbook`);
         return true;
     }
     
     // Remove a spell from the spellbook by index
     removeSpell(index) {
         if (index < 0 || index >= this.spellbook.length) {
-            console.error(`Invalid spell index: ${index}`);
             return null;
         }
         
         const removedSpell = this.spellbook.splice(index, 1)[0];
-        console.log(`Removed spell ${removedSpell.name} from ${this.name}'s spellbook`);
         return removedSpell;
     }
     
@@ -547,8 +520,6 @@ export class Hero {
                 this.temporaryModifiers.atk = [];
             }
             this.temporaryModifiers.atk.push(modifier);
-        } else {
-            console.warn('Permanent attack modifications must be done in heroSelection, not during battle');
         }
     }
 
@@ -608,7 +579,7 @@ export class Hero {
             attackBonusses: this.attackBonusses,
             hpBonusses: this.hpBonusses,
             
-            // NEW: Battle-duration bonuses
+            // Battle-duration bonuses
             battleAttackBonus: this.battleAttackBonus,
             battleHpBonus: this.battleHpBonus,
             
@@ -621,9 +592,10 @@ export class Hero {
             creatures: this.creatures.map(creature => ({ ...creature })),
             equipment: this.equipment.map(item => ({...item})),
             
-            // Necromancy stacks
+            // Stacks
             necromancyStacks: this.necromancyStacks,
             maxNecromancyStacks: this.maxNecromancyStacks,
+            burningFingerStack: this.burningFingerStack || 0,
             
             // Battle state
             statusEffects: this.statusEffects,
@@ -653,7 +625,8 @@ export class Hero {
                 id: savedState.id,
                 name: savedState.name,
                 image: savedState.image,
-                filename: savedState.filename
+                filename: savedState.filename,
+                burningFingerStack: savedState.burningFingerStack
             },
             savedState.position,
             savedState.side,
@@ -676,7 +649,7 @@ export class Hero {
         hero.attackBonusses = savedState.attackBonusses || 0;
         hero.hpBonusses = savedState.hpBonusses || 0;
         
-        // NEW: Restore battle bonuses
+        // Restore battle bonuses
         hero.battleAttackBonus = savedState.battleAttackBonus || 0;
         hero.battleHpBonus = savedState.battleHpBonus || 0;
         
@@ -691,9 +664,10 @@ export class Hero {
             hero.setEquipment(savedState.equipment);
         }
         
-        // Restore necromancy stacks
+        // Restore Stacks
         hero.necromancyStacks = savedState.necromancyStacks || 0;
         hero.maxNecromancyStacks = savedState.maxNecromancyStacks || 0;
+        hero.burningFingerStack = savedState.burningFingerStack || 0;
         
         // Restore battle state
         hero.statusEffects = savedState.statusEffects || [];
@@ -703,7 +677,7 @@ export class Hero {
         hero.equipmentEffects = savedState.equipmentEffects || [];
         hero.lastAction = savedState.lastAction;
         hero.turnsTaken = savedState.turnsTaken || 0;
-        
+
         return hero;
     }
 }

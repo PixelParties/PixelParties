@@ -222,9 +222,7 @@ export class BattleAnimationManager {
             console.warn('animateMoniaProtectionDash called with null target, skipping animation');
             return;
         }
-        
-        console.log(`🛡️ Animating Monia protection dash: ${protectingMonia.name} → ${target.name || 'creature'}`);
-        
+            
         if (target.type === 'creature') {
             await this.animateMoniaToCreatureDash(protectingMonia, target);
         } else {

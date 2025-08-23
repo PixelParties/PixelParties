@@ -20,8 +20,6 @@ export class BattlePersistenceManager {
         
         // Version for compatibility
         this.BATTLE_STATE_VERSION = '2.0.0'; // Updated to reflect checkpoint system
-        
-        console.log('📌 BattlePersistenceManager initialized as checkpoint bridge');
     }
 
     // ============================================
@@ -50,7 +48,6 @@ export class BattlePersistenceManager {
             
             if (success) {
                 this.lastSaveTime = Date.now();
-                console.log('💾 Battle state saved via checkpoint system');
             }
             
             return success;
@@ -76,7 +73,6 @@ export class BattlePersistenceManager {
             const checkpoint = await this.checkpointSystem.loadCheckpoint();
             
             if (!checkpoint) {
-                console.log('📍 No checkpoint found');
                 return null;
             }
             
@@ -84,7 +80,6 @@ export class BattlePersistenceManager {
             // This allows modules expecting the old format to still work
             const legacyFormat = this.convertCheckpointToLegacyFormat(checkpoint);
             
-            console.log(`📥 Battle state loaded from checkpoint (turn ${checkpoint.turnNumber})`);
             return legacyFormat;
 
         } catch (error) {
@@ -145,7 +140,6 @@ export class BattlePersistenceManager {
             const success = await this.checkpointSystem.clearCheckpoint();
             
             if (success) {
-                console.log('🧹 Battle state cleared via checkpoint system');
             }
             
             return success;
@@ -169,11 +163,7 @@ export class BattlePersistenceManager {
             const roomRef = this.roomManager.getRoomRef();
             const checkpointSnapshot = await roomRef.child('battleCheckpoint').once('value');
             const exists = checkpointSnapshot.exists();
-            
-            if (exists) {
-                console.log('📍 Battle checkpoint exists');
-            }
-            
+                        
             return exists;
             
         } catch (error) {
@@ -232,6 +222,14 @@ export class BattlePersistenceManager {
             battleActive: checkpoint.battleState?.battleActive,
             currentTurn: checkpoint.battleState?.currentTurn,
             turnInProgress: checkpoint.battleState?.turnInProgress,
+
+            // Add hand data
+            playerHand: checkpoint.battleState?.playerHand || [],
+            opponentHand: checkpoint.battleState?.opponentHand || [],
+            
+            // Or if stored differently in checkpoint:
+            hostHand: checkpoint.hands?.host || [],
+            guestHand: checkpoint.hands?.guest || [],
             
             // Heroes in legacy format
             hostHeroes: checkpoint.heroes?.player || {},
@@ -271,7 +269,6 @@ export class BattlePersistenceManager {
      */
     queueSave(battleManager) {
         // In checkpoint system, we don't queue - we save at specific points
-        console.log('📌 Save request received - will save at next checkpoint');
         this.saveQueue = []; // Clear queue
     }
 
@@ -322,7 +319,6 @@ export class BattlePersistenceManager {
      */
     restoreHeroStates(battleManager, savedState) {
         // This is handled by checkpoint restoration
-        console.log('📌 Hero states restoration handled by checkpoint system');
     }
 
     /**
@@ -393,7 +389,6 @@ export class BattlePersistenceManager {
         this.saveQueue = [];
         this.isSaving = false;
         this.lastSavedStateHash = null;
-        console.log('📌 BattlePersistenceManager cleanup completed');
     }
 
     // ============================================

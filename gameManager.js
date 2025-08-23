@@ -48,6 +48,17 @@ export class GameManager {
             }
         });
 
+        // Victory screen handler
+        const absoluteWinner = lifeChangeData.winner === 'player' ? 
+            (this.roomManager.getIsHost() ? 'host' : 'guest') :
+            (this.roomManager.getIsHost() ? 'guest' : 'host');
+
+        this.webRTCManager.sendGameData('victory_achieved', {
+            winner: absoluteWinner,  // Now using 'host' or 'guest'
+            winnerName: playerName,
+            trophies: lifeChangeData.trophies
+        });
+
         // Handler for formation updates
         this.webRTCManager.registerMessageHandler('formation_update', (data) => {
             if (this.heroSelection) {
@@ -63,8 +74,14 @@ export class GameManager {
             if (this.heroSelection && this.heroSelection.getLifeManager()) {
                 const lifeManager = this.heroSelection.getLifeManager();
                 // Update opponent's view of the lives (reversed perspective)
-                lifeManager.setOpponentLives(data.playerLives);
-                lifeManager.setPlayerLives(data.opponentLives);
+                lifeManager.setOpponentLives(data.data.playerLives);
+                lifeManager.setPlayerLives(data.data.opponentLives);
+                
+                // Update trophy counts if available
+                if (data.data.playerTrophies !== undefined) {
+                    lifeManager.opponentTrophies = data.data.playerTrophies;
+                    lifeManager.playerTrophies = data.data.opponentTrophies;
+                }
                 
                 // Update the UI
                 if (this.heroSelection.updateLifeDisplay) {
@@ -121,6 +138,29 @@ export class GameManager {
         this.webRTCManager.registerMessageHandler('battle_ack', (data) => {
             if (this.heroSelection && this.heroSelection.getBattleScreen() && this.heroSelection.getBattleScreen().battleManager) {
                 this.heroSelection.getBattleScreen().battleManager.receiveBattleAcknowledgment(data);
+            }
+        });
+
+        this.webRTCManager.registerMessageHandler('sid_card_theft', (data) => {
+            console.log('🎭 GAMEMANAGER: Received sid_card_theft message:', data);
+            if (this.heroSelection && this.heroSelection.cardRewardManager) {
+                this.heroSelection.cardRewardManager.handleTheftMessage(data, this.heroSelection);
+            } else {
+                console.error('🎭 GAMEMANAGER: No heroSelection or cardRewardManager available');
+            }
+        });
+
+        this.webRTCManager.registerMessageHandler('sid_card_theft', (data) => {            
+            if (this.heroSelection && this.heroSelection.cardRewardManager) {
+                // Only process if current player is the victim
+                const isHost = this.roomManager.getIsHost();
+                const currentPlayerSide = isHost ? 'host' : 'guest';
+                
+                if (data.victimSide === currentPlayerSide) {
+                    this.heroSelection.cardRewardManager.handleOpponentSidTheft(data, this.heroSelection);
+                }
+            } else {
+                console.error('🎭 GAMEMANAGER: No heroSelection or cardRewardManager available');
             }
         });
     }
@@ -182,6 +222,12 @@ export class GameManager {
                 lifeManager.setOpponentLives(message.data.playerLives);
                 lifeManager.setPlayerLives(message.data.opponentLives);
                 
+                // Update trophy counts if available
+                if (message.data.playerTrophies !== undefined) {
+                    lifeManager.opponentTrophies = message.data.playerTrophies;
+                    lifeManager.playerTrophies = message.data.opponentTrophies;
+                }
+                
                 // Update the UI
                 if (this.heroSelection.updateLifeDisplay) {
                     this.heroSelection.updateLifeDisplay();
@@ -202,7 +248,33 @@ export class GameManager {
             } else if (message.type === 'battle_transition_start' && this.heroSelection) {
                 // Handle battle transition start via Firebase fallback
                 this.heroSelection.transitionToBattleScreen();
+            } else if (message.type === 'victory_achieved' && this.heroSelection && this.heroSelection.victoryScreen) {
+                // Handle victory via Firebase fallback
+                const myAbsoluteSide = this.roomManager.getIsHost() ? 'host' : 'guest';
+                const didIWin = message.data.winner === myAbsoluteSide;
+                
+                const winnerFormation = didIWin ? 
+                    this.heroSelection.formationManager.getBattleFormation() : 
+                    this.heroSelection.formationManager.getOpponentBattleFormation();
+                
+                const winnerData = {
+                    playerName: message.data.winnerName,
+                    heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
+                    isLocalPlayer: didIWin
+                };
+                
+                // Transition to victory state and show victory screen
+                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+            } else if (message.type === 'sid_card_theft' && this.heroSelection && this.heroSelection.cardRewardManager) {                
+                // Only process if current player is the victim
+                const isHost = this.roomManager.getIsHost();
+                const currentPlayerSide = isHost ? 'host' : 'guest';
+                if (message.data.victimSide === currentPlayerSide) {
+                    this.heroSelection.cardRewardManager.handleOpponentSidTheft(message.data, this.heroSelection);
+                }
             }
+            
             // Clean up old game data messages (keep only last 10)
             setTimeout(() => {
                 roomRef.child('game_data').limitToFirst(1).once('value', (oldSnapshot) => {
@@ -468,13 +540,72 @@ export class GameManager {
             const lifeUpdate = {
                 playerLives: lifeManager.getPlayerLives(),
                 opponentLives: lifeManager.getOpponentLives(),
+                playerTrophies: lifeManager.getPlayerTrophies(),
+                opponentTrophies: lifeManager.getOpponentTrophies(),
                 changeData: lifeChangeData
             };
             
             // Send life update to opponent
             this.webRTCManager.sendGameData('life_update', lifeUpdate);
             
-            // Check for game over
+            // Handle victory condition (10 trophies)
+            if (lifeChangeData.type === 'victory') {
+                // Get winner's formation data
+                const winnerFormation = lifeChangeData.winner === 'player' ? 
+                    this.heroSelection.formationManager.getBattleFormation() : 
+                    this.heroSelection.formationManager.getOpponentBattleFormation();
+                
+                // Get winner's name
+                const playerName = lifeChangeData.winner === 'player' ? 
+                    this.uiManager.getCurrentUsername() : 
+                    (this.roomManager.getIsHost() ? 
+                        this.roomManager.getRoomRef()?.guestName || 'Opponent' : 
+                        this.roomManager.getRoomRef()?.hostName || 'Opponent');
+                
+                const winnerData = {
+                    playerName: playerName,
+                    heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
+                    isLocalPlayer: lifeChangeData.winner === 'player'
+                };
+
+                // Save victory data to Firebase for reconnection support
+                const victoryData = {
+                    winner: lifeChangeData.winner,
+                    winnerName: playerName,
+                    trophies: lifeChangeData.trophies,
+                    timestamp: Date.now()
+                };
+
+                // Update game phase and save victory data
+                if (this.roomManager && this.roomManager.getRoomRef()) {
+                    this.roomManager.getRoomRef().child('gameState').update({
+                        gamePhase: 'Victory',
+                        gamePhaseUpdated: Date.now(),
+                        victoryData: victoryData
+                    }).catch(error => {
+                        // Error saving victory data, but continue with local victory display
+                    });
+                }
+                
+                // Send victory message to opponent
+                const absoluteWinner = lifeChangeData.winner === 'player' ? 
+                    (this.roomManager.getIsHost() ? 'host' : 'guest') :
+                    (this.roomManager.getIsHost() ? 'guest' : 'host');
+
+                this.webRTCManager.sendGameData('victory_achieved', {
+                    winner: absoluteWinner, 
+                    winnerName: playerName,
+                    trophies: lifeChangeData.trophies
+                });
+                
+                // Transition to victory state and show victory screen
+                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+                
+                return; // Don't check regular game over when victory condition is met
+            }
+            
+            // Check for regular game over (lives-based)
             if (lifeManager.isGameOver()) {
                 const winner = lifeManager.getWinner();
                 this.handleGameOver(winner);

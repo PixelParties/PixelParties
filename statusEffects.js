@@ -31,6 +31,24 @@ export class StatusEffectsManager {
                 visual: 'frost_aura',
                 description: 'Each stack gives 50% chance to freeze target on attack'
             },
+            stoneskin: {
+                name: 'stoneskin',
+                displayName: 'Stoneskin',
+                type: 'buff',
+                targetTypes: ['hero'], // Only heroes can have stoneskin
+                persistent: true, // Lasts entire battle
+                visual: 'stone_aura',
+                description: 'Stone-like protection'
+            },
+            immortal: {
+                name: 'immortal',
+                displayName: 'Immortal',
+                type: 'buff',
+                targetTypes: ['hero'], // Only heroes can have immortal
+                persistent: true, // Lasts until consumed or battle ends
+                visual: 'immortal_halo',
+                description: 'When dying without heal-block, revive with 100 HP and consume 1 stack.'
+            },
             silenced: {
                 name: 'silenced',
                 displayName: 'Silenced',
@@ -84,6 +102,15 @@ export class StatusEffectsManager {
                 persistent: false, // Decreases each turn via duration
                 visual: 'heal_block_symbol',
                 description: 'Cannot be healed or revived. Reduces by 1 stack each turn (persists when dead).'
+            },
+            weakened: {
+                name: 'weakened',
+                displayName: 'Weakened',
+                type: 'debuff',
+                targetTypes: ['hero'],
+                persistent: false,
+                visual: 'weakness_arrow',
+                description: 'Deals half damage on attacks. Reduces by 1 stack each turn.'
             }
         };
         
@@ -520,6 +547,7 @@ export class StatusEffectsManager {
         this.processSilencedDuration(target);
         this.processTauntingDuration(target);
         this.processHealBlockDuration(target);
+        this.processWeakenedDuration(target);
 
         // Clean up expired effects
         this.cleanupExpiredEffects(target);
@@ -573,7 +601,7 @@ export class StatusEffectsManager {
         // Apply damage
         if (target.type === 'hero' || !target.type) {
             // Hero damage with poison source
-            this.battleManager.authoritative_applyDamage({
+            await this.battleManager.authoritative_applyDamage({
                 target: target,
                 damage: finalDamage,
                 newHp: Math.max(0, target.currentHp - finalDamage),
@@ -651,7 +679,7 @@ export class StatusEffectsManager {
         // Apply damage
         if (target.type === 'hero' || !target.type) {
             // Hero damage with burn source
-            this.battleManager.authoritative_applyDamage({
+            await this.battleManager.authoritative_applyDamage({
                 target: target,
                 damage: damage,
                 newHp: Math.max(0, target.currentHp - damage),
@@ -776,6 +804,20 @@ export class StatusEffectsManager {
         }
     }
 
+    // Process weakened duration (decreases each turn)
+    processWeakenedDuration(target) {
+        if (this.hasStatusEffect(target, 'weakened')) {
+            this.removeStatusEffect(target, 'weakened', 1);
+            
+            if (!this.hasStatusEffect(target, 'weakened')) {
+                this.battleManager.addCombatLog(
+                    `💪 ${target.name} is no longer weakened!`,
+                    target.side === 'player' ? 'success' : 'error'
+                );
+            }
+        }
+    }
+
     // ============================================
     // STATUS EFFECT INTERACTIONS
     // ============================================
@@ -838,13 +880,16 @@ export class StatusEffectsManager {
     // Create application effect
     createApplicationEffect(targetElement, target, effectName) {
         const effects = {
+            stoneskin: { icon: '🗿', color: '#8B4513' },
+            immortal: { icon: '✨', color: 'rgba(255, 215, 0, 0.9)' },
             silenced: { icon: '🔇', color: 'rgba(128, 128, 128, 0.9)' },
             poisoned: { icon: '☠️', color: 'rgba(128, 0, 128, 0.9)' },
             stunned: { icon: '😵', color: 'rgba(255, 255, 0, 0.9)' },
             burned: { icon: '🔥', color: 'rgba(255, 100, 0, 0.9)' },
             frozen: { icon: '🧊', color: 'rgba(100, 200, 255, 0.9)' },
             taunting: { icon: '📢', color: 'rgba(255, 107, 107, 0.9)' },
-            healblock: { icon: '🚫', color: 'rgba(220, 53, 69, 0.9)' }
+            healblock: { icon: '🚫', color: 'rgba(220, 53, 69, 0.9)' },
+            weakened: { icon: '↓', color: 'rgba(220, 53, 69, 0.9)' }
         };
 
         const effect = effects[effectName];
@@ -879,7 +924,7 @@ export class StatusEffectsManager {
 
     // Create persistent status indicator - ✅ FIXED
     createPersistentStatusIndicator(targetElement, target, effectName) {
-        // ✅ FIX: Don't create indicators for dead targets
+        // Don't create indicators for dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
             console.log(`⚰️ Skipping status indicator creation for dead target: ${target.name}`);
@@ -896,13 +941,16 @@ export class StatusEffectsManager {
         if (stacks === 0) return;
 
         const indicators = {
+            stoneskin: { icon: '🗿', color: '#8B4513' },
+            immortal: { icon: '✨', color: '#ffd700' },
             silenced: { icon: '🔇', color: '#808080' },
             poisoned: { icon: '☠️', color: '#800080' },
             stunned: { icon: '😵', color: '#ffff00' },
             burned: { icon: '🔥', color: '#ff6400' },
             frozen: { icon: '🧊', color: '#64c8ff' },
             taunting: { icon: '📢', color: '#ff6b6b' },
-            healblock: { icon: '🚫', color: '#dc3545' }
+            healblock: { icon: '🚫', color: '#dc3545' },
+            weakened: { icon: '↓', color: '#dc3545' }
         };
 
         const indicator = indicators[effectName];
@@ -1169,6 +1217,53 @@ export class StatusEffectsManager {
                     box-shadow: 0 2px 8px rgba(220, 53, 69, 0.6);
                     transform: translateX(-50%) scale(1.05);
                 }
+            }
+
+            @keyframes immortalRevivalBurst {
+                0% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) scale(0.3);
+                }
+                30% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%) scale(1.5);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) scale(2);
+                }
+            }
+
+            @keyframes immortalGodRay {
+                0% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(0);
+                }
+                50% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(1);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) rotate(var(--angle)) scaleY(0.5);
+                }
+            }
+
+            @keyframes weakenedPulse {
+                0%, 100% { 
+                    transform: translateX(-50%) scale(1) rotate(0deg);
+                    color: #dc3545;
+                }
+                50% { 
+                    transform: translateX(-50%) scale(1.1) rotate(-5deg);
+                    color: #ff6b6b;
+                }
+            }
+
+            .status-indicator-weakened {
+                animation: weakenedPulse 2s ease-in-out infinite !important;
+                background: #dc3545 !important;
+                border-color: rgba(220, 53, 69, 0.8) !important;
             }
         `;
         
@@ -1489,6 +1584,28 @@ export class StatusEffectsManager {
         
         const clearingMode = completeClearing ? 'COMPLETE' : 'PARTIAL';
         console.log(`🧹 ${clearingMode} cleaned up status visuals for dead target: ${target.name}`);
+    }
+
+    // Check if attacker is weakened and should deal reduced damage
+    applyWeakenedDamageReduction(attacker, baseDamage) {
+        if (!this.hasStatusEffect(attacker, 'weakened')) {
+            return baseDamage;
+        }
+        
+        const weakenedStacks = this.getStatusEffectStacks(attacker, 'weakened');
+        if (weakenedStacks > 0) {
+            // Half damage, rounded up
+            const reducedDamage = Math.ceil(baseDamage / 2);
+            
+            this.battleManager.addCombatLog(
+                `${attacker.name} deals reduced damage due to being weakened! (${baseDamage} → ${reducedDamage})`,
+                attacker.side === 'player' ? 'error' : 'success'
+            );
+            
+            return reducedDamage;
+        }
+        
+        return baseDamage;
     }
 
     // Clear all status effects from all targets (battle end)

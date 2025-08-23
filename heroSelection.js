@@ -17,8 +17,10 @@ import { GameStateMachine } from './gameStateMachine.js';
 import { globalSpellManager } from './globalSpellManager.js';
 import { potionHandler } from './potionHandler.js';
 import { HeroEquipmentManager } from './heroEquipment.js';
+import VictoryScreen from './victoryScreen.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
+import { trainingAbility } from './Abilities/training.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
 import { VacarnEffectManager } from './Heroes/vacarn.js';
@@ -30,6 +32,7 @@ import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 export class HeroSelection {
     constructor() {
         this.allCharacters = [];
+        this.allPreviewCharacters = [];
         this.playerCharacters = []; // Player's 3 character options
         this.opponentCharacters = []; // Opponent's 3 character options
         this.selectedCharacter = null;
@@ -41,6 +44,9 @@ export class HeroSelection {
         this.battleStateListener = null; // Firebase listener for battle state
         this.globalSpellManager = globalSpellManager;
         this.opponentPermanentArtifactsData = null;
+
+        this.magicSapphiresUsed = 0;
+        this.magicRubiesUsed = 0;
 
 
         // Guard Change mode tracking
@@ -69,6 +75,7 @@ export class HeroSelection {
         this.actionManager = new ActionManager();
         this.heroCreatureManager = new HeroCreatureManager();
         this.heroEquipmentManager = new HeroEquipmentManager();
+        this.victoryScreen = new VictoryScreen();
 
         this.potionHandler = potionHandler; 
 
@@ -153,20 +160,34 @@ export class HeroSelection {
         
         // Character card mappings
         this.characterCards = {
-            'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'LootThePrincess', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
+            'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
-            'Ida': ['BottledFlame', 'BurningSkeleton',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
+            'Ida': ['BottledFlame', 'BurningFinger',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
-            'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'PressedSkill'],
-            'Semi': ['Adventurousness', 'ElixirOfImmortality', 'ElixirOfStrength', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
+            'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
+            'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
             'Tharx': ['Archer', 'Cavalry', 'Challenge', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic']
         };
+
+        
+
+
+        // Individual Abilities
+        this.trainingAbility = trainingAbility;
+
+        // Initialize training system
+        if (typeof window !== 'undefined') {
+            // Defer training initialization until after the instance is fully created
+            setTimeout(() => {
+                this.initializeTrainingSystem();
+            }, 0);
+        }
     }
 
     // Initialize with game context and setup turn tracker
@@ -205,7 +226,6 @@ export class HeroSelection {
         
         // Add state change listener for debugging
         this.stateMachine.onStateChange((fromState, toState, context) => {
-            console.log(`HeroSelection state changed: ${fromState} -> ${toState}`, context);
         });
 
         this.crusaderArtifactsHandler.init(this);
@@ -515,13 +535,16 @@ export class HeroSelection {
                 'Vacarn.png', 'Tharx.png', 'Semi.png'
             ];
 
-            // Load character data
+            // Load character data (for formation - uses Cards/All)
             this.allCharacters = characterFiles.map((filename, index) => ({
                 id: index,
                 name: this.formatCharacterName(filename),
-                image: `./Cards/Characters/${filename}`,
+                image: `./Cards/All/${filename}`,
                 filename: filename
             }));
+
+            // Load preview character data (for selection - uses Cards/Characters) 
+            await this.loadPreviewCharacters();
 
             // ALWAYS attempt to restore state first (for both fresh games and reconnections)
             const stateRestored = await this.restoreGameState();
@@ -539,6 +562,29 @@ export class HeroSelection {
         }
     }
 
+    // Load character images specifically for preview/selection from Cards/Characters folder
+    async loadPreviewCharacters() {
+        try {
+            const characterFiles = [
+                'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
+                'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
+                'Vacarn.png', 'Tharx.png', 'Semi.png'
+            ];
+
+            // Load preview character data with Cards/Characters sprites
+            this.allPreviewCharacters = characterFiles.map((filename, index) => ({
+                id: index,
+                name: this.formatCharacterName(filename),
+                image: `./Cards/Characters/${filename}`, // Different path for selection
+                filename: filename
+            }));
+
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
     async setGamePhase(phase) {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
             return false;
@@ -549,10 +595,8 @@ export class HeroSelection {
                 gamePhase: phase,
                 gamePhaseUpdated: Date.now()
             });
-            console.log(`🎯 Game phase set to: ${phase}`);
             return true;
         } catch (error) {
-            console.error('Error setting game phase:', error);
             return false;
         }
     }
@@ -572,9 +616,7 @@ export class HeroSelection {
             if (!gameState || 
                 !gameState.hostCharacters || gameState.hostCharacters.length === 0 ||
                 !gameState.guestCharacters || gameState.guestCharacters.length === 0) {
-                
-                console.log('No valid game state found - starting fresh game');
-                
+                                
                 // Transition to initializing state for fresh game
                 this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
                 
@@ -582,15 +624,12 @@ export class HeroSelection {
                 const selectionStarted = await this.startSelection();
                 
                 if (!selectionStarted) {
-                    console.error('Failed to start character selection for new game');
                     this.stateMachine.transitionTo(this.stateMachine.states.ERROR, {
                         error: 'Failed to start character selection'
                     });
                     return false;
                 }
-                
-                console.log('✅ New game character selection started successfully');
-                
+                                
                 // Update UI
                 if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                     window.updateHeroSelectionUI();
@@ -598,16 +637,11 @@ export class HeroSelection {
                 
                 return false; // Indicate no state was restored (this is a new game)
             }
-            
-            // Valid game state found with character assignments - proceed with reconnection
-            console.log('🔄 Valid game state found with character assignments');
-            
+                        
             // Transition to reconnecting state
             this.stateMachine.transitionTo(this.stateMachine.states.RECONNECTING, {
                 reason: 'restoring_saved_state'
             });
-            
-            console.log('🔄 Delegating reconnection to ReconnectionManager');
             
             // Initialize reconnection manager if not already done
             if (!this.reconnectionManager) {
@@ -620,10 +654,11 @@ export class HeroSelection {
                     this.isHost
                 );
             }
-            
+
+
             // Delegate all reconnection logic to the centralized manager
             const success = await this.reconnectionManager.handleReconnection(gameState);
-
+            
             // Additional restoration for permanent artifacts (direct handling)
             if (success && gameState && window.artifactHandler) {
                 const playerRole = this.isHost ? 'host' : 'guest';
@@ -632,26 +667,19 @@ export class HeroSelection {
                 
                 if (permanentArtifactsData) {
                     window.artifactHandler.importPermanentArtifactsState(permanentArtifactsData);
-                    console.log('📋 Permanent artifacts restored during reconnection');
                 }
             }
 
             return success;
 
         } catch (error) {
-            console.error('Error restoring game state:', error);
-            
-            // On error, assume fresh game
-            console.log('Error during restore - treating as fresh game');
-            
+                        
             this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
             
             // Try to start fresh game
             try {
                 const selectionStarted = await this.startSelection();
-                if (selectionStarted) {
-                    console.log('✅ Recovery successful - started fresh game');
-                    
+                if (selectionStarted) {                    
                     if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                         window.updateHeroSelectionUI();
                     }
@@ -659,7 +687,6 @@ export class HeroSelection {
                     return false;
                 }
             } catch (startError) {
-                console.error('Failed to start fresh game after restore error:', startError);
             }
             
             // If all else fails, transition to error state
@@ -728,7 +755,7 @@ export class HeroSelection {
     }
 
     // Save game state method with comprehensive ability verification and debugging
-    async saveGameState() {
+    async saveGameState() {       
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
             return false;
         }
@@ -837,7 +864,6 @@ export class HeroSelection {
                 // Save potion state for host (now includes active effects)
                 if (this.potionHandler) {
                     gameState.hostPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
-                    console.log(`💾 Host saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
                 }
 
 
@@ -851,16 +877,15 @@ export class HeroSelection {
                 if (this.semiEffectManager) {
                     gameState.hostSemiState = sanitizeForFirebase(this.semiEffectManager.exportSemiState());
                 }
-
-
-
+                
+                // Magic gems count
+                gameState.hostMagicSapphiresUsed = sanitizeForFirebase(this.magicSapphiresUsed || 0);
+                gameState.hostMagicRubiesUsed = sanitizeForFirebase(this.magicRubiesUsed || 0); 
 
                 // Save delayed artifact effects for host
                 if (this.delayedArtifactEffects) {
                     gameState.hostDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
-                    console.log(`💾 Host saving ${this.delayedArtifactEffects.length} delayed artifact effects`);
                 }
-
             } else if (!this.isHost && this.selectedCharacter) {
                 gameState.guestSelected = this.selectedCharacter;
                 gameState.guestBattleFormation = sanitizeForFirebase(this.formationManager.getBattleFormation());
@@ -937,7 +962,6 @@ export class HeroSelection {
                 // Save potion state for guest (now includes active effects)
                 if (this.potionHandler) {
                     gameState.guestPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
-                    console.log(`💾 Guest saving potion state with ${this.potionHandler.getPotionStatus().activeEffects} active effects`);
                 }
 
 
@@ -953,13 +977,21 @@ export class HeroSelection {
                     gameState.guestSemiState = sanitizeForFirebase(this.semiEffectManager.exportSemiState());
                 }
 
+                // Save Magic gems count
+                let magicSapphireValue = 0; 
+                
+                if (this.magicSapphiresUsed !== undefined && this.magicSapphiresUsed !== null)magicSapphireValue = this.magicSapphiresUsed;
+                                
+                gameState.guestMagicSapphiresUsed = sanitizeForFirebase(magicSapphireValue);
 
-
-
+                let magicRubyValue = 0; 
+                if (this.magicRubiesUsed !== undefined && this.magicRubiesUsed !== null)magicRubyValue = this.magicRubiesUsed;
+                
+                gameState.guestMagicRubiesUsed = sanitizeForFirebase(magicRubyValue);
+                
                 // Save delayed artifact effects for guest
                 if (this.delayedArtifactEffects) {
                     gameState.guestDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
-                    console.log(`💾 Guest saving ${this.delayedArtifactEffects.length} delayed artifact effects`);
                 }
             }
 
@@ -972,11 +1004,23 @@ export class HeroSelection {
 
             // Sanitize the entire gameState object
             const sanitizedGameState = sanitizeForFirebase(gameState);
+
+
+
+
+            // Before saving, log current burning finger stacks in formation
+            const formation = this.formationManager.getBattleFormation();
+            ['left', 'center', 'right'].forEach(position => {
+                const hero = formation[position];
+                if (hero && hero.burningFingerStack !== undefined) {
+                }
+            });
+
+            
             
             await roomRef.child('gameState').update(sanitizedGameState);
             return true;
         } catch (error) {
-            console.error('Error saving game state:', error);
             return false;
         }
     }
@@ -1016,7 +1060,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, magicSapphiresUsedData = null, magicRubiesUsedData = null){
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1046,33 +1090,28 @@ export class HeroSelection {
         if (potionData && this.potionHandler) {
             const potionRestored = this.potionHandler.importPotionState(potionData, false);
             if (potionRestored) {
-                console.log('✅ Potion state restored successfully');
                 // Don't call updateAlchemyBonuses here - it will be called by reconnectionManager if needed
             }
         } else {
             // Initialize potion state for new game
             this.potionHandler.resetForNewGame(); // Use new method that clears any lingering effects
             this.potionHandler.updateAlchemyBonuses(this);
-            console.log('🔍 No potion data found - initialized fresh for new game');
         }
 
         // ===== Restore Hero effect states =====
         if (nicolasData && this.nicolasEffectManager) {
             const nicolasRestored = this.nicolasEffectManager.importNicolasState(nicolasData);
             if (nicolasRestored) {
-                console.log('✅ Nicolas effect state restored successfully');
             }
         } else {
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.reset();
-                console.log('🔍 No Nicolas data found - initialized fresh state');
             }
         }
 
         if (vacarnData && this.vacarnEffectManager) {
             const vacarnRestored = this.vacarnEffectManager.importVacarnState(vacarnData);
             if (vacarnRestored) {
-                console.log('✅ Vacarn effect state restored successfully');
             }
         } else {
             if (this.vacarnEffectManager) {
@@ -1083,44 +1122,35 @@ export class HeroSelection {
         if (semiData && this.semiEffectManager) {
             const semiRestored = this.semiEffectManager.importSemiState(semiData);
             if (semiRestored) {
-                console.log('✅ Semi effect state restored successfully');
             }
         } else {
             // Initialize Semi state if no saved data
             if (this.semiEffectManager) {
                 this.semiEffectManager.reset();
-                console.log('🔍 No Semi data found - initialized fresh state');
             }
         }
 
         // ===== Restore delayed artifact effects =====
         if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
             this.delayedArtifactEffects = [...delayedArtifactEffectsData];
-            console.log(`✅ Restored ${this.delayedArtifactEffects.length} delayed artifact effects`);
             
             // Log what effects were restored
             this.delayedArtifactEffects.forEach((effect, index) => {
-                console.log(`🥩 Restored effect ${index + 1}: ${effect.source} - ${effect.description}`);
             });
         } else {
             // Initialize empty array if no saved data
             this.delayedArtifactEffects = [];
-            console.log('🔍 No delayed artifact effects found - initialized empty array');
         }
 
         // ===== Restore permanent artifacts for LOCAL player =====
         if (permanentArtifactsData && window.artifactHandler) {
             const restored = window.artifactHandler.importPermanentArtifactsState(permanentArtifactsData);
             if (restored) {
-                console.log('✅ Permanent artifacts state restored successfully');
             } else {
-                console.log('🔍 No permanent artifacts found - initialized empty list');
             }
-        } else {
-            console.log('🔍 No permanent artifacts data found - keeping current state');
         }
 
-        // ===== NEW: Restore OPPONENT's permanent artifacts data =====
+        // ===== Restore OPPONENT's permanent artifacts data =====
         if (opponentPermanentArtifactsData) {
             // Store opponent's permanent artifacts for use when battle starts
             // This data comes from Firebase and represents the other player's permanent artifacts
@@ -1128,37 +1158,23 @@ export class HeroSelection {
             // Handle both formats: direct array or object with permanentArtifacts property
             if (Array.isArray(opponentPermanentArtifactsData)) {
                 this.opponentPermanentArtifactsData = opponentPermanentArtifactsData;
-                console.log(`✅ Restored ${opponentPermanentArtifactsData.length} opponent permanent artifacts (array format)`);
             } else if (opponentPermanentArtifactsData.permanentArtifacts) {
                 this.opponentPermanentArtifactsData = opponentPermanentArtifactsData.permanentArtifacts;
-                console.log(`✅ Restored ${this.opponentPermanentArtifactsData.length} opponent permanent artifacts (object format)`);
             } else {
                 this.opponentPermanentArtifactsData = [];
-                console.log('⚠️ Opponent permanent artifacts data format unrecognized, initialized empty');
-            }
-            
-            // Log what artifacts the opponent has
-            if (this.opponentPermanentArtifactsData.length > 0) {
-                console.log('📋 Opponent permanent artifacts:');
-                this.opponentPermanentArtifactsData.forEach(artifact => {
-                    console.log(`  - ${artifact.name} (used at: ${new Date(artifact.usedAt).toLocaleTimeString()})`);
-                });
             }
         } else {
             // No opponent permanent artifacts data provided
             this.opponentPermanentArtifactsData = [];
-            console.log('🔍 No opponent permanent artifacts data found - initialized empty');
         }
         
         // ===== Restore player-specific global spell state (including Guard Change mode) =====
         if (globalSpellData && this.globalSpellManager) {
-            console.log('🔄 Restoring player-specific global spell state:', globalSpellData);
             const globalSpellRestored = this.globalSpellManager.importGlobalSpellState(globalSpellData);
             
             if (globalSpellRestored) {
-                // CRITICAL: Sync the Guard Change mode with HeroCreatureManager
+                // Sync the Guard Change mode with HeroCreatureManager
                 const isGuardChangeActive = this.globalSpellManager.isGuardChangeModeActive();
-                console.log('🔄 Syncing Guard Change mode with HeroCreatureManager:', isGuardChangeActive);
                 
                 if (this.heroCreatureManager) {
                     this.heroCreatureManager.setGuardChangeMode(isGuardChangeActive);
@@ -1166,7 +1182,6 @@ export class HeroSelection {
                 
                 // Update UI to show Guard Change indicator if active
                 if (isGuardChangeActive) {
-                    console.log('🛡️ Guard Change mode restored and active');
                     // UI will be updated by the importGlobalSpellState method
                     
                     // Ensure body class is properly set for reconnection
@@ -1174,22 +1189,54 @@ export class HeroSelection {
                         document.body.classList.add('guard-change-active');
                     }
                 }
-                
-                console.log('✅ Player-specific global spell state restored successfully');
-            } else {
-                console.log('⚠️ No player-specific global spell state to restore');
             }
         } else {
-            console.log('🔍 No global spell data found for this player - ensuring Guard Change is off');
-            
             // Ensure Guard Change mode is off if no data
             if (this.globalSpellManager) {
                 this.globalSpellManager.setGuardChangeMode(false, this);
             }
         }
+
+        // ===== Restore Magic Sapphire usage count =====
+        if (magicSapphiresUsedData !== null && magicSapphiresUsedData !== undefined) {
+            this.magicSapphiresUsed = magicSapphiresUsedData;
+        } else {
+            if (this.magicSapphiresUsed === undefined || this.magicSapphiresUsed === null) {
+                this.magicSapphiresUsed = 0;
+            }
+        }
+
+        if (magicRubiesUsedData !== null && magicRubiesUsedData !== undefined) {
+            this.magicRubiesUsed = magicRubiesUsedData;           
+            // Update hand manager's max hand size based on restored ruby count
+            if (this.handManager) {
+                const newMaxHandSize = 10 + this.magicRubiesUsed;
+                this.handManager.setMaxHandSize(newMaxHandSize);
+            }
+        } else {
+            if (this.magicRubiesUsed === undefined || this.magicRubiesUsed === null) {
+                this.magicRubiesUsed = 0;
+            } else {                
+                // Still update hand manager if we have an existing count
+                if (this.handManager && this.magicRubiesUsed > 0) {
+                    const newMaxHandSize = 10 + this.magicRubiesUsed;
+                    this.handManager.setMaxHandSize(newMaxHandSize);
+                }
+            }
+        }
         
         // Initialize life manager with turn tracker after restoration
         this.initializeLifeManagerWithTurnTracker();
+
+        // Add specific debugging for burning finger stacks after formation is restored
+        setTimeout(() => {
+            const formation = this.formationManager.getBattleFormation();
+            ['left', 'center', 'right'].forEach(position => {
+                const hero = formation[position];
+                if (hero) {
+                }
+            });
+        }, 100);
 
         // Refresh hero stats after all data is restored
         setTimeout(() => this.refreshHeroStats(), 200);
@@ -1197,7 +1244,7 @@ export class HeroSelection {
 
     // Enhanced start character selection process
     async startSelection() {
-        if (this.allCharacters.length < 6) {
+        if (this.allPreviewCharacters.length < 6) { 
             return false;
         }
 
@@ -1257,9 +1304,9 @@ export class HeroSelection {
             this.initializeLifeManagerWithTurnTracker();
         }
         
-        // Generate new character selection
-        const selectedIndices = this.getRandomUniqueIndices(this.allCharacters.length, 6);
-        const allSelectedCharacters = selectedIndices.map(index => this.allCharacters[index]);
+        // Generate new character selection using PREVIEW characters
+        const selectedIndices = this.getRandomUniqueIndices(this.allPreviewCharacters.length, 6);
+        const allSelectedCharacters = selectedIndices.map(index => this.allPreviewCharacters[index]); // Use preview characters
         
         // Split into two groups of 3 (host gets first 3, guest gets last 3)
         this.playerCharacters = allSelectedCharacters.slice(0, 3);
@@ -1317,26 +1364,31 @@ export class HeroSelection {
 
     // Select a character (when player clicks on one)
     async selectCharacter(characterId) {
-        const character = this.playerCharacters.find(c => c.id === characterId);
-        if (!character) {
+        const previewCharacter = this.playerCharacters.find(c => c.id === characterId);
+        if (!previewCharacter) {
             return false;
         }
 
-        this.selectedCharacter = character;
+        // Find the corresponding character from allCharacters (for formation use)
+        const formationCharacter = this.allCharacters.find(c => c.name === previewCharacter.name);
+        if (!formationCharacter) {
+            return false;
+        }
+
+        this.selectedCharacter = formationCharacter; // Use formation character with Cards/All path
         
         // Transition to team building state
         this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING);
 
         // Calculate and award starting gold
-        const startingGold = this.calculateStartingGold(character);
+        const startingGold = this.calculateStartingGold(formationCharacter); // Use formation character
         this.goldManager.setPlayerGold(startingGold, 'starting_gold');
-        console.log(`💰 Awarded ${startingGold} starting gold to player`);
 
         // Initialize battle formation with selected character in center
-        this.formationManager.initWithCharacter(character);
+        this.formationManager.initWithCharacter(formationCharacter); // Use formation character
 
         // Get full hero info from database
-        const heroInfo = getHeroInfo(character.name);
+        const heroInfo = getHeroInfo(formationCharacter.name); // Use formation character
         if (heroInfo) {
             // Initialize hero with starting abilities in center position
             this.heroAbilitiesManager.updateHeroPlacement('center', heroInfo);
@@ -1349,7 +1401,7 @@ export class HeroSelection {
         this.initializeLifeManagerWithTurnTracker();
 
         // Add character's cards to deck
-        const characterCards = this.characterCards[character.name];
+        const characterCards = this.characterCards[formationCharacter.name]; // Use formation character
         if (characterCards) {
             this.deckManager.addCards(characterCards);
         } else {
@@ -1368,10 +1420,10 @@ export class HeroSelection {
         // Save complete selection state to Firebase (including new hand)
         await this.saveGameState();
 
-        // Send selection to opponent
+        // Send selection to opponent (send the formation character)
         if (this.gameDataSender) {
             this.gameDataSender('character_selected', {
-                character: character,
+                character: formationCharacter, // Use formation character
                 playerRole: this.isHost ? 'host' : 'guest'
             });
         }
@@ -1423,7 +1475,13 @@ export class HeroSelection {
             // Gather permanent artifacts data
             const permanentArtifactsData = window.artifactHandler ? 
                 window.artifactHandler.getPermanentArtifacts() : [];
+
+            // Gather hand data
+            const handData = this.handManager.getHand();
             
+            //Gather deck data
+            const deckData = this.deckManager.getDeck();
+
             // Send all data
             this.gameDataSender('formation_update', {
                 playerRole: this.isHost ? 'host' : 'guest',
@@ -1432,8 +1490,16 @@ export class HeroSelection {
                 spellbooks: spellbooksData,
                 creatures: creaturesData,
                 equipment: equipmentData,
-                permanentArtifacts: permanentArtifactsData
+                permanentArtifacts: permanentArtifactsData,
+                hand: handData,
+                deck: deckData
             });
+        }
+    }
+
+    receiveVictoryExit(data) {
+        if (this.victoryScreen) {
+            this.victoryScreen.handleOpponentVictoryExit();
         }
     }
 
@@ -1469,13 +1535,19 @@ export class HeroSelection {
         if (data.equipment) {
             // Store for later use when battle starts
             this.opponentEquipmentData = data.equipment;
-            console.log('📦 Received opponent equipment data:', data.equipment);
         }
 
         // Store opponent permanent artifacts if included
         if (data.permanentArtifacts) {
             this.opponentPermanentArtifactsData = data.permanentArtifacts;
-            console.log('📦 Received opponent permanent artifacts:', data.permanentArtifacts);
+        }
+
+        // Store opponent hand and deck if included
+        if (data.hand) {
+            this.opponentHandData = data.hand;
+        }
+        if (data.deck) {
+            this.opponentDeckData = data.deck;
         }
     }
 
@@ -1529,7 +1601,6 @@ export class HeroSelection {
         // Calculate opponent's starting gold
         const opponentStartingGold = this.calculateStartingGold(this.opponentSelectedCharacter);
         this.goldManager.setOpponentGold(opponentStartingGold, 'starting_gold');
-        console.log(`💰 Set opponent's starting gold to ${opponentStartingGold}`);
         
         // Update Firebase with opponent's selection
         if (this.roomManager && this.roomManager.getRoomRef()) {
@@ -1712,9 +1783,7 @@ export class HeroSelection {
     }
 
     // Return to formation screen with more aggressive cleanup
-    async returnToFormationScreenAfterBattle() {
-        console.log('🛡️ Returning to formation screen after battle');
-        
+    async returnToFormationScreenAfterBattle() {       
         // Transition to cleanup state
         this.stateMachine.transitionTo(this.stateMachine.states.CLEANING_UP, {
             reason: 'returning_from_battle'
@@ -1729,12 +1798,10 @@ export class HeroSelection {
                 try {
                     this.potionHandler.clearPotionEffects();
                 } catch (error) {
-                    console.error('❌ Error clearing potion effects during formation return:', error);
                 }
             }
             
             if (window.heroSelection) {
-                console.log('🥩 HOST: Clearing processed delayed artifact effects...');
                 window.heroSelection.clearProcessedDelayedEffects();
             }
             
@@ -1785,13 +1852,11 @@ export class HeroSelection {
             // Reset actions for the new turn after battle
             if (this.actionManager) {
                 this.actionManager.resetActions();
-                console.log('✨ Actions reset for new turn after battle');
             }
 
             // Reset Nicolas effect usage when returning to formation
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.resetForNewTurn();
-                console.log('✨ Nicolas effect usage reset when returning to formation');
             }
             if (this.vacarnEffectManager) {
                 this.vacarnEffectManager.resetForNewTurn();
@@ -1810,13 +1875,10 @@ export class HeroSelection {
             
             // STEP 5: Background Firebase cleanup
             this.aggressiveBattleStateClear().then(() => {
-                console.log('Background Firebase cleanup completed');
             }).catch(error => {
-                console.log('Background Firebase cleanup failed, but UI already updated');
             });
             
         } catch (error) {
-            console.error('Error returning to formation screen:', error);
             this.stateMachine.transitionTo(this.stateMachine.states.ERROR, {
                 error: error.message
             });
@@ -1861,12 +1923,9 @@ export class HeroSelection {
     }
 
     // Handle To Battle click with improved state management
-    async handleToBattleClick() {
-        console.log('To Battle clicked');
-        
+    async handleToBattleClick() {       
         // Can only go to battle from team building state
         if (!this.stateMachine.isInState(this.stateMachine.states.TEAM_BUILDING)) {
-            console.log('Not in correct state to go to battle');
             return;
         }
         
@@ -1883,6 +1942,10 @@ export class HeroSelection {
         
         // Transition to waiting state
         this.stateMachine.transitionTo(this.stateMachine.states.WAITING_FOR_BATTLE);
+
+        if (!this.isHost) {
+            await this.sendFormationUpdate(); // Ensure latest data is sent
+        }
         
         // Set player ready state
         await this.setPlayerBattleReady(true);
@@ -1952,7 +2015,7 @@ export class HeroSelection {
                 
                 // Only HOST should mark battle as started
                 if (this.isHost) {
-                    // ❗ CRITICAL: Set ALL battle flags atomically to prevent race conditions
+                    // CRITICAL: Set ALL battle flags atomically to prevent race conditions
                     await roomRef.child('gameState').update({
                         battleStarted: true,
                         battleStartTime: Date.now(),
@@ -1961,9 +2024,7 @@ export class HeroSelection {
                         gamePhase: 'Battle',        // Set phase atomically
                         gamePhaseUpdated: Date.now(),
                         battlePaused: false         // Ensure not paused
-                    });
-                    console.log('🔥 HOST: Battle state set atomically - battleStarted, gamePhase=Battle, battleActive=true');
-                    
+                    });                   
                     // Send battle start signal via P2P
                     if (this.gameDataSender) {
                         this.gameDataSender('battle_transition_start', {
@@ -1979,7 +2040,6 @@ export class HeroSelection {
                 this.showBattleWaitingOverlay();
             }
         } catch (error) {
-            console.error('Error in checkAndHandleBattleTransition:', error);
         }
     }
     
@@ -1996,7 +2056,7 @@ export class HeroSelection {
         
         waitingOverlay.innerHTML = `
             <div class="waiting-content">
-                <h2>⏳ Waiting for opponent...</h2>
+                <h2>Waiting for opponent...</h2>
                 <div class="waiting-spinner"></div>
                 <p>Your battle formation is ready!</p>
                 <p style="font-size: 0.9rem; color: #aaa; margin-top: 10px;">
@@ -2046,8 +2106,6 @@ export class HeroSelection {
     
     // Transition to battle screen (called when both are ready)
     async transitionToBattleScreen() {
-        console.log('🔥 Transitioning to battle screen');
-
         this.globalSpellManager.clearGuardChangeMode(this);
         
         // Check if we're in a valid state to transition to battle
@@ -2057,10 +2115,8 @@ export class HeroSelection {
         ];
         
         if (!this.stateMachine.isInAnyState(validStates)) {
-            console.warn('Not in correct state to transition to battle. Current state:', this.stateMachine.getState());
             
             if (this.stateMachine.isInState(this.stateMachine.states.WAITING_FOR_BATTLE)) {
-                console.log('Fixing state: WAITING_FOR_BATTLE -> TRANSITIONING_TO_BATTLE');
                 this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
                     reason: 'state_fix_for_battle'
                 });
@@ -2068,11 +2124,7 @@ export class HeroSelection {
                 return;
             }
         }
-        
-        // ✅ Game phase is now set atomically by HOST in checkAndHandleBattleTransition()
-        // This eliminates the race condition that caused reconnection issues
-        console.log('✅ Battle state already set atomically - proceeding with battle');
-        
+                
         // Hide any waiting overlay
         this.hideBattleWaitingOverlay();
         
@@ -2115,6 +2167,22 @@ export class HeroSelection {
         return getCardInfo(cardName);
     }
 
+    getLatestPlayerHand() {
+        if (this.handManager) {
+            const hand = this.handManager.getHand();
+            return hand;
+        }
+        
+        return [];
+    }
+
+    getLatestPlayerDeck() {
+        if (this.deckManager) {
+            return this.deckManager.getDeck();
+        }
+        return this.playerDeck || [];
+    }
+
     // Battle screen management with abilities, spellbooks, and creatures
     initBattleScreen() {        
         if (!this.selectedCharacter || !this.opponentSelectedCharacter) {
@@ -2127,7 +2195,6 @@ export class HeroSelection {
             const stats = this.calculateEffectiveHeroStats(position);
             if (stats) {
                 playerEffectiveStats[position] = stats;
-                console.log(`📊 Calculated effective stats for ${position}: HP ${stats.maxHp}, ATK ${stats.attack}`);
             }
         });
         
@@ -2151,9 +2218,6 @@ export class HeroSelection {
                 opponentPermanentArtifacts = this.opponentPermanentArtifactsData.permanentArtifacts;
             }
         }
-
-        console.log(`🎯 Player permanent artifacts: ${playerPermanentArtifacts.length}`);
-        console.log(`🎯 Opponent permanent artifacts: ${opponentPermanentArtifacts.length}`);
         
         // Verify player abilities
         let totalPlayerAbilities = 0;
@@ -2177,15 +2241,6 @@ export class HeroSelection {
                 
                 if (totalAbilities > 0) {
                     totalPlayerAbilities += totalAbilities;
-                }
-                
-                // Log stat-affecting abilities
-                if (fightingCount > 0 || toughnessCount > 0) {
-                    const formation = this.formationManager.getBattleFormation();
-                    const hero = formation[position];
-                    if (hero) {
-                        console.log(`⚔️ ${hero.name} has ${fightingCount} Fighting (+${fightingCount * 10} ATK) and ${toughnessCount} Toughness (+${toughnessCount * 200} HP)`);
-                    }
                 }
             }
         });
@@ -2222,7 +2277,6 @@ export class HeroSelection {
         const hasValidPlayerAbilities = Object.values(playerAbilities).some(pos => pos !== null);
         
         if (!hasValidPlayerAbilities) {
-            console.warn('⚠️ No valid player abilities found, attempting emergency recovery');
             
             // EMERGENCY RECOVERY: Try to rebuild abilities from formation
             const formation = this.formationManager.getBattleFormation();
@@ -2234,7 +2288,6 @@ export class HeroSelection {
                     const directAbilities = this.heroAbilitiesManager.heroAbilityZones?.[position];
                     if (directAbilities) {
                         emergencyAbilities[position] = directAbilities;
-                        console.log(`🎮 Emergency recovery: found abilities for ${position}`);
                     }
                 }
             });
@@ -2288,6 +2341,24 @@ export class HeroSelection {
         if (this.opponentEffectiveStatsData) {
             opponentEffectiveStats = this.opponentEffectiveStatsData;
         }
+
+        // Hands and decks
+        const playerHand = this.getLatestPlayerHand();
+        const opponentHand = this.opponentHandData || [];
+        const playerDeck = this.getLatestPlayerDeck();
+        const opponentDeck = this.opponentDeckData || [];
+
+        
+
+
+    
+        // Debug formation data before battle starts
+        const playerFormation = this.formationManager.getBattleFormation();
+        const opponentFormation = this.formationManager.getOpponentBattleFormation();
+        
+
+
+
         
         // Initialize battle screen with all data        
         try {
@@ -2313,14 +2384,15 @@ export class HeroSelection {
                 playerEffectiveStats,
                 opponentEffectiveStats,
                 playerPermanentArtifacts,
-                opponentPermanentArtifacts 
+                opponentPermanentArtifacts,
+                playerHand,
+                opponentHand,
+                playerDeck,
+                opponentDeck 
             );
-            
-            console.log('✅ Battle screen initialized with stat-enhanced Hero instances and both players\' permanent artifacts');
             return true;
             
         } catch (error) {
-            console.error('❌ Error during battle screen initialization:', error);
             return false;
         }
     }
@@ -2373,23 +2445,45 @@ export class HeroSelection {
         if (removedCard) {
             await this.autoSave();
             this.updateHandDisplay();
+            
+            // FORCE update of reward screen if it's active
+            const rewardOverlay = document.getElementById('cardRewardOverlay');
+            if (rewardOverlay && this.cardRewardManager) {
+                // Small delay to ensure hand manager state is updated
+                setTimeout(() => {
+                    this.cardRewardManager.updateRewardScreenHandDisplay();
+                }, 50);
+            }
         }
         return removedCard;
     }
 
     updateHandDisplay() {
+        // Update team building hand display
         const handContainer = document.querySelector('.hand-display-area-inline .hand-container');
         if (handContainer) {
             const updatedHandDisplay = this.handManager.createHandDisplay((cardName) => this.formatCardName(cardName));
             handContainer.outerHTML = updatedHandDisplay;
+        } else {
+            // Defer the update if we're not in team building phase
+            setTimeout(() => {
+                const deferredContainer = document.querySelector('.hand-display-area-inline .hand-container');
+                if (deferredContainer) {
+                    const updatedHandDisplay = this.handManager.createHandDisplay((cardName) => this.formatCardName(cardName));
+                    deferredContainer.outerHTML = updatedHandDisplay;
+                }
+            }, 500);
+        }
+        
+        // ALSO update reward screen hand display if it exists
+        if (this.cardRewardManager && typeof this.cardRewardManager.updateRewardScreenHandDisplay === 'function') {
+            this.cardRewardManager.updateRewardScreenHandDisplay();
         }
     }
 
     // Calculate starting gold based on selected hero
     calculateStartingGold(character) {
-        let startingGold = 4; // Base gold
-        console.log('🏆 Calculating starting gold for', character.name);
-        
+        let startingGold = 4; // Base gold        
         // Get hero info to check abilities
         const heroInfo = getHeroInfo(character.name);
         if (heroInfo) {
@@ -2409,17 +2503,13 @@ export class HeroSelection {
             if (wealthCount > 0) {
                 const wealthGold = wealthCount * 4;
                 startingGold += wealthGold;
-                console.log(`💰 ${character.name} has ${wealthCount} Wealth abilities, adding ${wealthGold} gold`);
             }
         }
         
         // Check if hero is Semi
         if (character.name === 'Semi') {
             startingGold += 6;
-            console.log('🌟 Semi hero selected! Adding 6 bonus gold');
         }
-        
-        console.log(`📊 Total starting gold for ${character.name}: ${startingGold}`);
         return startingGold;
     }
 
@@ -2580,12 +2670,9 @@ export class HeroSelection {
             const removedCount = this.delayedArtifactEffects.length - filteredEffects.length;
             this.delayedArtifactEffects = filteredEffects;
             
-            if (removedCount > 0) {
-                console.log(`🧹 Cleared ${removedCount} processed PoisonedMeat effects from local state`);
-                
+            if (removedCount > 0) {                
                 // Save updated state to Firebase
                 this.saveGameState().then(() => {
-                    console.log('💾 Updated game state after clearing delayed effects');
                 });
             }
         }
@@ -2816,11 +2903,11 @@ export class HeroSelection {
         
         switch (archerSummonType) {
             case 'reduced_level':
-                message = '🏹 Archer summoned with reduced level requirement!';
+                message = 'Archer summoned with reduced level requirement!';
                 bgColor = 'rgba(34, 139, 34, 0.9)';
                 break;
             case 'free_leadership':
-                message = '👑 Leadership allows free Archer summoning!';
+                message = 'Leadership allows free Archer summoning!';
                 bgColor = 'rgba(255, 215, 0, 0.9)';
                 break;
             default:
@@ -2919,20 +3006,6 @@ export class HeroSelection {
         if (this.heroSelectionUI && typeof this.heroSelectionUI.updateAllHeroStats === 'function') {
             this.heroSelectionUI.updateAllHeroStats();
         }
-        
-        // Also log current stat bonuses for debugging
-        ['left', 'center', 'right'].forEach(position => {
-            const stats = this.calculateEffectiveHeroStats(position);
-            if (stats && (stats.bonuses.toughnessStacks > 0 || stats.bonuses.fightingStacks > 0)) {
-                const formation = this.formationManager.getBattleFormation();
-                const hero = formation[position];
-                if (hero) {
-                    console.log(`📊 ${hero.name} (${position}): ` +
-                            `HP ${stats.maxHp} (+${stats.bonuses.hpBonus}), ` +
-                            `ATK ${stats.attack} (+${stats.bonuses.attackBonus})`);
-                }
-            }
-        });
     }
 
     // Create team slot HTML (delegating to UI manager)
@@ -3061,7 +3134,7 @@ export class HeroSelection {
     // Generate team building screen HTML
     generateTeamBuildingHTML() {
         if (!this.selectedCharacter) {
-            return '<div class="loading-heroes"><h2>❌ No character selected</h2></div>';
+            return '<div class="loading-heroes"><h2>No character selected</h2></div>';
         }
 
         // Get the battle formation
@@ -3104,17 +3177,18 @@ export class HeroSelection {
             <div class="team-building-container">
                 <!-- Left Column - Team Formation -->
                 <div class="team-building-left">
-                    <div class="team-header">
-                        <div class="team-header-title">
+                    <div class="team-header" style="text-align: center;">
+                        <div class="team-header-title" style="text-align: center;">
                             <h2>🛡️ Your Battle Formation</h2>
                             ${this.globalSpellManager.isGuardChangeModeActive() ? 
-                            '<div class="guard-change-indicator">🛡️ Guard Change Active</div>' : 
+                            '<div class="guard-change-indicator">Guard Change Active</div>' : 
                             ''}
                         </div>
-                        <p class="drag-hint">💡 Drag and drop heroes to rearrange your formation!</p>
-                        <p class="drag-hint">🎯 Drag ability cards to any hero slot to attach them!</p>
-                        <p class="drag-hint">📜 Drag spell cards to heroes to add them to their Spellbook!</p>
-                        <p class="drag-hint">🐾 Drag creatures to reorder them within the same hero!</p>
+                        <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
+                        <p class="drag-hint">🎯 Drag Abilities to a Hero slot to attach them!</p>
+                        <p class="drag-hint">📜 Drag Spell to Heroes to add them to their Spellbook!</p>
+                        <p class="drag-hint">⚔️ Drag Equip Artifacts to Heroes to equip them!</p> <!-- NEW -->
+                        <p class="drag-hint">🐾 Drag and drop Creatures to reorder them within the same Hero!</p>
                     </div>
                     
                     <div class="team-slots-container">
@@ -3208,11 +3282,10 @@ export class HeroSelection {
             }
         }
 
-        // NEW: Special exception for Archer when hero has 1+ creatures (level becomes 0)
+        // Special exception for Archer when hero has 1+ creatures (level becomes 0)
         if (spellCardName === 'Archer') {
             const canSummonWithReducedLevel = this.canSummonArcherWithReducedLevel(heroPosition, spellCardName);
             if (canSummonWithReducedLevel) {
-                console.log(`🏹 ${hero.name} can summon Archer with reduced level requirement (has creatures)`);
                 return { 
                     canLearn: true, 
                     heroName: hero.name,
@@ -3221,14 +3294,15 @@ export class HeroSelection {
             }
         }
 
-        // Check 3: Does hero have required spell school at required level?
+        // Check 3: Get spell requirements
         const spellSchool = spellInfo.spellSchool;
-        const spellLevel = spellInfo.level || 0;
+        const baseSpellLevel = spellInfo.level || 0;
 
         // Count spell school abilities across all zones
         const heroAbilities = this.heroAbilitiesManager.getHeroAbilities(heroPosition);
         
         let totalSpellSchoolLevel = 0;
+        let totalThievingLevel = 0; // NEW: Track Thieving ability level
 
         ['zone1', 'zone2', 'zone3'].forEach(zone => {
             if (heroAbilities && heroAbilities[zone]) {
@@ -3236,12 +3310,25 @@ export class HeroSelection {
                     if (ability && ability.name === spellSchool) {
                         totalSpellSchoolLevel++;
                     }
+                    // NEW: Count Thieving abilities
+                    if (ability && ability.name === 'Thieving') {
+                        totalThievingLevel++;
+                    }
                 });
             }
         });
 
-        // Check 4: Compare levels
-        if (totalSpellSchoolLevel < spellLevel) {
+        // NEW: Calculate effective spell level requirement for ThievingStrike
+        let effectiveSpellLevel = baseSpellLevel;
+        let thievingReduction = 0;
+        
+        if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
+            thievingReduction = totalThievingLevel;
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - thievingReduction);
+        }
+
+        // Check 4: Compare levels with the effective requirement
+        if (totalSpellSchoolLevel < effectiveSpellLevel) {
             // Check if Semi can use gold learning
             if (hero.name === 'Semi') {
                 const semiCheck = this.semiEffectManager.canUseSemiGoldLearning(this, heroPosition, spellCardName);
@@ -3264,13 +3351,34 @@ export class HeroSelection {
             const formattedSpellSchool = this.formatCardName(spellSchool);
             const formattedSpellName = this.formatCardName(spellCardName);
             
-            return { 
-                canLearn: false, 
-                reason: `${hero.name} needs ${formattedSpellSchool} at level ${spellLevel} or higher to learn ${formattedSpellName}!`
-            };
+            // NEW: Enhanced error message for ThievingStrike
+            if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
+                const originalRequirement = baseSpellLevel;
+                const currentCombined = totalSpellSchoolLevel + totalThievingLevel;
+                
+                return { 
+                    canLearn: false, 
+                    reason: `${hero.name} needs ${formattedSpellSchool} ${effectiveSpellLevel}+ to learn ${formattedSpellName}! (Has ${formattedSpellSchool} ${totalSpellSchoolLevel} + Thieving ${totalThievingLevel} = ${currentCombined}/${originalRequirement})`
+                };
+            } else {
+                return { 
+                    canLearn: false, 
+                    reason: `${hero.name} needs ${formattedSpellSchool} at level ${effectiveSpellLevel} or higher to learn ${formattedSpellName}!`
+                };
+            }
         }
 
-        return { canLearn: true, heroName: hero.name };
+        // Success case - include information about Thieving reduction if applicable
+        const result = { canLearn: true, heroName: hero.name };
+        
+        if (spellCardName === 'ThievingStrike' && thievingReduction > 0) {
+            result.isThievingReduced = true;
+            result.thievingReduction = thievingReduction;
+            result.originalLevel = baseSpellLevel;
+            result.effectiveLevel = effectiveSpellLevel;
+        }
+        
+        return result;
     }
 
     canSummonFrontSoldierForFree(heroPosition, spellCardName) {
@@ -3390,14 +3498,10 @@ export class HeroSelection {
                     this.heroSelectionUI.updateAllHeroStats();
                 }
             };
-            
-            console.log('✅ Stat update system initialized');
         }
     }
 
-    syncStatsForBattleTransition() {
-        console.log('🔄 Syncing stats for battle transition...');
-        
+    syncStatsForBattleTransition() {       
         // For each hero position, log the effective stats
         ['left', 'center', 'right'].forEach(position => {
             const stats = this.calculateEffectiveHeroStats(position);
@@ -3405,9 +3509,6 @@ export class HeroSelection {
                 const formation = this.formationManager.getBattleFormation();
                 const hero = formation[position];
                 if (hero) {
-                    console.log(`⚔️ ${hero.name} entering battle: ` +
-                            `${stats.maxHp} HP, ${stats.attack} ATK ` +
-                            `(+${stats.bonuses.hpBonus} HP, +${stats.bonuses.attackBonus} ATK from abilities)`);
                 }
             }
         });
@@ -3450,6 +3551,12 @@ export class HeroSelection {
         });
         
         return leadershipLevel >= 3;
+    }
+
+    initializeTrainingSystem() {
+        if (this.trainingAbility) {
+            this.trainingAbility.initializeTrainingSystem();
+        }
     }
 }
 
@@ -3667,7 +3774,7 @@ function updateHeroSelectionUI() {
         default:
             heroContainer.innerHTML = `
                 <div class="hero-selection-waiting">
-                    <h2>⚔️ Battle Arena Loading...</h2>
+                    <h2>Battle Arena Loading...</h2>
                     <p>Preparing for epic combat...</p>
                 </div>
             `;

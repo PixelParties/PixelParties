@@ -181,10 +181,7 @@ export class BattleSpeedManager {
         
         // Force UI update to ensure button states are correct
         this.forceUpdateUI();
-        
-        // Log the change
-        this.addCombatLog(`⚡ Battle speed changed to ${speedOption.name} (${speedOption.label})`, 'info');
-                
+                        
         // Sync to guest via existing battle data system
         if (this.battleManager && this.battleManager.sendBattleUpdate) {
             this.battleManager.sendBattleUpdate('speed_change', {
@@ -223,9 +220,6 @@ export class BattleSpeedManager {
         
         // Force UI update with debugging
         this.forceUpdateUI();
-        
-        // Log the change
-        this.addCombatLog(`⚡ Host changed battle speed to ${speedName} (${speedLabel})`, 'info');
     }
 
     // Update UI to reflect current speed
@@ -330,9 +324,7 @@ export class BattleSpeedManager {
             this.saveSpeeds(); // Save the reset to normal speed
             this.forceUpdateUI(); // Use force update to ensure UI reflects change
             
-            if (this.isHost) {
-                this.addCombatLog('⚡ Battle speed reset to Normal', 'info');
-                
+            if (this.isHost) {               
                 // Sync to guest
                 if (this.battleManager && this.battleManager.sendBattleUpdate) {
                     this.battleManager.sendBattleUpdate('speed_change', {
@@ -343,15 +335,6 @@ export class BattleSpeedManager {
                     });
                 }
             }
-        }
-    }
-
-    // Add message to combat log (helper method)
-    addCombatLog(message, type = 'info') {
-        if (this.battleManager && this.battleManager.addCombatLog) {
-            this.battleManager.addCombatLog(message, type);
-        } else if (this.battleManager && this.battleManager.battleScreen && this.battleManager.battleScreen.addCombatLogMessage) {
-            this.battleManager.battleScreen.addCombatLogMessage(message, type);
         }
     }
 

@@ -33,7 +33,7 @@ export class OverheatSpell {
             return;
         }
 
-        // 🔥 UPDATED: Pass caster to resistance check for Ida effect
+        // Pass caster to resistance check for Ida effect
         const isResisted = this.battleManager.resistanceManager && 
             this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         

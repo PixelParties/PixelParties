@@ -3,6 +3,7 @@
 import { artifactHandler } from './artifactHandler.js';
 import { globalSpellManager } from './globalSpellManager.js';
 import { potionHandler } from './potionHandler.js';
+import { magicArtsRedraw } from './Abilities/magicArts.js';
 
 export class HandManager {
     constructor(deckManager) {
@@ -21,11 +22,11 @@ export class HandManager {
 
         // ===== TEST HELPER FLAGS =====
         // Set to false to disable test functionality completely
-        this.ENABLE_TEST_HELPERS = true;
+        this.ENABLE_TEST_HELPERS = false;
         // Set to false if you only want to disable the auto-add feature
         this.AUTO_ADD_TEST_CARD = true;
         // The test card to add
-        this.TEST_CARD_NAME = 'ElixirOfCold';
+        this.TEST_CARD_NAME = 'Wheels';
     }
 
     // ===== TEST HELPER FUNCTION =====
@@ -809,6 +810,12 @@ async function onHandCardClick(event, cardIndex, cardName) {
     // Check if it's a global spell
     if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
         const result = await window.globalSpellManager.handleGlobalSpellActivation(cardIndex, cardName, window.heroSelection);
+        
+        // Check for MagicArts redraw after successful activation
+        if (result && window.heroSelection) {
+            await magicArtsRedraw.handleMagicArtsRedraw(cardName, window.heroSelection);
+        }
+        
         return;
     }
     
@@ -1105,7 +1112,7 @@ function createOptimizedDragImage(cardElement) {
     }
 }
 
-function onHandCardDragEnd(event) {
+async function onHandCardDragEnd(event) {
     if (window.handManager) {
         const dragState = window.handManager.getHandDragState();
         if (dragState.isDragging) {
@@ -1118,7 +1125,7 @@ function onHandCardDragEnd(event) {
                 if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
                     // Check if it's a potion being dragged out of hand
                     if (window.potionHandler && window.potionHandler.isPotionCard(dragState.draggedCardName, window.heroSelection)) {
-                        window.potionHandler.handlePotionDrag(
+                        const result = await window.potionHandler.handlePotionDrag(
                             dragState.draggedCardIndex,
                             dragState.draggedCardName,
                             window.heroSelection
@@ -1127,14 +1134,19 @@ function onHandCardDragEnd(event) {
                     else if (window.globalSpellManager && window.heroSelection &&
                         window.globalSpellManager.isGlobalSpell(dragState.draggedCardName, window.heroSelection)) {
                                                 
-                        window.globalSpellManager.handleGlobalSpellActivation(
+                        const result = await window.globalSpellManager.handleGlobalSpellActivation(
                             dragState.draggedCardIndex,
                             dragState.draggedCardName,
                             window.heroSelection
                         );
+                        
+                        // Check for MagicArts redraw after successful activation
+                        if (result && window.heroSelection) {
+                            await magicArtsRedraw.handleMagicArtsRedraw(dragState.draggedCardName, window.heroSelection);
+                        }
                     }
                     else if (window.artifactHandler) {
-                        window.artifactHandler.handleArtifactDrag(
+                        const result = await window.artifactHandler.handleArtifactDrag(
                             dragState.draggedCardIndex, 
                             dragState.draggedCardName, 
                             window.heroSelection

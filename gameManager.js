@@ -49,14 +49,23 @@ export class GameManager {
         });
 
         // Victory screen handler
-        const absoluteWinner = lifeChangeData.winner === 'player' ? 
-            (this.roomManager.getIsHost() ? 'host' : 'guest') :
-            (this.roomManager.getIsHost() ? 'guest' : 'host');
-
-        this.webRTCManager.sendGameData('victory_achieved', {
-            winner: absoluteWinner,  // Now using 'host' or 'guest'
-            winnerName: playerName,
-            trophies: lifeChangeData.trophies
+        this.webRTCManager.registerMessageHandler('victory_achieved', (data) => {
+            if (this.heroSelection && this.heroSelection.victoryScreen) {
+                // Get opponent's formation data for display
+                const winnerFormation = data.data.winner === 'opponent' ? 
+                    this.heroSelection.formationManager.getOpponentBattleFormation() : 
+                    this.heroSelection.formationManager.getBattleFormation();
+                
+                const winnerData = {
+                    playerName: data.data.winnerName,
+                    heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
+                    isLocalPlayer: data.data.winner === 'player'
+                };
+                
+                // Transition to victory state and show victory screen
+                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+            }
         });
 
         // Handler for formation updates
@@ -588,12 +597,8 @@ export class GameManager {
                 }
                 
                 // Send victory message to opponent
-                const absoluteWinner = lifeChangeData.winner === 'player' ? 
-                    (this.roomManager.getIsHost() ? 'host' : 'guest') :
-                    (this.roomManager.getIsHost() ? 'guest' : 'host');
-
                 this.webRTCManager.sendGameData('victory_achieved', {
-                    winner: absoluteWinner, 
+                    winner: lifeChangeData.winner,
                     winnerName: playerName,
                     trophies: lifeChangeData.trophies
                 });

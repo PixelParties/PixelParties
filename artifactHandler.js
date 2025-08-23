@@ -366,9 +366,26 @@ export class ArtifactHandler {
     }
 
     async preloadAllArtifacts() {
-        const knownArtifacts = ['treasureChest', 'magneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald'];
+        // Use card names in PascalCase, then convert them to proper module names
+        const knownCardNames = [
+            'TreasureChest', 
+            'MagneticGlove', 
+            'PoisonedMeat', 
+            'Wheels', 
+            'AlchemicJournal', 
+            'TreasureHuntersBackpack', 
+            'MagicCobalt', 
+            'MagicTopaz', 
+            'MagicAmethyst', 
+            'MagicSapphire', 
+            'MagicRuby', 
+            'MagicEmerald'
+        ];
         
-        const loadPromises = knownArtifacts.map(async (moduleName) => {
+        // Convert card names to proper module names using the existing method
+        const moduleNames = knownCardNames.map(cardName => this.cardNameToModuleName(cardName));
+        
+        const loadPromises = moduleNames.map(async (moduleName) => {
             try {
                 await this.loadArtifact(moduleName);
                 return { moduleName, success: true };

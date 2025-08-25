@@ -399,8 +399,7 @@ export class BattleScreen {
                 this.battleManager.opponentDeck = data.hostDeck;
             }
             
-            
-            // Send our pre-calculated data back to host
+            // Get guest's own latest data
             const guestStats = this.getLatestPlayerEffectiveStats();
             const guestAbilities = this.getLatestPlayerAbilities();
             const guestSpellbooks = this.getLatestPlayerSpellbooks();
@@ -409,13 +408,28 @@ export class BattleScreen {
             const guestHand = this.getLatestPlayerHand();
             const guestDeck = this.getLatestPlayerDeck();
 
+            // Update guest's own data in battle manager
+            this.playerAbilities = guestAbilities;
+            this.playerSpellbooks = guestSpellbooks;
+            this.playerCreatures = guestCreatures;
+            this.playerEquips = guestEquipment;
+            this.playerHand = guestHand;
             this.playerDeck = guestDeck;
+            this.playerEffectiveStats = guestStats;
+            
+            this.battleManager.playerAbilities = guestAbilities;
+            this.battleManager.playerSpellbooks = guestSpellbooks;
+            this.battleManager.playerCreatures = guestCreatures;
+            this.battleManager.playerEquips = guestEquipment;
+            this.battleManager.playerHand = guestHand;
             this.battleManager.playerDeck = guestDeck;
+            this.battleManager.playerEffectiveStats = guestStats;
 
             const guestFormationWithPersistentData = this.preservePersistentDataInFormation(
                 window.heroSelection.formationManager.getBattleFormation()
             );
 
+            // Send guest data back to host
             if (this.gameDataSender) {
                 this.gameDataSender('battle_data', {
                     type: 'guest_abilities_sync',
@@ -433,10 +447,29 @@ export class BattleScreen {
                 });
             }
             
-            // Re-initialize opponent heroes with synced data
-            if (this.battleManager.opponentAbilities || this.battleManager.opponentSpellbooks || 
-                this.battleManager.opponentCreatures || this.battleManager.opponentEquips ||
-                this.battleManager.opponentEffectiveStats) {
+            // Re-initialize player heroes with guest's own data including equipment
+            if (this.battleManager.playerFormation) {
+                this.battleManager.initializeHeroesForSide(
+                    'player', 
+                    this.battleManager.playerFormation, 
+                    this.battleManager.playerHeroes, 
+                    guestAbilities,
+                    guestSpellbooks,
+                    guestCreatures,
+                    guestEquipment,  // Ensure equipment is included
+                    'guest',
+                    guestStats
+                );
+            }
+            
+            // Re-initialize opponent heroes with synced host data including equipment
+            if (this.battleManager.opponentFormation && (
+                this.battleManager.opponentAbilities || 
+                this.battleManager.opponentSpellbooks || 
+                this.battleManager.opponentCreatures || 
+                this.battleManager.opponentEquips ||
+                this.battleManager.opponentEffectiveStats)) {
+                
                 this.battleManager.initializeHeroesForSide(
                     'opponent', 
                     this.battleManager.opponentFormation, 
@@ -444,7 +477,7 @@ export class BattleScreen {
                     this.battleManager.opponentAbilities,
                     this.battleManager.opponentSpellbooks,
                     this.battleManager.opponentCreatures,
-                    this.battleManager.opponentEquips,
+                    this.battleManager.opponentEquips,  // Ensure equipment is included
                     'host',
                     this.battleManager.opponentEffectiveStats
                 );

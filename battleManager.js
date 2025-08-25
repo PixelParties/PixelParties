@@ -570,11 +570,11 @@ export class BattleManager {
         });
         
         // Clear manager-level equipment references to prevent future conflicts
-        if (side === 'player') {
+        /*if (side === 'player') {
             this.playerEquips = {};
         } else {
             this.opponentEquips = {};
-        }
+        }*/
     }
 
     initializeHeroArrowCounters(hero, side, position) {

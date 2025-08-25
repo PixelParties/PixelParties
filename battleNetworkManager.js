@@ -585,6 +585,10 @@ export class BattleNetworkManager {
                 this.handleDeckUpdate(data);
                 break;
 
+            case 'creature_state_sync':
+                this.guest_handleCreatureStateSync(data);
+                break;
+
             case 'necromancy_revival':
                 bm.guest_handleNecromancyRevival(data);
                 break;
@@ -1234,6 +1238,22 @@ export class BattleNetworkManager {
             this.battleManager.playerDeck = deck;
         } else {
             this.battleManager.opponentDeck = deck;
+        }
+    }
+
+    guest_handleCreatureStateSync(data) {
+        const bm = this.battleManager;
+        
+        if (bm.isAuthoritative) {
+            return; // Only guests should process this
+        }
+        
+        // Apply the synced creature states
+        if (bm.checkpointSystem) {
+            bm.checkpointSystem.applyCreatureStatesFromSync(data);
+            
+            // Add log message
+            bm.addCombatLog('🔄 Creature states synchronized with host', 'system');
         }
     }
 

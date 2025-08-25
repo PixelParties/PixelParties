@@ -2,7 +2,8 @@
 
 export class ThievingManager {
     constructor() {
-
+        // Configurable constant for gold stolen per thieving level
+        this.GOLD_PER_THIEVING_LEVEL = 2;
     }
 
     /**
@@ -40,8 +41,12 @@ export class ThievingManager {
         );
 
         // Calculate actual gold theft amounts (limited by available gold)
-        result.playerGoldStolen = Math.min(result.playerThievingLevel, opponentCurrentGold);
-        result.opponentGoldStolen = Math.min(result.opponentThievingLevel, playerCurrentGold);
+        // Apply the gold multiplier here
+        const playerMaxSteal = result.playerThievingLevel * this.GOLD_PER_THIEVING_LEVEL;
+        const opponentMaxSteal = result.opponentThievingLevel * this.GOLD_PER_THIEVING_LEVEL;
+        
+        result.playerGoldStolen = Math.min(playerMaxSteal, opponentCurrentGold);
+        result.opponentGoldStolen = Math.min(opponentMaxSteal, playerCurrentGold);
 
         // Calculate net thieving effects
         result.playerNetThieving = result.playerGoldStolen - result.opponentGoldStolen;
@@ -84,7 +89,9 @@ export class ThievingManager {
                     details.push({
                         heroName: hero.name,
                         position: position,
-                        level: heroThievingLevel
+                        level: heroThievingLevel,
+                        goldPerLevel: this.GOLD_PER_THIEVING_LEVEL,
+                        totalGoldStolen: heroThievingLevel * this.GOLD_PER_THIEVING_LEVEL
                     });
                 }
             }
@@ -126,7 +133,7 @@ export class ThievingManager {
                             <div class="thieving-detail-line">
                                 <span class="hero-name">${detail.heroName}</span>
                                 <span class="thieving-level">${detail.level} ${detail.level === 1 ? 'level' : 'levels'}</span>
-                                <span class="thieving-contribution">Steals ${detail.level}</span>
+                                <span class="thieving-contribution">Steals ${detail.totalGoldStolen}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -290,7 +297,7 @@ export class ThievingManager {
                             <div class="thieving-detail-line">
                                 <span class="hero-name">${detail.heroName}</span>
                                 <span class="thieving-level">${detail.level} ${detail.level === 1 ? 'level' : 'levels'}</span>
-                                <span class="thieving-gold">Steals ${detail.level}</span>
+                                <span class="thieving-gold">Steals ${detail.totalGoldStolen}</span>
                             </div>
                         `).join('')}
                     </div>
@@ -490,18 +497,19 @@ export class ThievingManager {
         }
 
         // Log if thieving was limited by available gold
-        if (thievingData.playerThievingLevel > playerGoldStolen) {
-            const attempted = thievingData.playerThievingLevel;
+        const playerMaxSteal = thievingData.playerThievingLevel * this.GOLD_PER_THIEVING_LEVEL;
+        const opponentMaxSteal = thievingData.opponentThievingLevel * this.GOLD_PER_THIEVING_LEVEL;
+        
+        if (playerMaxSteal > playerGoldStolen) {
             addLogCallback(
-                `⚠️ Your thieves attempted to steal ${attempted} gold but opponent only had ${playerGoldStolen}!`, 
+                `⚠️ Your thieves attempted to steal ${playerMaxSteal} gold but opponent only had ${playerGoldStolen}!`, 
                 'info'
             );
         }
 
-        if (thievingData.opponentThievingLevel > opponentGoldStolen) {
-            const attempted = thievingData.opponentThievingLevel;
+        if (opponentMaxSteal > opponentGoldStolen) {
             addLogCallback(
-                `⚠️ Opponent's thieves attempted to steal ${attempted} gold but you only had ${opponentGoldStolen}!`, 
+                `⚠️ Opponent's thieves attempted to steal ${opponentMaxSteal} gold but you only had ${opponentGoldStolen}!`, 
                 'info'
             );
         }

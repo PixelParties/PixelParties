@@ -403,6 +403,11 @@ export class CheckpointSystem {
                 checkpointType: checkpointType
             });
             
+            // NEW: Sync creature states to guest after successful checkpoint save
+            if (this.isHost) {
+                await this.syncCreatureStatesToGuest();
+            }
+            
             return true;
             
         } catch (error) {
@@ -506,6 +511,11 @@ export class CheckpointSystem {
                 `📋 Battle restored from checkpoint (Turn ${checkpoint.turnNumber})`,
                 'system'
             );
+            
+            // NEW: Sync creature states to guest after successful restoration
+            if (this.isHost) {
+                await this.syncCreatureStatesToGuest();
+            }
             
             return true;
             
@@ -857,7 +867,7 @@ export class CheckpointSystem {
         this.battleManager.restoreFrostRuneVisuals();
     }
 
-    // NEW: Update hero attack displays to show current totals including battle bonuses
+    // Update hero attack displays to show current totals including battle bonuses
     updateHeroAttackDisplaysWithBonuses() {
         ['left', 'center', 'right'].forEach(position => {
             // Update player heroes
@@ -873,6 +883,143 @@ export class CheckpointSystem {
             }
         });
     }
+
+
+
+    // ============================================
+    // CREATURE SYNC METHODS
+    // ============================================
+
+    /**
+     * Capture all current creature states across all heroes
+     * @returns {Object} Complete creature state data for sync
+     */
+    captureAllCreatureStatesForSync() {
+        const creatureStates = {
+            player: {},
+            opponent: {}
+        };
+        
+        ['left', 'center', 'right'].forEach(position => {
+            // Player heroes
+            const playerHero = this.battleManager.playerHeroes[position];
+            if (playerHero && playerHero.creatures) {
+                creatureStates.player[position] = playerHero.creatures.map((creature, index) => ({
+                    ...this.captureCreatureState(creature),
+                    arrayIndex: index
+                }));
+            }
+            
+            // Opponent heroes
+            const opponentHero = this.battleManager.opponentHeroes[position];
+            if (opponentHero && opponentHero.creatures) {
+                creatureStates.opponent[position] = opponentHero.creatures.map((creature, index) => ({
+                    ...this.captureCreatureState(creature),
+                    arrayIndex: index
+                }));
+            }
+        });
+        
+        return creatureStates;
+    }
+
+    /**
+     * Sync creature states with guest (host only)
+     */
+    async syncCreatureStatesToGuest() {
+        if (!this.isHost || !this.battleManager) return;
+        
+        const creatureStates = this.captureAllCreatureStatesForSync();
+        
+        // Send to guest via network manager
+        this.battleManager.sendBattleUpdate('creature_state_sync', {
+            creatureStates: creatureStates,
+            timestamp: Date.now(),
+            syncReason: 'checkpoint'
+        });
+    }
+
+    /**
+     * Apply received creature states from host (guest only)
+     */
+    applyCreatureStatesFromSync(syncData) {
+        if (this.isHost || !syncData || !syncData.creatureStates) return;
+        
+        const { creatureStates } = syncData;
+        
+        // For guest, swap player and opponent data since checkpoint was from host perspective
+        const playerCreatures = creatureStates.opponent || {}; // Guest's actual creatures
+        const opponentCreatures = creatureStates.player || {}; // Host's creatures (guest's opponent)
+        
+        // Apply to player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            if (playerCreatures[position] && this.battleManager.playerHeroes[position]) {
+                this.applySyncedCreaturesToHero(this.battleManager.playerHeroes[position], playerCreatures[position]);
+            }
+            
+            if (opponentCreatures[position] && this.battleManager.opponentHeroes[position]) {
+                this.applySyncedCreaturesToHero(this.battleManager.opponentHeroes[position], opponentCreatures[position]);
+            }
+        });
+        
+        // Update all creature visuals
+        this.updateAllCreatureVisualsAfterSync();
+    }
+
+    /**
+     * Apply synced creature data to a specific hero
+     */
+    applySyncedCreaturesToHero(hero, syncedCreatures) {
+        if (!hero || !hero.creatures || !Array.isArray(syncedCreatures)) return;
+        
+        // Update existing creatures or add missing ones
+        syncedCreatures.forEach((syncedCreature, index) => {
+            if (index < hero.creatures.length) {
+                // Update existing creature
+                const creature = hero.creatures[index];
+                creature.currentHp = syncedCreature.currentHp;
+                creature.maxHp = syncedCreature.maxHp;
+                creature.alive = syncedCreature.alive;
+                creature.statusEffects = syncedCreature.statusEffects || [];
+                creature.counters = syncedCreature.counters || 0;
+            } else {
+                // Add missing creature (shouldn't normally happen, but defensive)
+                hero.creatures.push({
+                    name: syncedCreature.name,
+                    image: syncedCreature.image,
+                    currentHp: syncedCreature.currentHp,
+                    maxHp: syncedCreature.maxHp,
+                    atk: syncedCreature.atk,
+                    alive: syncedCreature.alive,
+                    type: syncedCreature.type || 'creature',
+                    statusEffects: syncedCreature.statusEffects || [],
+                    counters: syncedCreature.counters || 0
+                });
+            }
+        });
+        
+        // Remove extra creatures if guest has more than host
+        if (hero.creatures.length > syncedCreatures.length) {
+            hero.creatures.splice(syncedCreatures.length);
+        }
+    }
+
+    /**
+     * Update all creature visuals after sync
+     */
+    updateAllCreatureVisualsAfterSync() {
+        ['left', 'center', 'right'].forEach(position => {
+            ['player', 'opponent'].forEach(side => {
+                const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+                const hero = heroes[position];
+                if (hero && hero.creatures && hero.creatures.length > 0) {
+                    this.battleManager.updateCreatureVisuals(side, position, hero.creatures);
+                }
+            });
+        });
+    }
+
+
 
     // ============================================
     // UTILITY METHODS

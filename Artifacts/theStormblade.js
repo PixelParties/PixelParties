@@ -725,24 +725,8 @@ export class TheStormbladeEffect {
         hero1.position = position2;
         hero2.position = position1;
         
-        // ===== NEW: UPDATE FORMATION MANAGER ON GUEST SIDE =====
-        if (this.battleManager.heroSelection && this.battleManager.heroSelection.formationManager) {
-            const formationManager = this.battleManager.heroSelection.formationManager;
-            if (localSide === 'player') {
-                const formation = formationManager.getBattleFormation();
-                const temp = formation[position1];
-                formation[position1] = formation[position2];
-                formation[position2] = temp;
-                formationManager.battleFormation = formation;
-            } else {
-                const formation = formationManager.getOpponentBattleFormation();
-                const temp = formation[position1];
-                formation[position1] = formation[position2];
-                formation[position2] = temp;
-                formationManager.opponentBattleFormation = formation;
-            }
-            console.log(`🌪️ GUEST: Updated FormationManager for ${localSide} side`);
-        }
+        // NOTE: TheStormblade should NOT update the permanent FormationManager
+        // as that affects the team building screen. Only battle state should be modified.
         
         // ===== ENHANCED VISUAL SWAPPING =====
         await this.swapHeroVisuals(localSide, position1, position2);

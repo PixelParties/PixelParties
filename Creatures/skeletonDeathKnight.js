@@ -8,7 +8,7 @@ export class SkeletonDeathKnightCreature {
         // Skeleton Death Knight stats
         this.SLASH_DAMAGE = 10;
         this.SLASH_ANIMATION_TIME = 800; // 0.8 second slash animation
-        this.SILENCED_STACKS = 2;
+        this.SILENCED_STACKS = 1;
         
         // Inject CSS styles
         this.injectSkeletonDeathKnightStyles();

@@ -153,7 +153,15 @@ export class HeroSelectionUI {
     // Method to handle hero hover leave (called from global handler)
     handleHeroHoverLeave() {
         this.isHeroHovered = false;
-        this.scheduleTooltipHide();
+        
+        // Check if we're in locked mode
+        if (window.heroTooltipManager && window.heroTooltipManager.isLockedMode()) {
+            // Let the locked mode manager handle this
+            window.heroTooltipManager.handleHeroHoverLeave();
+        } else {
+            // Normal behavior - schedule hide with delay
+            this.scheduleTooltipHide();
+        }
     }
 
     // Method to handle hero hover enter (called from global handler) 
@@ -358,10 +366,15 @@ export class HeroSelectionUI {
         });
         
         document.body.appendChild(tooltip);
-        
+
         // Update tracking state - only track hero hover
         this.currentTooltipPosition = position;
         this.isHeroHovered = true;
+
+        // Enhance tooltip for locked mode
+        if (window.heroTooltipManager) {
+            window.heroTooltipManager.enhanceTooltipForLockedMode(tooltip, position);
+        }
         
         // Position tooltip to the left of the hero card
         this.positionSpellbookTooltip(tooltip, heroElement);
@@ -651,6 +664,11 @@ export class HeroSelectionUI {
         // Reset tracking state - hero only
         this.currentTooltipPosition = null;
         this.isHeroHovered = false;
+
+        // Cleanup locked mode state
+        if (window.heroTooltipManager) {
+            window.heroTooltipManager.cleanup();
+        }
     }
 
     updateScrollIndicators(tooltip) {
@@ -2969,6 +2987,29 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
             color: white;
             border-color: rgba(255, 255, 255, 0.4);
             box-shadow: 0 0 15px rgba(74, 144, 226, 0.4);
+        }
+
+        /* Locked tooltip mode styles */
+        .formation-spellbook-tooltip.enhanced-hero-tooltip {
+            user-select: none; /* Prevent text selection when hovering */
+        }
+
+        .tooltip-padlock {
+            animation: padlockGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes padlockGlow {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1.0; }
+        }
+
+        /* Ensure tooltips are interactive in locked mode */
+        .formation-spellbook-tooltip {
+            pointer-events: auto;
+        }
+
+        .formation-spellbook-tooltip:not(.locked-mode) {
+            pointer-events: none;
         }
     `;
     document.head.appendChild(style);

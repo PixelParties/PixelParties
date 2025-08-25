@@ -18,6 +18,7 @@ import { globalSpellManager } from './globalSpellManager.js';
 import { potionHandler } from './potionHandler.js';
 import { HeroEquipmentManager } from './heroEquipment.js';
 import VictoryScreen from './victoryScreen.js';
+import heroTooltipManager from './heroTooltips.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
@@ -44,6 +45,7 @@ export class HeroSelection {
         this.battleStateListener = null; // Firebase listener for battle state
         this.globalSpellManager = globalSpellManager;
         this.opponentPermanentArtifactsData = null;
+        this.heroTooltipManager = heroTooltipManager;
 
         this.magicSapphiresUsed = 0;
         this.magicRubiesUsed = 0;

@@ -51,15 +51,31 @@ export class GameManager {
         // Victory screen handler
         this.webRTCManager.registerMessageHandler('victory_achieved', (data) => {
             if (this.heroSelection && this.heroSelection.victoryScreen) {
-                // Get opponent's formation data for display
-                const winnerFormation = data.data.winner === 'opponent' ? 
-                    this.heroSelection.formationManager.getOpponentBattleFormation() : 
-                    this.heroSelection.formationManager.getBattleFormation();
+                // Convert winner from sender's perspective to receiver's perspective
+                const senderIsHost = this.roomManager.getIsHost() !== true; // Sender is opposite of receiver
+                let actualWinner;
+                
+                if (data.data.winner === 'player') {
+                    // Sender won - from receiver's perspective, opponent won
+                    actualWinner = 'opponent';
+                } else if (data.data.winner === 'opponent') {
+                    // Sender's opponent won - from receiver's perspective, player won  
+                    actualWinner = 'player';
+                } else {
+                    // Fallback: assume data contains absolute role info
+                    const myAbsoluteSide = this.roomManager.getIsHost() ? 'host' : 'guest';
+                    actualWinner = data.data.winner === myAbsoluteSide ? 'player' : 'opponent';
+                }
+                
+                // Get correct formation data for display
+                const winnerFormation = actualWinner === 'player' ? 
+                    this.heroSelection.formationManager.getBattleFormation() : 
+                    this.heroSelection.formationManager.getOpponentBattleFormation();
                 
                 const winnerData = {
                     playerName: data.data.winnerName,
                     heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
-                    isLocalPlayer: data.data.winner === 'player'
+                    isLocalPlayer: actualWinner === 'player'
                 };
                 
                 // Transition to victory state and show victory screen

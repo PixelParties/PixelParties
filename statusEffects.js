@@ -285,26 +285,43 @@ export class StatusEffectsManager {
     }
 
     checkAndConsumeJuice(target, effectName, stacks) {
-        // Only works on heroes
-        if (target.type && target.type !== 'hero') {
-            return false;
+        // Determine target's side - works for both heroes and creatures
+        let targetSide = null;
+        if (target.side) {
+            targetSide = target.side;
+        } else if (target.type === 'hero' || !target.type) {
+            targetSide = target.side;
+        } else {
+            // For creatures, we need to find their hero to get the side
+            const creatureInfo = this.findCreatureInfo(target);
+            if (creatureInfo && creatureInfo.hero) {
+                targetSide = creatureInfo.hero.side;
+            }
         }
         
-        // Check if battle has any Juice artifacts available
-        if (!this.battleManager.battlePermanentArtifacts) {
-            return false;
+        if (!targetSide) {
+            return false; // Cannot determine target side
         }
         
-        const juiceIndex = this.battleManager.battlePermanentArtifacts.findIndex(
+        // Get the appropriate permanent artifacts array based on target's side
+        const permanentArtifacts = targetSide === 'player' 
+            ? this.battleManager.playerPermanentArtifacts 
+            : this.battleManager.opponentPermanentArtifacts;
+            
+        if (!permanentArtifacts || !Array.isArray(permanentArtifacts)) {
+            return false; // No permanent artifacts available for this side
+        }
+        
+        const juiceIndex = permanentArtifacts.findIndex(
             artifact => artifact.name === 'Juice'
         );
         
         if (juiceIndex === -1) {
-            return false; // No Juice available
+            return false; // No Juice available for this side
         }
         
         // Consume one Juice to negate the status effect
-        this.battleManager.battlePermanentArtifacts.splice(juiceIndex, 1);
+        permanentArtifacts.splice(juiceIndex, 1);
         
         // Create visual effect
         this.createJuiceNegationEffect(target, effectName);
@@ -321,12 +338,16 @@ export class StatusEffectsManager {
                 targetInfo: this.getTargetSyncInfo(target),
                 effectName: effectName,
                 stacks: stacks,
-                remainingJuice: this.battleManager.battlePermanentArtifacts.filter(a => a.name === 'Juice').length,
+                targetSide: targetSide,
+                remainingJuicePlayer: this.battleManager.playerPermanentArtifacts ? 
+                    this.battleManager.playerPermanentArtifacts.filter(a => a.name === 'Juice').length : 0,
+                remainingJuiceOpponent: this.battleManager.opponentPermanentArtifacts ? 
+                    this.battleManager.opponentPermanentArtifacts.filter(a => a.name === 'Juice').length : 0,
                 timestamp: Date.now()
             });
         }
         
-        console.log(`🧃 Juice consumed! Remaining: ${this.battleManager.battlePermanentArtifacts.filter(a => a.name === 'Juice').length}`);
+        console.log(`🧃 Juice consumed from ${targetSide} side! Player remaining: ${this.battleManager.playerPermanentArtifacts ? this.battleManager.playerPermanentArtifacts.filter(a => a.name === 'Juice').length : 0}, Opponent remaining: ${this.battleManager.opponentPermanentArtifacts ? this.battleManager.opponentPermanentArtifacts.filter(a => a.name === 'Juice').length : 0}`);
         return true;
     }
 

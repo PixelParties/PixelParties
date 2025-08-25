@@ -1,8 +1,12 @@
-// victoryScreen.js - Victory celebration screen
+// victoryScreen.js - Enhanced Victory celebration screen with advanced particle effects
 export class VictoryScreen {
     constructor() {
         this.heroSelection = null;
         this.isActive = false;
+        this.fireworksInterval = null;
+        this.confettiInterval = null;
+        this.sparkleInterval = null;
+        this.particleAnimations = [];
     }
 
     // Show victory screen for the winner
@@ -31,8 +35,8 @@ export class VictoryScreen {
         // Add click handler to exit
         overlay.addEventListener('click', () => this.handleVictoryExit());
         
-        // Start fireworks animation
-        this.startFireworks();
+        // Start all particle effects
+        this.startParticleEffects();
         
         // Animate in
         overlay.style.animation = 'victoryFadeIn 1s ease-out';
@@ -43,8 +47,11 @@ export class VictoryScreen {
         
         return `
             <div class="victory-container">
-                <!-- Fireworks container -->
+                <!-- Particle effects containers -->
                 <div class="fireworks-container" id="fireworksContainer"></div>
+                <div class="confetti-container" id="confettiContainer"></div>
+                <div class="sparkles-container" id="sparklesContainer"></div>
+                <div class="celebration-burst" id="celebrationBurst"></div>
                 
                 <!-- Main victory content -->
                 <div class="victory-content">
@@ -81,49 +88,256 @@ export class VictoryScreen {
         `;
     }
 
+    startParticleEffects() {
+        // Initial celebration burst
+        setTimeout(() => this.createCelebrationBurst(), 500);
+        
+        // Start continuous fireworks
+        this.startFireworks();
+        
+        // Start confetti rain
+        this.startConfetti();
+        
+        // Start sparkles
+        this.startSparkles();
+        
+        // Add some random celebration bursts
+        this.scheduleRandomBursts();
+    }
+
     startFireworks() {
         const container = document.getElementById('fireworksContainer');
         if (!container) return;
         
-        // Create multiple firework bursts
-        for (let i = 0; i < 8; i++) {
+        // Create initial firework show
+        for (let i = 0; i < 12; i++) {
             setTimeout(() => {
-                this.createFirework(container);
-            }, i * 300);
+                this.createAdvancedFirework(container);
+            }, i * 200 + Math.random() * 300);
         }
         
-        // Continue fireworks every 2 seconds
+        // Continue fireworks at varied intervals
         this.fireworksInterval = setInterval(() => {
             if (this.isActive) {
-                this.createFirework(container);
+                // Random number of fireworks (1-3)
+                const count = Math.floor(Math.random() * 3) + 1;
+                for (let i = 0; i < count; i++) {
+                    setTimeout(() => this.createAdvancedFirework(container), i * 400);
+                }
             }
-        }, 2000);
+        }, 1500 + Math.random() * 1000);
     }
 
-    createFirework(container) {
-        const firework = document.createElement('div');
-        firework.className = 'firework';
+    createAdvancedFirework(container) {
+        // Random position (avoid edges)
+        const x = Math.random() * 80 + 10;
+        const y = Math.random() * 50 + 15;
         
-        // Random position
+        // Random firework type
+        const types = ['burst', 'ring', 'willow', 'chrysanthemum', 'peony'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        // Random colors
+        const colorSets = [
+            ['#ff6b6b', '#ffd93d', '#6bcf7f'],
+            ['#4ecdc4', '#45b7d1', '#96ceb4'],
+            ['#feca57', '#ff9ff3', '#54a0ff'],
+            ['#ff6348', '#ff7675', '#fd79a8'],
+            ['#00b894', '#00cec9', '#81ecec']
+        ];
+        const colors = colorSets[Math.floor(Math.random() * colorSets.length)];
+        
+        this.createFireworkExplosion(container, x, y, type, colors);
+    }
+
+    createFireworkExplosion(container, x, y, type, colors) {
+        const particleCount = type === 'ring' ? 16 : (type === 'burst' ? 24 : 20);
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = `firework-particle firework-${type}`;
+            
+            const angle = (2 * Math.PI * i) / particleCount + (Math.random() * 0.5 - 0.25);
+            const velocity = 80 + Math.random() * 60;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            particle.style.left = `${x}%`;
+            particle.style.top = `${y}%`;
+            particle.style.setProperty('--particle-color', color);
+            particle.style.setProperty('--end-x', `${Math.cos(angle) * velocity}px`);
+            particle.style.setProperty('--end-y', `${Math.sin(angle) * velocity}px`);
+            particle.style.animationDelay = `${Math.random() * 0.1}s`;
+            
+            container.appendChild(particle);
+            
+            // Add trailing sparkles for some particles
+            if (Math.random() < 0.3) {
+                this.createTrailingSpark(container, x, y, angle, velocity, color);
+            }
+            
+            // Remove after animation
+            setTimeout(() => {
+                if (particle.parentNode) {
+                    particle.parentNode.removeChild(particle);
+                }
+            }, 2500);
+        }
+    }
+
+    createTrailingSpark(container, startX, startY, angle, velocity, color) {
+        const trail = document.createElement('div');
+        trail.className = 'firework-trail';
+        trail.style.left = `${startX}%`;
+        trail.style.top = `${startY}%`;
+        trail.style.setProperty('--trail-color', color);
+        trail.style.setProperty('--trail-x', `${Math.cos(angle) * velocity * 0.7}px`);
+        trail.style.setProperty('--trail-y', `${Math.sin(angle) * velocity * 0.7}px`);
+        
+        container.appendChild(trail);
+        
+        setTimeout(() => {
+            if (trail.parentNode) {
+                trail.parentNode.removeChild(trail);
+            }
+        }, 1500);
+    }
+
+    startConfetti() {
+        const container = document.getElementById('confettiContainer');
+        if (!container) return;
+        
+        // Create initial confetti shower
+        for (let i = 0; i < 50; i++) {
+            setTimeout(() => this.createConfettiPiece(container), i * 50);
+        }
+        
+        // Continue confetti
+        this.confettiInterval = setInterval(() => {
+            if (this.isActive) {
+                const count = Math.floor(Math.random() * 8) + 3;
+                for (let i = 0; i < count; i++) {
+                    this.createConfettiPiece(container);
+                }
+            }
+        }, 300);
+    }
+
+    createConfettiPiece(container) {
+        const confetti = document.createElement('div');
+        const shapes = ['square', 'rectangle', 'circle', 'diamond'];
+        const shape = shapes[Math.floor(Math.random() * shapes.length)];
+        
+        confetti.className = `confetti confetti-${shape}`;
+        
+        // Random starting position and properties
         const x = Math.random() * 100;
-        const y = Math.random() * 60 + 20; // Keep in upper 60% of screen
-        
-        firework.style.left = `${x}%`;
-        firework.style.top = `${y}%`;
+        const rotation = Math.random() * 360;
+        const scale = 0.5 + Math.random() * 0.8;
+        const duration = 3 + Math.random() * 2;
+        const drift = (Math.random() - 0.5) * 200;
         
         // Random colors
         const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff'];
         const color = colors[Math.floor(Math.random() * colors.length)];
-        firework.style.setProperty('--firework-color', color);
         
-        container.appendChild(firework);
+        confetti.style.left = `${x}%`;
+        confetti.style.top = '-10px';
+        confetti.style.setProperty('--confetti-color', color);
+        confetti.style.setProperty('--rotation', `${rotation}deg`);
+        confetti.style.setProperty('--scale', scale);
+        confetti.style.setProperty('--duration', `${duration}s`);
+        confetti.style.setProperty('--drift', `${drift}px`);
+        
+        container.appendChild(confetti);
         
         // Remove after animation
         setTimeout(() => {
-            if (firework.parentNode) {
-                firework.parentNode.removeChild(firework);
+            if (confetti.parentNode) {
+                confetti.parentNode.removeChild(confetti);
             }
-        }, 1500);
+        }, duration * 1000 + 500);
+    }
+
+    startSparkles() {
+        const container = document.getElementById('sparklesContainer');
+        if (!container) return;
+        
+        this.sparkleInterval = setInterval(() => {
+            if (this.isActive) {
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => this.createSparkle(container), i * 100);
+                }
+            }
+        }, 800);
+    }
+
+    createSparkle(container) {
+        const sparkle = document.createElement('div');
+        sparkle.className = 'sparkle';
+        
+        // Random position
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        const size = 4 + Math.random() * 8;
+        const duration = 0.8 + Math.random() * 0.4;
+        
+        sparkle.style.left = `${x}%`;
+        sparkle.style.top = `${y}%`;
+        sparkle.style.width = `${size}px`;
+        sparkle.style.height = `${size}px`;
+        sparkle.style.animationDuration = `${duration}s`;
+        
+        container.appendChild(sparkle);
+        
+        setTimeout(() => {
+            if (sparkle.parentNode) {
+                sparkle.parentNode.removeChild(sparkle);
+            }
+        }, duration * 1000);
+    }
+
+    createCelebrationBurst() {
+        const container = document.getElementById('celebrationBurst');
+        if (!container) return;
+        
+        // Create a big central celebration burst
+        for (let i = 0; i < 60; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'celebration-particle';
+            
+            const angle = (2 * Math.PI * i) / 60;
+            const velocity = 100 + Math.random() * 150;
+            const colors = ['#ffd700', '#ffed4a', '#ffd93d', '#ff6b6b', '#4ecdc4'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            particle.style.left = '50%';
+            particle.style.top = '50%';
+            particle.style.setProperty('--burst-color', color);
+            particle.style.setProperty('--burst-x', `${Math.cos(angle) * velocity}px`);
+            particle.style.setProperty('--burst-y', `${Math.sin(angle) * velocity}px`);
+            particle.style.animationDelay = `${Math.random() * 0.2}s`;
+            
+            container.appendChild(particle);
+            
+            setTimeout(() => {
+                if (particle.parentNode) {
+                    particle.parentNode.removeChild(particle);
+                }
+            }, 3000);
+        }
+    }
+
+    scheduleRandomBursts() {
+        if (!this.isActive) return;
+        
+        // Schedule next random burst
+        const delay = 3000 + Math.random() * 4000;
+        setTimeout(() => {
+            if (this.isActive) {
+                this.createCelebrationBurst();
+                this.scheduleRandomBursts(); // Schedule next one
+            }
+        }, delay);
     }
 
     handleVictoryExit() {
@@ -172,26 +386,38 @@ export class VictoryScreen {
         }
         
         // Transition back to room/lobby UI
-        // This should trigger the same flow as after a surrender
         if (this.heroSelection.stateMachine) {
             this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.INITIALIZING);
         }
         
         // Reset hero selection state
         this.heroSelection.reset();
-        
-        // Show room interface (this should already be handled by the existing system)
-        // The room manager and UI manager should handle showing the lobby
     }
 
     hideVictoryScreen() {
         this.isActive = false;
         
-        // Stop fireworks
+        // Stop all intervals
         if (this.fireworksInterval) {
             clearInterval(this.fireworksInterval);
             this.fireworksInterval = null;
         }
+        
+        if (this.confettiInterval) {
+            clearInterval(this.confettiInterval);
+            this.confettiInterval = null;
+        }
+        
+        if (this.sparkleInterval) {
+            clearInterval(this.sparkleInterval);
+            this.sparkleInterval = null;
+        }
+        
+        // Cancel any ongoing animations
+        this.particleAnimations.forEach(animation => {
+            if (animation.cancel) animation.cancel();
+        });
+        this.particleAnimations = [];
         
         // Remove overlay
         const overlay = document.getElementById('victoryOverlay');
@@ -220,7 +446,7 @@ export class VictoryScreen {
                 left: 0;
                 right: 0;
                 bottom: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: radial-gradient(ellipse at center, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.95) 100%);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -242,7 +468,11 @@ export class VictoryScreen {
                 justify-content: center;
             }
             
-            .fireworks-container {
+            /* Particle Effect Containers */
+            .fireworks-container,
+            .confetti-container,
+            .sparkles-container,
+            .celebration-burst {
                 position: absolute;
                 top: 0;
                 left: 0;
@@ -252,9 +482,13 @@ export class VictoryScreen {
                 z-index: 1;
             }
             
+            .celebration-burst {
+                z-index: 3;
+            }
+            
             .victory-content {
                 position: relative;
-                z-index: 2;
+                z-index: 4;
                 text-align: center;
                 color: white;
                 max-width: 90%;
@@ -265,11 +499,12 @@ export class VictoryScreen {
                 font-weight: 900;
                 margin: 0 0 20px 0;
                 text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
-                background: linear-gradient(45deg, #ffd700, #ffed4a);
+                background: linear-gradient(45deg, #ffd700, #ffed4a, #ffd93d);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
-                animation: victoryTitlePulse 2s ease-in-out infinite;
+                background-size: 200% 200%;
+                animation: victoryTitleShimmer 3s ease-in-out infinite;
             }
             
             .victory-subtitle {
@@ -277,6 +512,7 @@ export class VictoryScreen {
                 margin-bottom: 40px;
                 opacity: 0.9;
                 animation: victorySubtitleFade 3s ease-out;
+                text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
             }
             
             .heroes-title {
@@ -284,6 +520,7 @@ export class VictoryScreen {
                 font-weight: 700;
                 margin-bottom: 30px;
                 text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+                animation: heroesGlow 2s ease-in-out infinite;
             }
             
             .heroes-display {
@@ -305,12 +542,26 @@ export class VictoryScreen {
                 padding: 20px;
                 backdrop-filter: blur(10px);
                 transition: all 0.3s ease;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .hero-frame::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+                animation: heroFrameShine 3s ease-in-out infinite;
+                pointer-events: none;
             }
             
             .hero-frame:hover {
                 transform: scale(1.05);
                 border-color: rgba(255, 215, 0, 0.9);
-                box-shadow: 0 10px 30px rgba(255, 215, 0, 0.4);
+                box-shadow: 0 15px 40px rgba(255, 215, 0, 0.4), 0 0 30px rgba(255, 255, 255, 0.2);
             }
             
             .hero-image {
@@ -320,6 +571,8 @@ export class VictoryScreen {
                 border-radius: 12px;
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
                 margin-bottom: 15px;
+                position: relative;
+                z-index: 2;
             }
             
             .hero-name {
@@ -327,19 +580,8 @@ export class VictoryScreen {
                 font-weight: 600;
                 color: #ffd700;
                 text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-            }
-            
-            .hero-placeholder {
-                width: 160px;
-                height: 224px;
-                background: rgba(255, 255, 255, 0.1);
-                border: 2px dashed rgba(255, 255, 255, 0.3);
-                border-radius: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: rgba(255, 255, 255, 0.5);
-                font-style: italic;
+                position: relative;
+                z-index: 2;
             }
             
             .victory-footer {
@@ -353,37 +595,105 @@ export class VictoryScreen {
                 padding: 10px 20px;
                 border-radius: 25px;
                 backdrop-filter: blur(5px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
             }
             
-            /* Firework animation */
-            .firework {
+            /* Advanced Firework Particles */
+            .firework-particle {
                 position: absolute;
-                width: 4px;
-                height: 4px;
+                width: 6px;
+                height: 6px;
                 border-radius: 50%;
-                background: var(--firework-color, #ffd700);
-                animation: fireworkExplode 1.5s ease-out;
+                background: var(--particle-color);
+                box-shadow: 0 0 6px var(--particle-color);
+                animation: fireworkParticle 2.5s ease-out forwards;
             }
             
-            .firework::before,
-            .firework::after {
-                content: '';
+            .firework-particle.firework-ring {
+                animation: fireworkRing 2.5s ease-out forwards;
+            }
+            
+            .firework-particle.firework-willow {
+                animation: fireworkWillow 3s ease-out forwards;
+            }
+            
+            .firework-trail {
                 position: absolute;
-                width: 4px;
-                height: 4px;
+                width: 3px;
+                height: 3px;
                 border-radius: 50%;
-                background: inherit;
+                background: var(--trail-color);
+                box-shadow: 0 0 4px var(--trail-color);
+                animation: fireworkTrail 1.5s ease-out forwards;
             }
             
-            /* Animations */
+            /* Confetti Particles */
+            .confetti {
+                position: absolute;
+                animation: confettiFall var(--duration, 4s) linear forwards;
+            }
+            
+            .confetti-square {
+                width: 8px;
+                height: 8px;
+                background: var(--confetti-color);
+            }
+            
+            .confetti-rectangle {
+                width: 12px;
+                height: 6px;
+                background: var(--confetti-color);
+            }
+            
+            .confetti-circle {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--confetti-color);
+            }
+            
+            .confetti-diamond {
+                width: 8px;
+                height: 8px;
+                background: var(--confetti-color);
+                transform: rotate(45deg);
+            }
+            
+            /* Sparkle Effects */
+            .sparkle {
+                position: absolute;
+                background: radial-gradient(circle, #ffffff 0%, #ffd700 50%, transparent 100%);
+                border-radius: 50%;
+                animation: sparkleGlow 1s ease-in-out;
+                pointer-events: none;
+            }
+            
+            /* Celebration Burst Particles */
+            .celebration-particle {
+                position: absolute;
+                width: 8px;
+                height: 8px;
+                background: var(--burst-color);
+                border-radius: 50%;
+                box-shadow: 0 0 8px var(--burst-color);
+                animation: celebrationBurst 3s ease-out forwards;
+            }
+            
+            /* Enhanced Animations */
             @keyframes victoryFadeIn {
-                from { opacity: 0; transform: scale(0.8); }
-                to { opacity: 1; transform: scale(1); }
+                from { opacity: 0; transform: scale(0.8) rotateY(10deg); }
+                to { opacity: 1; transform: scale(1) rotateY(0deg); }
             }
             
-            @keyframes victoryTitlePulse {
-                0%, 100% { transform: scale(1); }
-                50% { transform: scale(1.05); }
+            @keyframes victoryTitleShimmer {
+                0%, 100% { 
+                    background-position: 0% 50%; 
+                    transform: scale(1);
+                }
+                50% { 
+                    background-position: 100% 50%; 
+                    transform: scale(1.05);
+                }
             }
             
             @keyframes victorySubtitleFade {
@@ -391,27 +701,115 @@ export class VictoryScreen {
                 100% { opacity: 0.9; transform: translateY(0); }
             }
             
+            @keyframes heroesGlow {
+                0%, 100% { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6); }
+                50% { text-shadow: 0 2px 20px rgba(255, 215, 0, 0.4), 0 2px 10px rgba(0, 0, 0, 0.6); }
+            }
+            
             @keyframes heroSlideUp {
-                0% { opacity: 0; transform: translateY(50px); }
-                100% { opacity: 1; transform: translateY(0); }
+                0% { opacity: 0; transform: translateY(50px) rotateX(20deg); }
+                100% { opacity: 1; transform: translateY(0) rotateX(0deg); }
+            }
+            
+            @keyframes heroFrameShine {
+                0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+                50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+                100% { transform: translateX(200%) translateY(200%) rotate(45deg); }
             }
             
             @keyframes victoryHintBlink {
-                0%, 50%, 100% { opacity: 0.8; }
-                25%, 75% { opacity: 0.4; }
+                0%, 50%, 100% { opacity: 0.8; transform: scale(1); }
+                25%, 75% { opacity: 0.4; transform: scale(0.98); }
             }
             
-            @keyframes fireworkExplode {
+            /* Firework Animations */
+            @keyframes fireworkParticle {
                 0% {
-                    transform: scale(1);
+                    transform: translate(0, 0) scale(1);
+                    opacity: 1;
+                }
+                100% {
+                    transform: translate(var(--end-x), var(--end-y)) scale(0.3);
+                    opacity: 0;
+                }
+            }
+            
+            @keyframes fireworkRing {
+                0% {
+                    transform: translate(0, 0) scale(0.5);
                     opacity: 1;
                 }
                 50% {
-                    transform: scale(3);
+                    opacity: 1;
+                    transform: translate(calc(var(--end-x) * 0.7), calc(var(--end-y) * 0.7)) scale(1);
+                }
+                100% {
+                    transform: translate(var(--end-x), var(--end-y)) scale(0.2);
+                    opacity: 0;
+                }
+            }
+            
+            @keyframes fireworkWillow {
+                0% {
+                    transform: translate(0, 0) scale(1);
+                    opacity: 1;
+                }
+                30% {
+                    transform: translate(calc(var(--end-x) * 0.3), calc(var(--end-y) * 0.3)) scale(0.8);
+                    opacity: 1;
+                }
+                100% {
+                    transform: translate(var(--end-x), calc(var(--end-y) + 100px)) scale(0.1);
+                    opacity: 0;
+                }
+            }
+            
+            @keyframes fireworkTrail {
+                0% {
+                    transform: translate(0, 0) scale(1);
                     opacity: 0.8;
                 }
                 100% {
-                    transform: scale(6);
+                    transform: translate(var(--trail-x), var(--trail-y)) scale(0.1);
+                    opacity: 0;
+                }
+            }
+            
+            /* Confetti Animation */
+            @keyframes confettiFall {
+                0% {
+                    transform: translateY(0) translateX(0) rotateZ(0deg) scale(var(--scale, 1));
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(100vh) translateX(var(--drift, 0px)) rotateZ(720deg) scale(var(--scale, 1));
+                    opacity: 0;
+                }
+            }
+            
+            /* Sparkle Animation */
+            @keyframes sparkleGlow {
+                0%, 100% {
+                    transform: scale(0) rotate(0deg);
+                    opacity: 0;
+                }
+                50% {
+                    transform: scale(1) rotate(180deg);
+                    opacity: 1;
+                }
+            }
+            
+            /* Celebration Burst Animation */
+            @keyframes celebrationBurst {
+                0% {
+                    transform: translate(0, 0) scale(1);
+                    opacity: 1;
+                }
+                70% {
+                    opacity: 0.8;
+                }
+                100% {
+                    transform: translate(var(--burst-x), var(--burst-y)) scale(0.2);
                     opacity: 0;
                 }
             }
@@ -433,6 +831,15 @@ export class VictoryScreen {
                 
                 .hero-frame {
                     padding: 15px;
+                }
+                
+                .firework-particle {
+                    width: 4px;
+                    height: 4px;
+                }
+                
+                .confetti {
+                    transform: scale(0.8);
                 }
             }
         `;

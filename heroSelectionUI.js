@@ -1293,11 +1293,17 @@ export class HeroSelectionUI {
                         <p class="drag-hint">🌍 Drag Area cards to the Area zone!</p>
                     </div>
                     
+                    <!-- UPDATED: Decoupled Area and Hero slots -->
                     <div class="team-slots-container">
+                        <!-- Area slot - positioned independently -->
                         ${areaSlot}
-                        ${leftSlot}
-                        ${centerSlot}
-                        ${rightSlot}
+                        
+                        <!-- Hero slots - wrapped separately -->
+                        <div class="hero-slots-container">
+                            ${leftSlot}
+                            ${centerSlot}
+                            ${rightSlot}
+                        </div>
                     </div>
                     
                     <!-- Hand directly below hero slots -->

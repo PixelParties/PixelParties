@@ -84,6 +84,9 @@ export class CheckpointSystem {
                 
                 // Network/Speed State
                 networkState: this.captureNetworkState(),
+
+                // Area
+                areaData: this.captureAreaData(),
                 
                 // Extended State
                 extendedState: this.captureExtendedState()
@@ -295,9 +298,19 @@ export class CheckpointSystem {
             };
         }
         
-        // NEW: Arrow System State
+        // Arrow System State
         if (this.battleManager.attackEffectsManager && this.battleManager.attackEffectsManager.arrowSystem) {
             states.arrowSystem = this.battleManager.attackEffectsManager.arrowSystem.exportArrowState();
+        }
+
+        // Kazena
+        if (this.battleManager.kazenaEffect) {
+            states.kazenaEffect = this.battleManager.kazenaEffect.exportKazenaState();
+        }
+
+        // Gathering Storm Effect State
+        if (this.battleManager.gatheringStormEffect) {
+            states.gatheringStormEffect = this.battleManager.gatheringStormEffect.exportState();
         }
         
         // Speed Manager State
@@ -477,6 +490,7 @@ export class CheckpointSystem {
             this.restoreCreatures(checkpoint.creatures);
             this.restoreEquipment(checkpoint.equipment);
             this.restorePermanentArtifacts(checkpoint.permanentArtifacts);
+            this.restoreAreaData(checkpoint.areaData);
             
             // 4. Restore all heroes with complete state
             this.restoreAllHeroes(checkpoint.heroes);
@@ -763,6 +777,26 @@ export class CheckpointSystem {
             this.battleManager.attackEffectsManager.arrowSystem) {
             this.battleManager.attackEffectsManager.arrowSystem.importArrowState(managerStates.arrowSystem);
         }
+
+        // Restore Kazena
+        if (managerStates.kazenaEffect && this.battleManager.kazenaEffect) {
+            this.battleManager.kazenaEffect.importKazenaState(managerStates.kazenaEffect);
+        }
+        
+        // Restore Gathering Storm Effect
+        if (managerStates.gatheringStormEffect) {
+            // Import the Gathering Storm effect class if needed
+            if (!this.battleManager.gatheringStormEffect) {
+                import('./Spells/gatheringStorm.js').then(({ GatheringStormEffect }) => {
+                    this.battleManager.gatheringStormEffect = new GatheringStormEffect();
+                    this.battleManager.gatheringStormEffect.importState(managerStates.gatheringStormEffect);
+                }).catch(error => {
+                    console.error('Error importing Gathering Storm effect:', error);
+                });
+            } else {
+                this.battleManager.gatheringStormEffect.importState(managerStates.gatheringStormEffect);
+            }
+        }
     }
 
     restoreBattleLog(battleLog) {
@@ -882,6 +916,36 @@ export class CheckpointSystem {
                 this.battleManager.updateHeroAttackDisplay('opponent', position, opponentHero);
             }
         });
+    }
+
+
+
+    // ============================================
+    // AREA SYNC METHODS
+    // ============================================
+
+    captureAreaData() {
+        if (!this.battleManager) return null;
+        
+        return {
+            playerAreaCard: this.battleManager.playerAreaCard || null,
+            opponentAreaCard: this.battleManager.opponentAreaCard || null
+        };
+    }
+
+    // Add this method in the RESTORATION METHODS section  
+    restoreAreaData(areaData) {
+        if (!areaData || !this.battleManager) return;
+        
+        // For guests, swap player and opponent data
+        if (this.isHost) {
+            this.battleManager.playerAreaCard = areaData.playerAreaCard;
+            this.battleManager.opponentAreaCard = areaData.opponentAreaCard;
+        } else {
+            // GUEST: Swap the area data since checkpoint was saved from host perspective
+            this.battleManager.playerAreaCard = areaData.opponentAreaCard;
+            this.battleManager.opponentAreaCard = areaData.playerAreaCard;
+        }
     }
 
 

@@ -19,6 +19,7 @@ import { potionHandler } from './potionHandler.js';
 import { HeroEquipmentManager } from './heroEquipment.js';
 import VictoryScreen from './victoryScreen.js';
 import heroTooltipManager from './heroTooltips.js';
+import AreaHandler from './areaHandler.js'
 
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
@@ -78,6 +79,7 @@ export class HeroSelection {
         this.heroCreatureManager = new HeroCreatureManager();
         this.heroEquipmentManager = new HeroEquipmentManager();
         this.victoryScreen = new VictoryScreen();
+        this.areaHandler = new AreaHandler();
 
         this.potionHandler = potionHandler; 
 
@@ -165,8 +167,9 @@ export class HeroSelection {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
-            'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
+            'Gon': ['DecayMagic', 'BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Ida': ['BottledFlame', 'BurningFinger',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
+            'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
@@ -183,11 +186,12 @@ export class HeroSelection {
         // Individual Abilities
         this.trainingAbility = trainingAbility;
 
-        // Initialize training system
+        // Initialize individual systems
         if (typeof window !== 'undefined') {
             // Defer training initialization until after the instance is fully created
             setTimeout(() => {
                 this.initializeTrainingSystem();
+                this.initializeGatheringStormSystem();
             }, 0);
         }
     }
@@ -222,6 +226,8 @@ export class HeroSelection {
         const { ReconnectionManager } = await import('./reconnectionManager.js');
         this.reconnectionManager = new ReconnectionManager();
         this.reconnectionManager.init(this, roomManager, gameDataSender, isHost);
+
+        this.areaHandler.init(this);
         
         // Set up battle state listener
         this.setupBattleStateListener();
@@ -233,6 +239,15 @@ export class HeroSelection {
         this.crusaderArtifactsHandler.init(this);
         
         return this.loadCharacters();
+    }
+
+    initializeGatheringStormSystem() {
+        // Import and initialize the GatheringStorm system
+        import('./Spells/gatheringStorm.js').then(({ initializeGatheringStormSystem }) => {
+            initializeGatheringStormSystem();
+        }).catch(error => {
+            console.error('Failed to initialize GatheringStorm system:', error);
+        });
     }
 
     calculateEffectiveHeroStats(heroPosition) {
@@ -534,7 +549,7 @@ export class HeroSelection {
             const characterFiles = [
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
-                'Vacarn.png', 'Tharx.png', 'Semi.png'
+                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -570,7 +585,7 @@ export class HeroSelection {
             const characterFiles = [
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
-                'Vacarn.png', 'Tharx.png', 'Semi.png'
+                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -828,6 +843,10 @@ export class HeroSelection {
                 const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
                 gameState.hostGlobalSpellState = sanitizeForFirebase(globalSpellState);
 
+                // Save Area
+                const hostAreaState = this.areaHandler.exportAreaState();
+                gameState.hostAreaCard = sanitizeForFirebase(hostAreaState.areaCard);
+
                 // Save opponent abilities data if we have it
                 if (this.opponentAbilitiesData) {
                     gameState.guestAbilitiesData = sanitizeForFirebase(this.opponentAbilitiesData);
@@ -925,6 +944,10 @@ export class HeroSelection {
                 // Save Guard Change state for GUEST only
                 const globalSpellState = this.globalSpellManager.exportGlobalSpellState();
                 gameState.guestGlobalSpellState = sanitizeForFirebase(globalSpellState);
+
+                // Save Area
+                const guestAreaState = this.areaHandler.exportAreaState();
+                gameState.guestAreaCard = sanitizeForFirebase(guestAreaState.areaCard);
 
                 // Save opponent abilities data if we have it
                 if (this.opponentAbilitiesData) {
@@ -1062,7 +1085,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, magicSapphiresUsedData = null, magicRubiesUsedData = null){
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, magicSapphiresUsedData = null, magicRubiesUsedData = null, areaCardData = null){
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1098,6 +1121,12 @@ export class HeroSelection {
             // Initialize potion state for new game
             this.potionHandler.resetForNewGame(); // Use new method that clears any lingering effects
             this.potionHandler.updateAlchemyBonuses(this);
+        }
+
+        // Restore area card data
+        if (areaCardData && this.areaHandler) {
+            const areaState = { areaCard: areaCardData, opponentAreaCard: null };
+            this.areaHandler.importAreaState(areaState);
         }
 
         // ===== Restore Hero effect states =====
@@ -1484,7 +1513,10 @@ export class HeroSelection {
             //Gather deck data
             const deckData = this.deckManager.getDeck();
 
-            // Send all data
+            // Gather area data
+            const areaFormationData = this.areaHandler.getFormationUpdateData();
+
+            // Send all data including area
             this.gameDataSender('formation_update', {
                 playerRole: this.isHost ? 'host' : 'guest',
                 battleFormation: this.formationManager.getBattleFormation(),
@@ -1494,7 +1526,12 @@ export class HeroSelection {
                 equipment: equipmentData,
                 permanentArtifacts: permanentArtifactsData,
                 hand: handData,
-                deck: deckData
+                deck: deckData,
+                // Include area data
+                playerAreaCard: areaFormationData.playerAreaCard,
+                opponentAreaCard: areaFormationData.opponentAreaCard,
+                // Keep the spread for backward compatibility
+                ...areaFormationData
             });
         }
     }
@@ -1550,6 +1587,17 @@ export class HeroSelection {
         }
         if (data.deck) {
             this.opponentDeckData = data.deck;
+        }
+
+        // Store opponent area data if included
+        if (data.playerAreaCard !== undefined) {
+            this.opponentAreaCardData = data.playerAreaCard; // Opponent's area card
+        }
+
+        // Handle area card data through areaHandler
+        if (this.areaHandler) {
+            // Pass the full data object so areaHandler can extract what it needs
+            this.areaHandler.handleFormationUpdateReceived(data); 
         }
     }
 
@@ -2349,6 +2397,8 @@ export class HeroSelection {
         const opponentHand = this.opponentHandData || [];
         const playerDeck = this.getLatestPlayerDeck();
         const opponentDeck = this.opponentDeckData || [];
+        
+        const areaBattleData = this.areaHandler.getBattleInitData();
 
         
 
@@ -2357,7 +2407,6 @@ export class HeroSelection {
         // Debug formation data before battle starts
         const playerFormation = this.formationManager.getBattleFormation();
         const opponentFormation = this.formationManager.getOpponentBattleFormation();
-        
 
 
 
@@ -2390,7 +2439,9 @@ export class HeroSelection {
                 playerHand,
                 opponentHand,
                 playerDeck,
-                opponentDeck 
+                opponentDeck,
+                areaBattleData.playerAreaCard,
+                areaBattleData.opponentAreaCard
             );
             return true;
             
@@ -2687,6 +2738,12 @@ export class HeroSelection {
 
     // Enhanced handleDrop to check for ability cards first
     async handleDrop(targetSlot) {
+        // Check if dropping an Area
+        if (this.areaHandler.isDraggingAreaCard()) {
+            this.handManager.endHandCardDrag();
+            return false;
+        }
+
         // Check if dropping a spell card
         if (this.isDraggingSpellCard()) {
             const success = await this.handleSpellDrop(targetSlot);
@@ -3066,6 +3123,11 @@ export class HeroSelection {
             this.potionHandler.resetForNewGame(); 
         }
 
+        // Reset Area
+        if (this.areaHandler) {
+            this.areaHandler.reset();
+        }
+
         // Reset Hero effect managers
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.reset();
@@ -3133,107 +3195,6 @@ export class HeroSelection {
         return this.heroSelectionUI.generateSelectionHTML(this.playerCharacters);
     }
 
-    // Generate team building screen HTML
-    generateTeamBuildingHTML() {
-        if (!this.selectedCharacter) {
-            return '<div class="loading-heroes"><h2>No character selected</h2></div>';
-        }
-
-        // Get the battle formation
-        const battleFormation = this.formationManager.getBattleFormation();
-        
-        // Create the team slots
-        const leftSlot = this.createTeamSlotHTML('left', battleFormation.left);
-        const centerSlot = this.createTeamSlotHTML('center', battleFormation.center);
-        const rightSlot = this.createTeamSlotHTML('right', battleFormation.right);
-        
-        // Create life display
-        const lifeDisplay = this.lifeManager.createLifeDisplay();
-        
-        const permanentArtifactsIndicator = this.heroSelectionUI.createPermanentArtifactsIndicator();
-
-
-        // Create hand display
-        const handDisplay = this.handManager.createHandDisplay(
-            (cardName) => this.formatCardName(cardName)
-        );
-        
-        // Create deck grid
-        const deckGrid = this.deckManager.createDeckGrid(
-            (cardName) => this.formatCardName(cardName)
-        );
-        
-        // Create gold display
-        const goldDisplay = this.goldManager.createGoldDisplay();
-        
-        // // Create action display
-        const actionDisplay = this.actionManager.createActionDisplay();
-        
-        // Create potion display
-        const potionDisplay = window.potionHandler ? window.potionHandler.createPotionDisplay() : '';
-        setTimeout(() => this.refreshHeroStats(), 200);
-        
-        return `
-            ${lifeDisplay}
-            ${permanentArtifactsIndicator}
-            <div class="team-building-container">
-                <!-- Left Column - Team Formation -->
-                <div class="team-building-left">
-                    <div class="team-header" style="text-align: center;">
-                        <div class="team-header-title" style="text-align: center;">
-                            <h2>🛡️ Your Battle Formation</h2>
-                            ${this.globalSpellManager.isGuardChangeModeActive() ? 
-                            '<div class="guard-change-indicator">Guard Change Active</div>' : 
-                            ''}
-                        </div>
-                        <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
-                        <p class="drag-hint">🎯 Drag Abilities to a Hero slot to attach them!</p>
-                        <p class="drag-hint">📜 Drag Spell to Heroes to add them to their Spellbook!</p>
-                        <p class="drag-hint">⚔️ Drag Equip Artifacts to Heroes to equip them!</p> <!-- NEW -->
-                        <p class="drag-hint">🐾 Drag and drop Creatures to reorder them within the same Hero!</p>
-                    </div>
-                    
-                    <div class="team-slots-container">
-                        ${leftSlot}
-                        ${centerSlot}
-                        ${rightSlot}
-                    </div>
-                    
-                    <!-- Hand directly below hero slots -->
-                    <div class="hand-display-area-inline">
-                        ${handDisplay}
-                    </div>
-                </div>
-                
-                <!-- Right Column - Player's Deck -->
-                <div class="team-building-right-wrapper">
-                    <!-- Tooltip Container - now a sibling, not a child -->
-                    <div class="deck-tooltip-anchor" id="deckTooltipAnchor">
-                        <div class="deck-tooltip-content" id="deckTooltipContent" style="display: none;">
-                            <!-- Tooltip content will be inserted here -->
-                        </div>
-                    </div>
-                    
-                    <!-- Deck Container -->
-                    <div class="team-building-right">
-                        ${deckGrid}
-                    </div>
-                </div>
-                
-                <!-- Gold, Action, and Potion Display - positioned together -->
-                <div class="resource-display-container">
-                    <div class="resource-top-row">
-                        ${goldDisplay}
-                        ${potionDisplay}
-                    </div>
-                    <div class="resource-bottom-row">
-                        ${actionDisplay}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
     // Handle bonus card draw message from opponent
     receiveRewardBonusDraw(data) {
         this.cardRewardManager.handleOpponentBonusCardDraw(this);
@@ -3266,6 +3227,12 @@ export class HeroSelection {
         const spellInfo = getCardInfo(spellCardName);
         if (!spellInfo || spellInfo.cardType !== 'Spell') {
             return { canLearn: false, reason: "Invalid spell card!" };
+        }
+
+        // NEW: First check heroSpellbookManager restrictions (includes Area spell restriction)
+        const spellbookCheck = this.heroSpellbookManager.canHeroLearnSpell(heroPosition, spellCardName);
+        if (!spellbookCheck.canLearn) {
+            return spellbookCheck; // Return the specific restriction (like Area spells)
         }
 
         // Special exception for Cavalry with 3 total heroes
@@ -3304,7 +3271,7 @@ export class HeroSelection {
         const heroAbilities = this.heroAbilitiesManager.getHeroAbilities(heroPosition);
         
         let totalSpellSchoolLevel = 0;
-        let totalThievingLevel = 0; // NEW: Track Thieving ability level
+        let totalThievingLevel = 0; // Track Thieving ability level
 
         ['zone1', 'zone2', 'zone3'].forEach(zone => {
             if (heroAbilities && heroAbilities[zone]) {
@@ -3312,7 +3279,7 @@ export class HeroSelection {
                     if (ability && ability.name === spellSchool) {
                         totalSpellSchoolLevel++;
                     }
-                    // NEW: Count Thieving abilities
+                    // Count Thieving abilities
                     if (ability && ability.name === 'Thieving') {
                         totalThievingLevel++;
                     }
@@ -3320,7 +3287,7 @@ export class HeroSelection {
             }
         });
 
-        // NEW: Calculate effective spell level requirement for ThievingStrike
+        // Calculate effective spell level requirement for ThievingStrike
         let effectiveSpellLevel = baseSpellLevel;
         let thievingReduction = 0;
         
@@ -3353,7 +3320,7 @@ export class HeroSelection {
             const formattedSpellSchool = this.formatCardName(spellSchool);
             const formattedSpellName = this.formatCardName(spellCardName);
             
-            // NEW: Enhanced error message for ThievingStrike
+            // Enhanced error message for ThievingStrike
             if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
                 const originalRequirement = baseSpellLevel;
                 const currentCombined = totalSpellSchoolLevel + totalThievingLevel;
@@ -3760,7 +3727,7 @@ function updateHeroSelectionUI() {
             break;
             
         case 'team_building':
-            const teamBuildingHTML = window.heroSelection.generateTeamBuildingHTML();
+            const teamBuildingHTML = window.heroSelection.heroSelectionUI.generateTeamBuildingHTML();
             heroContainer.innerHTML = teamBuildingHTML;
             
             // Ensure gold display is created after team building UI is rendered

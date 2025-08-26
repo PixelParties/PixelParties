@@ -356,7 +356,8 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald'];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing'];
+
         return clickableArtifacts.includes(cardName);
     }
 
@@ -379,7 +380,9 @@ export class ArtifactHandler {
             'MagicAmethyst', 
             'MagicSapphire', 
             'MagicRuby', 
-            'MagicEmerald'
+            'MagicEmerald',
+            'CloudPillow', 
+            'StormRing'
         ];
         
         // Convert card names to proper module names using the existing method

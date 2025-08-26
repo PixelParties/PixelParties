@@ -68,6 +68,19 @@ const CARD_DATABASE = {
         ability1: 'DestructionMagic',
         ability2: 'DestructionMagic'
     },
+    'Kazena': {
+        name: 'Kazena',
+        image: './Cards/Characters/Kazena.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 40,
+        ability1: 'Adventurousness',
+        ability2: 'SupportMagic'
+    },
     'Medea': {
         name: 'Medea',
         image: './Cards/Characters/Medea.png',
@@ -398,7 +411,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
 
     // Gon's Cards
@@ -521,7 +535,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'Fireshield': {
         name: 'Fireshield',
@@ -541,7 +556,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'MountainTearRiver': {
         name: 'MountainTearRiver',
@@ -551,7 +567,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'VampireOnFire': {
         name: 'VampireOnFire',
@@ -561,7 +578,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
 
     // Medea's Cards
@@ -591,7 +609,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'PoisonPollen': {
         name: 'PoisonPollen',
@@ -601,7 +620,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'PoisonVial': {
         name: 'PoisonVial',
@@ -620,7 +640,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'ToxicTrap': {
         name: 'ToxicTrap',
@@ -1287,7 +1308,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        aoe: true
     },
     'Curse': {
         name: 'Curse',
@@ -1316,6 +1338,63 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: null,
         subtype: "Permanent"
+    },
+    'CloudPillow': {
+        name: 'CloudPillow',
+        image: './Cards/All/CloudPillow.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: "Permanent"
+    },
+    'StormRing': {
+        name: 'StormRing',
+        image: './Cards/All/StormRing.png',
+        cardType: 'Artifact',
+        cost: 12,
+        action: false,
+        spellSchool: null,
+        subtype: "Permanent"
+    },
+    'Haste': {
+        name: 'Haste',
+        image: './Cards/All/Haste.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: null
+    },
+    'GatheringStorm': {
+        name: 'GatheringStorm',
+        image: './Cards/All/GatheringStorm.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
+        subtype: 'Area',
+        aoe: true
+    },
+    'CloudInABottle': {
+        name: 'CloudInABottle',
+        image: './Cards/All/CloudInABottle.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'ElixirOfQuickness': {
+        name: 'ElixirOfQuickness',
+        image: './Cards/All/ElixirOfQuickness.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
     },
 };
 
@@ -1371,6 +1450,11 @@ export function getCardInfo(cardName) {
     // Only add isPhysical if it exists (for spell cards)
     if (cardInfo.isPhysical !== undefined) {
         baseInfo.isPhysical = cardInfo.isPhysical;
+    }
+    
+    // Only add aoe if it exists (for spell cards)
+    if (cardInfo.aoe !== undefined) {
+        baseInfo.aoe = cardInfo.aoe;
     }
 
     // Add hero-specific properties if this is a hero card

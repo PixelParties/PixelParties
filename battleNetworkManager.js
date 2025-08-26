@@ -851,9 +851,21 @@ export class BattleNetworkManager {
                 });
                 break;
 
+            case 'cloud_pillow_effects_complete':
+                return this.battleManager.guest_handleCloudPillowEffectsComplete(data);
+
+            case 'cloud_pillow_protection':
+                return this.battleManager.guest_handleCloudPillowProtection(data);
+
             case 'dark_gear_creature_stolen':
                 import('./Artifacts/darkGear.js').then(({ handleGuestDarkGearStealing }) => {
                     handleGuestDarkGearStealing(data, this.battleManager);
+                });
+                break;
+
+            case 'storm_ring_negation':
+                import('./Artifacts/stormRing.js').then(({ handleGuestStormRingNegation }) => {
+                    handleGuestStormRingNegation(data, this.battleManager);
                 });
                 break;
 
@@ -974,6 +986,10 @@ export class BattleNetworkManager {
                 if (this.statusEffectsManager) {
                     this.statusEffectsManager.handleGuestFireshieldFrozenImmunity(data);
                 }
+                break;
+
+            case 'gathering_storm_damage':
+                bm.guest_handleGatheringStormDamage(data);
                 break;
         }
     }
@@ -1266,6 +1282,10 @@ export class BattleNetworkManager {
             bm.battleScreen.transferBurningFingerStacksToPermanent();
         }
         
+        if (bm.kazenaEffect) {
+            bm.kazenaEffect.transferCountersToFormation(bm);
+        }
+
         const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn } = data;
         
         // Update turn from the battle_end message BEFORE showing rewards

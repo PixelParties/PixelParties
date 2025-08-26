@@ -129,6 +129,13 @@ export class DamageSourceManager {
                 modifications.push(stoneskinResult.modification);
             }
         }
+
+        // Apply clouded reduction for ALL damage types (unlike stoneskin)
+        const cloudedResult = this.applyCloudedReduction(target, finalDamage);
+        finalDamage = cloudedResult.damage;
+        if (cloudedResult.modified) {
+            modifications.push(cloudedResult.modification);
+        }
         
         // Future damage modifications can be added here
         // Example: Apply magical resistance for magical damage
@@ -145,6 +152,49 @@ export class DamageSourceManager {
             modifications: modifications,
             sourceAnalysis: sourceAnalysis
         };
+    }
+    
+    /**
+     * Apply clouded damage reduction (halves all damage)
+     * @param {Object} target - The target with potential clouded status
+     * @param {number} damage - Original damage amount
+     * @returns {Object} - { damage, modified, modification }
+     */
+    applyCloudedReduction(target, damage) {
+        if (!this.battleManager.statusEffectsManager) {
+            return { damage: damage, modified: false };
+        }
+        
+        // Check if target has clouded status
+        if (!this.battleManager.statusEffectsManager.hasStatusEffect(target, 'clouded')) {
+            return { damage: damage, modified: false };
+        }
+        
+        const originalDamage = damage;
+        const reducedDamage = Math.ceil(damage / 2); // Half damage, rounded up
+        
+        if (reducedDamage < originalDamage) {
+            const reduction = originalDamage - reducedDamage;
+            
+            // Log the reduction
+            this.battleManager.addCombatLog(
+                `☁️ ${target.name}'s Clouded status reduces damage by half! (${originalDamage} → ${reducedDamage})`,
+                target.side === 'player' ? 'success' : 'info'
+            );
+            
+            return {
+                damage: reducedDamage,
+                modified: true,
+                modification: {
+                    type: 'clouded_reduction',
+                    originalDamage: originalDamage,
+                    finalDamage: reducedDamage,
+                    reduction: reduction
+                }
+            };
+        }
+        
+        return { damage: damage, modified: false };
     }
 
     // ============================================

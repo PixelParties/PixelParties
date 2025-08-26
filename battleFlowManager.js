@@ -2,13 +2,13 @@
 // Handles the main battle flow, turn processing, and actor management
 
 import CavalryCreature from './Creatures/cavalry.js';
-
-import { applyArrowStartOfBattleEffects } from './arrowSystem.js';
+import BattleStartManager from './battleStartManager.js';
 
 export class BattleFlowManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.cavalryManager = null;
+        this.battleStartManager = new BattleStartManager(battleManager);
     }
 
     // Start the battle
@@ -42,14 +42,6 @@ export class BattleFlowManager {
         bm.necromancyManager.initializeNecromancyStacks();
         bm.necromancyManager.initializeNecromancyStackDisplays();
         
-        
-        // ============================================
-        // ARROWS - UPDATED TO USE ARROW SYSTEM
-        // Each player needs to initialize their own counters
-        // ============================================
-        applyArrowStartOfBattleEffects(bm);
-
-
         // Initialize Diplomacy manager
         const { DiplomacyManager } = await import('./Abilities/diplomacy.js');
         bm.diplomacyManager = new DiplomacyManager(bm);
@@ -174,99 +166,21 @@ export class BattleFlowManager {
         }
         
         // ============================================
-        // Apply start-of-battle effects (HOST ONLY)
+        // APPLY ALL START-OF-BATTLE EFFECTS (CENTRALIZED)
         // ============================================
-        if (bm.isAuthoritative) {
+        await this.battleStartManager.applyAllStartOfBattleEffects();
+        
+        // Final visual refresh after all start effects
+        await this.battleStartManager.refreshAllVisuals();
+        
+        // ============================================
+        // CHECKPOINT #2: After all start-of-battle effects
+        // ============================================
+        if (bm.isAuthoritative && bm.checkpointSystem) {
             try {
-            // Get both players' potion states from Firebase
-                const potionStates = await bm.getBothPlayersPotionStates();
-                
-                // Let the potion handler deal with applying effects from both states
-                if (window.potionHandler && potionStates) {
-                    await window.potionHandler.applyBothPlayersPotionEffectsAtBattleStart(
-                        potionStates.host, 
-                        potionStates.guest, 
-                        bm
-                    );
-                }
-
-                if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
-                    bm.battleScreen.renderCreaturesAfterInit();
-                }
-
-                // Also update necromancy displays if boulders were added
-                if (bm.necromancyManager) {
-                    bm.necromancyManager.initializeNecromancyStackDisplays();
-                }
-
-                // Apply Diplomacy effects (creature recruitment)
-                if (bm.diplomacyManager) {
-                    await bm.diplomacyManager.applyDiplomacyEffects();
-                }
-
-                // Re-render creatures after Diplomacy effects (creatures may have moved)
-                if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
-                    bm.battleScreen.renderCreaturesAfterInit();
-                }
-
-                // Update necromancy displays if creatures were recruited
-                if (bm.necromancyManager) {
-                    bm.necromancyManager.initializeNecromancyStackDisplays();
-                }
-
-                // Apply Tharx HP bonus effects (after all creatures are in their final positions)
-                const { TharxHeroEffect } = await import('./Heroes/tharx.js');
-                TharxHeroEffect.applyTharxEffectsAtBattleStart(bm);
-
-                // Re-render creatures after Tharx effects (HP values may have changed)
-                if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
-                    bm.battleScreen.renderCreaturesAfterInit();
-                }
-
-                // Update necromancy displays after HP changes
-                if (bm.necromancyManager) {
-                    bm.necromancyManager.initializeNecromancyStackDisplays();
-                }
-
-                // Apply delayed artifact effects from both players (like Poisoned Meat)
-                const delayedEffects = await bm.getBothPlayersDelayedEffects();
-                
-                if (delayedEffects) {
-                    const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
-                    await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, bm);
-                }
-
-                if (bm.crusaderArtifactsHandler) {
-                    await bm.crusaderArtifactsHandler.applyStartOfBattleEffects();
-                }
-
-                try {
-                    const { applySnowCannonBattleEffects } = await import('./Artifacts/snowCannon.js');
-                    await applySnowCannonBattleEffects(bm);
-                } catch (error) {
-                    // Error handled silently
-                }
-
-                try {
-                    const { applyFieldStandardBattleEffects } = await import('./Artifacts/fieldStandard.js');
-                    await applyFieldStandardBattleEffects(bm);
-                } catch (error) {
-                    // Error handled silently
-                }
-                
-                // ============================================
-                // CHECKPOINT #2: After all start-of-battle effects
-                // ============================================
-                if (bm.checkpointSystem) {
-                    try {
-                        await bm.checkpointSystem.createBattleCheckpoint('effects_complete');
-                    } catch (error) {
-                        // Error handled silently
-                    }
-                }
-                
+                await bm.checkpointSystem.createBattleCheckpoint('effects_complete');
             } catch (error) {
-                bm.addCombatLog('⚠️ Some battle start effects failed to apply', 'warning');
+                // Error handled silently
             }
         }
         
@@ -299,7 +213,7 @@ export class BattleFlowManager {
             return;
         }
 
-        // ADDED: Mark that battle loop is starting
+        // Mark that battle loop is starting
         if (bm.networkManager) {
             if (bm.networkManager.battleLoopRunning) {
                 return;
@@ -356,6 +270,18 @@ export class BattleFlowManager {
                     await this.authoritative_processTurnForPosition(position);
                 
                     await bm.delay(10);
+                }
+
+                // Apply end-of-round Gathering Storm damage
+                if (bm.gatheringStormEffect && bm.gatheringStormEffect.isActive) {
+                    try {
+                        const { applyEndOfRoundGatheringStorm } = await import('./Spells/gatheringStorm.js');
+                        await applyEndOfRoundGatheringStorm(bm);
+                        await bm.delay(500);
+                        if (this.checkBattleEnd()) break;
+                    } catch (error) {
+                        console.error('Error applying end-of-round storm damage:', error);
+                    }
                 }
                 
                 // Exit if battle was paused during turn processing
@@ -609,7 +535,7 @@ export class BattleFlowManager {
             
             // Import and trigger Alice's laser effect BEFORE her actual action
             try {
-                const { AliceHeroEffect } = await import('../Heroes/alice.js');
+                const { AliceHeroEffect } = await import('./Heroes/alice.js');
                 await AliceHeroEffect.checkAliceActionEffect(originalPlayerActor.data, bm);
             } catch (error) {
                 // Error handled silently
@@ -622,7 +548,7 @@ export class BattleFlowManager {
             
             // Import and trigger Alice's laser effect BEFORE her actual action
             try {
-                const { AliceHeroEffect } = await import('../Heroes/alice.js');
+                const { AliceHeroEffect } = await import('./Heroes/alice.js');
                 await AliceHeroEffect.checkAliceActionEffect(originalOpponentActor.data, bm);
             } catch (error) {
                 // Error handled silently

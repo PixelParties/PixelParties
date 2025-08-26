@@ -16,6 +16,22 @@ export class PoisonedWellSpell {
     // Execute Poisoned Well spell effect
     async executeSpell(caster, spell) {
         console.log(`☔ ${caster.name} casting ${this.displayName}!`);
+
+        // ============================================
+        // STORM RING NEGATION CHECK
+        // ============================================
+        try {
+            const { checkStormRingNegation } = await import('../Artifacts/stormRing.js');
+            const negationResult = await checkStormRingNegation(caster, spell, this.battleManager);
+            
+            if (negationResult.negated) {
+                console.log(`⛈️ ${spell.name} was negated by Storm Ring!`);
+                return; // Spell negated - exit without executing
+            }
+        } catch (error) {
+            console.log('Storm Ring check failed, continuing with spell execution:', error);
+        }
+        
         
         // Calculate poison stacks based on DecayMagic level
         const poisonStacks = this.calculatePoisonStacks(caster);

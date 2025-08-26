@@ -429,8 +429,18 @@ class CrusaderArtifactsHandler {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(side, position1, hero2.necromancyStacks);
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(side, position2, hero1.necromancyStacks);
         }
+
+        // Notify Kazena about the swap
+        if (this.battleManager.kazenaEffect) {
+            await this.battleManager.kazenaEffect.onHeroSwap({
+                side: side,
+                position1: position1,
+                position2: position2,
+                source: 'hookshot'
+            });
+        }
         
-        // ===== NEW: SAVE TO PERSISTENCE =====
+        // ===== SAVE TO PERSISTENCE =====
         // Save the updated battle state with swapped formations
         if (this.battleManager.isAuthoritative) {
             await this.battleManager.saveBattleStateToPersistence();
@@ -766,6 +776,18 @@ class CrusaderArtifactsHandler {
         if (this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position1, hero2.necromancyStacks);
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position2, hero1.necromancyStacks);
+        }
+        
+        // ===== KAZENA INTEGRATION - ADD THIS RIGHT HERE =====
+        // Notify Kazena about the swap
+        if (this.battleManager.kazenaEffect) {
+            await this.battleManager.kazenaEffect.onHeroSwap({
+                side: localSide,
+                position1: position1,
+                position2: position2,
+                source: 'hookshot_guest',
+                originalSide: side
+            });
         }
         
         // NEW: Send acknowledgment when swap is complete

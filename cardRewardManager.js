@@ -49,7 +49,7 @@ export class CardRewardManager {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
-            'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'FrostRune', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
+            'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Ida': ['BottledFlame', 'BurningFinger', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
@@ -323,13 +323,50 @@ export class CardRewardManager {
                 setTimeout(() => notification.remove(), 300);
             }, 3000);
         }
+
+        let kazenaBonusCards = 0;
+        if (window.kazenaEffect) {
+            kazenaBonusCards = window.kazenaEffect.calculateKazenaBonusCards(heroSelection);
+        }
+
+        // Add bonus cards to hand if any
+        if (kazenaBonusCards > 0 && this.handManager) {
+            this.handManager.drawCards(kazenaBonusCards);
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.textContent = `Kazena bonus: +${kazenaBonusCards} cards!`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 25%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(135, 206, 235, 0.9);
+                color: black;
+                padding: 15px 25px;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: bold;
+                z-index: 10000;
+                animation: fadeIn 0.3s ease-out;
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
         
         // Check if this is a Hero reward turn
         const isHeroRewardTurn = currentTurn === 3 || currentTurn === 5;
         
         if (isHeroRewardTurn) {
             const rewardHeroes = this.generateHeroRewards(3);
+            
+            // TIMING FIX: Save pending rewards AFTER all bonus cards have been added to hand
             await this.savePendingRewards(rewardHeroes, true); // true = isHeroReward
+            
             // Pass gold breakdown directly to ensure it's available
             setTimeout(() => {
                 this.lastGoldBreakdown = goldBreakdown; // Restore it before display
@@ -337,7 +374,10 @@ export class CardRewardManager {
             }, 100);
         } else {
             const rewardCards = this.generateRewardCards(3);
+            
+            // TIMING FIX: Save pending rewards AFTER all bonus cards have been added to hand
             await this.savePendingRewards(rewardCards, false); // false = not hero reward
+            
             // Pass gold breakdown directly to ensure it's available
             setTimeout(() => {
                 this.lastGoldBreakdown = goldBreakdown; // Restore it before display
@@ -446,6 +486,24 @@ export class CardRewardManager {
                             <span class="gold-amount">${breakdown.sapphireBonus}</span>
                         </div>
                     ` : ''}
+
+                    <!-- Kazena Section -->
+                    ${(() => {
+                        if (window.kazenaEffect && this.heroSelection) {
+                            const kazenaBonusCards = window.kazenaEffect.calculateKazenaBonusCards(this.heroSelection);
+                            
+                            if (kazenaBonusCards > 0) {
+                                return `
+                                    <div class="gold-line-item kazena-bonus">
+                                        <span class="gold-source">Kazena Winds (${kazenaBonusCards} bonus cards)</span>
+                                        <span class="gold-arrow">→</span>
+                                        <span class="gold-amount">Cards</span>
+                                    </div>
+                                `;
+                            }
+                        }
+                        return '';
+                    })()}
 
                     <!-- Sid Card Theft Section -->
                     ${(() => {                        
@@ -2616,6 +2674,11 @@ export class CardRewardManager {
                 border-color: rgba(0, 102, 204, 0.4);
             }
 
+            .gold-line-item.kazena-bonus {
+                background: rgba(135, 206, 235, 0.1);
+                border-color: rgba(135, 206, 235, 0.4);
+            }
+
             ${SidHeroEffect.getSidStyles()}
             ${CharmeManager.getCharmeStyles()}
         `;
@@ -3081,6 +3144,13 @@ export class CardRewardManager {
                         }, 300);
                     }
                 }
+
+                // Reset Kazena
+                if (window.kazenaEffect) {
+                    window.kazenaEffect.clearAllKazenaCounters(heroSelection);
+                }
+                this.kazenaReconnectionCards = null;
+
                 
                 // Clear pending rewards from Firebase
                 await this.clearPendingRewards();
@@ -3092,7 +3162,7 @@ export class CardRewardManager {
                 if (this.heroSelection) {
                     await this.heroSelection.saveGameState();
                 }
-            // Reset actions for the new turn after selecting reward
+                // Reset actions for the new turn after selecting reward
                 if (window.heroSelection && window.heroSelection.actionManager) {
                     window.heroSelection.actionManager.resetActions();
                     
@@ -3220,6 +3290,11 @@ export class CardRewardManager {
                     // Update action display immediately
                     window.heroSelection.updateActionDisplay();
                 }
+
+                if (window.kazenaEffect) {
+                    window.kazenaEffect.clearAllKazenaCounters(heroSelection);
+                }
+                this.kazenaReconnectionCards = null;
                 
                 // Wait a moment for visual feedback
                 await new Promise(resolve => setTimeout(resolve, 1000));
@@ -3424,6 +3499,8 @@ export class CardRewardManager {
                 totalRedraws: this.totalRedraws,
                 charmeState: this.charmeManager.exportCharmeState(),
                 viewMode: this.viewMode,
+                // *** NEW: Save current hand state including bonus cards ***
+                handState: this.handManager ? this.handManager.exportHand() : null,
                 timestamp: Date.now()
             };
             
@@ -3457,6 +3534,14 @@ export class CardRewardManager {
                 const battleScreenInitialized = await this.ensureBattleScreenInitialized(heroSelection);
                 if (!battleScreenInitialized) {
                     // Still show rewards but warn user that battlefield view may not work
+                }
+                
+                // *** Restore hand state if available ***
+                if (pendingRewards.handState && this.handManager) {
+                    const handRestored = this.handManager.importHand(pendingRewards.handState);
+                    if (handRestored) {
+                        // Silent success
+                    }
                 }
                 
                 // Restore gold breakdown if available

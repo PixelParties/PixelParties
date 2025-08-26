@@ -56,7 +56,9 @@ export class BattleScreen {
         playerHand = null,
         opponentHand = null,
         playerDeck = null,
-        opponentDeck = null) {
+        opponentDeck = null,
+        playerAreaCard = null,  
+        opponentAreaCard = null) {
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -80,6 +82,8 @@ export class BattleScreen {
         this.opponentHand = opponentHand || [];
         this.playerDeck = playerDeck || [];
         this.opponentDeck = opponentDeck || [];
+        this.playerAreaCard = playerAreaCard;
+        this.opponentAreaCard = opponentAreaCard;
 
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
@@ -107,7 +111,9 @@ export class BattleScreen {
             this.playerHand,
             this.opponentHand,
             this.playerDeck,
-            this.opponentDeck
+            this.opponentDeck,
+            this.playerAreaCard,    
+            this.opponentAreaCard   
         );
     }
 
@@ -174,9 +180,10 @@ export class BattleScreen {
                 const latestPlayerEffectiveStats = this.getLatestPlayerEffectiveStats();
                 const latestPlayerHand = this.getLatestPlayerHand();
                 const latestPlayerDeck = this.getLatestPlayerDeck();
+                const latestPlayerAreaCard = this.getLatestPlayerAreaData();
 
                 // Update battle manager with latest player data
-                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment, latestPlayerHand, latestPlayerDeck);
+                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment, latestPlayerHand, latestPlayerDeck, latestPlayerAreaCard);
 
                 // Also update effective stats
                 this.playerEffectiveStats = latestPlayerEffectiveStats;
@@ -316,13 +323,28 @@ export class BattleScreen {
         return effectiveStats;
     }
 
+    getLatestPlayerAreaData() {
+        if (window.heroSelection && window.heroSelection.areaHandler) {
+            const areaCard = window.heroSelection.areaHandler.getAreaCard();
+            if (areaCard && areaCard.name === 'GatheringStorm') {
+                // Ensure counter data is preserved
+                return {
+                    ...areaCard,
+                    stormCounters: areaCard.stormCounters || 1
+                };
+            }
+            return areaCard;
+        }
+        return this.playerAreaCard;
+    }
+
     // Helper method to check if there's a hero at a position
     hasHeroAtPosition(position) {
         return this.playerFormation && this.playerFormation[position] && this.playerFormation[position] !== null;
     }
 
     // Helper method to update battle manager with latest player data
-    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment, hand = null, deck = null) {
+    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment, hand = null, deck = null, areaCard = null) {
         if (this.battleManager) {
             // Update stored data
             this.playerAbilities = abilities;
@@ -335,6 +357,9 @@ export class BattleScreen {
             if (deck !== null) {
                 this.playerDeck = deck;
             }
+            if (areaCard !== null) {
+                this.playerAreaCard = areaCard;
+            }
             
             // Update battle manager references
             this.battleManager.playerAbilities = abilities;
@@ -346,6 +371,9 @@ export class BattleScreen {
             }
             if (deck !== null) {
                 this.battleManager.playerDeck = deck;
+            }
+            if (areaCard !== null) {
+                this.battleManager.playerAreaCard = areaCard;
             }
         }
     }

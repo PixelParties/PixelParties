@@ -38,6 +38,8 @@ export class PotionHandler {
             'BoulderInABottle',
             'SwordInABottle',
             'AcidVial',
+            'ElixirOfQuickness',
+            'CloudInABottle', 
         ];
         
         return knownPotions.includes(cardName);
@@ -77,10 +79,42 @@ export class PotionHandler {
                 heroSelection.handManager.removeCardFromHandByIndex(cardIndex);
             }
 
-            // Add potion effect to active effects list
+            // ===== SPECIAL HANDLING FOR ELIXIR OF QUICKNESS =====
+            if (cardName === 'ElixirOfQuickness') {
+                // ElixirOfQuickness: Draw 2 cards instead of 1, no battle effects
+                if (heroSelection.handManager && heroSelection.deckManager) {
+                    const drawnCards = heroSelection.handManager.drawCards(2); // Draw 2 cards instead of 1
+                    
+                    if (drawnCards.length > 0) {
+                        console.log(`Drew ${drawnCards.length} cards after using ElixirOfQuickness: ${drawnCards.join(', ')}`);
+                    } else {
+                        console.log('No cards available to draw after using ElixirOfQuickness');
+                    }
+                }
+
+                // Show special usage notification for ElixirOfQuickness
+                this.showPotionUsage(cardName);
+
+                // Update UI displays
+                if (heroSelection.updateHandDisplay) {
+                    heroSelection.updateHandDisplay();
+                }
+                this.updatePotionDisplay();
+
+                // Save game state
+                if (heroSelection.autoSave) {
+                    await heroSelection.autoSave();
+                }
+
+                console.log('ElixirOfQuickness used successfully - drew extra card, no battle effects added');
+                return true;
+            }
+
+            // ===== NORMAL POTION HANDLING (ALL OTHER POTIONS) =====
+            // Add potion effect to active effects list for battle
             this.addPotionEffect(cardName);
 
-            // Draw a card from deck
+            // Draw 1 card from deck (normal potion behavior)
             if (heroSelection.handManager && heroSelection.deckManager) {
                 const drawnCards = heroSelection.handManager.drawCards(1);
                 
@@ -343,11 +377,65 @@ export class PotionHandler {
 
             case 'MonsterInABottle':
                 return await this.handleMonsterInABottleEffects(effects, playerRole, battleManager);
+
+            case 'CloudInABottle':
+                return await this.handleCloudInABottleEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
                 console.log(`No battle effect defined for potion: ${potionName}`);
                 return 0;
+        }
+    }
+
+    async handleCloudInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the CloudInABottle module
+            const { CloudInABottlePotion } = await import('./Potions/cloudInABottle.js');
+            const cloudInABottlePotion = new CloudInABottlePotion();
+            
+            // Delegate everything to the CloudInABottle module
+            const effectsProcessed = await cloudInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`☁️ CloudInABottle delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating CloudInABottle effects for ${playerRole}:`, error);
+            
+            // Fallback: try basic clouded application
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            const cloudedStacks = 1 * effectCount;
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive && battleManager.statusEffectsManager) {
+                    // Apply clouded status effect
+                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'clouded', cloudedStacks);
+                    fallbackTargets++;
+                    
+                    // Apply to creatures too
+                    if (hero.creatures) {
+                        hero.creatures.forEach(creature => {
+                            if (creature.alive) {
+                                battleManager.statusEffectsManager.applyStatusEffect(creature, 'clouded', cloudedStacks);
+                                fallbackTargets++;
+                            }
+                        });
+                    }
+                }
+            }
+            
+            battleManager.addCombatLog(`☁️ Cloud in a Bottle effects applied (+${cloudedStacks} clouded stacks to ${fallbackTargets} targets)`, 'info');
+            return effectCount;
         }
     }
 

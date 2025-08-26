@@ -282,11 +282,11 @@ export class ReconnectionManager {
                     gameState.hostDelayedArtifactEffects,
                     gameState.hostSemiState,
                     gameState.hostPermanentArtifacts,
-                    gameState.hostPermanentArtifacts,
+                    gameState.guestPermanentArtifacts,
                     gameState.hostMagicSapphiresUsed,
-                    gameState.hostMagicRubiesUsed
-                );
-                
+                    gameState.hostMagicRubiesUsed,
+                    gameState.hostAreaCard
+                );                
             } else if (!this.isHost && gameState.guestSelected) {                
                 this.heroSelection.selectedCharacter = gameState.guestSelected;
                 
@@ -321,10 +321,22 @@ export class ReconnectionManager {
                     gameState.guestDelayedArtifactEffects,
                     gameState.guestSemiState,
                     gameState.guestPermanentArtifacts,
-                    gameState.guestPermanentArtifacts,
+                    gameState.hostPermanentArtifacts, 
                     guestMagicSapphireValue,
-                    guestMagicRubyValue
+                    guestMagicRubyValue,
+                    gameState.guestAreaCard
                 );
+            }
+                
+            if (gameState.hostAreaCard || gameState.guestAreaCard) {
+                console.log('🌍 Area card data found in gameState, verifying restoration...');
+                const currentAreaCard = this.heroSelection.areaHandler.getAreaCard();
+                console.log('🌍 Current area card after restoration:', currentAreaCard);
+                
+                // Force UI update for area slot
+                setTimeout(() => {
+                    this.heroSelection.updateBattleFormationUI();
+                }, 100);
             }
 
             // Update restoration progress

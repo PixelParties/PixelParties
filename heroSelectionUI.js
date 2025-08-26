@@ -170,7 +170,6 @@ export class HeroSelectionUI {
         this.showHeroSpellbookTooltip(position, element);
     }
 
-
     // Updated showHeroSpellbookTooltip method with hero-only persistence
     showHeroSpellbookTooltip(position, heroElement) {
         // Prevent tooltips during any drag operation
@@ -1140,12 +1139,12 @@ export class HeroSelectionUI {
     }
 
     // Create team building slot HTML
-    createTeamSlotHTML(position, character = null, createCharacterCardFn, heroAbilitiesManager = null) {
+    createTeamSlotHTML(position, character = null, createCharacterCardFn = null, heroAbilitiesManager = null) {
         const slotClass = character ? 'team-slot filled' : 'team-slot empty';
         
         // Create character HTML WITHOUT tooltip events (we'll handle them at the slot level)
         const characterHTML = character ? 
-            this.createCharacterCardHTML(character, false, false, false, true, position, true, heroAbilitiesManager) : 
+            this.createCharacterCardHTML(character, false, false, false, true, position, true, heroAbilitiesManager || window.heroSelection?.heroAbilitiesManager) : 
             '<div class="slot-placeholder">Empty Slot</div>';
         
         // Add mouse events at the slot level
@@ -1230,31 +1229,72 @@ export class HeroSelectionUI {
         return fullHTML;
     }
 
-    // Generate team building screen HTML
-    generateTeamBuildingHTML(selectedCharacter, battleFormation, deckGrid, handDisplay, lifeDisplay, goldDisplay, createTeamSlotFn) {
-        if (!selectedCharacter) {
-            return '<div class="loading-heroes"><h2>⏱ No character selected</h2></div>';
+    // Generate team building screen HTML - CONSOLIDATED VERSION
+    generateTeamBuildingHTML() {
+        if (!window.heroSelection?.selectedCharacter) {
+            return '<div class="loading-heroes"><h2>No character selected</h2></div>';
         }
 
-        const leftSlot = createTeamSlotFn('left', battleFormation.left);
-        const centerSlot = createTeamSlotFn('center', battleFormation.center);
-        const rightSlot = createTeamSlotFn('right', battleFormation.right);
+        // Get the battle formation
+        const battleFormation = window.heroSelection.formationManager.getBattleFormation();
+        
+        // Create the area slot using AreaHandler
+        const areaSlot = window.heroSelection.areaHandler ? 
+            window.heroSelection.areaHandler.createAreaSlotHTML() : 
+            '<div class="area-slot empty"><div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div></div>';
+        
+        // Create the hero team slots
+        const leftSlot = this.createTeamSlotHTML('left', battleFormation.left);
+        const centerSlot = this.createTeamSlotHTML('center', battleFormation.center);
+        const rightSlot = this.createTeamSlotHTML('right', battleFormation.right);
+        
+        // Create life display
+        const lifeDisplay = window.heroSelection.lifeManager.createLifeDisplay();
+        
+        const permanentArtifactsIndicator = this.createPermanentArtifactsIndicator();
 
+        // Create hand display
+        const handDisplay = window.heroSelection.handManager.createHandDisplay(
+            (cardName) => window.heroSelection.formatCardName(cardName)
+        );
+        
+        // Create deck grid
+        const deckGrid = window.heroSelection.deckManager.createDeckGrid(
+            (cardName) => window.heroSelection.formatCardName(cardName)
+        );
+        
+        // Create gold display
+        const goldDisplay = window.heroSelection.goldManager.createGoldDisplay();
+        
+        // Create action display
+        const actionDisplay = window.heroSelection.actionManager.createActionDisplay();
+        
+        // Create potion display
+        const potionDisplay = window.potionHandler ? window.potionHandler.createPotionDisplay() : '';
+        
+        setTimeout(() => this.refreshHeroStats(), 200);
+        
         return `
             ${lifeDisplay}
+            ${permanentArtifactsIndicator}
             <div class="team-building-container">
                 <!-- Left Column - Team Formation -->
                 <div class="team-building-left">
                     <div class="team-header" style="text-align: center;">
-                        <h2>🛡️ Your Battle Formation</h2>
+                        <div class="team-header-title" style="text-align: center;">
+                            <h2>🛡️ Your Battle Formation</h2>
+                            ${window.heroSelection.globalSpellManager.isGuardChangeModeActive() ? 
+                            '<div class="guard-change-indicator">Guard Change Active</div>' : 
+                            ''}
+                        </div>
                         <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
-                        <p class="drag-hint">🎯 Drag Abilities to a Hero slot to attach them!</p>
-                        <p class="drag-hint">📜 Drag Spell to Heroes to add them to their Spellbook!</p>
-                        <p class="drag-hint">⚔️ Drag Equip Artifacts to Heroes to equip them!</p> <!-- NEW -->
+                        <p class="drag-hint">🎯 Drag cards onto a Hero slot to attach them!</p>
                         <p class="drag-hint">🐾 Drag and drop Creatures to reorder them within the same Hero!</p>
+                        <p class="drag-hint">🌍 Drag Area cards to the Area zone!</p>
                     </div>
                     
                     <div class="team-slots-container">
+                        ${areaSlot}
                         ${leftSlot}
                         ${centerSlot}
                         ${rightSlot}
@@ -1267,29 +1307,62 @@ export class HeroSelectionUI {
                 </div>
                 
                 <!-- Right Column - Player's Deck -->
-                <div class="team-building-right">
-                    ${deckGrid}
+                <div class="team-building-right-wrapper">
+                    <!-- Tooltip Container - now a sibling, not a child -->
+                    <div class="deck-tooltip-anchor" id="deckTooltipAnchor">
+                        <div class="deck-tooltip-content" id="deckTooltipContent" style="display: none;">
+                            <!-- Tooltip content will be inserted here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Deck Container -->
+                    <div class="team-building-right">
+                        ${deckGrid}
+                    </div>
                 </div>
                 
+                <!-- Gold, Action, and Potion Display - positioned together -->
+                <div class="resource-display-container">
+                    <div class="resource-top-row">
+                        ${goldDisplay}
+                        ${potionDisplay}
+                    </div>
+                    <div class="resource-bottom-row">
+                        ${actionDisplay}
+                    </div>
+                </div>
             </div>
         `;
     }
 
     // Update the battle formation UI after drag/drop
-    updateBattleFormationUI(battleFormation, createTeamSlotFn) {
+    updateBattleFormationUI() {
         const teamSlotsContainer = document.querySelector('.team-slots-container');
-        if (teamSlotsContainer) {
+        if (teamSlotsContainer && window.heroSelection) {
+            const battleFormation = window.heroSelection.formationManager.getBattleFormation();
+            
+            // Create area slot using AreaHandler
+            const areaSlot = window.heroSelection.areaHandler ? 
+                window.heroSelection.areaHandler.createAreaSlotHTML() : 
+                '<div class="area-slot empty"><div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div></div>';
+            
             teamSlotsContainer.innerHTML = `
-                ${createTeamSlotFn('left', battleFormation.left)}
-                ${createTeamSlotFn('center', battleFormation.center)}
-                ${createTeamSlotFn('right', battleFormation.right)}
+                ${areaSlot}
+                ${this.createTeamSlotHTML('left', battleFormation.left)}
+                ${this.createTeamSlotHTML('center', battleFormation.center)}
+                ${this.createTeamSlotHTML('right', battleFormation.right)}
             `;
             
             // Update hero stats after UI refresh
             setTimeout(() => {
-                this.updateAllHeroStats();
-            }, 50); // Small delay to ensure DOM is updated
+                this.refreshHeroStats();
+            }, 50);
         }
+    }
+
+    // Refresh hero stats - delegated method
+    refreshHeroStats() {
+        this.updateAllHeroStats();
     }
 }
 
@@ -2078,7 +2151,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Only handle creature drags
     if (!creatureDragState.isDragging) {
-        console.log('⌐ Global creatureDragState.isDragging is false, returning');
+        console.log('⚠ Global creatureDragState.isDragging is false, returning');
         return false;
     }
     
@@ -2088,7 +2161,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Allow drops within same hero OR if Guard Change mode is active
     if (!isSameHero && !isGuardChangeActive) {
-        console.log('⌐ Cannot move creature to different hero - Guard Change mode not active');
+        console.log('⚠ Cannot move creature to different hero - Guard Change mode not active');
         return false;
     }
     
@@ -2097,7 +2170,7 @@ async function onCreatureContainerDrop(event, heroPosition) {
         const hasTargetHero = window.heroSelection.heroCreatureManager.hasHeroAtPosition(heroPosition);
         console.log('🔍 hasTargetHero:', hasTargetHero);
         if (!hasTargetHero) {
-            console.log(`⌐ Cannot move creature to ${heroPosition} - no hero at that position`);
+            console.log(`⚠ Cannot move creature to ${heroPosition} - no hero at that position`);
             return false;
         }
     }
@@ -2137,13 +2210,13 @@ async function onCreatureContainerDrop(event, heroPosition) {
                 console.log(`🛡️ Guard Change: Successfully moved creature from ${creatureDragState.draggedFromHero} to ${heroPosition}`);
             }
         } else {
-            console.log('⌐ Move failed');
+            console.log('⚠ Move failed');
         }
         
         return success;
     }
     
-    console.log('⌐ No heroSelection or heroCreatureManager found');
+    console.log('⚠ No heroSelection or heroCreatureManager found');
     return false;
 }
 
@@ -2342,7 +2415,7 @@ window.toggleHeroSpell = function(heroPosition, spellIndex) {
     console.log(`🎯 Toggling spell at ${heroPosition}[${spellIndex}]`);
     
     if (!window.heroSelection || !window.heroSelection.heroSpellbookManager) {
-        console.error('⌐ Hero selection or spellbook manager not available');
+        console.error('⚠ Hero selection or spellbook manager not available');
         return;
     }
     
@@ -2350,7 +2423,7 @@ window.toggleHeroSpell = function(heroPosition, spellIndex) {
     const newState = window.heroSelection.heroSpellbookManager.toggleSpellEnabled(heroPosition, spellIndex);
     
     if (newState !== false && newState !== true) {
-        console.error('⌐ Failed to toggle spell');
+        console.error('⚠ Failed to toggle spell');
         return;
     }
     
@@ -3032,3 +3105,5 @@ if (typeof document !== 'undefined' && !document.getElementById('abilityErrorSty
     `;
     document.head.appendChild(style);
 }
+
+export default HeroSelectionUI;

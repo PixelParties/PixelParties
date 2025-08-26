@@ -30,6 +30,7 @@ import RoyalCorgiCreature from './Creatures/royalCorgi.js';
 import GrinningCatCreature from './Creatures/grinningCat.js';
 
 import { MoniaHeroEffect } from './Heroes/monia.js';
+import { kazenaEffect } from './Heroes/kazena.js';
 
 
 export class BattleManager {
@@ -46,6 +47,10 @@ export class BattleManager {
         this.goldManager = null;
         this.onBattleEnd = null;
         this.turnInProgress = false;
+
+        // Area storage
+        this.playerAreaCard = null;
+        this.opponentAreaCard = null;
         
         // Ability data storage
         this.playerAbilities = null;
@@ -97,8 +102,7 @@ export class BattleManager {
         
         // Individual cards
         this.crusaderArtifactsHandler = null;
-        
-
+        this.kazenaEffect = null;
 
 
 
@@ -313,7 +317,9 @@ export class BattleManager {
         playerHand = null,
         opponentHand = null,
         playerDeck = null,
-        opponentDeck = null) {
+        opponentDeck = null,
+        playerAreaCard = null,
+        opponentAreaCard = null) {
         
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;
@@ -357,6 +363,8 @@ export class BattleManager {
         this.opponentCreatures = opponentCreatures;
         this.playerEquips = playerEquips;
         this.opponentEquips = opponentEquips;
+        this.playerAreaCard = playerAreaCard;
+        this.opponentAreaCard = opponentAreaCard;
         
         // Store effective stats
         this.playerEffectiveStats = playerEffectiveStats;
@@ -404,6 +412,11 @@ export class BattleManager {
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
         this.crusaderArtifactsHandler.initBattleEffects(this);
+        
+        // Initialize Kazena Effect
+        this.kazenaEffect = kazenaEffect;
+        this.kazenaEffect.init(this);
+        window.kazenaEffect = kazenaEffect;
     }
 
     setBattleSpeed(speed) {
@@ -1170,6 +1183,11 @@ export class BattleManager {
             this.totalDamageDealt[hero.absoluteSide] = 0;
         }
         this.totalDamageDealt[hero.absoluteSide] += finalDamage;
+
+        // Process clouded stack removal after damage is applied  
+        if (this.statusEffectsManager && finalDamage > 0) {
+            this.statusEffectsManager.processCloudedAfterDamage(creature, finalDamage);
+        }
         
         this.addCombatLog( 
             `🩸 ${creature.name} takes ${finalDamage} damage! (${oldHp} → ${creature.currentHp} HP)`,
@@ -1775,6 +1793,20 @@ export class BattleManager {
         });
     }
 
+    guest_handleCloudPillowEffectsComplete(data) {
+        import('./Artifacts/cloudPillow.js').then(({ handleGuestCloudPillowEffects }) => {
+            handleGuestCloudPillowEffects(data, this);
+        }).catch(error => {
+        });
+    }
+
+    guest_handleCloudPillowProtection(data) {
+        import('./Artifacts/cloudPillow.js').then(({ handleGuestCloudPillowProtection }) => {
+            handleGuestCloudPillowProtection(data, this);
+        }).catch(error => {
+        });
+    }
+
     guest_handleFieldStandardEffectsComplete(data) {
         import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardEffects }) => {
             handleGuestFieldStandardEffects(data, this);
@@ -1994,6 +2026,24 @@ export class BattleManager {
     guest_handleStoneskinDamageReduction(data) {
         if (this.damageSourceManager) {
             this.damageSourceManager.handleGuestStoneskinReduction(data);
+        }
+    }
+
+
+
+    guest_handleGatheringStormDamage(data) {
+        if (this.isAuthoritative) {
+            return;
+        }
+
+        try {
+            import('./Spells/gatheringStorm.js').then(({ handleGuestGatheringStormDamage }) => {
+                handleGuestGatheringStormDamage(data, this);
+            }).catch(error => {
+                console.error('Error handling guest gathering storm:', error);
+            });
+        } catch (error) {
+            console.error('Error importing gathering storm handler:', error);
         }
     }
 
@@ -2468,6 +2518,10 @@ export class BattleManager {
         
         // Transfer burning finger stacks from battle heroes to permanent heroes
         this.battleScreen.transferBurningFingerStacksToPermanent();
+        
+        if (this.kazenaEffect) {
+            this.kazenaEffect.transferCountersToFormation(this);
+        }
 
         this.battleActive = false;
         
@@ -2929,6 +2983,18 @@ export class BattleManager {
             this.crumTheClassPetManager.cleanup();
             this.crumTheClassPetManager = null;
         }
+
+
+
+        // Area cleanups
+        
+        if (this.gatheringStormEffect) {
+            this.gatheringStormEffect.cleanup();
+            this.gatheringStormEffect = null;
+        }
+
+
+
 
         // ===== RESTORE OVERHEAT EQUIPMENT AFTER BATTLE =====
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Overheat')) {
@@ -3516,6 +3582,16 @@ export class BattleManager {
             this.diplomacyManager.cleanup();
             this.diplomacyManager = null;
         }
+
+
+        
+        // Area cleanups
+        
+        if (this.gatheringStormEffect) {
+            this.gatheringStormEffect.cleanup();
+            this.gatheringStormEffect = null;
+        }
+
         
 
         // Cleanup Creature managers

@@ -333,7 +333,7 @@ export class TheStormbladeEffect {
         }
         
         // ===== SWAP RESISTANCE STACKS =====
-        // NEW: Swap resistance stacks so they follow the heroes
+        // Swap resistance stacks so they follow the heroes
         if (this.battleManager.resistanceManager) {
             this.battleManager.resistanceManager.swapResistanceStacks(side, position1, position2);
             console.log(`🌪️ Swapped resistance stacks between ${position1} and ${position2}`);
@@ -356,6 +356,20 @@ export class TheStormbladeEffect {
         if (this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(side, position1, hero2.necromancyStacks);
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(side, position2, hero1.necromancyStacks);
+        }
+
+        // Notify Kazena about the swap
+        if (this.battleManager.kazenaEffect) {
+            console.log(`🌪️ [DEBUG] Notifying Kazena about Stormblade swap: ${side} ${position1}<->${position2}`);
+            await this.battleManager.kazenaEffect.onHeroSwap({
+                side: side,
+                position1: position1,
+                position2: position2,
+                source: 'stormblade'
+            });
+            console.log(`🌪️ [DEBUG] Kazena swap notification completed`);
+        } else {
+            console.log(`🌪️ [DEBUG] No kazenaEffect available to notify about swap`);
         }
         
         // ===== SAVE TO PERSISTENCE =====
@@ -754,7 +768,19 @@ export class TheStormbladeEffect {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(localSide, position2, hero1.necromancyStacks);
         }
         
-        // NEW: Send acknowledgment when swap is complete
+        // ===== KAZENA INTEGRATION - ADD THIS =====
+        // Notify Kazena about the swap (guest receives swap notification, so Kazena should trigger)
+        if (this.battleManager.kazenaEffect) {
+            await this.battleManager.kazenaEffect.onHeroSwap({
+                side: localSide,
+                position1: position1,
+                position2: position2,
+                source: 'stormblade_guest',
+                originalSide: side // Keep track of which side was actually swapped in the original event
+            });
+        }
+        
+        // Send acknowledgment when swap is complete
         if (swapData && swapData.swapId) {
             this.battleManager.sendAcknowledgment('wind_swap_' + swapData.swapId);
         }

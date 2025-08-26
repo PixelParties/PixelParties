@@ -49,6 +49,15 @@ export class StatusEffectsManager {
                 visual: 'immortal_halo',
                 description: 'When dying without heal-block, revive with 100 HP and consume 1 stack.'
             },
+            clouded: {
+                name: 'clouded',
+                displayName: 'Clouded',
+                type: 'buff',
+                targetTypes: ['hero', 'creature'], // Both heroes and creatures can be clouded
+                persistent: false, // Decreases when taking damage
+                visual: 'cloud_aura',
+                description: 'Takes half damage from any source. Reduces by 1 stack after taking damage.'
+            },
             silenced: {
                 name: 'silenced',
                 displayName: 'Silenced',
@@ -75,6 +84,15 @@ export class StatusEffectsManager {
                 persistent: false, // Decreases when skipping turns
                 visual: 'stun_stars',
                 description: 'Skips turns. Reduces by 1 stack when turn is skipped.'
+            },
+            dazed: {
+                name: 'dazed',
+                displayName: 'Dazed',
+                type: 'debuff',
+                targetTypes: ['hero'],
+                persistent: false, // Decreases every turn
+                visual: 'daze_swirl',
+                description: 'Skips turns. Reduces by 1 stack when turn is skipped. Negates Kazena passive effects.'
             },
             burned: {
                 name: 'burned',
@@ -908,6 +926,7 @@ export class StatusEffectsManager {
             stunned: { icon: '😵', color: 'rgba(255, 255, 0, 0.9)' },
             burned: { icon: '🔥', color: 'rgba(255, 100, 0, 0.9)' },
             frozen: { icon: '🧊', color: 'rgba(100, 200, 255, 0.9)' },
+            dazed: { icon: '😵‍💫', color: 'rgba(200, 150, 255, 0.9)' },
             taunting: { icon: '📢', color: 'rgba(255, 107, 107, 0.9)' },
             healblock: { icon: '🚫', color: 'rgba(220, 53, 69, 0.9)' },
             weakened: { icon: '↓', color: 'rgba(220, 53, 69, 0.9)' }
@@ -964,11 +983,13 @@ export class StatusEffectsManager {
         const indicators = {
             stoneskin: { icon: '🗿', color: '#8B4513' },
             immortal: { icon: '✨', color: '#ffd700' },
+            clouded: { icon: '☁️', color: '#87ceeb' } ,
             silenced: { icon: '🔇', color: '#808080' },
             poisoned: { icon: '☠️', color: '#800080' },
             stunned: { icon: '😵', color: '#ffff00' },
             burned: { icon: '🔥', color: '#ff6400' },
             frozen: { icon: '🧊', color: '#64c8ff' },
+            dazed: { icon: '😵‍💫', color: '#c896ff' },
             taunting: { icon: '📢', color: '#ff6b6b' },
             healblock: { icon: '🚫', color: '#dc3545' },
             weakened: { icon: '↓', color: '#dc3545' }
@@ -1286,6 +1307,31 @@ export class StatusEffectsManager {
                 background: #dc3545 !important;
                 border-color: rgba(220, 53, 69, 0.8) !important;
             }
+
+            @keyframes dazedSwirl {
+                0%, 100% { 
+                    transform: translateX(-50%) scale(1) rotate(0deg);
+                    color: #c896ff;
+                }
+                25% { 
+                    transform: translateX(-50%) scale(1.05) rotate(90deg);
+                    color: #e6b3ff;
+                }
+                50% { 
+                    transform: translateX(-50%) scale(1.1) rotate(180deg);
+                    color: #c896ff;
+                }
+                75% { 
+                    transform: translateX(-50%) scale(1.05) rotate(270deg);
+                    color: #e6b3ff;
+                }
+            }
+
+            .status-indicator-dazed {
+                animation: dazedSwirl 3s ease-in-out infinite !important;
+                background: #c896ff !important;
+                border-color: rgba(200, 150, 255, 0.8) !important;
+            }
         `;
         
         document.head.appendChild(style);
@@ -1382,6 +1428,28 @@ export class StatusEffectsManager {
         
         if (beforeCount !== afterCount) {
             console.log(`🧹 Cleaned up ${beforeCount - afterCount} expired status effects from ${target.name}`);
+        }
+    }
+
+    /**
+     * Process clouded stack removal after taking damage
+     * @param {Object} target - The target that took damage
+     * @param {number} damageAmount - Amount of damage taken (for logging)
+     */
+    processCloudedAfterDamage(target, damageAmount) {
+        if (!this.hasStatusEffect(target, 'clouded')) {
+            return;
+        }
+        
+        // Remove 1 stack of clouded
+        this.removeStatusEffect(target, 'clouded', 1);
+        
+        // Log if clouded is completely removed
+        if (!this.hasStatusEffect(target, 'clouded')) {
+            this.battleManager.addCombatLog(
+                `☁️ ${target.name}'s Clouded protection fades away!`,
+                target.side === 'player' ? 'info' : 'success'
+            );
         }
     }
 

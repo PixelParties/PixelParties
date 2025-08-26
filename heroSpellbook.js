@@ -82,6 +82,12 @@ export class HeroSpellbookManager {
             return false;
         }
 
+        // NEW RULE: Check if spell has "Area" subtype - Heroes cannot learn Area spells
+        if (cardInfo.subtype === 'Area') {
+            console.error(`Card ${spellCardName} cannot be learned by heroes (Area subtype spells are restricted)`);
+            return false;
+        }
+
         // Add the full card info to the spellbook with enabled state
         this.heroSpellbooks[heroPosition].push({
             ...cardInfo,
@@ -136,6 +142,29 @@ export class HeroSpellbookManager {
 
         // Return enabled state (default to true for backward compatibility)
         return spellbook[spellIndex].enabled !== false;
+    }
+
+    // Check if a hero can learn a specific spell (NEW: includes Area restriction)
+    canHeroLearnSpell(heroPosition, spellCardName) {
+        if (!this.hasHeroAtPosition(heroPosition)) {
+            return { canLearn: false, reason: 'No hero at this position' };
+        }
+
+        const cardInfo = getCardInfo(spellCardName);
+        if (!cardInfo) {
+            return { canLearn: false, reason: 'Card not found in database' };
+        }
+
+        if (cardInfo.cardType !== 'Spell') {
+            return { canLearn: false, reason: 'Card is not a Spell' };
+        }
+
+        // Check for Area subtype restriction
+        if (cardInfo.subtype === 'Area') {
+            return { canLearn: false, reason: 'Heroes cannot learn Area spells' };
+        }
+
+        return { canLearn: true, reason: 'Spell can be learned' };
     }
 
     // Remove a spell from a hero's spellbook by index
@@ -233,6 +262,33 @@ export class HeroSpellbookManager {
         return total;
     }
 
+    // Get statistics about learnable vs non-learnable spells (NEW)
+    getSpellRestrictionStats() {
+        const allCardNames = Object.keys(window.heroSelection?.cardDatabase || {});
+        const spellCards = allCardNames.filter(cardName => {
+            const cardInfo = getCardInfo(cardName);
+            return cardInfo && cardInfo.cardType === 'Spell';
+        });
+        
+        const areaSpells = spellCards.filter(cardName => {
+            const cardInfo = getCardInfo(cardName);
+            return cardInfo && cardInfo.subtype === 'Area';
+        });
+        
+        const learnableSpells = spellCards.filter(cardName => {
+            const cardInfo = getCardInfo(cardName);
+            return cardInfo && cardInfo.subtype !== 'Area';
+        });
+        
+        return {
+            totalSpells: spellCards.length,
+            areaSpells: areaSpells.length,
+            learnableSpells: learnableSpells.length,
+            restrictedSpells: areaSpells,
+            restriction: 'Heroes cannot learn Area spells'
+        };
+    }
+
     // Export state for saving
     exportSpellbooksState() {
         // Deep copy the spellbooks (enabled state will be included automatically)
@@ -256,7 +312,16 @@ export class HeroSpellbookManager {
         const validPositions = ['left', 'center', 'right'];
         for (const position of validPositions) {
             if (state.heroSpellbooks[position] && Array.isArray(state.heroSpellbooks[position])) {
-                this.heroSpellbooks[position] = state.heroSpellbooks[position].map(spell => {
+                // Filter out any Area spells that might have been saved before this restriction
+                const filteredSpells = state.heroSpellbooks[position].filter(spell => {
+                    if (spell.subtype === 'Area') {
+                        console.warn(`Removing Area spell "${spell.name}" from ${position} hero during state import (now restricted)`);
+                        return false;
+                    }
+                    return true;
+                });
+                
+                this.heroSpellbooks[position] = filteredSpells.map(spell => {
                     // Ensure backward compatibility for spells without enabled property
                     return {
                         ...spell,

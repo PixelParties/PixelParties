@@ -822,6 +822,11 @@ export class BattleCombatManager {
             console.error(`⚠️ Target HP became NaN after damage! Target: ${target.name}, Old HP: ${oldHp}, Damage: ${finalDamage}`);
             target.currentHp = Math.max(0, oldHp - finalDamage); // Fallback calculation
         }
+
+        // Process clouded stack removal after damage is applied
+        if (this.battleManager.statusEffectsManager && finalDamage > 0) {
+            this.battleManager.statusEffectsManager.processCloudedAfterDamage(target, finalDamage);
+        }
         
         // Create damage number visual
         if (target.type === 'hero' || !target.type) {

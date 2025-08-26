@@ -15,8 +15,30 @@ export class RainOfArrowsSpell {
      * @returns {Promise} - Effect completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // ============================================
+        // STORM RING NEGATION CHECK
+        // ============================================
+        try {
+            // Create a mock spell object for the Storm Ring check
+            const mockSpell = {
+                name: this.spellName,
+                spellSchool: 'Fighting'
+            };
+            
+            const { checkStormRingNegation } = await import('../Artifacts/stormRing.js');
+            const negationResult = await checkStormRingNegation(attacker, mockSpell, this.battleManager);
+            
+            if (negationResult.negated) {
+                console.log(`⛈️ ${this.spellName} was negated by Storm Ring!`);
+                return; // Effect negated - exit without executing
+            }
+        } catch (error) {
+            console.log('Storm Ring check failed, continuing with spell execution:', error);
+        }
+        // ============================================
+
         this.battleManager.addCombatLog(
-            `🏹 ${attacker.name}'s Rain of Arrows darkens the sky!`,
+            `� ${attacker.name}'s Rain of Arrows darkens the sky!`,
             attacker.side === 'player' ? 'success' : 'error'
         );
 

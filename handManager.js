@@ -1,4 +1,4 @@
-// handManager.js - Enhanced Hand Management with Exclusive Artifact Support
+// handManager.js - Enhanced Hand Management with Exclusive Artifact Support and Card Disenchanting
 
 import { artifactHandler } from './artifactHandler.js';
 import { globalSpellManager } from './globalSpellManager.js';
@@ -22,11 +22,11 @@ export class HandManager {
 
         // ===== TEST HELPER FLAGS =====
         // Set to false to disable test functionality completely
-        this.ENABLE_TEST_HELPERS = false;
+        this.ENABLE_TEST_HELPERS = true;
         // Set to false if you only want to disable the auto-add feature
         this.AUTO_ADD_TEST_CARD = true;
         // The test card to add
-        this.TEST_CARD_NAME = 'Wheels';
+        this.TEST_CARD_NAME = 'GatheringStorm';
     }
 
     // ===== TEST HELPER FUNCTION =====
@@ -39,7 +39,7 @@ export class HandManager {
 
         // Check if we have room in hand
         if (this.hand.length >= this.maxHandSize) {
-            console.warn('❌ TEST: Cannot add test card - hand is full');
+            console.warn('⌛ TEST: Cannot add test card - hand is full');
             return false;
         }
 
@@ -49,9 +49,169 @@ export class HandManager {
             console.log(`🧪 TEST: Added "${this.TEST_CARD_NAME}" to hand for testing`);
             return true;
         } else {
-            console.warn(`❌ TEST: Failed to add "${this.TEST_CARD_NAME}" to hand`);
+            console.warn(`⌛ TEST: Failed to add "${this.TEST_CARD_NAME}" to hand`);
             return false;
         }
+    }
+
+    // === CARD DISENCHANTING FEATURE ===
+
+    // Method to handle card disenchanting (right-click removal for gold)
+    async disenchantCard(cardIndex, cardName, cardElement) {
+        // Check if entire hand is disabled due to exclusive artifact
+        if (window.artifactHandler && window.artifactHandler.isExclusiveArtifactActive()) {
+            const activeExclusive = window.artifactHandler.getActiveExclusiveArtifact();
+            const formattedName = this.formatCardName(activeExclusive);
+            showHandDisabledError(`Hand is disabled while ${formattedName} is active`, window.event);
+            return false;
+        }
+
+        // Validate inputs
+        if (cardIndex < 0 || cardIndex >= this.hand.length) {
+            console.warn('Invalid card index for disenchanting');
+            return false;
+        }
+
+        if (this.hand[cardIndex] !== cardName) {
+            console.warn('Card name mismatch during disenchanting');
+            return false;
+        }
+
+        try {
+            // Play dust animation before removing the card
+            await this.playDisenchantAnimation(cardElement, cardName);
+            
+            // Remove the card from hand
+            const removedCard = this.removeCardFromHandByIndex(cardIndex);
+            
+            if (removedCard) {
+                // Award 2 gold to the player
+                if (window.heroSelection && window.heroSelection.goldManager) {
+                    window.heroSelection.goldManager.addPlayerGold(2, 'card_disenchant');
+                }
+                
+                // Show success feedback
+                this.showDisenchantFeedback(cardElement, cardName);
+                
+                // Trigger UI updates through heroSelection if available
+                if (window.heroSelection) {
+                    window.heroSelection.updateHandDisplay();
+                    window.heroSelection.updateGoldDisplay();
+                    await window.heroSelection.autoSave();
+                }
+                
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('Error during card disenchanting:', error);
+            return false;
+        }
+    }
+
+    // Play disenchant animation on the card element
+    async playDisenchantAnimation(cardElement, cardName) {
+        if (!cardElement) return;
+        
+        return new Promise((resolve) => {
+            // Create dust particle container
+            const dustContainer = document.createElement('div');
+            dustContainer.className = 'disenchant-dust-container';
+            
+            // Position relative to the card
+            const rect = cardElement.getBoundingClientRect();
+            dustContainer.style.cssText = `
+                position: fixed;
+                left: ${rect.left}px;
+                top: ${rect.top}px;
+                width: ${rect.width}px;
+                height: ${rect.height}px;
+                pointer-events: none;
+                z-index: 10000;
+            `;
+            
+            document.body.appendChild(dustContainer);
+            
+            // Create multiple dust particles
+            for (let i = 0; i < 8; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'dust-particle';
+                
+                const angle = (i / 8) * 2 * Math.PI;
+                const distance = 50 + Math.random() * 30;
+                const endX = Math.cos(angle) * distance;
+                const endY = Math.sin(angle) * distance;
+                
+                particle.style.cssText = `
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    width: 4px;
+                    height: 4px;
+                    background: #FFD700;
+                    border-radius: 50%;
+                    transform: translate(-50%, -50%);
+                    animation: dustFloat 0.3s ease-out forwards;
+                    --end-x: ${endX}px;
+                    --end-y: ${endY}px;
+                    opacity: 0.9;
+                    box-shadow: 0 0 6px #FFD700;
+                `;
+                
+                dustContainer.appendChild(particle);
+            }
+            
+            // Fade out the card itself
+            cardElement.style.transition = 'all 0.3s ease-out';
+            cardElement.style.opacity = '0';
+            cardElement.style.transform = 'scale(0.8)';
+            
+            // Clean up after animation
+            setTimeout(() => {
+                dustContainer.remove();
+                resolve();
+            }, 300);
+        });
+    }
+
+    // Show success feedback for disenchanting
+    showDisenchantFeedback(cardElement, cardName) {
+        if (!cardElement) return;
+        
+        const feedback = document.createElement('div');
+        feedback.className = 'disenchant-feedback';
+        feedback.innerHTML = `
+            <div class="disenchant-feedback-content">
+                <span class="disenchant-icon">✨</span>
+                <span class="disenchant-text">+2 Gold</span>
+            </div>
+        `;
+        
+        const rect = cardElement.getBoundingClientRect();
+        feedback.style.cssText = `
+            position: fixed;
+            left: ${rect.left + rect.width / 2}px;
+            top: ${rect.top - 30}px;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #8B4513;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10001;
+            pointer-events: none;
+            animation: disenchantFeedback 2s ease-out;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        `;
+        
+        document.body.appendChild(feedback);
+        
+        setTimeout(() => {
+            feedback.remove();
+        }, 2000);
     }
 
     // === ENHANCED DRAG & DROP EVENT HANDLERS ===
@@ -472,7 +632,7 @@ export class HandManager {
             handHTML += `
                 <div class="hand-exclusive-overlay">
                     <div class="hand-exclusive-message">
-                        <span class="hand-exclusive-icon">🔐</span>
+                        <span class="hand-exclusive-icon">🔒</span>
                         <span class="hand-exclusive-text">Hand disabled while ${formattedArtifactName} is active</span>
                     </div>
                 </div>
@@ -572,6 +732,7 @@ export class HandManager {
                     ondragstart="${canPlay ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
                     ondragend="onHandCardDragEnd(event)"
                     onclick="onHandCardClick(event, ${index}, '${cardName}')"
+                    oncontextmenu="onHandCardRightClick(event, ${index}, '${cardName}')"
                     onmouseenter="window.showCardTooltip('${cardDataJson}', this)"
                     onmouseleave="window.hideCardTooltip()">
                     <img src="${cardPath}" 
@@ -828,6 +989,25 @@ async function onHandCardClick(event, cardIndex, cardName) {
     }
 }
 
+// Enhanced hand card right-click with ENTIRE HAND disabling and disenchanting
+async function onHandCardRightClick(event, cardIndex, cardName) {
+    // Prevent the browser context menu
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (window.handManager && window.heroSelection) {
+        const cardElement = event.target.closest('.hand-card');
+        const success = await window.handManager.disenchantCard(cardIndex, cardName, cardElement);
+        
+        if (!success) {
+            // Could show an error message here if needed
+            console.warn('Failed to disenchant card:', cardName);
+        }
+    }
+    
+    return false;
+}
+
 // === UTILITY FUNCTIONS (unchanged) ===
 
 function canPlayerAffordArtifact(cardName) {
@@ -948,7 +1128,7 @@ function showHandDisabledError(message, event) {
     errorDiv.className = 'hand-disabled-error-popup';
     errorDiv.innerHTML = `
         <div class="hand-disabled-error-content">
-            <span class="hand-disabled-error-icon">🔐</span>
+            <span class="hand-disabled-error-icon">🔒</span>
             <span class="hand-disabled-error-text">${message}</span>
         </div>
     `;
@@ -1184,7 +1364,7 @@ function onHandZoneDrop(event) {
     }
 }
 
-// Enhanced styles including exclusive restriction indicators
+// Enhanced styles including exclusive restriction indicators and disenchant animations
 const actionIndicatorStyle = document.createElement('style');
 actionIndicatorStyle.textContent = `
     .hand-card {
@@ -1366,6 +1546,38 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
             }
         }
         
+        /* NEW: Disenchant animations */
+        @keyframes dustFloat {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.9;
+            }
+            100% {
+                transform: translate(calc(-50% + var(--end-x)), calc(-50% + var(--end-y))) scale(0);
+                opacity: 0;
+            }
+        }
+        
+        @keyframes disenchantFeedback {
+            0% {
+                transform: translateX(-50%) translateY(0) scale(0.8);
+                opacity: 0;
+            }
+            20% {
+                transform: translateX(-50%) translateY(-10px) scale(1.1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(-50%) translateY(-30px) scale(1);
+                opacity: 0;
+            }
+        }
+        
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.2) rotate(180deg); }
+        }
+        
         .gold-error-popup {
             display: flex;
             align-items: center;
@@ -1433,6 +1645,30 @@ if (typeof document !== 'undefined' && !document.getElementById('goldErrorStyles
         @keyframes handDisabledIconPulse {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.15); }
+        }
+        
+        /* NEW: Disenchant feedback styling */
+        .disenchant-feedback {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .disenchant-feedback-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .disenchant-icon {
+            font-size: 16px;
+            animation: sparkle 1s ease-in-out infinite;
+        }
+        
+        .hand-card.disenchanting {
+            transition: all 0.8s ease-out;
+            opacity: 0;
+            transform: scale(0.8);
         }
         
         .hand-card[data-card-type="artifact"][data-unaffordable="true"] {
@@ -1561,7 +1797,7 @@ if (typeof window !== 'undefined') {
     });
     
     window.showActionError = showActionError;
-    window.showHandDisabledError = showHandDisabledError; // NEW: Export hand disabled error function
+    window.showHandDisabledError = showHandDisabledError;
     window.onHandCardDragStart = onHandCardDragStart;
     window.onHandCardDragEnd = onHandCardDragEnd;
     window.onHandZoneDragEnter = onHandZoneDragEnter;
@@ -1569,6 +1805,7 @@ if (typeof window !== 'undefined') {
     window.onHandZoneDragLeave = onHandZoneDragLeave;
     window.onHandZoneDrop = onHandZoneDrop;
     window.onHandCardClick = onHandCardClick;
+    window.onHandCardRightClick = onHandCardRightClick; // NEW: Export right-click handler
     window.canPlayerAffordArtifact = canPlayerAffordArtifact;
     window.showGoldError = showGoldError;
 }

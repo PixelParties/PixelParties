@@ -29,6 +29,7 @@ import BurningFingerSpell from './Spells/burningFinger.js';
 import CoolnessOverchargeSpell from './Spells/coolnessOvercharge.js';
 import { TrialOfCoolnessSpell } from './Spells/trialOfCoolness.js';
 import CurseSpell from './Spells/curse.js';
+import HasteSpell from './Spells/haste.js';
 
 
 
@@ -162,6 +163,10 @@ export class BattleSpellSystem {
         // Register Curse
         const curse = new CurseSpell(this.battleManager);
         this.spellImplementations.set('Curse', curse);
+
+        // Register Haste
+        const haste = new HasteSpell(this.battleManager);
+        this.spellImplementations.set('Haste', haste);
     }
 
     // ============================================
@@ -294,7 +299,7 @@ export class BattleSpellSystem {
         }
         
         // Invert the chance (0.9 becomes 0.1, 0.81 becomes 0.19, etc.)
-        const finalChance = 1 - chance;
+        const finalChance = 1 - chance + 1;
         
         return finalChance;
     }
@@ -347,6 +352,25 @@ export class BattleSpellSystem {
     // Placeholder for future spell effects implementation
     async executeSpellEffects(hero, spell) {
         const spellName = spell.name;
+        
+        // Check for Storm Ring negation before executing AOE spells
+        try {
+            console.log('🌩️ Attempting to import Storm Ring module...'); // ADD THIS
+            const { checkStormRingNegation } = await import('./Artifacts/stormRing.js');
+            console.log('✅ Storm Ring module imported successfully'); // ADD THIS
+            
+            const negationResult = await checkStormRingNegation(hero, spell, this.battleManager);
+            console.log('🎲 Storm Ring negation result:', negationResult); // ADD THIS
+            
+            if (negationResult.negated) {
+                // Spell was negated by Storm Ring - don't execute it
+                console.log('⛈️ Spell was negated by Storm Ring!'); // ADD THIS
+                return;
+            }
+        } catch (error) {
+            // Storm Ring module not available or error occurred, continue with spell execution
+            console.log('❌ Storm Ring check failed:', error); // MODIFY EXISTING
+        }
         
         // Check if we have a specific implementation for this spell
         if (this.spellImplementations.has(spellName)) {

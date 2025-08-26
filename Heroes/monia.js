@@ -12,8 +12,6 @@ export class MoniaHeroEffect {
         
         // Inject CSS styles
         this.injectMoniaShieldStyles();
-        
-        console.log('🛡️ Monia Hero effect initialized');
     }
 
     // ============================================
@@ -21,9 +19,7 @@ export class MoniaHeroEffect {
     // ============================================
 
     // Check and apply Monia's protection when any target takes damage
-    static checkMoniaProtection(target, damage, battleManager) {
-        console.log(`🛡️ Checking Monia protection for ${target.name} taking ${damage} damage`);
-        
+    static checkMoniaProtection(target, damage, battleManager) {        
         // Validate input
         if (typeof damage !== 'number' || isNaN(damage) || damage < 0) {
             console.warn(`⚠️ Invalid damage value: ${damage}, returning original`);
@@ -75,15 +71,11 @@ export class MoniaHeroEffect {
         const targetSide = this.getTargetSide(target);
         
         if (!targetPosition || !targetSide) {
-            console.log(`🛡️ Could not determine position/side for target ${target.name}`);
             return null;
         }
 
-        console.log(`🛡️ Target ${target.name} is at ${targetSide} ${targetPosition}`);
-
         // Get neighboring positions
         const neighboringPositions = this.getNeighboringPositions(targetPosition);
-        console.log(`🛡️ Checking neighboring positions: ${neighboringPositions.join(', ')}`);
 
         // Check each neighboring position for a protecting Monia
         for (const neighborPosition of neighboringPositions) {
@@ -97,17 +89,13 @@ export class MoniaHeroEffect {
                     console.error(`❌ Invalid reduced damage calculated: ${reducedDamage}`);
                     continue; // Try next Monia if this calculation failed
                 }
-                
-                console.log(`🛡️ ${protectingMonia.name} protects ${target.name}! Damage: ${damage} → ${reducedDamage}`);
-                
+                                
                 return {
                     protectingMonia: protectingMonia,
                     reducedDamage: reducedDamage
                 };
             }
         }
-
-        console.log(`🛡️ No protecting Monia found for ${target.name}`);
         return null;
     }
 
@@ -131,8 +119,6 @@ export class MoniaHeroEffect {
                 console.error(`❌ Invalid damage calculation result: ${result}, returning minimum damage`);
                 return 1;
             }
-            
-            console.log(`🛡️ Damage reduction: ${originalDamage} → ${result} (${this.DAMAGE_REDUCTION_PERCENT}% reduction)`);
             return result;
             
         } catch (error) {
@@ -277,7 +263,6 @@ export class MoniaHeroEffect {
         // Use existing status effects system to check if Monia can take action
         if (this.battleManager.statusEffectsManager) {
             const canAct = this.battleManager.statusEffectsManager.canTakeAction(monia);
-            console.log(`🛡️ ${monia.name} can act: ${canAct}`);
             return canAct;
         }
         
@@ -381,7 +366,6 @@ export class MoniaHeroEffect {
             shield.appendChild(core);
             targetElement.appendChild(shield);
             
-            console.log(`🛡️ Created protection shield (${shieldType}) on ${targetElement.className}`);
             return shield;
             
         } catch (error) {
@@ -573,8 +557,6 @@ export class MoniaHeroEffect {
             animations.push(this.removeShieldAfterDuration(targetShield));
         }
 
-        console.log(`🛡️ Guest created protection shields and dash animation`);
-
         // Wait for all animations to complete
         await Promise.all(animations);
         
@@ -685,8 +667,6 @@ export class MoniaHeroEffect {
 
     // Clean up all active shields
     cleanup() {
-        console.log(`Cleaning up ${this.activeShields.size} active Monia shields`);
-        
         this.activeShields.forEach(shield => {
             try {
                 if (shield && shield.parentNode) {
@@ -707,10 +687,6 @@ export class MoniaHeroEffect {
                     shield.remove();
                 }
             });
-            
-            if (orphanedShields.length > 0) {
-                console.log(`Cleaned up ${orphanedShields.length} orphaned Monia shields`);
-            }
         } catch (error) {
             console.warn('Error cleaning up orphaned shields:', error);
         }

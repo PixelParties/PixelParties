@@ -870,3 +870,272 @@
 .team-header-title {
     text-align: center !important;
 }
+
+/* ============================================
+   AREA ZONE STYLES - ADD TO END OF hero-selection.css
+   ============================================ */
+
+/* Area slot specific styles */
+.area-slot {
+    width: 200px;
+    min-height: 340px;
+    border: 3px dashed rgba(76, 175, 80, 0.4);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(129, 199, 132, 0.05));
+    backdrop-filter: blur(10px);
+    transition: var(--transition-medium);
+    overflow: hidden;
+}
+
+.area-slot.filled {
+    border: 3px solid #4CAF50;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(129, 199, 132, 0.1));
+    box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
+}
+
+.area-slot.empty:hover {
+    border-color: rgba(76, 175, 80, 0.6);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.12), rgba(129, 199, 132, 0.08));
+    transform: scale(1.02);
+}
+
+/* Area placeholder content */
+.area-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+}
+
+.area-globe {
+    font-size: 4rem;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.3));
+    animation: globeFloat 3s ease-in-out infinite;
+}
+
+.area-label {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #4CAF50;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+}
+
+/* Globe floating animation */
+@keyframes globeFloat {
+    0%, 100% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    33% {
+        transform: translateY(-8px) rotate(120deg);
+    }
+    66% {
+        transform: translateY(4px) rotate(240deg);
+    }
+}
+
+/* Area card styles */
+.area-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition-medium);
+}
+
+.area-card:hover {
+    transform: scale(1.02);
+}
+
+.area-card-image-container {
+    width: 160px; /* Slightly smaller than slot to show border */
+    height: 224px; /* Maintain 750x1050 aspect ratio (160 * 1.4) */
+    border-radius: var(--radius-medium);
+    overflow: hidden;
+    box-shadow: var(--shadow-medium);
+    position: relative;
+}
+
+.area-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition-medium);
+}
+
+.area-card:hover .area-card-image {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+/* Area slot drag states */
+.area-slot.area-drop-ready {
+    border-color: #4CAF50 !important;
+    border-style: solid !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(129, 199, 132, 0.2)) !important;
+    box-shadow: 
+        0 0 30px rgba(76, 175, 80, 0.6),
+        inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
+    transform: scale(1.03);
+    animation: areaDropPulse 1.5s ease-in-out infinite;
+}
+
+.area-slot.area-drop-invalid {
+    border-color: #F44336 !important;
+    border-style: solid !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(229, 57, 53, 0.1)) !important;
+    box-shadow: 
+        0 0 20px rgba(244, 67, 54, 0.5),
+        inset 0 0 15px rgba(244, 67, 54, 0.2) !important;
+    animation: invalidAreaDropPulse 1.5s ease-in-out infinite;
+}
+
+/* Area card dragging state */
+.area-card.area-card-dragging {
+    opacity: 0.5 !important;
+    transform: scale(0.9) !important;
+    z-index: 1000 !important;
+}
+
+/* Drop tooltips for area slot */
+.area-slot.area-drop-ready::after {
+    content: "Drop Area Card Here";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(76, 175, 80, 0.95);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
+}
+
+.area-slot.area-drop-invalid::after {
+    content: "Invalid Card Type";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(244, 67, 54, 0.95);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
+}
+
+/* Animations */
+@keyframes areaDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 30px rgba(76, 175, 80, 0.6),
+            inset 0 0 20px rgba(76, 175, 80, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 40px rgba(76, 175, 80, 0.8),
+            inset 0 0 30px rgba(76, 175, 80, 0.4);
+    }
+}
+
+@keyframes invalidAreaDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 20px rgba(244, 67, 54, 0.5),
+            inset 0 0 15px rgba(244, 67, 54, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 0 30px rgba(244, 67, 54, 0.7),
+            inset 0 0 25px rgba(244, 67, 54, 0.3);
+    }
+}
+
+/* Update team-slots-container to accommodate 4 slots */
+.team-slots-container {
+    gap: 25px; /* Slightly reduced gap to fit 4 slots */
+}
+
+/* Responsive adjustments for area slot */
+@media (max-width: 1200px) {
+    .team-slots-container {
+        gap: 20px;
+    }
+    
+    .area-slot,
+    .team-slot {
+        width: 180px;
+        min-height: 320px;
+    }
+    
+    .area-card-image-container {
+        width: 140px;
+        height: 196px;
+    }
+}
+
+@media (max-width: 900px) {
+    .team-slots-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        max-width: 220px;
+        margin: 0 auto;
+    }
+    
+    .area-slot,
+    .team-slot {
+        width: 200px;
+    }
+    
+    .area-card-image-container {
+        width: 160px;
+        height: 224px;
+    }
+}
+
+@media (max-width: 768px) {
+    .area-globe {
+        font-size: 3rem;
+        margin-bottom: 8px;
+    }
+    
+    .area-label {
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .area-slot.area-drop-ready::after,
+    .area-slot.area-drop-invalid::after {
+        font-size: 10px;
+        padding: 4px 8px;
+        top: -30px;
+    }
+}

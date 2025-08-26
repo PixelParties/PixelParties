@@ -1361,7 +1361,7 @@ const CARD_DATABASE = {
         name: 'Haste',
         image: './Cards/All/Haste.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',

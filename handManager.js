@@ -22,7 +22,7 @@ export class HandManager {
 
         // ===== TEST HELPER FLAGS =====
         // Set to false to disable test functionality completely
-        this.ENABLE_TEST_HELPERS = true;
+        this.ENABLE_TEST_HELPERS = false;
         // Set to false if you only want to disable the auto-add feature
         this.AUTO_ADD_TEST_CARD = true;
         // The test card to add

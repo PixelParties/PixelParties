@@ -513,21 +513,25 @@ export const futureTechLampArtifact = {
                 justify-content: center;
                 z-index: 10000;
                 animation: lampModeSlideIn 0.5s ease-out;
+                padding: 20px; /* Add padding to prevent touching screen edges */
             }
             
             .lamp-mode-container {
                 background: linear-gradient(135deg, #4a90e2 0%, #7b68ee 100%);
                 border: 3px solid #00ffff;
                 border-radius: 20px;
-                padding: 40px;
+                padding: 30px;
                 max-width: 900px;
                 width: 90%;
+                max-height: 90vh; /* Constrain height to 90% of viewport */
                 box-shadow: 
                     0 20px 60px rgba(0, 255, 255, 0.3),
                     inset 0 1px 0 rgba(255, 255, 255, 0.2);
                 text-align: center;
                 position: relative;
-                overflow: visible;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
             }
             
             .lamp-mode-container::before {
@@ -545,7 +549,8 @@ export const futureTechLampArtifact = {
             }
             
             .lamp-mode-header {
-                margin-bottom: 30px;
+                margin-bottom: 20px;
+                flex-shrink: 0; /* Prevent header from shrinking */
             }
             
             .lamp-icon {
@@ -580,11 +585,61 @@ export const futureTechLampArtifact = {
                 letter-spacing: 1px;
             }
             
+            /* SCROLLABLE CARD CHOICES CONTAINER */
             .lamp-card-choices {
                 display: flex;
                 gap: 25px;
-                justify-content: center;
+                justify-content: flex-start; /* Changed from center to flex-start for better scrolling */
                 flex-wrap: wrap;
+                overflow-y: auto;
+                overflow-x: hidden;
+                flex: 1; /* Take remaining space after header */
+                padding: 10px 5px; /* Add padding for better scrollbar appearance */
+                margin: -10px -5px; /* Compensate for padding */
+                
+                /* Custom scrollbar styling */
+                scrollbar-width: thin;
+                scrollbar-color: rgba(0, 255, 255, 0.6) rgba(255, 255, 255, 0.1);
+            }
+            
+            /* Webkit scrollbar styling for better appearance */
+            .lamp-card-choices::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .lamp-card-choices::-webkit-scrollbar-track {
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+            }
+            
+            .lamp-card-choices::-webkit-scrollbar-thumb {
+                background: rgba(0, 255, 255, 0.6);
+                border-radius: 4px;
+                transition: background 0.3s ease;
+            }
+            
+            .lamp-card-choices::-webkit-scrollbar-thumb:hover {
+                background: rgba(0, 255, 255, 0.8);
+            }
+            
+            /* Add scroll indicator when content overflows */
+            .lamp-card-choices::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 40px;
+                height: 3px;
+                background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.8), transparent);
+                border-radius: 2px;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            
+            /* Show scroll indicator when scrollable */
+            .lamp-card-choices[data-scrollable="true"]::after {
+                opacity: 1;
             }
             
             .lamp-card-choice {
@@ -594,7 +649,7 @@ export const futureTechLampArtifact = {
                 padding: 20px;
                 transition: all 0.3s ease;
                 cursor: pointer;
-                flex: 1;
+                flex: 0 0 220px; /* Fixed width instead of flex: 1 */
                 max-width: 220px;
                 min-width: 180px;
                 position: relative;
@@ -879,23 +934,31 @@ export const futureTechLampArtifact = {
             
             /* Responsive Design */
             @media (max-width: 768px) {
+                .lamp-mode-overlay {
+                    padding: 10px;
+                }
+                
                 .lamp-mode-container {
                     padding: 20px;
                     width: 95%;
+                    max-height: 95vh;
                 }
                 
                 .lamp-card-choices {
                     gap: 15px;
+                    justify-content: center; /* Center on mobile */
                 }
                 
                 .lamp-card-choice {
-                    max-width: none;
-                    min-width: 150px;
+                    flex: 0 0 150px;
+                    max-width: 150px;
+                    min-width: 130px;
+                    padding: 15px;
                 }
                 
                 .lamp-card-image {
-                    width: 120px;
-                    height: 168px;
+                    width: 100px;
+                    height: 140px;
                 }
                 
                 .lamp-icon {
@@ -908,6 +971,21 @@ export const futureTechLampArtifact = {
                 
                 .lamp-mode-header p {
                     font-size: 1rem;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .lamp-mode-container {
+                    max-height: 98vh;
+                    padding: 15px;
+                }
+                
+                .lamp-mode-header {
+                    margin-bottom: 15px;
+                }
+                
+                .lamp-card-choices {
+                    gap: 10px;
                 }
             }
         `;

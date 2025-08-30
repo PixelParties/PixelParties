@@ -1488,7 +1488,7 @@ const CARD_DATABASE = {
         name: 'FutureTechLamp',
         image: './Cards/All/FutureTechLamp.png',
         cardType: 'Artifact',
-        cost: 4,
+        cost: 6,
         action: false,
         spellSchool: null,
         subtype: null,

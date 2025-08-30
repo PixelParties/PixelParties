@@ -535,6 +535,62 @@ export class AttackEffectsManager {
         }
         return 0;
     }
+
+    /**
+     * Reset all attack effects for new battle
+     */
+    resetForNewBattle() {
+        // Reset FutureTechFists usage counter
+        if (this.futureTechFistsArtifact) {
+            this.futureTechFistsArtifact.resetUsageForNewBattle();
+        }
+
+        // Reset other effects if needed
+        this._skeletonSummonedThisAttack = false;
+
+        console.log('🔄 AttackEffectsManager reset for new battle');
+    }
+
+    /**
+     * Export state for checkpoint system
+     * @returns {Object} State data
+     */
+    exportState() {
+        const state = {};
+
+        // Export FutureTechFists state
+        if (this.futureTechFistsArtifact) {
+            state.futureTechFists = this.futureTechFistsArtifact.exportState();
+        }
+
+        // Export Arrow System state
+        if (this.arrowSystem) {
+            state.arrowSystem = this.arrowSystem.exportArrowState();
+        }
+
+        // Export other effect states as needed
+        return state;
+    }
+
+    /**
+     * Import state from checkpoint system
+     * @param {Object} state - State data to import
+     */
+    importState(state) {
+        if (!state) return;
+
+        // Import FutureTechFists state
+        if (state.futureTechFists && this.futureTechFistsArtifact) {
+            this.futureTechFistsArtifact.importState(state.futureTechFists);
+        }
+
+        // Import Arrow System state
+        if (state.arrowSystem && this.arrowSystem) {
+            this.arrowSystem.importArrowState(state.arrowSystem);
+        }
+
+        console.log('🔄 AttackEffectsManager state imported from checkpoint');
+    }
     
     // Ensure CSS for attack effects including shield damage numbers
     ensureAttackEffectsCSS() {
@@ -629,6 +685,9 @@ export class AttackEffectsManager {
         if (this.futureTechFistsArtifact) {
             this.futureTechFistsArtifact.init();
         }
+
+        // Reset for new battle
+        this.resetForNewBattle();
     }
     
     // Cleanup

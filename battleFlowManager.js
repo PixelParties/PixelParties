@@ -36,6 +36,11 @@ export class BattleFlowManager {
         // Re-initialize heroes to ensure fresh health/state (using pre-calculated stats)
         bm.initializeHeroes();
 
+        // Reset attack effects for new battle (including FutureTechFists usage counter)
+        if (bm.attackEffectsManager) {
+            bm.attackEffectsManager.resetForNewBattle();
+        }
+
         // Initialize necromancy manager and stacks
         const { NecromancyManager } = await import('./Abilities/necromancy.js');
         bm.necromancyManager = new NecromancyManager(bm);

@@ -300,7 +300,7 @@ export class HeroSelection {
             
             if (energyCoreCount > 0) {
                 const uniqueCardsInGraveyard = this.graveyardManager.getUniqueCards().length;
-                energyCoreAttackBonus = uniqueCardsInGraveyard * 10 * energyCoreCount;
+                energyCoreAttackBonus = uniqueCardsInGraveyard * 5 * energyCoreCount;
             }
         }
         

@@ -301,19 +301,17 @@ export class CheckpointSystem {
                 this.battleManager.killTracker.exportState() : {};
         }
         
-        // Attack Effects State
+        // Attack Effects State - NOW INCLUDES FUTURETECHFISTS AND ALL ATTACK EFFECTS
         if (this.battleManager.attackEffectsManager) {
-            states.attackEffects = {
-                // REMOVED: Individual arrow handling - now handled by ArrowSystem
-            };
+            states.attackEffects = this.battleManager.attackEffectsManager.exportState();
         }
         
-        // Arrow System State
+        // Arrow System State (legacy compatibility - still needed for older saves)
         if (this.battleManager.attackEffectsManager && this.battleManager.attackEffectsManager.arrowSystem) {
             states.arrowSystem = this.battleManager.attackEffectsManager.arrowSystem.exportArrowState();
         }
 
-        // Kazena
+        // Kazena Effect State
         if (this.battleManager.kazenaEffect) {
             states.kazenaEffect = this.battleManager.kazenaEffect.exportKazenaState();
         }
@@ -791,13 +789,20 @@ export class CheckpointSystem {
             }
         }
         
+        // Restore Attack Effects State
+        if (managerStates.attackEffects && this.battleManager.attackEffectsManager) {
+            if (this.battleManager.attackEffectsManager.importState) {
+                this.battleManager.attackEffectsManager.importState(managerStates.attackEffects);
+            }
+        }
+        
         // Restore speed settings
         if (managerStates.speedManager && this.battleManager.speedManager) {
             this.battleManager.speedManager.currentSpeed = managerStates.speedManager.currentSpeed || 1;
             this.battleManager.speedManager.speedLocked = managerStates.speedManager.speedLocked || false;
         }
 
-        // Restore Arrow System state
+        // Restore Arrow System state (legacy compatibility)
         if (managerStates.arrowSystem && 
             this.battleManager.attackEffectsManager && 
             this.battleManager.attackEffectsManager.arrowSystem) {

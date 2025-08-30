@@ -1,10 +1,15 @@
 // ./Artifacts/futureTechFists.js - Future Tech Fists Artifact Implementation
 // Grants shield points equal to 10x the number of FutureTechFists cards in graveyard when attacking
+// LIMITED: Can only trigger 3 times per battle
 
 export class FutureTechFistsArtifact {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.name = 'FutureTechFists';
+        
+        // Usage tracking - resets each battle
+        this.usageCount = 0;
+        this.maxUsages = 3;
     }
 
     /**
@@ -17,6 +22,15 @@ export class FutureTechFistsArtifact {
     async handleFutureTechFistsEffect(attacker, defender, damage, equipmentItem) {
         if (!this.battleManager.isAuthoritative) return;
 
+        // Check if we've reached the usage limit
+        if (this.usageCount >= this.maxUsages) {
+            this.battleManager.addCombatLog(
+                `⚡ ${attacker.name}'s Future Tech Fists have no energy left! (${this.usageCount}/${this.maxUsages} uses)`,
+                attacker.side === 'player' ? 'warning' : 'info'
+            );
+            return;
+        }
+
         // Count FutureTechFists cards in the attacker's graveyard
         const futureTechFistsCount = this.countFutureTechFistsInGraveyard(attacker);
         
@@ -27,6 +41,9 @@ export class FutureTechFistsArtifact {
         // Calculate shield amount (10 per FutureTechFists card in graveyard)
         const shieldAmount = futureTechFistsCount * 10;
 
+        // Increment usage counter
+        this.usageCount++;
+
         // Apply shield directly to hero object (bypass combat manager to avoid double messaging)
         const oldShield = attacker.currentShield || 0;
         attacker.currentShield = oldShield + shieldAmount;
@@ -34,9 +51,9 @@ export class FutureTechFistsArtifact {
         // Create visual effect
         this.createShieldGenerationEffect(attacker, shieldAmount);
 
-        // Add combat log message
+        // Add combat log message with usage info
         this.battleManager.addCombatLog(
-            `⚡ ${attacker.name}'s Future Tech Fists generate ${shieldAmount} shield! (${futureTechFistsCount} cards in graveyard)`,
+            `⚡ ${attacker.name}'s Future Tech Fists generate ${shieldAmount} shield! (${futureTechFistsCount} cards in graveyard) [${this.usageCount}/${this.maxUsages}]`,
             attacker.side === 'player' ? 'success' : 'info'
         );
 
@@ -52,6 +69,8 @@ export class FutureTechFistsArtifact {
             futureTechFistsCount: futureTechFistsCount,
             oldShield: oldShield,
             newShield: attacker.currentShield,
+            usageCount: this.usageCount,
+            maxUsages: this.maxUsages,
             timestamp: Date.now()
         });
     }
@@ -117,10 +136,10 @@ export class FutureTechFistsArtifact {
             shieldBurst.appendChild(orb);
         }
 
-        // Create shield number display
+        // Create shield number display with usage indicator
         const shieldNumber = document.createElement('div');
         shieldNumber.className = 'shield-amount-display';
-        shieldNumber.innerHTML = `+${shieldAmount} 🛡️`;
+        shieldNumber.innerHTML = `+${shieldAmount} 🛡️<br><small>[${this.usageCount}/${this.maxUsages}]</small>`;
         shieldNumber.style.cssText = `
             position: absolute;
             top: -20px;
@@ -135,6 +154,7 @@ export class FutureTechFistsArtifact {
                 0 0 20px #0099cc;
             z-index: 610;
             animation: shieldNumberRise ${this.battleManager.getSpeedAdjustedDelay(1500)}ms ease-out forwards;
+            text-align: center;
         `;
 
         shieldBurst.appendChild(shieldNumber);
@@ -153,16 +173,17 @@ export class FutureTechFistsArtifact {
 
         heroElement.appendChild(shieldBurst);
 
-        // Create shield aura effect
+        // Create shield aura effect - dimmer if approaching limit
         const shieldAura = document.createElement('div');
         shieldAura.className = 'tech-shield-aura';
+        const intensity = this.usageCount >= this.maxUsages ? 0.1 : 0.3 - (this.usageCount * 0.1);
         shieldAura.style.cssText = `
             position: absolute;
             top: -5px;
             left: -5px;
             right: -5px;
             bottom: -5px;
-            background: radial-gradient(ellipse, rgba(0, 204, 255, 0.3) 0%, transparent 70%);
+            background: radial-gradient(ellipse, rgba(0, 204, 255, ${intensity}) 0%, transparent 70%);
             border-radius: 50%;
             pointer-events: none;
             z-index: 590;
@@ -187,8 +208,12 @@ export class FutureTechFistsArtifact {
 
         const { 
             attackerAbsoluteSide, attackerPosition, attackerName, 
-            shieldAmount, futureTechFistsCount, oldShield, newShield 
+            shieldAmount, futureTechFistsCount, oldShield, newShield,
+            usageCount, maxUsages
         } = data;
+
+        // Update local usage counter
+        this.usageCount = usageCount;
 
         // Determine local side for guest
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
@@ -217,15 +242,67 @@ export class FutureTechFistsArtifact {
             this.battleManager.updateHeroHealthBar(attackerLocalSide, attackerPosition, attacker.currentHp, attacker.maxHp);
         }, 100);
 
-        // Add to combat log
+        // Add to combat log with usage info
         const logType = attackerLocalSide === 'player' ? 'success' : 'info';
         this.battleManager.addCombatLog(
-            `⚡ ${attackerName}'s Future Tech Fists generate ${shieldAmount} shield! (${futureTechFistsCount} cards in graveyard)`,
+            `⚡ ${attackerName}'s Future Tech Fists generate ${shieldAmount} shield! (${futureTechFistsCount} cards in graveyard) [${usageCount}/${maxUsages}]`,
             logType
         );
         
         // DEBUG: Log for troubleshooting
-        console.log(`🛡️ Guest received shield: ${attackerName} now has ${newShield} shield (was ${oldShield})`);
+        console.log(`🛡️ Guest received shield: ${attackerName} now has ${newShield} shield (was ${oldShield}) - Usage: ${usageCount}/${maxUsages}`);
+    }
+
+    /**
+     * Reset usage counter at start of battle
+     */
+    resetUsageForNewBattle() {
+        this.usageCount = 0;
+        console.log(`🔄 FutureTechFists usage counter reset to 0/${this.maxUsages}`);
+    }
+
+    /**
+     * Check if effect can still be used
+     * @returns {boolean} True if usage limit not reached
+     */
+    canUseEffect() {
+        return this.usageCount < this.maxUsages;
+    }
+
+    /**
+     * Get current usage info
+     * @returns {Object} Usage information
+     */
+    getUsageInfo() {
+        return {
+            usageCount: this.usageCount,
+            maxUsages: this.maxUsages,
+            remaining: this.maxUsages - this.usageCount,
+            canUse: this.canUseEffect()
+        };
+    }
+
+    /**
+     * Export state for checkpoint system
+     * @returns {Object} State data
+     */
+    exportState() {
+        return {
+            usageCount: this.usageCount,
+            maxUsages: this.maxUsages
+        };
+    }
+
+    /**
+     * Import state from checkpoint system
+     * @param {Object} state - State data to import
+     */
+    importState(state) {
+        if (state) {
+            this.usageCount = state.usageCount || 0;
+            this.maxUsages = state.maxUsages || 3;
+            console.log(`🔄 FutureTechFists state restored: ${this.usageCount}/${this.maxUsages} uses`);
+        }
     }
 
     /**
@@ -260,6 +337,13 @@ export class FutureTechFistsArtifact {
 
             .shield-amount-display {
                 will-change: transform, opacity;
+            }
+
+            .shield-amount-display small {
+                font-size: 12px;
+                opacity: 0.8;
+                display: block;
+                margin-top: 2px;
             }
 
             /* Animation Keyframes */
@@ -332,6 +416,7 @@ export class FutureTechFistsArtifact {
      */
     init() {
         FutureTechFistsArtifact.injectShieldGenerationCSS();
+        this.resetUsageForNewBattle(); // Reset at initialization
     }
 
     /**
@@ -340,6 +425,7 @@ export class FutureTechFistsArtifact {
     cleanup() {
         const css = document.getElementById('futureTechFistsStyles');
         if (css) css.remove();
+        this.usageCount = 0;
     }
 }
 

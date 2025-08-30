@@ -58,7 +58,11 @@ export class BattleScreen {
         playerDeck = null,
         opponentDeck = null,
         playerAreaCard = null,  
-        opponentAreaCard = null) {
+        opponentAreaCard = null,
+        playerGraveyard = null,
+        opponentGraveyard = null,
+        playerBirthdayPresentCounter = null,
+        opponentBirthdayPresentCounter = null) { 
         
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -82,8 +86,12 @@ export class BattleScreen {
         this.opponentHand = opponentHand || [];
         this.playerDeck = playerDeck || [];
         this.opponentDeck = opponentDeck || [];
+        this.playerGraveyard = playerGraveyard || [];
+        this.opponentGraveyard = opponentGraveyard || [];
         this.playerAreaCard = playerAreaCard;
         this.opponentAreaCard = opponentAreaCard;
+        this.playerBirthdayPresentCounter = playerBirthdayPresentCounter || 0;
+        this.opponentBirthdayPresentCounter = opponentBirthdayPresentCounter || 0;
 
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
@@ -112,8 +120,12 @@ export class BattleScreen {
             this.opponentHand,
             this.playerDeck,
             this.opponentDeck,
-            this.playerAreaCard,    
-            this.opponentAreaCard   
+            this.playerAreaCard,
+            this.opponentAreaCard,
+            this.playerGraveyard,
+            this.opponentGraveyard,
+            this.playerBirthdayPresentCounter,
+            this.opponentBirthdayPresentCounter 
         );
     }
 
@@ -180,10 +192,11 @@ export class BattleScreen {
                 const latestPlayerEffectiveStats = this.getLatestPlayerEffectiveStats();
                 const latestPlayerHand = this.getLatestPlayerHand();
                 const latestPlayerDeck = this.getLatestPlayerDeck();
+                const latestPlayerGraveyard = this.getLatestPlayerGraveyard();
                 const latestPlayerAreaCard = this.getLatestPlayerAreaData();
 
                 // Update battle manager with latest player data
-                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment, latestPlayerHand, latestPlayerDeck, latestPlayerAreaCard);
+                this.updateBattleManagerPlayerData(latestPlayerAbilities, latestPlayerSpellbooks, latestPlayerCreatures, latestPlayerEquipment, latestPlayerHand, latestPlayerDeck, latestPlayerGraveyard, latestPlayerAreaCard); 
 
                 // Also update effective stats
                 this.playerEffectiveStats = latestPlayerEffectiveStats;
@@ -204,7 +217,8 @@ export class BattleScreen {
                         hostEffectiveStats: latestPlayerEffectiveStats,
                         hostFormation: this.playerFormation,
                         hostHand: latestPlayerHand,
-                        hostDeck: latestPlayerDeck
+                        hostDeck: latestPlayerDeck,
+                        hostBirthdayPresentCounter: this.playerBirthdayPresentCounter 
                     });
                 }
             }, this.getSpeedAdjustedDelay(500));
@@ -223,6 +237,17 @@ export class BattleScreen {
             return window.heroSelection.deckManager.getDeck();
         }
         return this.playerDeck || [];
+    }
+
+    getLatestPlayerGraveyard() {
+        if (window.heroSelection && window.heroSelection.graveyardManager) {
+            return window.heroSelection.graveyardManager.getGraveyard();
+        }
+        return this.playerGraveyard || [];
+    }
+
+    getLatestOpponentGraveyard() {
+        return this.opponentGraveyardData || [];
     }
 
     // Helper method to get current player abilities from heroSelection
@@ -344,7 +369,7 @@ export class BattleScreen {
     }
 
     // Helper method to update battle manager with latest player data
-    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment, hand = null, deck = null, areaCard = null) {
+    updateBattleManagerPlayerData(abilities, spellbooks, creatures, equipment, hand = null, deck = null, graveyard = null, areaCard = null) {
         if (this.battleManager) {
             // Update stored data
             this.playerAbilities = abilities;
@@ -356,6 +381,9 @@ export class BattleScreen {
             }
             if (deck !== null) {
                 this.playerDeck = deck;
+            }
+            if (graveyard !== null) {
+                this.playerGraveyard = graveyard;
             }
             if (areaCard !== null) {
                 this.playerAreaCard = areaCard;
@@ -371,6 +399,9 @@ export class BattleScreen {
             }
             if (deck !== null) {
                 this.battleManager.playerDeck = deck;
+            }
+            if (graveyard !== null) {
+                this.battleManager.playerGraveyard = graveyard;
             }
             if (areaCard !== null) {
                 this.battleManager.playerAreaCard = areaCard;
@@ -421,10 +452,18 @@ export class BattleScreen {
                 this.opponentHand = data.hostHand;
                 this.battleManager.opponentHand = data.hostHand;
             }
-
             if (data.hostDeck) {
                 this.opponentDeck = data.hostDeck;
                 this.battleManager.opponentDeck = data.hostDeck;
+            }
+            if (data.hostGraveyard) {
+                this.opponentGraveyard = data.hostGraveyard;
+                this.battleManager.opponentGraveyard = data.hostGraveyard;
+            }
+
+            if (data.hostBirthdayPresentCounter !== undefined) {
+                this.opponentBirthdayPresentCounter = data.hostBirthdayPresentCounter;
+                this.battleManager.opponentBirthdayPresentCounter = data.hostBirthdayPresentCounter;
             }
             
             // Get guest's own latest data
@@ -435,6 +474,7 @@ export class BattleScreen {
             const guestEquipment = this.getLatestPlayerEquipment();
             const guestHand = this.getLatestPlayerHand();
             const guestDeck = this.getLatestPlayerDeck();
+            const guestGraveyard = this.getLatestPlayerGraveyard();
 
             // Update guest's own data in battle manager
             this.playerAbilities = guestAbilities;
@@ -443,6 +483,7 @@ export class BattleScreen {
             this.playerEquips = guestEquipment;
             this.playerHand = guestHand;
             this.playerDeck = guestDeck;
+            this.playerGraveyard = guestGraveyard; 
             this.playerEffectiveStats = guestStats;
             
             this.battleManager.playerAbilities = guestAbilities;
@@ -451,6 +492,7 @@ export class BattleScreen {
             this.battleManager.playerEquips = guestEquipment;
             this.battleManager.playerHand = guestHand;
             this.battleManager.playerDeck = guestDeck;
+            this.battleManager.playerGraveyard = guestGraveyard;
             this.battleManager.playerEffectiveStats = guestStats;
 
             const guestFormationWithPersistentData = this.preservePersistentDataInFormation(
@@ -470,6 +512,8 @@ export class BattleScreen {
                         guestBattleFormation: guestFormationWithPersistentData,
                         guestHand,
                         guestDeck,
+                        guestGraveyard,
+                        guestBirthdayPresentCounter: window.heroSelection?.birthdayPresentCounter || 0,
                         timestamp: Date.now()
                     }
                 });
@@ -606,16 +650,24 @@ export class BattleScreen {
                 this.opponentHand = data.guestHand;
                 this.battleManager.opponentHand = data.guestHand;
             }
-
             if (data.guestDeck) {
                 this.opponentDeck = data.guestDeck;
                 this.battleManager.opponentDeck = data.guestDeck;
+            }
+            if (data.guestGraveyard) {
+                this.opponentGraveyard = data.guestGraveyard;
+                this.battleManager.opponentGraveyard = data.guestGraveyard;
             }
 
             if (data.guestBattleFormation) {
                 this.opponentFormation = data.guestBattleFormation;
                 this.battleManager.opponentFormation = data.guestBattleFormation;
             }
+            if (data.guestBirthdayPresentCounter !== undefined) {
+                this.opponentBirthdayPresentCounter = data.guestBirthdayPresentCounter;
+                this.battleManager.opponentBirthdayPresentCounter = data.guestBirthdayPresentCounter;
+            }
+
             
             // Re-initialize opponent heroes with all synced data
             if (this.battleManager) {

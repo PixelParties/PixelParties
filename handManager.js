@@ -25,33 +25,60 @@ export class HandManager {
         this.ENABLE_TEST_HELPERS = false;
         // Set to false if you only want to disable the auto-add feature
         this.AUTO_ADD_TEST_CARD = true;
-        // The test card to add
-        this.TEST_CARD_NAME = 'GatheringStorm';
+        // Up to 5 test cards to add (empty strings mean no card in that slot)
+        this.TEST_CARD_NAMES = [
+            'FutureTechMech',  // Card slot 1
+            'FutureTechMech',                // Card slot 2 (empty)
+            'FutureTechMech',                // Card slot 3 (empty)
+            'FutureTechMech',                // Card slot 4 (empty)
+            'FutureTechMech'                 // Card slot 5 (empty)
+        ];
     }
 
     // ===== TEST HELPER FUNCTION =====
-    // This function adds a test card to the hand for testing purposes
+    // This function adds test cards to the hand for testing purposes
     // Easy to remove - just delete this function and the call in drawInitialHand()
     addTestCardToHand() {
         if (!this.ENABLE_TEST_HELPERS || !this.AUTO_ADD_TEST_CARD) {
             return false;
         }
 
-        // Check if we have room in hand
-        if (this.hand.length >= this.maxHandSize) {
-            console.warn('⌛ TEST: Cannot add test card - hand is full');
-            return false;
+        let addedCards = [];
+        let failedCards = [];
+
+        // Iterate through all 5 test card slots
+        for (let i = 0; i < this.TEST_CARD_NAMES.length; i++) {
+            const cardName = this.TEST_CARD_NAMES[i];
+            
+            // Skip empty card slots
+            if (!cardName || cardName.trim() === '') {
+                continue;
+            }
+
+            // Check if we have room in hand
+            if (this.hand.length >= this.maxHandSize) {
+                console.warn(`⏱️ TEST: Cannot add more test cards - hand is full (attempted to add "${cardName}")`);
+                break;
+            }
+
+            // Add the test card
+            const success = this.addCardToHand(cardName);
+            if (success) {
+                addedCards.push(cardName);
+            } else {
+                failedCards.push(cardName);
+            }
         }
 
-        // Add the test card
-        const success = this.addCardToHand(this.TEST_CARD_NAME);
-        if (success) {
-            console.log(`🧪 TEST: Added "${this.TEST_CARD_NAME}" to hand for testing`);
-            return true;
-        } else {
-            console.warn(`⌛ TEST: Failed to add "${this.TEST_CARD_NAME}" to hand`);
-            return false;
+        // Log results
+        if (addedCards.length > 0) {
+            console.log(`🧪 TEST: Added ${addedCards.length} test card(s) to hand: [${addedCards.join(', ')}]`);
         }
+        if (failedCards.length > 0) {
+            console.warn(`⏱️ TEST: Failed to add ${failedCards.length} test card(s): [${failedCards.join(', ')}]`);
+        }
+
+        return addedCards.length > 0;
     }
 
     // === CARD DISENCHANTING FEATURE ===
@@ -85,11 +112,39 @@ export class HandManager {
             const removedCard = this.removeCardFromHandByIndex(cardIndex);
             
             if (removedCard) {
+                // Add to graveyard
+                if (window.heroSelection && window.heroSelection.graveyardManager) {
+                    window.heroSelection.graveyardManager.addCard(cardName);
+                }
+
                 // Award 2 gold to the player
                 if (window.heroSelection && window.heroSelection.goldManager) {
                     window.heroSelection.goldManager.addPlayerGold(2, 'card_disenchant');
                 }
-                
+
+                // Check if Heinz can trigger first discard bonus
+                if (window.heroSelection && window.heroSelection.heinzEffectManager) {
+                    try {
+                        const heinzTriggered = await window.heroSelection.heinzEffectManager.triggerHeinzFirstDiscardBonus(window.heroSelection);
+                        if (heinzTriggered) {
+                            console.log('Heinz first discard bonus triggered!');
+                        }
+                    } catch (heinzError) {
+                        console.error('Error triggering Heinz effect:', heinzError);
+                        // Don't let Heinz errors prevent the disenchant from completing
+                    }
+                }
+
+                // Check if any Heroes with Inventing can gain counters
+                if (window.heroSelection && window.heroSelection.inventingAbility) {
+                    try {
+                        window.heroSelection.inventingAbility.handleDisenchant(window.heroSelection);
+                    } catch (inventingError) {
+                        console.error('Error triggering Inventing effect:', inventingError);
+                        // Don't let Inventing errors prevent the disenchant from completing
+                    }
+                }
+
                 // Show success feedback
                 this.showDisenchantFeedback(cardElement, cardName);
                 
@@ -519,7 +574,7 @@ export class HandManager {
         this.clearHand();
         const drawnCards = this.drawCards(5);
         
-        // ===== TEST HELPER: Add test card after initial hand is drawn =====
+        // ===== TEST HELPER: Add test cards after initial hand is drawn =====
         // TO REMOVE: Simply delete this line and the addTestCardToHand() function above
         this.addTestCardToHand();
         
@@ -688,7 +743,9 @@ export class HandManager {
             }
             
             // If ANY exclusive artifact is active, ALL cards are disabled
+            const canDrag = !isAnyExclusiveActive; // Always allow dragging unless exclusive artifact is active
             const canPlay = !isAnyExclusiveActive && (!requiresAction || hasActions) && !isUnaffordable;
+
             
             const cardData = {
                 imagePath: cardPath,
@@ -714,7 +771,7 @@ export class HandManager {
 
             // ===== TEST HELPER: Add visual indicator for test cards =====
             let testCardIndicator = '';
-            if (this.ENABLE_TEST_HELPERS && cardName === this.TEST_CARD_NAME) {
+            if (this.ENABLE_TEST_HELPERS && this.TEST_CARD_NAMES.includes(cardName)) {
                 testCardIndicator = '<div class="test-card-indicator">🧪</div>';
                 cardClasses += ' test-card';
             }
@@ -728,8 +785,8 @@ export class HandManager {
                     data-can-play="${canPlay}"
                     data-unaffordable="${isUnaffordable}"
                     data-exclusive-hand-disabled="${isAnyExclusiveActive}"
-                    draggable="${canPlay ? 'true' : 'false'}"
-                    ondragstart="${canPlay ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
+                    draggable="${canDrag ? 'true' : 'false'}"
+                    ondragstart="${canDrag ? `onHandCardDragStart(event, ${index}, '${cardName}')` : 'return false;'}"
                     ondragend="onHandCardDragEnd(event)"
                     onclick="onHandCardClick(event, ${index}, '${cardName}')"
                     oncontextmenu="onHandCardRightClick(event, ${index}, '${cardName}')"
@@ -861,7 +918,7 @@ export class HandManager {
 // Enhanced hand card drag start with ENTIRE HAND disabling
 function onHandCardDragStart(event, cardIndex, cardName) {
     if (window.handManager && window.heroSelection) {
-        // Check if entire hand is disabled due to exclusive artifact
+        // Check if entire hand is disabled due to exclusive artifact - this still blocks dragging
         if (window.artifactHandler && window.artifactHandler.isExclusiveArtifactActive()) {
             const activeExclusive = window.artifactHandler.getActiveExclusiveArtifact();
             const formattedName = window.handManager.formatCardName(activeExclusive);
@@ -870,15 +927,13 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             return false;
         }
 
-        // Check if it's an artifact and if player can afford it
+        // Check affordability and actions - show warnings but DON'T prevent dragging
         const affordCheck = canPlayerAffordArtifact(cardName);
         if (!affordCheck.canAfford) {
-            event.preventDefault();
-            showGoldError(affordCheck.reason, event);
-            return false;
+            // Show warning but allow dragging to continue
+            showGoldError(`${affordCheck.reason} (dragging to discard pile still works)`, event);
         }
         
-        // Check if player can play action card
         const cardInfo = window.heroSelection.getCardInfo ? 
             window.heroSelection.getCardInfo(cardName) : null;
         
@@ -886,9 +941,8 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             const actionCheck = window.heroSelection.actionManager.canPlayActionCard(cardInfo);
             
             if (!actionCheck.canPlay) {
-                event.preventDefault();
-                showActionError(actionCheck.reason, event);
-                return false;
+                // Show warning but allow dragging to continue
+                showActionError(`${actionCheck.reason} (dragging to discard pile still works)`, event);
             }
         }
 
@@ -900,25 +954,22 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             return false;
         }
         
-        // Browser detection for different drag image strategies
+        // Rest of the drag setup code remains the same...
         const isOpera = (!!window.opr && !!opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
         const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
         const isChrome = navigator.userAgent.toLowerCase().indexOf('chrome') > -1 && !isOpera;
         const isSafari = navigator.userAgent.toLowerCase().indexOf('safari') > -1 && !isChrome && !isOpera;
         
-        // Set dataTransfer FIRST (before any visual modifications)
         try {
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.dropEffect = 'move';
             
-            // Set drag data
             event.dataTransfer.setData('application/x-hand-drag', JSON.stringify({
                 cardIndex: cardIndex,
                 cardName: cardName
             }));
             event.dataTransfer.setData('text/plain', cardName);
             
-            // Browser-specific drag image handling
             if (isOpera) {
                 setupOperaDragImage(event, draggedElement);
             } else if (isFirefox) {
@@ -930,11 +981,9 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             console.error('Error setting up drag:', error);
         }
         
-        // DELAY visual modifications to not interfere with ghost image generation
         setTimeout(() => {
             const success = window.handManager.startHandCardDrag(cardIndex, cardName, draggedElement);
             if (!success) {
-                // Drag was blocked, clean up dataTransfer
                 event.preventDefault();
                 return false;
             }
@@ -946,6 +995,7 @@ function onHandCardDragStart(event, cardIndex, cardName) {
 async function onHandCardClick(event, cardIndex, cardName) {
     event.stopPropagation();
 
+    // Keep all the existing blocking logic here since we still want to block effects
     // Check if entire hand is disabled due to exclusive artifact
     if (window.artifactHandler && window.artifactHandler.isExclusiveArtifactActive()) {
         const activeExclusive = window.artifactHandler.getActiveExclusiveArtifact();
@@ -958,19 +1008,24 @@ async function onHandCardClick(event, cardIndex, cardName) {
     // Check if it's a potion
     if (window.potionHandler && window.potionHandler.isPotionCard(cardName, window.heroSelection)) {
         const result = await window.potionHandler.handlePotionClick(cardIndex, cardName, window.heroSelection);
-        return;
-    }
         
-    // Check if it's an artifact and if player can afford it
-    const affordCheck = canPlayerAffordArtifact(cardName);
-    if (!affordCheck.canAfford) {
-        showGoldError(affordCheck.reason, event);
+        // Add to graveyard if successfully activated
+        if (result && window.heroSelection && window.heroSelection.graveyardManager) {
+            window.heroSelection.graveyardManager.addCard(cardName);
+            await window.heroSelection.autoSave(); // Save the graveyard state
+        }
         return;
     }
 
     // Check if it's a global spell
     if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
         const result = await window.globalSpellManager.handleGlobalSpellActivation(cardIndex, cardName, window.heroSelection);
+        
+        // Add to graveyard if successfully activated
+        if (result && window.heroSelection && window.heroSelection.graveyardManager) {
+            window.heroSelection.graveyardManager.addCard(cardName);
+            await window.heroSelection.autoSave(); // Save the graveyard state
+        }
         
         // Check for MagicArts redraw after successful activation
         if (result && window.heroSelection) {
@@ -979,10 +1034,42 @@ async function onHandCardClick(event, cardIndex, cardName) {
         
         return;
     }
+
+    // Use artifact handler for all artifacts
+    if (window.artifactHandler) {
+        const handled = await window.artifactHandler.handleArtifactClick(cardIndex, cardName, window.heroSelection);
+        
+        // Add to graveyard if successfully activated
+        if (handled && window.heroSelection && window.heroSelection.graveyardManager) {
+            // Magic gems handle their own graveyard logic, skip automatic addition
+            const magicGems = ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'MagneticGlove', 'FutureTechCopyDevice'];
+            
+            if (!magicGems.includes(cardName)) {
+                window.heroSelection.graveyardManager.addCard(cardName);
+            }
+            await window.heroSelection.autoSave();
+        }
+        
+        if (handled) {
+            return; // Artifact was successfully handled
+        }
+    }
     
     // Use artifact handler for all artifacts
     if (window.artifactHandler) {
         const handled = await window.artifactHandler.handleArtifactClick(cardIndex, cardName, window.heroSelection);
+        
+        // Add to graveyard if successfully activated
+        if (handled && window.heroSelection && window.heroSelection.graveyardManager) {
+            // Magic gems handle their own graveyard logic, skip automatic addition
+            const magicGems = ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'MagneticGlove', 'FutureTechCopyDevice'];
+            
+            if (!magicGems.includes(cardName)) {
+                window.heroSelection.graveyardManager.addCard(cardName);
+            }
+            await window.heroSelection.autoSave();
+        }
+        
         if (handled) {
             return; // Artifact was successfully handled
         }
@@ -1303,34 +1390,69 @@ async function onHandCardDragEnd(event) {
                 const y = event.clientY;
                 
                 if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-                    // Check if it's a potion being dragged out of hand
-                    if (window.potionHandler && window.potionHandler.isPotionCard(dragState.draggedCardName, window.heroSelection)) {
-                        const result = await window.potionHandler.handlePotionDrag(
-                            dragState.draggedCardIndex,
-                            dragState.draggedCardName,
-                            window.heroSelection
+                    // Check if the card was dropped on the discard pile
+                    const discardPile = document.getElementById('discardPileSlot');
+                    let droppedOnDiscardPile = false;
+                    
+                    if (discardPile) {
+                        const discardRect = discardPile.getBoundingClientRect();
+                        droppedOnDiscardPile = (
+                            x >= discardRect.left && 
+                            x <= discardRect.right && 
+                            y >= discardRect.top && 
+                            y <= discardRect.bottom
                         );
                     }
-                    else if (window.globalSpellManager && window.heroSelection &&
-                        window.globalSpellManager.isGlobalSpell(dragState.draggedCardName, window.heroSelection)) {
-                                                
-                        const result = await window.globalSpellManager.handleGlobalSpellActivation(
-                            dragState.draggedCardIndex,
-                            dragState.draggedCardName,
-                            window.heroSelection
-                        );
-                        
-                        // Check for MagicArts redraw after successful activation
-                        if (result && window.heroSelection) {
-                            await magicArtsRedraw.handleMagicArtsRedraw(dragState.draggedCardName, window.heroSelection);
+                    
+                    // Only activate effects if NOT dropped on discard pile
+                    if (!droppedOnDiscardPile) {
+                        // Check if it's a potion being dragged out of hand
+                        if (window.potionHandler && window.potionHandler.isPotionCard(dragState.draggedCardName, window.heroSelection)) {
+                            const result = await window.potionHandler.handlePotionDrag(
+                                dragState.draggedCardIndex,
+                                dragState.draggedCardName,
+                                window.heroSelection
+                            );
+                            
+                            // Add to graveyard if successfully activated
+                            if (result && window.heroSelection && window.heroSelection.graveyardManager) {
+                                window.heroSelection.graveyardManager.addCard(dragState.draggedCardName);
+                                await window.heroSelection.autoSave(); // Save the graveyard state
+                            }
                         }
-                    }
-                    else if (window.artifactHandler) {
-                        const result = await window.artifactHandler.handleArtifactDrag(
-                            dragState.draggedCardIndex, 
-                            dragState.draggedCardName, 
-                            window.heroSelection
-                        );
+                        else if (window.globalSpellManager && window.heroSelection &&
+                            window.globalSpellManager.isGlobalSpell(dragState.draggedCardName, window.heroSelection)) {
+                                                
+                            const result = await window.globalSpellManager.handleGlobalSpellActivation(
+                                dragState.draggedCardIndex,
+                                dragState.draggedCardName,
+                                window.heroSelection
+                            );
+                            
+                            // Add to graveyard if successfully activated
+                            if (result && window.heroSelection && window.heroSelection.graveyardManager) {
+                                window.heroSelection.graveyardManager.addCard(dragState.draggedCardName);
+                                await window.heroSelection.autoSave(); // Save the graveyard state
+                            }
+                            
+                            // Check for MagicArts redraw after successful activation
+                            if (result && window.heroSelection) {
+                                await magicArtsRedraw.handleMagicArtsRedraw(dragState.draggedCardName, window.heroSelection);
+                            }
+                        }
+                        else if (window.artifactHandler) {
+                            const result = await window.artifactHandler.handleArtifactDrag(
+                                dragState.draggedCardIndex, 
+                                dragState.draggedCardName, 
+                                window.heroSelection
+                            );
+                            
+                            // Add to graveyard if successfully activated
+                            if (result && window.heroSelection && window.heroSelection.graveyardManager) {
+                                window.heroSelection.graveyardManager.addCard(dragState.draggedCardName);
+                                await window.heroSelection.autoSave(); // Save the graveyard state
+                            }
+                        }
                     }
                 }
             }
@@ -1416,7 +1538,6 @@ actionIndicatorStyle.textContent = `
     .hand-card.no-actions-available {
         opacity: 0.6;
         filter: grayscale(30%);
-        cursor: not-allowed;
     }
     
     .hand-card.no-actions-available::after {

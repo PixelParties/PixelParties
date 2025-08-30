@@ -55,6 +55,19 @@ const CARD_DATABASE = {
         ability1: 'DecayMagic',
         ability2: 'Resistance'
     },
+    'Heinz': {
+        name: 'Heinz',
+        image: './Cards/Characters/Heinz.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 10,
+        ability1: 'Inventing',
+        ability2: 'Inventing'
+    },
     'Ida': {
         name: 'Ida',
         image: './Cards/Characters/Ida.png',
@@ -1339,6 +1352,9 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: "Permanent"
     },
+
+
+    //KAZENA
     'CloudPillow': {
         name: 'CloudPillow',
         image: './Cards/All/CloudPillow.png',
@@ -1395,6 +1411,88 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: null,
         subtype: null
+    },
+
+
+    /// HEINZ
+    'Inventing': {
+        name: 'Inventing',
+        image: './Cards/All/Inventing.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'FutureTechDrone': {
+        name: 'FutureTechDrone',
+        image: './Cards/All/FutureTechDrone.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 20,
+        physicalAttack: false
+    },
+    'FutureTechMech': {
+        name: 'FutureTechMech',
+        image: './Cards/All/FutureTechMech.png',
+        cardType: 'Spell',
+        level: 5,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 150,
+        physicalAttack: false
+    },
+    'AncientTechInfiniteEnergyCore': {
+        name: 'AncientTechInfiniteEnergyCore',
+        image: './Cards/All/AncientTechInfiniteEnergyCore.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
+    'BirthdayPresent': {
+        name: 'BirthdayPresent',
+        image: './Cards/All/BirthdayPresent.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'FutureTechCopyDevice': {
+        name: 'FutureTechCopyDevice',
+        image: './Cards/All/FutureTechCopyDevice.png',
+        cardType: 'Artifact',
+        cost: 8,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'FutureTechFists': {
+        name: 'FutureTechFists',
+        image: './Cards/All/FutureTechFists.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: 'Equip'
+    },
+    'FutureTechLamp': {
+        name: 'FutureTechLamp',
+        image: './Cards/All/FutureTechLamp.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        exclusive: true
     },
 };
 

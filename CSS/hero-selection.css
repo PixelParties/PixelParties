@@ -352,7 +352,7 @@
 }
 
 .character-card[data-ability-received="true"]::before {
-    content: '✓';
+    content: '';
     position: absolute;
     top: 5px;
     right: 5px;
@@ -402,7 +402,7 @@
     transform: scale(0.95);
 }
 
-/* UPDATED: Team Building Slots - Decoupled Area and Heroes */
+/* UPDATED: Team Building Slots - Decoupled Area, Discard Pile, and Heroes */
 .team-slots-container {
     display: flex;
     justify-content: center;
@@ -412,14 +412,14 @@
     min-height: 340px;
 }
 
-/* Independent Area Slot Positioning */
+/* Independent Area Slot Positioning - UPDATED for half height */
 .area-slot {
     position: absolute;
-    left: -10px; /* Adjust this value to move left/right */
-    top: 50%;
-    transform: translateY(-50%);
+    left: -20px;
+    top: 0%;
+    transform: translateY(0);
     width: 200px;
-    min-height: 227px; /* Reduced by 1/3 from 340px */
+    min-height: 227px; /* Half the hero slot height */
     border: 3px dashed rgba(76, 175, 80, 0.4);
     border-radius: var(--radius-large);
     display: flex;
@@ -441,7 +441,107 @@
 .area-slot.empty:hover {
     border-color: rgba(76, 175, 80, 0.6);
     background: linear-gradient(135deg, rgba(76, 175, 80, 0.12), rgba(129, 199, 132, 0.08));
-    transform: translateY(-50%) scale(1.02);
+    transform: translateY(0) scale(1.02);
+}
+
+/* Discard Pile Styles */
+.discard-pile-slot {
+    position: absolute;
+    left: -20px;
+    top: calc(19% + 170px + 10px); 
+    width: 200px;
+    min-height: 170px; /* Half the hero slot height */
+    border: 3px dashed rgba(220, 53, 69, 0.4);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.08), rgba(244, 67, 54, 0.05));
+    backdrop-filter: blur(10px);
+    transition: var(--transition-medium);
+    overflow: hidden;
+    z-index: 1;
+}
+
+.discard-pile-slot.empty {
+    border-style: dashed;
+}
+
+.discard-pile-slot.empty:hover {
+    border-color: rgba(220, 53, 69, 0.6);
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.12), rgba(244, 67, 54, 0.08));
+    transform: scale(1.02);
+}
+
+/* Discard pile placeholder content */
+.discard-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+}
+
+.discard-icon {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 4px 8px rgba(220, 53, 69, 0.3));
+    animation: discardIconFloat 3s ease-in-out infinite;
+}
+
+.discard-label {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #dc3545;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+}
+
+/* Discard pile drag states */
+.discard-pile-slot.discard-drop-ready {
+    border-color: #dc3545 !important;
+    border-style: solid !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.25), rgba(244, 67, 54, 0.2)) !important;
+    box-shadow: 
+        0 0 30px rgba(220, 53, 69, 0.6),
+        inset 0 0 20px rgba(220, 53, 69, 0.3) !important;
+    transform: scale(1.03);
+    animation: discardDropPulse 1.5s ease-in-out infinite;
+}
+
+.discard-pile-slot.discard-drop-invalid {
+    border-color: #6c757d !important;
+    border-style: solid !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(108, 117, 125, 0.15), rgba(134, 142, 150, 0.1)) !important;
+    box-shadow: 
+        0 0 20px rgba(108, 117, 125, 0.5),
+        inset 0 0 15px rgba(108, 117, 125, 0.2) !important;
+    animation: invalidDiscardDropPulse 1.5s ease-in-out infinite;
+}
+
+/* Drop tooltip for discard pile */
+.discard-pile-slot.discard-drop-ready::after {
+    content: "Discard for 2 Gold";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(220, 53, 69, 0.95);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
 }
 
 /* NEW: Hero Slots Container - Only affects heroes */
@@ -451,7 +551,7 @@
     gap: 30px;
 }
 
-/* Hero Slots - Independent from Area */
+/* Hero Slots - Independent from Area and Discard Pile */
 .team-slot {
     width: 200px;
     min-height: 340px;
@@ -604,7 +704,7 @@
 }
 
 .team-slot.global-spell-hover::after {
-    content: "🌐 Global spell - drop anywhere outside hand to activate!";
+    content: " Global spell - drop anywhere outside hand to activate!";
     position: absolute;
     top: -30px;
     left: 50%;
@@ -724,6 +824,7 @@
     align-items: center;
     gap: 16px;
     position: relative;
+    text-align: center !important;
 }
 
 .guard-change-indicator {
@@ -771,12 +872,6 @@
     align-items: center;
     gap: 5px;
     letter-spacing: 0.5px;
-}
-
-.ability-hint::before {
-    content: '⚡';
-    font-style: normal;
-    color: #ffc107;
 }
 
 /* Hero stats with Pixel font - keep existing positioning, just update font */
@@ -855,15 +950,11 @@
     right: 25px;
 }
 
-.team-header-title {
-    text-align: center !important;
-}
-
 /* ============================================
    AREA ZONE STYLES - Independent from Heroes
    ============================================ */
 
-/* Area placeholder content */
+/* Area placeholder content - UPDATED for smaller height */
 .area-placeholder {
     display: flex;
     flex-direction: column;
@@ -874,15 +965,15 @@
 }
 
 .area-globe {
-    font-size: 3.5rem; /* Reduced from 4rem to fit smaller height */
-    margin-bottom: 10px; /* Reduced from 12px */
+    font-size: 2.8rem; /* Reduced from 3.5rem to fit smaller height */
+    margin-bottom: 8px; /* Reduced from 10px */
     filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.3));
     animation: globeFloat 3s ease-in-out infinite;
 }
 
 .area-label {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 1.1rem; /* Slightly reduced from 1.2rem */
+    font-size: 1rem; /* Slightly reduced from 1.1rem */
     font-weight: 700;
     color: #4CAF50;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -895,10 +986,10 @@
         transform: translateY(0px) rotate(0deg);
     }
     33% {
-        transform: translateY(-6px) rotate(120deg); /* Reduced from -8px */
+        transform: translateY(-4px) rotate(120deg); /* Reduced from -6px */
     }
     66% {
-        transform: translateY(3px) rotate(240deg); /* Reduced from 4px */
+        transform: translateY(2px) rotate(240deg); /* Reduced from 3px */
     }
 }
 
@@ -919,8 +1010,8 @@
 }
 
 .area-card-image-container {
-    width: 140px; /* Reduced from 160px to fit smaller height */
-    height: 196px; /* Reduced proportionally (140 * 1.4) */
+    width: 120px; /* Reduced from 140px to fit smaller height */
+    height: 168px; /* Reduced proportionally (120 * 1.4) */
     border-radius: var(--radius-medium);
     overflow: hidden;
     box-shadow: var(--shadow-medium);
@@ -948,7 +1039,7 @@
     box-shadow: 
         0 0 30px rgba(76, 175, 80, 0.6),
         inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
-    transform: translateY(-50%) scale(1.03);
+    transform: translateY(0) scale(1.03);
     animation: areaDropPulse 1.5s ease-in-out infinite;
 }
 
@@ -1011,7 +1102,81 @@
     letter-spacing: 0.5px;
 }
 
-/* Animations */
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Discard pile animations */
+@keyframes discardIconFloat {
+    0%, 100% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    33% {
+        transform: translateY(-4px) rotate(5deg);
+    }
+    66% {
+        transform: translateY(2px) rotate(-5deg);
+    }
+}
+
+@keyframes discardDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 30px rgba(220, 53, 69, 0.6),
+            inset 0 0 20px rgba(220, 53, 69, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 40px rgba(220, 53, 69, 0.8),
+            inset 0 0 30px rgba(220, 53, 69, 0.4);
+    }
+}
+
+@keyframes invalidDiscardDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 20px rgba(108, 117, 125, 0.5),
+            inset 0 0 15px rgba(108, 117, 125, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 0 30px rgba(108, 117, 125, 0.7),
+            inset 0 0 25px rgba(108, 117, 125, 0.3);
+    }
+}
+
+/* Discard success feedback animation */
+@keyframes discardSuccessFeedback {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+    20% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+    }
+}
+
+.discard-success-feedback {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.discard-success-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.discard-success-icon {
+    font-size: 16px;
+}
+
 @keyframes areaDropPulse {
     0%, 100% {
         box-shadow: 
@@ -1038,8 +1203,84 @@
     }
 }
 
+@keyframes abilityDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 30px rgba(76, 175, 80, 0.6),
+            inset 0 0 20px rgba(76, 175, 80, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 40px rgba(76, 175, 80, 0.8),
+            inset 0 0 30px rgba(76, 175, 80, 0.4);
+    }
+}
+
+@keyframes invalidDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 20px rgba(220, 53, 69, 0.4),
+            inset 0 0 15px rgba(220, 53, 69, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 0 30px rgba(220, 53, 69, 0.7),
+            inset 0 0 25px rgba(220, 53, 69, 0.3);
+    }
+}
+
+@keyframes heroAddedGlow {
+    0% {
+        box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
+    }
+    50% {
+        box-shadow: 0 20px 50px rgba(40, 167, 69, 0.7);
+    }
+    100% {
+        box-shadow: 0 15px 35px rgba(40, 167, 69, 0.5);
+    }
+}
+
+@keyframes abilityClickPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+        filter: brightness(1.3);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes guardChangeGlow {
+    from {
+        box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    }
+    to {
+        box-shadow: 0 4px 16px rgba(76, 175, 80, 0.6);
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 /* ============================================
-   RESPONSIVE BREAKPOINTS - Updated for Decoupled Layout
+   RESPONSIVE BREAKPOINTS - Updated for Decoupled Layout with Discard Pile
    ============================================ */
 
 @media (max-width: 1200px) {
@@ -1056,21 +1297,37 @@
     /* Area slot - separate responsive rules */
     .area-slot {
         left: -240px; /* Adjust for smaller screens */
-        min-height: 213px; /* Maintain 1/3 reduction (320px ÷ 3 × 2) */
+        min-height: 160px; /* Half of hero slot height */
+        width: 180px;
+    }
+    
+    /* Discard pile - separate responsive rules */
+    .discard-pile-slot {
+        left: -240px;
+        top: calc(10% + 160px + 10px);
+        min-height: 160px;
         width: 180px;
     }
     
     .area-card-image-container {
-        width: 120px;
-        height: 168px;
+        width: 100px;
+        height: 140px;
     }
     
     .area-globe {
-        font-size: 3rem;
+        font-size: 2.4rem;
     }
     
     .area-label {
-        font-size: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .discard-icon {
+        font-size: 2rem;
+    }
+    
+    .discard-label {
+        font-size: 0.9rem;
     }
 }
 
@@ -1096,7 +1353,7 @@
         position: static;
         transform: none;
         margin-bottom: 20px;
-        min-height: 227px; /* Keep reduced height */
+        min-height: 170px; /* Keep reduced height */
         width: 200px;
     }
     
@@ -1108,9 +1365,22 @@
         transform: scale(1.03);
     }
     
+    /* Discard pile returns to normal positioning on mobile */
+    .discard-pile-slot {
+        position: static;
+        transform: none;
+        margin-bottom: 20px;
+        min-height: 170px;
+        width: 200px;
+    }
+    
+    .discard-pile-slot.discard-drop-ready {
+        transform: scale(1.03);
+    }
+    
     .area-card-image-container {
-        width: 160px;
-        height: 224px;
+        width: 140px;
+        height: 196px;
     }
 }
 
@@ -1144,17 +1414,34 @@
     
     /* Area adjustments */
     .area-globe {
-        font-size: 2.5rem;
+        font-size: 2.2rem;
         margin-bottom: 6px;
     }
     
     .area-label {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         letter-spacing: 0.5px;
     }
     
     .area-slot.area-drop-ready::after,
     .area-slot.area-drop-invalid::after {
+        font-size: 10px;
+        padding: 4px 8px;
+        top: -30px;
+    }
+    
+    /* Discard pile adjustments */
+    .discard-icon {
+        font-size: 1.8rem;
+        margin-bottom: 6px;
+    }
+    
+    .discard-label {
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .discard-pile-slot.discard-drop-ready::after {
         font-size: 10px;
         padding: 4px 8px;
         top: -30px;
@@ -1186,11 +1473,200 @@
     
     /* Area adjustments for very small screens */
     .area-globe {
-        font-size: 2rem;
+        font-size: 1.8rem;
     }
     
     .area-label {
-        font-size: 0.8rem;
+        font-size: 0.7rem;
         letter-spacing: 0.3px;
     }
+    
+    /* Discard pile adjustments for very small screens */
+    .discard-icon {
+        font-size: 1.5rem;
+    }
+    
+    .discard-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.3px;
+    }
+}
+
+/* Ensure team-slots-container provides positioning context for absolutely positioned children */
+.team-slots-container {
+    position: relative !important;
+}
+
+/* Strengthen area-slot positioning to prevent inheritance issues */
+.area-slot {
+    position: absolute !important;
+    /* Prevent flex styling if accidentally moved to hero container */
+    flex: none !important;
+    /* Ensure it maintains its intended dimensions */
+    width: 200px !important;
+    min-height: 227px !important;
+}
+
+/* Emergency styling if area-slot gets moved to wrong container */
+.hero-slots-container .area-slot {
+    /* If area slot somehow ends up in hero container, make it obvious */
+    position: absolute !important;
+    left: -250px !important; /* Move it outside the hero container */
+    top: 0 !important;
+    background: rgba(255, 0, 0, 0.3) !important; /* Red background to indicate error */
+    border: 3px solid red !important;
+    z-index: 1000 !important;
+}
+
+.hero-slots-container .area-slot::before {
+    content: "ERROR: Area in Hero Container!";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+/* Inventing Counter Display */
+.inventing-counter-display {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    padding: 2px 6px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow: 
+        0 2px 6px rgba(23, 162, 184, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    z-index: 15;
+    min-width: 28px;
+    justify-content: center;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.inventing-counter-display.counter-updated {
+    transform: scale(1.2);
+    box-shadow: 
+        0 4px 12px rgba(23, 162, 184, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    animation: counterUpdatePulse 0.5s ease-out;
+}
+
+.inventing-counter-icon {
+    font-size: 9px;
+    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.5));
+}
+
+.inventing-counter-value {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    min-width: 8px;
+    text-align: center;
+}
+
+/* Animation for counter updates */
+@keyframes counterUpdatePulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.3);
+    }
+    100% {
+        transform: scale(1.2);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .inventing-counter-display {
+        font-size: 8px;
+        padding: 1px 4px;
+        border-radius: 8px;
+        min-width: 22px;
+        gap: 2px;
+    }
+    
+    .inventing-counter-icon {
+        font-size: 7px;
+    }
+    
+    .inventing-counter-value {
+        font-size: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .inventing-counter-display {
+        font-size: 7px;
+        padding: 1px 3px;
+        border-radius: 6px;
+        min-width: 18px;
+    }
+    
+    .inventing-counter-icon {
+        font-size: 6px;
+    }
+    
+    .inventing-counter-value {
+        font-size: 7px;
+    }
+}
+
+@keyframes birthdayPresentOpponentDrawFeedback {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px) scale(0.8);
+    }
+    20% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1.1);
+    }
+    80% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px) scale(0.9);
+    }
+}
+
+.birthday-present-opponent-draw-feedback {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.birthday-present-opponent-draw-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.birthday-present-opponent-draw-icon {
+    font-size: 24px;
+    animation: bounce 1s ease-out infinite;
+}
+
+.birthday-present-opponent-draw-text {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
 }

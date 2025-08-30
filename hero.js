@@ -1,4 +1,4 @@
-// hero.js - Enhanced Hero Class with Pre-calculated Stats from heroSelection + Battle Bonus System
+// hero.js - Enhanced Hero Class with Pre-calculated Stats from heroSelection + Battle Bonus System + Shield System
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -33,6 +33,9 @@ export class Hero {
         
         // Combat state
         this.alive = true;
+        
+        // SHIELD SYSTEM - Add shield support to Hero class
+        this.currentShield = 0;  // Current shield points
         
         // Abilities - structured storage
         this.abilities = {
@@ -81,6 +84,153 @@ export class Hero {
         }
     }
 
+    // ============================================
+    // SHIELD SYSTEM METHODS
+    // ============================================
+
+    /**
+     * Add shield points to this hero
+     * @param {number} amount - Amount of shield to add
+     */
+    addShield(amount) {
+        if (amount <= 0) return;
+
+        const oldShield = this.currentShield;
+        this.currentShield += amount;
+
+        // Add to combat history
+        this.combatHistory.push({
+            action: 'shield_gained',
+            amount: amount,
+            oldShield: oldShield,
+            newShield: this.currentShield,
+            timestamp: Date.now()
+        });
+
+        return {
+            oldShield: oldShield,
+            newShield: this.currentShield,
+            gained: amount
+        };
+    }
+
+    /**
+     * Remove shield points from this hero
+     * @param {number} amount - Amount of shield to remove
+     * @returns {number} Actual amount of shield removed
+     */
+    removeShield(amount) {
+        if (amount <= 0) return 0;
+
+        const oldShield = this.currentShield;
+        const actualRemoved = Math.min(amount, this.currentShield);
+        this.currentShield = Math.max(0, this.currentShield - amount);
+
+        // Add to combat history
+        if (actualRemoved > 0) {
+            this.combatHistory.push({
+                action: 'shield_lost',
+                amount: actualRemoved,
+                oldShield: oldShield,
+                newShield: this.currentShield,
+                timestamp: Date.now()
+            });
+        }
+
+        return actualRemoved;
+    }
+
+    /**
+     * Get current shield amount
+     * @returns {number} Current shield points
+     */
+    getShield() {
+        return this.currentShield || 0;
+    }
+
+    /**
+     * Check if hero has any shield
+     * @returns {boolean} True if hero has shield
+     */
+    hasShield() {
+        return this.currentShield > 0;
+    }
+
+    /**
+     * Set shield amount directly (for restoration)
+     * @param {number} amount - Shield amount to set
+     */
+    setShield(amount) {
+        this.currentShield = Math.max(0, amount);
+    }
+
+    /**
+     * Clear all shield points
+     */
+    clearShield() {
+        const oldShield = this.currentShield;
+        this.currentShield = 0;
+        
+        if (oldShield > 0) {
+            this.combatHistory.push({
+                action: 'shield_cleared',
+                amount: oldShield,
+                oldShield: oldShield,
+                newShield: 0,
+                timestamp: Date.now()
+            });
+        }
+        
+        return oldShield;
+    }
+
+    /**
+     * Apply damage to shields first, then HP
+     * @param {number} damage - Damage amount
+     * @returns {Object} Damage application result
+     */
+    takeDamageWithShields(damage) {
+        if (damage <= 0) {
+            return { shieldDamage: 0, hpDamage: 0, died: false };
+        }
+
+        let remainingDamage = damage;
+        let shieldDamage = 0;
+        let hpDamage = 0;
+
+        // Apply damage to shields first
+        if (this.hasShield()) {
+            shieldDamage = Math.min(remainingDamage, this.currentShield);
+            remainingDamage -= shieldDamage;
+            this.removeShield(shieldDamage);
+        }
+
+        // Apply remaining damage to HP
+        if (remainingDamage > 0) {
+            const damageResult = this.takeDamage(remainingDamage);
+            hpDamage = remainingDamage;
+            return {
+                shieldDamage: shieldDamage,
+                hpDamage: hpDamage,
+                died: damageResult.died,
+                oldHp: damageResult.oldHp,
+                newHp: damageResult.newHp
+            };
+        }
+
+        return { 
+            shieldDamage: shieldDamage, 
+            hpDamage: 0, 
+            died: false,
+            oldHp: this.currentHp,
+            newHp: this.currentHp
+        };
+    }
+
+    // ============================================
+    // EXISTING METHODS (unchanged)
+    // ============================================
+
     addPermanentStatBonuses(attackBonus, hpBonus) {
         this.attackBonusses += attackBonus;
         this.hpBonusses += hpBonus;
@@ -122,6 +272,9 @@ export class Hero {
             this.battleAttackBonus = 0;
             this.battleHpBonus = 0;
         }
+        
+        // Clear shields when battle ends
+        this.clearShield();
     }
     
     // Get current attack including battle bonuses
@@ -471,7 +624,7 @@ export class Hero {
         return abilityData ? abilityData.stackCount : 0;
     }
     
-    // Take damage
+    // Take damage (without shields - legacy method)
     takeDamage(damage) {
         const oldHp = this.currentHp;
         this.currentHp = Math.max(0, this.currentHp - damage);
@@ -553,7 +706,7 @@ export class Hero {
         return this.statusEffects.some(effect => effect.name === effectName);
     }
     
-    // Export hero state for persistence
+    // Export hero state for persistence - UPDATED WITH SHIELD SUPPORT
     exportState() {
         return {
             // Basic info
@@ -574,6 +727,9 @@ export class Hero {
             baseMaxHp: this.baseMaxHp,
             baseAtk: this.baseAtk,
             alive: this.alive,
+            
+            // SHIELD SYSTEM - Include shield in export
+            currentShield: this.currentShield || 0,
             
             // Permanent stat bonuses
             attackBonusses: this.attackBonusses,
@@ -618,7 +774,7 @@ export class Hero {
         return this.spellbook.some(spell => spell.name === spellName && spell.enabled !== false);
     }
     
-    // Import hero state from persistence
+    // Import hero state from persistence - UPDATED WITH SHIELD SUPPORT
     static fromSavedState(savedState) {
         const hero = new Hero(
             {
@@ -644,6 +800,9 @@ export class Hero {
         hero.maxHp = savedState.maxHp;
         hero.atk = savedState.atk;
         hero.alive = savedState.alive;
+        
+        // SHIELD SYSTEM - Restore shield data
+        hero.currentShield = savedState.currentShield || 0;
         
         // Restore permanent stat bonuses
         hero.attackBonusses = savedState.attackBonusses || 0;

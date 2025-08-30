@@ -120,6 +120,9 @@ export class BattleFlowManager {
             const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
             bm.coldHeartedYukiOnnaManager = new ColdHeartedYukiOnnaCreature(bm);
 
+            const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
+            bm.futureTechMechManager = new FutureTechMechCreature(bm);
+
         } catch (error) {
             // Initialize fallback null managers to prevent undefined errors
             if (!bm.jigglesManager) bm.jigglesManager = null;
@@ -130,6 +133,7 @@ export class BattleFlowManager {
             if (!bm.royalCorgiManager) bm.royalCorgiManager = null;
             if (!bm.crumTheClassPetManager) bm.crumTheClassPetManager = null;
             if (!bm.coldHeartedYukiOnnaManager) bm.coldHeartedYukiOnnaManager = null;
+            if (!bm.futureTechMechManager) bm.futureTechMechManager = null;
         }
 
         try {
@@ -583,6 +587,7 @@ export class BattleFlowManager {
                 const GrinningCatCreature = (await import('./Creatures/grinningCat.js')).default;
                 const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
                 const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
+                const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
 
                 if (JigglesCreature.isJiggles(playerActor.name)) {
                     if (bm.jigglesManager) {
@@ -706,6 +711,14 @@ export class BattleFlowManager {
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                         bm.addCombatLog(`😸 ${playerActor.name} activates!`, 'success');
                     }
+                } else if (FutureTechMechCreature.isFutureTechMech(playerActor.name)) {
+                    if (bm.futureTechMechManager) {
+                        actions.push(bm.futureTechMechManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🤖 ${playerActor.name} activates!`, 'success');
+                    }
                 } else {
                     actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                     bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
@@ -734,6 +747,7 @@ export class BattleFlowManager {
                 const GrinningCatCreature = (await import('./Creatures/grinningCat.js')).default;
                 const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
                 const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
+                const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
 
                 if (JigglesCreature.isJiggles(opponentActor.name)) {
                     if (bm.jigglesManager) {
@@ -850,6 +864,14 @@ export class BattleFlowManager {
                     } else {
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
                         bm.addCombatLog(`😸 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else if (FutureTechMechCreature.isFutureTechMech(opponentActor.name)) {
+                    if (bm.futureTechMechManager) {
+                        actions.push(bm.futureTechMechManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🤖 ${opponentActor.name} activates!`, 'error');
                     }
                 } else {
                     actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));

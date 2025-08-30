@@ -1,5 +1,5 @@
-// battleCombatManager.js - Combat Management Module
-// Handles damage calculation, targeting, and combat execution
+// battleCombatManager.js - Combat Management Module with Shield System
+// Handles damage calculation, targeting, combat execution, and shield mechanics
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js';
 
@@ -8,11 +8,200 @@ import { MoniaHeroEffect } from './Heroes/monia.js';
 
 import { checkHeartOfIceEffects } from './Artifacts/heartOfIce.js';
 
-
 export class BattleCombatManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
     }
+
+    // ============================================
+    // SHIELD SYSTEM METHODS
+    // ============================================
+
+    /**
+     * Add shield points to a hero
+     * @param {Object} hero - Hero to receive shield
+     * @param {number} amount - Amount of shield to add
+     */
+    addShield(hero, amount) {
+        if (!hero || amount <= 0) return;
+
+        // Initialize shield if not present
+        if (typeof hero.currentShield !== 'number') {
+            hero.currentShield = 0;
+        }
+
+        const oldShield = hero.currentShield;
+        hero.currentShield += amount;
+
+        // Update health bar to show shields
+        this.battleManager.updateHeroHealthBar(hero.side, hero.position, hero.currentHp, hero.maxHp);
+
+        // ONLY send network update if this is NOT being called from a specialized artifact handler
+        // (Check the call stack to see if we're in FutureTechFists context)
+        const stack = new Error().stack;
+        const isFromFutureTechFists = stack.includes('handleFutureTechFistsEffect') || 
+                                    stack.includes('futureTechFists');
+        
+        if (this.battleManager.isAuthoritative && !isFromFutureTechFists) {
+            this.battleManager.sendBattleUpdate('hero_shield_changed', {
+                targetAbsoluteSide: hero.absoluteSide,
+                targetPosition: hero.position,
+                targetName: hero.name,
+                oldShield: oldShield,
+                newShield: hero.currentShield,
+                change: amount,
+                changeType: 'gain'
+            });
+        }
+        
+        // DEBUG: Log shield addition
+        console.log(`🛡️ Shield added: ${hero.name} gained ${amount} shield (${oldShield} → ${hero.currentShield})`);
+    }
+
+    /**
+     * Remove shield points from a hero
+     * @param {Object} hero - Hero to remove shield from
+     * @param {number} amount - Amount of shield to remove
+     * @returns {number} Actual amount of shield removed
+     */
+    removeShield(hero, amount) {
+        if (!hero || amount <= 0) return 0;
+
+        // Initialize shield if not present
+        if (typeof hero.currentShield !== 'number') {
+            hero.currentShield = 0;
+        }
+
+        const oldShield = hero.currentShield;
+        const actualRemoved = Math.min(amount, hero.currentShield);
+        hero.currentShield = Math.max(0, hero.currentShield - amount);
+
+        // Update health bar to show shields
+        this.battleManager.updateHeroHealthBar(hero.side, hero.position, hero.currentHp, hero.maxHp);
+
+        // Send shield update to guest if host
+        if (this.battleManager.isAuthoritative && actualRemoved > 0) {
+            this.battleManager.sendBattleUpdate('hero_shield_changed', {
+                targetAbsoluteSide: hero.absoluteSide,
+                targetPosition: hero.position,
+                targetName: hero.name,
+                oldShield: oldShield,
+                newShield: hero.currentShield,
+                change: actualRemoved,
+                changeType: 'loss'
+            });
+        }
+
+        return actualRemoved;
+    }
+
+    /**
+     * Get current shield amount for a hero
+     * @param {Object} hero - Hero to check
+     * @returns {number} Current shield amount
+     */
+    getShield(hero) {
+        if (!hero) return 0;
+        return hero.currentShield || 0;
+    }
+
+    /**
+     * Check if hero has any shield
+     * @param {Object} hero - Hero to check
+     * @returns {boolean} True if hero has shield
+     */
+    hasShield(hero) {
+        return this.getShield(hero) > 0;
+    }
+
+    /**
+     * Apply damage to shields first, then HP
+     * @param {Object} hero - Hero taking damage
+     * @param {number} damage - Damage amount
+     * @returns {Object} Damage application result
+     */
+    applyDamageWithShields(hero, damage) {
+        if (!hero || damage <= 0) {
+            return { shieldDamage: 0, hpDamage: 0, died: false };
+        }
+
+        let remainingDamage = damage;
+        let shieldDamage = 0;
+        let hpDamage = 0;
+
+        // Apply damage to shields first
+        if (this.hasShield(hero)) {
+            const currentShield = this.getShield(hero);
+            shieldDamage = Math.min(remainingDamage, currentShield);
+            remainingDamage -= shieldDamage;
+            
+            // Remove shield
+            this.removeShield(hero, shieldDamage);
+        }
+
+        // Apply remaining damage to HP
+        if (remainingDamage > 0) {
+            const oldHp = hero.currentHp;
+            hpDamage = remainingDamage;
+            hero.currentHp = Math.max(0, hero.currentHp - hpDamage);
+            
+            // Check if hero died
+            const died = hero.currentHp <= 0 && oldHp > 0;
+            if (died) {
+                hero.alive = false;
+            }
+
+            return { shieldDamage, hpDamage, died };
+        }
+
+        return { shieldDamage, hpDamage, died: false };
+    }
+
+    /**
+     * Handle guest receiving shield update
+     * @param {Object} data - Shield update data from host
+     */
+    guest_handleShieldChanged(data) {
+        if (this.battleManager.isAuthoritative) return;
+
+        const { targetAbsoluteSide, targetPosition, targetName, oldShield, newShield, change, changeType } = data;
+
+        // Determine local side for guest
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+
+        // Find the target hero
+        const heroes = targetLocalSide === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+        const hero = heroes[targetPosition];
+
+        if (!hero) {
+            console.error(`Hero not found for shield update: ${targetLocalSide} ${targetPosition}`);
+            return;
+        }
+
+        // Apply shield change
+        hero.currentShield = newShield;
+
+        // Update health bar
+        this.battleManager.updateHeroHealthBar(targetLocalSide, targetPosition, hero.currentHp, hero.maxHp);
+
+        // Add to combat log
+        if (changeType === 'gain') {
+            this.battleManager.addCombatLog(
+                `🛡️ ${targetName} gains ${change} shield!`,
+                targetLocalSide === 'player' ? 'success' : 'info'
+            );
+        } else if (changeType === 'loss') {
+            this.battleManager.addCombatLog(
+                `🛡️ ${targetName} loses ${change} shield`,
+                targetLocalSide === 'player' ? 'error' : 'success'
+            );
+        }
+    }
+
+    // ============================================
+    // EXISTING COMBAT METHODS (updated for shields)
+    // ============================================
 
     // Use Hero's pre-calculated attack value directly
     getHeroAbilityModifiers(hero) {
@@ -456,11 +645,11 @@ export class BattleCombatManager {
         
         // Execute spell casting if applicable
         if (playerSpellToCast && this.battleManager.spellSystem) {
-            await this.battleManager.spellSystem.executeSpellCasting(playerHeroActor.data, playerSpellToCast); // …
+            await this.battleManager.spellSystem.executeSpellCasting(playerHeroActor.data, playerSpellToCast);
         }
 
         if (opponentSpellToCast && this.battleManager.spellSystem) {
-            await this.battleManager.spellSystem.executeSpellCasting(opponentHeroActor.data, opponentSpellToCast); // …
+            await this.battleManager.spellSystem.executeSpellCasting(opponentHeroActor.data, opponentSpellToCast);
         }
         
         // UPDATED: Check for ranged attackers and use appropriate targeting
@@ -473,7 +662,7 @@ export class BattleCombatManager {
             playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
             if (playerIsRanged) {
                 playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
-                this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🹹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
             } else {
                 playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
             }
@@ -483,7 +672,7 @@ export class BattleCombatManager {
             opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
             if (opponentIsRanged) {
                 opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
-                this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🹹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
             } else {
                 opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
             }
@@ -671,7 +860,7 @@ export class BattleCombatManager {
         }
     }
 
-    // Apply damage to target (hero or creature)
+    // Apply damage to target (hero or creature) - UPDATED WITH SHIELDS
     async applyAttackDamageToTarget(attack) {
         if (!attack || !attack.target) return;
         
@@ -711,7 +900,7 @@ export class BattleCombatManager {
             }
             
         } else {
-            // Hero-to-hero attack
+            // Hero-to-hero attack - NOW WITH SHIELD SUPPORT
             const defender = attack.target.hero;
             const attacker = attack.hero;
             const isRanged = attack.isRanged || false;
@@ -729,8 +918,8 @@ export class BattleCombatManager {
                 }
             }
             
-            // Apply the damage
-            await this.authoritative_applyDamage({
+            // Use authoritative_applyDamage to ensure all status effects are processed
+            const damageResult = await this.authoritative_applyDamage({
                 target: defender,
                 damage: attack.damage,
                 newHp: Math.max(0, defender.currentHp - attack.damage),
@@ -740,6 +929,20 @@ export class BattleCombatManager {
                 attacker: attacker
             });
                         
+            // Handle death (if not already handled by immortal revival)
+            if (damageResult && damageResult.died) {
+                this.battleManager.handleHeroDeath(defender);
+                
+                // Record kill if there's an attacker
+                if (this.battleManager.isAuthoritative) {
+                    this.battleManager.killTracker.recordKill(attacker, defender, 'hero');
+                    this.battleManager.addCombatLog(
+                        `💀 ${attacker.name} has slain ${defender.name}!`, 
+                        attacker.side === 'player' ? 'success' : 'error'
+                    );
+                }
+            }
+            
             // Check for SkeletonMage reactions to ally death (only if hero actually died)
             if (wasAlive && !defender.alive) {
                 this.battleManager.checkForSkeletonMageReactions(defender, defender.side, 'hero');
@@ -752,7 +955,7 @@ export class BattleCombatManager {
                     defender,
                     attack.damage,
                     'basic',
-                    attack.effectsTriggered || []  // … Pass the effects that were triggered!
+                    attack.effectsTriggered || []  
                 );
             }
             
@@ -764,7 +967,7 @@ export class BattleCombatManager {
                 );
             }
 
-            // Skip fireshield recoil for ranged attacks (they're not close enough to get burned)
+            // Skip fireshield recoil for ranged attacks
             if (!isRanged) {
                 // Check for fireshield recoil damage (only for melee hero-to-hero attacks)
                 this.checkAndApplyFireshieldRecoil(attacker, defender);
@@ -772,7 +975,7 @@ export class BattleCombatManager {
         }
     }
 
-    // Apply damage to target
+    // Apply damage to target - UPDATED FOR SHIELDS
     async authoritative_applyDamage(damageResult, context = {}) {
         if (!this.battleManager) {
             console.error('CRITICAL: Combat manager not initialized when applying damage!');
@@ -813,14 +1016,19 @@ export class BattleCombatManager {
             }
         }
         
-        // Apply the damage
-        const oldHp = target.currentHp;
-        const damageResult_final = target.takeDamage(finalDamage);
-        
-        // Validate current HP after damage
-        if (typeof target.currentHp !== 'number' || isNaN(target.currentHp)) {
-            console.error(`⚠️ Target HP became NaN after damage! Target: ${target.name}, Old HP: ${oldHp}, Damage: ${finalDamage}`);
-            target.currentHp = Math.max(0, oldHp - finalDamage); // Fallback calculation
+        // Apply damage using shield system for heroes
+        let damageApplication;
+        if (target.type === 'hero' || !target.type) {
+            damageApplication = this.applyDamageWithShields(target, finalDamage);
+        } else {
+            // For creatures, use old system (no shields)
+            const oldHp = target.currentHp;
+            const damageResult_old = target.takeDamage(finalDamage);
+            damageApplication = {
+                shieldDamage: 0,
+                hpDamage: finalDamage,
+                died: damageResult_old.died
+            };
         }
 
         // Process clouded stack removal after damage is applied
@@ -828,29 +1036,44 @@ export class BattleCombatManager {
             this.battleManager.statusEffectsManager.processCloudedAfterDamage(target, finalDamage);
         }
         
-        // Create damage number visual
+        // Create damage number visuals
         if (target.type === 'hero' || !target.type) {
-            // Hero damage
-            this.battleManager.animationManager.createDamageNumber(
-                target.side, 
-                target.position, 
-                finalDamage, 
-                target.maxHp, 
-                damageSource
-            );
+            // Hero damage with shields
+            if (damageApplication.shieldDamage > 0) {
+                this.battleManager.animationManager.createDamageNumber(
+                    target.side, 
+                    target.position, 
+                    damageApplication.shieldDamage, 
+                    target.maxHp, 
+                    'shield_damage'
+                );
+            }
+            
+            if (damageApplication.hpDamage > 0) {
+                this.battleManager.animationManager.createDamageNumber(
+                    target.side, 
+                    target.position, 
+                    damageApplication.hpDamage, 
+                    target.maxHp, 
+                    damageSource
+                );
+            }
             
             // Update hero health bar
             this.battleManager.updateHeroHealthBar(target.side, target.position, target.currentHp, target.maxHp);
             
-            // Send network update to guest for hero damage
-            this.battleManager.sendBattleUpdate('damage_applied', {
+            // Send network update to guest for hero damage with shields
+            this.battleManager.sendBattleUpdate('damage_applied_with_shields', {
                 targetAbsoluteSide: target.absoluteSide,
                 targetPosition: target.position,
-                damage: finalDamage, // Use finalDamage
-                oldHp: oldHp,
+                totalDamage: finalDamage,
+                shieldDamage: damageApplication.shieldDamage,
+                hpDamage: damageApplication.hpDamage,
+                oldHp: target.currentHp + damageApplication.hpDamage,
                 newHp: target.currentHp,
                 maxHp: target.maxHp,
-                died: damageResult_final.died,
+                currentShield: this.getShield(target),
+                died: damageApplication.died,
                 targetName: target.name
             });
             
@@ -859,26 +1082,26 @@ export class BattleCombatManager {
                 checkHeartOfIceEffects(this.battleManager, target, finalDamage, damageSource);
             }
 
-            if (damageResult_final.died && this.battleManager.isAuthoritative) {
+            if (damageApplication.died && this.battleManager.isAuthoritative) {
                 // Check for immortal revival before death (unless prevented by special effects)
                 if (!context.preventRevival) {
                     const immortalRevived = await this.checkImmortalRevival(target);
                     if (immortalRevived) {
                         // Revival successful, update damage result
-                        damageResult_final.died = false;
+                        damageApplication.died = false;
                         target.alive = true;
                         
                         // Update health bar after revival
                         this.battleManager.updateHeroHealthBar(target.side, target.position, target.currentHp, target.maxHp);
                         
                         // Don't process normal death
-                        return damageResult_final;
+                        return damageApplication;
                     }
                 }
             }
             
             // Handle hero death
-            if (damageResult_final.died) {
+            if (damageApplication.died) {
                 this.battleManager.handleHeroDeath(target);
                 
                 // Record kill if there's an attacker
@@ -916,26 +1139,40 @@ export class BattleCombatManager {
                     hero: hero,
                     creature: target,
                     creatureIndex: creatureIndex,
-                    damage: finalDamage, // Use finalDamage
+                    damage: finalDamage,
                     position: position,
                     side: side
                 }, context);
             }
         }
         
-        // Add combat log entry
+        // Add combat log entry with shield information
         const logType = target.side === 'player' ? 'error' : 'success';
         
-        if (damageResult_final.died) {
-            this.battleManager.addCombatLog(
-                `💥 ${target.name} takes ${finalDamage} damage and is defeated!`,
-                logType
-            );
+        if (damageApplication.died) {
+            if (damageApplication.shieldDamage > 0) {
+                this.battleManager.addCombatLog(
+                    `💥 ${target.name} takes ${finalDamage} damage (${damageApplication.shieldDamage} to shield, ${damageApplication.hpDamage} to HP) and is defeated!`,
+                    logType
+                );
+            } else {
+                this.battleManager.addCombatLog(
+                    `💥 ${target.name} takes ${finalDamage} damage and is defeated!`,
+                    logType
+                );
+            }
         } else {
-            this.battleManager.addCombatLog(
-                `🩸 ${target.name} takes ${finalDamage} damage! (${oldHp} → ${target.currentHp} HP)`,
-                logType
-            );
+            if (damageApplication.shieldDamage > 0) {
+                this.battleManager.addCombatLog(
+                    `🩸 ${target.name} takes ${finalDamage} damage (${damageApplication.shieldDamage} to shield, ${damageApplication.hpDamage} to HP)!`,
+                    logType
+                );
+            } else {
+                this.battleManager.addCombatLog(
+                    `🩸 ${target.name} takes ${finalDamage} damage! (${target.currentHp + damageApplication.hpDamage} → ${target.currentHp} HP)`,
+                    logType
+                );
+            }
         }
         
         // Save battle state
@@ -943,7 +1180,7 @@ export class BattleCombatManager {
             console.error('Error saving state after damage application:', error);
         });
         
-        return damageResult_final;
+        return damageApplication;
     }
 
     // Helper method to find creature info
@@ -1160,7 +1397,7 @@ export class BattleCombatManager {
             let target = null;
             if (isRanged) {
                 target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
-                this.battleManager.addCombatLog(`🏹 ${hero.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🹹 ${hero.name} uses ranged attack!`, 'info');
             } else {
                 target = this.authoritative_findTargetWithCreatures(position, attackerSide);
             }

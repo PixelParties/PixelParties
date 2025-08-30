@@ -134,7 +134,7 @@ export class BattleStartManager {
         }
     }
 
-    // Phase 4: Apply hero-specific battle start effects
+    // Phase 4: Apply specific battle start effects
     async applyHeroStartEffects() {
         const bm = this.battleManager;
         
@@ -156,6 +156,14 @@ export class BattleStartManager {
             bm.addCombatLog('⚡ Hero battle start effects applied', 'info');
         } catch (error) {
             console.error('Error applying hero start effects:', error);
+        }
+
+        // Apply Future Tech Drone HP bonuses
+        try {
+            const { FutureTechDroneCreature } = await import('./Creatures/futureTechDrone.js');
+            FutureTechDroneCreature.applyStartOfBattleHPBonuses(bm);
+        } catch (error) {
+            console.error('Error applying Future Tech Drone effects:', error);
         }
     }
 

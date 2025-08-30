@@ -20,15 +20,19 @@ import { HeroEquipmentManager } from './heroEquipment.js';
 import VictoryScreen from './victoryScreen.js';
 import heroTooltipManager from './heroTooltips.js';
 import AreaHandler from './areaHandler.js'
+import { graveyardManager } from './graveyard.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
+import { inventingAbility } from './Abilities/inventing.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
 import { VacarnEffectManager } from './Heroes/vacarn.js';
 import { SemiEffectManager } from './Heroes/semi.js';
+import { HeinzEffectManager } from './Heroes/heinz.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
+import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
 
 
 export class HeroSelection {
@@ -47,9 +51,11 @@ export class HeroSelection {
         this.globalSpellManager = globalSpellManager;
         this.opponentPermanentArtifactsData = null;
         this.heroTooltipManager = heroTooltipManager;
+        this.graveyardManager = graveyardManager;
 
         this.magicSapphiresUsed = 0;
         this.magicRubiesUsed = 0;
+        this.birthdayPresentCounter = 0;
 
 
         // Guard Change mode tracking
@@ -87,9 +93,12 @@ export class HeroSelection {
         this.nicolasEffectManager = new NicolasEffectManager();
         this.vacarnEffectManager = new VacarnEffectManager();
         this.semiEffectManager = new SemiEffectManager();
+        this.heinzEffectManager = new HeinzEffectManager();
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
+        this.ancientTechInfiniteEnergyCoreEffect = ancientTechInfiniteEnergyCoreEffect;
+
 
         // Initialize hero abilities manager with references
         this.heroAbilitiesManager.init(
@@ -103,7 +112,7 @@ export class HeroSelection {
                 // Update potion bonuses when abilities change
                 this.potionHandler.updateAlchemyBonuses(this);
                 
-                // NEW: Explicitly refresh hero stats when abilities change
+                // Explicitly refresh hero stats when abilities change
                 setTimeout(() => {
                     this.refreshHeroStats();
                 }, 100);
@@ -142,6 +151,7 @@ export class HeroSelection {
                 // Callback for when equipment state changes
                 this.updateBattleFormationUI();
                 await this.saveGameState();
+                this.ancientTechInfiniteEnergyCoreEffect.onEquipmentChange();
             }
         );
 
@@ -168,6 +178,7 @@ export class HeroSelection {
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['DecayMagic', 'BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
+            'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechCopyDevice', 'FutureTechFists', 'FutureTechLamp'],
             'Ida': ['BottledFlame', 'BurningFinger',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
             'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
@@ -185,6 +196,8 @@ export class HeroSelection {
 
         // Individual Abilities
         this.trainingAbility = trainingAbility;
+        this.inventingAbility = inventingAbility;
+
 
         // Initialize individual systems
         if (typeof window !== 'undefined') {
@@ -237,6 +250,10 @@ export class HeroSelection {
         });
 
         this.crusaderArtifactsHandler.init(this);
+        this.ancientTechInfiniteEnergyCoreEffect.init(this);
+
+        this.inventingAbility.init();
+
         
         return this.loadCharacters();
     }
@@ -271,6 +288,22 @@ export class HeroSelection {
             equipmentAttackBonus = equipmentCount * 10; // +10 Attack per equipment for Toras
         }
         
+        // Check for Ancient Tech Infinite Energy Core bonus
+        let energyCoreAttackBonus = 0;
+        let energyCoreCount = 0;
+        const equipment = this.heroEquipmentManager.getHeroEquipment(heroPosition);
+        if (equipment) {
+            energyCoreCount = equipment.filter(item => {
+                const name = item.name || item.cardName;
+                return name === 'AncientTechInfiniteEnergyCore';
+            }).length;
+            
+            if (energyCoreCount > 0) {
+                const uniqueCardsInGraveyard = this.graveyardManager.getUniqueCards().length;
+                energyCoreAttackBonus = uniqueCardsInGraveyard * 10 * energyCoreCount;
+            }
+        }
+        
         // Get permanent bonuses from LegendarySwordOfABarbarianKing
         let permanentAttackBonus = 0;
         let permanentHpBonus = 0;
@@ -286,7 +319,7 @@ export class HeroSelection {
         // Calculate final stats with all bonuses
         const hpBonus = toughnessStacks * 200;
         const fightingAttackBonus = fightingStacks * 10;
-        const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + permanentAttackBonus;
+        const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + energyCoreAttackBonus + permanentAttackBonus;
         const totalHpBonus = hpBonus + permanentHpBonus;
         
         return {
@@ -300,6 +333,8 @@ export class HeroSelection {
                 attackBonus: fightingAttackBonus,
                 equipmentCount: hero.name === 'Toras' ? (this.heroEquipmentManager.getHeroEquipment(heroPosition)?.length || 0) : 0,
                 equipmentAttackBonus,
+                energyCoreCount: energyCoreCount || 0,
+                energyCoreAttackBonus,
                 permanentAttackBonus,  
                 permanentHpBonus,      
                 totalAttackBonus,
@@ -343,7 +378,7 @@ export class HeroSelection {
             document.body.classList.remove('dragging-ability');
             const result = originalEndDrag();
             
-            // NEW: Trigger stat refresh after drag operations
+            // Trigger stat refresh after drag operations
             if (window.heroSelection) {
                 setTimeout(() => {
                     window.heroSelection.refreshHeroStats();
@@ -511,30 +546,58 @@ export class HeroSelection {
 
     // Handle turn changes from TurnTracker - UPDATED with Leadership reset
     async onTurnChange(turnChangeData) {
-        // Reset actions at the start of each turn (team building phase)
-        this.actionManager.resetActions();
+        // Check if we're in reconnection mode - skip turn-based resets during state restoration
+        const isReconnecting = this.stateMachine.isInState(this.stateMachine.states.RECONNECTING);
+        
+        if (!isReconnecting) {
+            // Reset actions at the start of each turn (team building phase)
+            this.actionManager.resetActions();
 
+            // Reset potion turn-based state
+            if (this.potionHandler) {
+                this.potionHandler.resetPotionsForTurn();
+            }
+            
+            // Reset Leadership usage and ability attachment tracking for new turn
+            if (this.heroAbilitiesManager) {
+                this.heroAbilitiesManager.resetTurnBasedTracking();
+            }
+            
+            // Reset Nicolas effect usage for new turn
+            if (this.nicolasEffectManager) {
+                this.nicolasEffectManager.resetForNewTurn();
+            }
+
+            // Reset Vacarn effect usage for new turn
+            if (this.vacarnEffectManager) {
+                this.vacarnEffectManager.resetForNewTurn();
+                
+                // Process any buried creatures that should be raised
+                await this.vacarnEffectManager.processStartOfTurn(this);
+            }
+
+            // Reset Heinz effect usage for new turn
+            if (this.heinzEffectManager) {
+                this.heinzEffectManager.resetForNewTurn();
+            }
+            
+            // Reset Inventing ability turn-based tracking
+            if (this.inventingAbility) {
+                this.inventingAbility.resetTurn();
+            }
+
+            // Reset birthday present counter to 0 at start of each turn
+            this.birthdayPresentCounter = 0;
+
+            // Process any Birthday Present effects for opponent draws
+            if (window.birthdayPresentArtifact) {
+                window.birthdayPresentArtifact.processOpponentDrawEffects(this);
+            }
+        }
+        
+        // These operations are safe during reconnection and should always run
         if (this.potionHandler) {
             this.potionHandler.updateAlchemyBonuses(this);
-            this.potionHandler.resetPotionsForTurn();
-        }
-        
-        // Reset Leadership usage and ability attachment tracking for new turn
-        if (this.heroAbilitiesManager) {
-            this.heroAbilitiesManager.resetTurnBasedTracking();
-        }
-        
-        // Reset Nicolas effect usage for new turn
-        if (this.nicolasEffectManager) {
-            this.nicolasEffectManager.resetForNewTurn();
-        }
-
-        // Reset Vacarn effect usage for new turn
-        if (this.vacarnEffectManager) {
-            this.vacarnEffectManager.resetForNewTurn();
-            
-            // Process any buried creatures that should be raised
-            await this.vacarnEffectManager.processStartOfTurn(this);
         }
         
         // Update UI to reflect new turn
@@ -549,7 +612,7 @@ export class HeroSelection {
             const characterFiles = [
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
-                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png'
+                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -585,7 +648,7 @@ export class HeroSelection {
             const characterFiles = [
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
-                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png'
+                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -877,16 +940,27 @@ export class HeroSelection {
                     gameState.hostPermanentArtifacts = sanitizeForFirebase(window.artifactHandler.exportPermanentArtifactsState());
                 }
 
-                // Save magnetic glove state for host
+                // Save special modes for host
                 if (window.magneticGloveArtifact) {
                     gameState.hostMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
+                if (window.futureTechLampArtifact) {
+                    gameState.hostFutureTechLampState = sanitizeForFirebase(window.futureTechLampArtifact.exportLampState(this));
+                }
+                if (window.futureTechCopyDeviceArtifact) {
+                    gameState.hostFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
+                }
+
 
                 // Save potion state for host (now includes active effects)
                 if (this.potionHandler) {
                     gameState.hostPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
                 }
 
+                // Save graveyard state for host
+                if (this.graveyardManager) {
+                    gameState.hostGraveyardState = sanitizeForFirebase(this.graveyardManager.exportGraveyard());
+                }
 
                 // Save Hero effect states for host
                 if (this.nicolasEffectManager) {
@@ -898,10 +972,20 @@ export class HeroSelection {
                 if (this.semiEffectManager) {
                     gameState.hostSemiState = sanitizeForFirebase(this.semiEffectManager.exportSemiState());
                 }
+                if (this.heinzEffectManager) {
+                    gameState.hostHeinzState = sanitizeForFirebase(this.heinzEffectManager.exportHeinzState());
+                }
+
+
+                // Abilities
+                if (this.inventingAbility) {
+                    gameState.hostInventingState = sanitizeForFirebase(this.inventingAbility.exportState());
+                }
                 
                 // Magic gems count
                 gameState.hostMagicSapphiresUsed = sanitizeForFirebase(this.magicSapphiresUsed || 0);
                 gameState.hostMagicRubiesUsed = sanitizeForFirebase(this.magicRubiesUsed || 0); 
+                gameState.hostBirthdayPresentCounter = sanitizeForFirebase(this.birthdayPresentCounter || 0);
 
                 // Save delayed artifact effects for host
                 if (this.delayedArtifactEffects) {
@@ -979,17 +1063,28 @@ export class HeroSelection {
                     gameState.guestPermanentArtifacts = sanitizeForFirebase(window.artifactHandler.exportPermanentArtifactsState());
                 }
 
-                // Save magnetic glove state for guest
+                // Save special modes for guest
                 if (window.magneticGloveArtifact) {
                     gameState.guestMagneticGloveState = sanitizeForFirebase(window.magneticGloveArtifact.exportMagneticGloveState(this));
                 }
+                if (window.futureTechLampArtifact) {
+                    gameState.guestFutureTechLampState = sanitizeForFirebase(window.futureTechLampArtifact.exportLampState(this));
+                }
+                if (window.futureTechCopyDeviceArtifact) {
+                    gameState.guestFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
+                }
+
+
 
                 // Save potion state for guest (now includes active effects)
                 if (this.potionHandler) {
                     gameState.guestPotionState = sanitizeForFirebase(this.potionHandler.exportPotionState());
                 }
 
-
+                // Save graveyard state for guest
+                if (this.graveyardManager) {
+                    gameState.guestGraveyardState = sanitizeForFirebase(this.graveyardManager.exportGraveyard());
+                }
 
                 // Save Hero effect states for guest
                 if (this.nicolasEffectManager) {
@@ -1001,18 +1096,30 @@ export class HeroSelection {
                 if (this.semiEffectManager) {
                     gameState.guestSemiState = sanitizeForFirebase(this.semiEffectManager.exportSemiState());
                 }
+                if (this.heinzEffectManager) {
+                    gameState.guestHeinzState = sanitizeForFirebase(this.heinzEffectManager.exportHeinzState());
+                }
+
+
+                // Abilities
+                if (this.inventingAbility) {
+                    gameState.guestInventingState = sanitizeForFirebase(this.inventingAbility.exportState());
+                }
+
 
                 // Save Magic gems count
                 let magicSapphireValue = 0; 
-                
                 if (this.magicSapphiresUsed !== undefined && this.magicSapphiresUsed !== null)magicSapphireValue = this.magicSapphiresUsed;
-                                
                 gameState.guestMagicSapphiresUsed = sanitizeForFirebase(magicSapphireValue);
 
-                let magicRubyValue = 0; 
+                let magicRubyValue = 0;
                 if (this.magicRubiesUsed !== undefined && this.magicRubiesUsed !== null)magicRubyValue = this.magicRubiesUsed;
-                
                 gameState.guestMagicRubiesUsed = sanitizeForFirebase(magicRubyValue);
+
+                let birthdayPresentValue = 0;
+                if (this.birthdayPresentCounter !== undefined && this.birthdayPresentCounter !== null) birthdayPresentValue = this.birthdayPresentCounter;
+                gameState.guestBirthdayPresentCounter = sanitizeForFirebase(birthdayPresentValue);
+                
                 
                 // Save delayed artifact effects for guest
                 if (this.delayedArtifactEffects) {
@@ -1030,9 +1137,6 @@ export class HeroSelection {
             // Sanitize the entire gameState object
             const sanitizedGameState = sanitizeForFirebase(gameState);
 
-
-
-
             // Before saving, log current burning finger stacks in formation
             const formation = this.formationManager.getBattleFormation();
             ['left', 'center', 'right'].forEach(position => {
@@ -1040,8 +1144,6 @@ export class HeroSelection {
                 if (hero && hero.burningFingerStack !== undefined) {
                 }
             });
-
-            
             
             await roomRef.child('gameState').update(sanitizedGameState);
             return true;
@@ -1085,7 +1187,7 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, magicSapphiresUsedData = null, magicRubiesUsedData = null, areaCardData = null){
+        restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, magicSapphiresUsedData = null, magicRubiesUsedData = null, birthdayPresentCounterData = null, areaCardData = null, graveyardData = null, inventingData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1099,6 +1201,16 @@ export class HeroSelection {
         // Restore hand
         if (handData && this.handManager) {
             const handRestored = this.handManager.importHand(handData);
+        }
+
+        // Restore graveyard data
+        if (graveyardData && this.graveyardManager) {
+            const graveyardRestored = this.graveyardManager.importGraveyard(graveyardData);
+        } else {
+            // Initialize empty graveyard for new game
+            if (this.graveyardManager) {
+                this.graveyardManager.reset();
+            }
         }
         
         // Restore life data
@@ -1139,7 +1251,6 @@ export class HeroSelection {
                 this.nicolasEffectManager.reset();
             }
         }
-
         if (vacarnData && this.vacarnEffectManager) {
             const vacarnRestored = this.vacarnEffectManager.importVacarnState(vacarnData);
             if (vacarnRestored) {
@@ -1149,7 +1260,6 @@ export class HeroSelection {
                 this.vacarnEffectManager.reset();
             }
         }
-
         if (semiData && this.semiEffectManager) {
             const semiRestored = this.semiEffectManager.importSemiState(semiData);
             if (semiRestored) {
@@ -1159,7 +1269,20 @@ export class HeroSelection {
             if (this.semiEffectManager) {
                 this.semiEffectManager.reset();
             }
+        }        
+        if (heinzData && this.heinzEffectManager) {
+            const heinzRestored = this.heinzEffectManager.importHeinzState(heinzData);
+            if (heinzRestored) {
+                // Debug info if needed
+            }
+        } else {
+            // Initialize Heinz state if no saved data
+            if (this.heinzEffectManager) {
+                this.heinzEffectManager.reset();
+            }
         }
+
+
 
         // ===== Restore delayed artifact effects =====
         if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
@@ -1255,6 +1378,14 @@ export class HeroSelection {
                 }
             }
         }
+
+        if (birthdayPresentCounterData !== null && birthdayPresentCounterData !== undefined) {
+            this.birthdayPresentCounter = birthdayPresentCounterData;
+        } else {
+            if (this.birthdayPresentCounter === undefined || this.birthdayPresentCounter === null) {
+                this.birthdayPresentCounter = 0;
+            }
+        }
         
         // Initialize life manager with turn tracker after restoration
         this.initializeLifeManagerWithTurnTracker();
@@ -1302,7 +1433,7 @@ export class HeroSelection {
             return true;
         }
 
-        // IMPORTANT: Check if this is truly a fresh game before resetting
+        // Check if this is truly a fresh game before resetting
         const currentTurn = this.turnTracker.getCurrentTurn();
         if (currentTurn > 1) {
             // Don't proceed with new game generation if turn > 1
@@ -1513,6 +1644,9 @@ export class HeroSelection {
             //Gather deck data
             const deckData = this.deckManager.getDeck();
 
+            // Gather graveyard data
+            const graveyardData = this.graveyardManager.getGraveyard();
+
             // Gather area data
             const areaFormationData = this.areaHandler.getFormationUpdateData();
 
@@ -1527,10 +1661,10 @@ export class HeroSelection {
                 permanentArtifacts: permanentArtifactsData,
                 hand: handData,
                 deck: deckData,
-                // Include area data
+                graveyard: graveyardData,
+                birthdayPresentCounter: this.birthdayPresentCounter || 0,
                 playerAreaCard: areaFormationData.playerAreaCard,
                 opponentAreaCard: areaFormationData.opponentAreaCard,
-                // Keep the spread for backward compatibility
                 ...areaFormationData
             });
         }
@@ -1588,6 +1722,9 @@ export class HeroSelection {
         if (data.deck) {
             this.opponentDeckData = data.deck;
         }
+        if (data.graveyard) {
+            this.opponentGraveyardData = data.graveyard;
+        }
 
         // Store opponent area data if included
         if (data.playerAreaCard !== undefined) {
@@ -1598,6 +1735,11 @@ export class HeroSelection {
         if (this.areaHandler) {
             // Pass the full data object so areaHandler can extract what it needs
             this.areaHandler.handleFormationUpdateReceived(data); 
+        }
+        
+        // Store opponent birthday present counter if included
+        if (data.birthdayPresentCounter !== undefined) {
+            this.opponentBirthdayPresentCounterData = data.birthdayPresentCounter;
         }
     }
 
@@ -1849,6 +1991,11 @@ export class HeroSelection {
                     this.potionHandler.clearPotionEffects();
                 } catch (error) {
                 }
+            }
+
+            // ===== PROCESS BIRTHDAY PRESENT EFFECTS AFTER BATTLE =====
+            if (window.birthdayPresentArtifact) {
+                window.birthdayPresentArtifact.processBirthdayPresentEffectsAfterBattle(this);
             }
             
             if (window.heroSelection) {
@@ -2397,19 +2544,19 @@ export class HeroSelection {
         const opponentHand = this.opponentHandData || [];
         const playerDeck = this.getLatestPlayerDeck();
         const opponentDeck = this.opponentDeckData || [];
+        const playerGraveyard = this.graveyardManager.getGraveyard();
+        const opponentGraveyard = this.opponentGraveyardData || [];
         
         const areaBattleData = this.areaHandler.getBattleInitData();
 
         
-
-
     
         // Debug formation data before battle starts
         const playerFormation = this.formationManager.getBattleFormation();
         const opponentFormation = this.formationManager.getOpponentBattleFormation();
 
-
-
+        const playerBirthdayPresentCounter = this.birthdayPresentCounter || 0;
+        const opponentBirthdayPresentCounter = this.opponentBirthdayPresentCounterData || 0;
         
         // Initialize battle screen with all data        
         try {
@@ -2441,7 +2588,11 @@ export class HeroSelection {
                 playerDeck,
                 opponentDeck,
                 areaBattleData.playerAreaCard,
-                areaBattleData.opponentAreaCard
+                areaBattleData.opponentAreaCard,
+                playerGraveyard,
+                opponentGraveyard,
+                playerBirthdayPresentCounter,
+                opponentBirthdayPresentCounter 
             );
             return true;
             
@@ -2731,6 +2882,44 @@ export class HeroSelection {
         }
     }
 
+    // Process opponent draw effects at turn start
+    processOpponentDrawEffects() {
+        if (!this.delayedArtifactEffects || this.delayedArtifactEffects.length === 0) {
+            return 0;
+        }
+        
+        // Find and process opponent draw effects
+        let totalCardsToDrawForOpponent = 0;
+        const effectsToRemove = [];
+        
+        this.delayedArtifactEffects.forEach((effect, index) => {
+            if (effect.type === 'opponent_draw_cards' && 
+                effect.triggerCondition === 'at_turn_start') {
+                
+                totalCardsToDrawForOpponent += effect.drawCount || 0;
+                effectsToRemove.push(index);
+            }
+        });
+        
+        // Remove processed effects (in reverse order to maintain indices)
+        effectsToRemove.reverse().forEach(index => {
+            this.delayedArtifactEffects.splice(index, 1);
+        });
+        
+        // Draw the cards if any
+        if (totalCardsToDrawForOpponent > 0) {
+            const drawnCards = this.handManager.drawCards(totalCardsToDrawForOpponent);
+                        
+            // Update UI
+            this.updateHandDisplay();
+            
+            // Save state
+            this.saveGameState();
+        }
+        
+        return totalCardsToDrawForOpponent;
+    }
+
     // Drag and Drop delegation to FormationManager with ability card handling
     startDrag(character, fromSlot, draggedElement) {
         this.formationManager.startDrag(character, fromSlot, draggedElement);
@@ -2822,14 +3011,14 @@ export class HeroSelection {
         // Get card info to check if it requires an action
         const cardInfo = getCardInfo(spellCardName);
         
-        // Check if this is FrontSoldier being summoned for free
+        // Check if this is a Creature being summoned for free
         const isFrontSoldierFree = this.canSummonFrontSoldierForFree(targetSlot, spellCardName);
-        
-        // NEW: Check if this is Archer being summoned for free (Leadership 3+)
         const isArcherFree = this.canSummonArcherForFree(targetSlot, spellCardName);
+        const isFutureTechDroneFree = this.canSummonFutureTechDroneForFree(targetSlot, spellCardName);
+
         
         // Check if player can play action card (skip for free creatures)
-        if (!isFrontSoldierFree && !isArcherFree) {
+        if (!isFrontSoldierFree && !isArcherFree && !isFutureTechDroneFree) {
             const actionCheck = this.actionManager.canPlayActionCard(cardInfo);
             if (!actionCheck.canPlay) {
                 this.handManager.endHandCardDrag();
@@ -2854,7 +3043,7 @@ export class HeroSelection {
 
             if (success) {
                 // Consume action if required (skip for free creatures)
-                if (cardInfo.action && !isFrontSoldierFree && !isArcherFree) {
+                if (cardInfo.action && !isFrontSoldierFree && !isArcherFree && !isFutureTechDroneFree) {
                     this.actionManager.consumeAction();
                 }
                 
@@ -2867,6 +3056,8 @@ export class HeroSelection {
                     successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free!`;
                 } else if (isArcherFree) {
                     successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free with Leadership!`;
+                } else if (isFutureTechDroneFree) {
+                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free (3+ in graveyard)!`;
                 } else if (learnCheck.isArcherReducedLevel) {
                     successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} with reduced requirements!`;
                 } else {
@@ -2889,7 +3080,7 @@ export class HeroSelection {
         const learnCheck = this.canHeroLearnSpell(targetSlot, spellCardName);
 
         if (!learnCheck.canLearn) {
-            // NEW: Check if this is Semi's gold learning case
+            // Check if this is Semi's gold learning case
             if (learnCheck.isSemiGoldLearning) {
                 this.handManager.endHandCardDrag();
                 
@@ -3128,6 +3319,11 @@ export class HeroSelection {
             this.areaHandler.reset();
         }
 
+        // Reset graveyard
+        if (this.graveyardManager) {
+            this.graveyardManager.reset();
+        }
+
         // Reset Hero effect managers
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.reset();
@@ -3138,11 +3334,24 @@ export class HeroSelection {
         if (this.semiEffectManager) {
             this.semiEffectManager.reset();
         }
+        if (this.heinzEffectManager) {
+            this.heinzEffectManager.reset();
+        }
+
+
+        // Reset Abilities
+        if (this.inventingAbility) {
+            this.inventingAbility.reset();
+        }
         
-        // Reset crusader artifacts handler
+        // Reset Artifact handlers
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.reset();
         }
+        if (this.ancientTechInfiniteEnergyCoreEffect) {
+            this.ancientTechInfiniteEnergyCoreEffect.reset();
+        }
+
         
         // Hide battle waiting overlay
         this.hideBattleWaitingOverlay();
@@ -3173,6 +3382,10 @@ export class HeroSelection {
         const heroSelectionScreen = document.querySelector('.hero-selection-screen');
         if (heroSelectionScreen) {
             heroSelectionScreen.style.display = 'flex';
+        }
+
+        if (window.futureTechCopyDeviceArtifact) {
+            window.futureTechCopyDeviceArtifact.cleanup(this);
         }
 
         this.heroAbilitiesManager.reset();
@@ -3229,7 +3442,7 @@ export class HeroSelection {
             return { canLearn: false, reason: "Invalid spell card!" };
         }
 
-        // NEW: First check heroSpellbookManager restrictions (includes Area spell restriction)
+        // First check heroSpellbookManager restrictions (includes Area spell restriction)
         const spellbookCheck = this.heroSpellbookManager.canHeroLearnSpell(heroPosition, spellCardName);
         if (!spellbookCheck.canLearn) {
             return spellbookCheck; // Return the specific restriction (like Area spells)
@@ -3287,13 +3500,23 @@ export class HeroSelection {
             }
         });
 
-        // Calculate effective spell level requirement for ThievingStrike
+        // Calculate effective spell level requirement for Spells with level reduction
         let effectiveSpellLevel = baseSpellLevel;
         let thievingReduction = 0;
         
         if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
             thievingReduction = totalThievingLevel;
             effectiveSpellLevel = Math.max(0, baseSpellLevel - thievingReduction);
+        }
+
+        if (spellCardName === 'FutureTechMech') {
+            const levelReduction = this.graveyardManager ? 
+                this.graveyardManager.getGraveyard().filter(card => card === 'FutureTechMech').length : 0;
+            
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - levelReduction);
+            
+            // Don't return early - let the normal spell school level checking continue
+            // The effectiveSpellLevel will be used in the comparison below
         }
 
         // Check 4: Compare levels with the effective requirement
@@ -3330,19 +3553,36 @@ export class HeroSelection {
                     reason: `${hero.name} needs ${formattedSpellSchool} ${effectiveSpellLevel}+ to learn ${formattedSpellName}! (Has ${formattedSpellSchool} ${totalSpellSchoolLevel} + Thieving ${totalThievingLevel} = ${currentCombined}/${originalRequirement})`
                 };
             } else {
+                // For FutureTechMech, show the reduced level requirement in the error message
+                let errorMessage = `${hero.name} needs ${formattedSpellSchool} at level ${effectiveSpellLevel} or higher to learn ${formattedSpellName}!`;
+                
+                if (spellCardName === 'FutureTechMech' && effectiveSpellLevel < baseSpellLevel) {
+                    const levelReduction = baseSpellLevel - effectiveSpellLevel;
+                    errorMessage += ` (Level reduced from ${baseSpellLevel} to ${effectiveSpellLevel} due to ${levelReduction} in graveyard)`;
+                }
+                
                 return { 
                     canLearn: false, 
-                    reason: `${hero.name} needs ${formattedSpellSchool} at level ${effectiveSpellLevel} or higher to learn ${formattedSpellName}!`
+                    reason: errorMessage
                 };
             }
         }
 
-        // Success case - include information about Thieving reduction if applicable
+        // Success case - include information about reductions if applicable
         const result = { canLearn: true, heroName: hero.name };
         
         if (spellCardName === 'ThievingStrike' && thievingReduction > 0) {
             result.isThievingReduced = true;
             result.thievingReduction = thievingReduction;
+            result.originalLevel = baseSpellLevel;
+            result.effectiveLevel = effectiveSpellLevel;
+        }
+        
+        // Add FutureTechMech reduction info to success case
+        if (spellCardName === 'FutureTechMech' && effectiveSpellLevel < baseSpellLevel) {
+            const levelReduction = baseSpellLevel - effectiveSpellLevel;
+            result.isFutureTechMechReduced = true;
+            result.levelReduction = levelReduction;
             result.originalLevel = baseSpellLevel;
             result.effectiveLevel = effectiveSpellLevel;
         }
@@ -3367,6 +3607,21 @@ export class HeroSelection {
         
         // Check if hero has Leadership 3 or higher
         return this.canSummonArcherForFree(heroPosition, spellCardName);
+    }
+
+    canSummonFutureTechDroneForFree(heroPosition, spellCardName) {
+        if (spellCardName !== 'FutureTechDrone') {
+            return false;
+        }
+        
+        // Check if graveyard has 3+ Future Tech Drones
+        if (this.graveyardManager) {
+            const graveyard = this.graveyardManager.getGraveyard();
+            const droneCount = graveyard.filter(card => card === 'FutureTechDrone').length;
+            return droneCount >= 3;
+        }
+        
+        return false;
     }
 
     // Add helper method to check if dragging an equip artifact card
@@ -3532,7 +3787,7 @@ export class HeroSelection {
 // Global drag and drop functions (Hero formation only - hand drag/drop is now in HandManager)
 function onHeroDragStart(event, characterJson, slotPosition) {
     if (window.heroSelection) {
-        // NEW: Immediately hide any tooltips when drag starts
+        // Immediately hide any tooltips when drag starts
         if (window.heroSelection.heroSelectionUI) {
             window.heroSelection.heroSelectionUI.hideHeroSpellbookTooltip();
         }

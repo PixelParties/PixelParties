@@ -57,7 +57,11 @@ export class CheckpointSystem {
                     playerHand: this.battleManager.playerHand || [],
                     opponentHand: this.battleManager.opponentHand || [],
                     playerDeck: this.battleManager.playerDeck || [],
-                    opponentDeck: this.battleManager.opponentDeck || []
+                    opponentDeck: this.battleManager.opponentDeck || [],
+                    playerGraveyard: this.battleManager.playerGraveyard || [],
+                    opponentGraveyard: this.battleManager.opponentGraveyard || [],
+                    playerBirthdayPresentCounter: this.battleManager.playerBirthdayPresentCounter || 0,
+                    opponentBirthdayPresentCounter: this.battleManager.opponentBirthdayPresentCounter || 0
                 },
                 
                 // Heroes - Complete state for both sides
@@ -130,7 +134,6 @@ export class CheckpointSystem {
     }
 
     captureHeroState(hero) {
-        // FIXED: Use the hero's built-in exportState() method to ensure all properties are captured
         // This includes battle bonuses and any other state that the hero manages
         if (hero.exportState && typeof hero.exportState === 'function') {
             const heroState = hero.exportState();
@@ -157,12 +160,15 @@ export class CheckpointSystem {
             baseAtk: hero.baseAtk,
             alive: hero.alive,
             
+            // Shield system support - was missing!
+            currentShield: hero.currentShield || 0,
+            
             // Position info
             position: hero.position,
             side: hero.side,
             absoluteSide: hero.absoluteSide,
             
-            // Battle bonuses - MANUALLY ADDED for fallback
+            // Battle bonuses
             battleAttackBonus: hero.battleAttackBonus || 0,
             battleHpBonus: hero.battleHpBonus || 0,
             
@@ -180,7 +186,7 @@ export class CheckpointSystem {
                 arrayIndex: index
             })) : [],
             
-            // Equipment - NOW CAPTURED AT HERO LEVEL ONLY
+            // Equipment - captured at hero level only
             equipment: hero.equipment ? JSON.parse(JSON.stringify(hero.equipment)) : [],
             
             // Status effects
@@ -193,12 +199,16 @@ export class CheckpointSystem {
             necromancyStacks: hero.necromancyStacks || 0,
             maxNecromancyStacks: hero.maxNecromancyStacks || 0,
 
-            // Arrows
+            // Arrow counters
             flameArrowCounters: hero.flameArrowCounters || 0,
             
             // Any custom properties
             customStats: hero.customStats || {},
-            combatHistory: hero.combatHistory || []
+            combatHistory: hero.combatHistory || [],
+            
+            // Special hero properties that might exist
+            burningFingerStack: hero.burningFingerStack || 0,
+            _syncedUniqueEquipmentCount: hero._syncedUniqueEquipmentCount || 0
         };
     }
 
@@ -554,7 +564,7 @@ export class CheckpointSystem {
         this.battleManager.currentTurn = battleState.currentTurn;
         this.battleManager.turnInProgress = battleState.turnInProgress || false;
         this.battleManager.totalDamageDealt = battleState.totalDamageDealt || {};
-    
+
         // Restore hands
         this.battleManager.playerHand = battleState.playerHand || [];
         this.battleManager.opponentHand = battleState.opponentHand || [];
@@ -563,13 +573,21 @@ export class CheckpointSystem {
         this.battleManager.playerDeck = battleState.playerDeck || [];
         this.battleManager.opponentDeck = battleState.opponentDeck || [];
         
-        // IMPORTANT: Initialize battleLog as empty array before restoration
+        // Restore graveyards - ADD THESE TWO LINES
+        this.battleManager.playerGraveyard = battleState.playerGraveyard || [];
+        this.battleManager.opponentGraveyard = battleState.opponentGraveyard || [];
+    
+        // Restore birthday present counters - ADD THESE LINES
+        this.battleManager.playerBirthdayPresentCounter = battleState.playerBirthdayPresentCounter || 0;
+        this.battleManager.opponentBirthdayPresentCounter = battleState.opponentBirthdayPresentCounter || 0;
+        
+        // Initialize battleLog as empty array before restoration
         this.battleManager.battleLog = [];
     }
 
     restoreFormations(formations) {
         if (!formations) return;
-        
+    
         // For guests, swap player and opponent data
         let playerFormation, opponentFormation;
         if (this.isHost) {
@@ -585,13 +603,13 @@ export class CheckpointSystem {
         this.battleManager.playerFormation = playerFormation;
         this.battleManager.opponentFormation = opponentFormation;
         
-        // CRITICAL: Also update the battle screen's references
+        // Also update the battle screen's references
         if (this.battleManager.battleScreen) {
             this.battleManager.battleScreen.playerFormation = playerFormation;
             this.battleManager.battleScreen.opponentFormation = opponentFormation;
         }
         
-        // CRITICAL: Update FormationManager so it stays in sync
+        // Update FormationManager so it stays in sync
         if (window.heroSelection && window.heroSelection.formationManager) {
             const formationManager = window.heroSelection.formationManager;
             
@@ -694,32 +712,31 @@ export class CheckpointSystem {
         ['left', 'center', 'right'].forEach(position => {
             if (playerHeroes[position]) {
                 const hero = this.restoreHero(playerHeroes[position]);
-                // CRITICAL: Update the side property to match the new perspective
+                // Update the side property to match the new perspective
                 hero.side = 'player';
                 this.battleManager.playerHeroes[position] = hero;
             }
             
             if (opponentHeroes[position]) {
                 const hero = this.restoreHero(opponentHeroes[position]);
-                // CRITICAL: Update the side property to match the new perspective  
+                // Update the side property to match the new perspective  
                 hero.side = 'opponent';
                 this.battleManager.opponentHeroes[position] = hero;
             }
         });
         
-        // CRITICAL: Reinitialize kill tracker for the new perspective
+        // Reinitialize kill tracker for the new perspective
         if (this.battleManager.killTracker) {
             this.battleManager.killTracker.reset();
             this.battleManager.killTracker.init(this.battleManager);
         }
         
-        // CRITICAL: Clear manager-level equipment after hero restoration
+        // Clear manager-level equipment after hero restoration
         this.battleManager.playerEquips = {};
         this.battleManager.opponentEquips = {};
     }
 
     restoreHero(heroState) {
-        // FIXED: Use the hero's built-in fromSavedState method properly
         // This will handle battle bonuses and all other state correctly
         const hero = Hero.fromSavedState(heroState);
         
@@ -732,8 +749,17 @@ export class CheckpointSystem {
             hero.battleHpBonus = heroState.battleHpBonus;
         }
         
+        // Explicitly restore shield data
+        if (heroState.currentShield !== undefined) {
+            hero.currentShield = heroState.currentShield;
+        } else {
+            // Ensure shield is initialized to 0 if not present
+            hero.currentShield = 0;
+        }
+        
         return hero;
     }
+
 
     restoreRandomState(randomState) {
         if (!randomState || !this.battleManager.randomnessManager) return;
@@ -866,7 +892,7 @@ export class CheckpointSystem {
         // Now update all hero visuals (they should exist in DOM now)
         this.battleManager.updateAllHeroVisuals();
         
-        // NEW: Explicitly update attack displays to show battle bonuses
+        // Explicitly update attack displays to show battle bonuses
         this.updateHeroAttackDisplaysWithBonuses();
         
         // Explicitly update creature visuals to ensure proper death states
@@ -899,6 +925,11 @@ export class CheckpointSystem {
         // Restore visual effects
         this.battleManager.restoreFireshieldVisuals();
         this.battleManager.restoreFrostRuneVisuals();
+        
+        // Verify shield displays after restoration
+        setTimeout(() => {
+            this.battleManager.verifyAndFixShieldDisplays();
+        }, 200);
     }
 
     // Update hero attack displays to show current totals including battle bonuses
@@ -948,7 +979,57 @@ export class CheckpointSystem {
         }
     }
 
+    // ============================================
+    // GRAVEYARD SYNC METHODS
+    // ============================================
 
+    /**
+     * Capture all current graveyard states for sync (optional future enhancement)
+     */
+    captureAllGraveyardStatesForSync() {
+        const graveyardStates = {
+            player: this.battleManager.playerGraveyard || [],
+            opponent: this.battleManager.opponentGraveyard || []
+        };
+        
+        return graveyardStates;
+    }
+    
+    /**
+     * Sync graveyard states with guest (optional future enhancement)
+     */
+    async syncGraveyardStatesToGuest() {
+        if (!this.isHost || !this.battleManager) return;
+        
+        const graveyardStates = this.captureAllGraveyardStatesForSync();
+        
+        // Send to guest via network manager
+        this.battleManager.sendBattleUpdate('graveyard_state_sync', {
+            graveyardStates: graveyardStates,
+            timestamp: Date.now(),
+            syncReason: 'checkpoint'
+        });
+    }
+
+    /**
+     * Apply received graveyard states from host (optional future enhancement)  
+     */
+    applyGraveyardStatesFromSync(syncData) {
+        if (this.isHost || !syncData || !syncData.graveyardStates) return;
+        
+        const { graveyardStates } = syncData;
+        
+        // For guest, swap player and opponent data since checkpoint was from host perspective
+        const playerGraveyard = graveyardStates.opponent || []; // Guest's actual graveyard
+        const opponentGraveyard = graveyardStates.player || []; // Host's graveyard (guest's opponent)
+        
+        // Apply to battle manager
+        this.battleManager.playerGraveyard = playerGraveyard;
+        this.battleManager.opponentGraveyard = opponentGraveyard;
+    }
+
+
+    
 
     // ============================================
     // CREATURE SYNC METHODS

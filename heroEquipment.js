@@ -90,6 +90,12 @@ export class HeroEquipmentManager {
         
         console.log(`⚔️ ${hero.name} equipped ${artifactCardName}!`);
         
+        // Trigger Ancient Tech effect update if this is an Energy Core
+        if (artifactCardName === 'AncientTechInfiniteEnergyCore' && 
+            window.ancientTechInfiniteEnergyCoreEffect) {
+            window.ancientTechInfiniteEnergyCoreEffect.onEquipmentChange();
+        }
+        
         // Trigger callback
         if (this.onEquipmentChangeCallback) {
             this.onEquipmentChangeCallback({

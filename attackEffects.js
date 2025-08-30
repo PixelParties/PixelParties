@@ -1,8 +1,9 @@
-// attackEffects.js - Centralized Attack Effects Handler
+// attackEffects.js - Centralized Attack Effects Handler with FutureTechFists
 import { TheMastersSwordEffect } from './Artifacts/theMastersSword.js';
 import { registerTheSunSword } from './Artifacts/theSunSword.js';
 import { registerTheStormblade } from './Artifacts/theStormblade.js';
 import { skullmaelsGreatswordArtifact } from './Artifacts/skullmaelsGreatsword.js';
+import { FutureTechFistsArtifact } from './Artifacts/futureTechFists.js';
 import ArrowSystem from './arrowSystem.js';
 
 export class AttackEffectsManager {
@@ -20,6 +21,7 @@ export class AttackEffectsManager {
         this.sunSwordEffect = null;
         this.stormbladeEffect = null;
         this.skullmaelsGreatswordArtifact = skullmaelsGreatswordArtifact;
+        this.futureTechFistsArtifact = new FutureTechFistsArtifact(this.battleManager);
         
         // Arrow System
         this.arrowSystem = new ArrowSystem(this.battleManager);
@@ -43,6 +45,12 @@ export class AttackEffectsManager {
         this.registerEffectHandler('SkullmaelsGreatsword', {
             trigger: 'on_attack_hit',
             handler: this.handleSkullmaelsGreatsword.bind(this)
+        });
+        
+        // Register FutureTechFists handler
+        this.registerEffectHandler('FutureTechFists', {
+            trigger: 'on_attack_hit',
+            handler: this.handleFutureTechFists.bind(this)
         });
         
         // Register Equip item effects
@@ -111,7 +119,7 @@ export class AttackEffectsManager {
                 
                 // Add combat log message
                 this.battleManager.addCombatLog(
-                    `The Master's Sword activates! Damage Ã—${effect.multiplier}!`,
+                    `The Master's Sword activates! Damage ×${effect.multiplier}!`,
                     'success'
                 );
             }
@@ -123,6 +131,15 @@ export class AttackEffectsManager {
         // This is handled in calculateDamageModifiers
         // Kept for consistency with the registration pattern
         return baseDamage;
+    }
+    
+    // Handler for FutureTechFists effect
+    async handleFutureTechFists(attacker, defender, damage, equipmentItem) {
+        if (this.futureTechFistsArtifact) {
+            await this.futureTechFistsArtifact.handleFutureTechFistsEffect(
+                attacker, defender, damage, equipmentItem
+            );
+        }
     }
     
     // Process all attack effects when an attack lands
@@ -351,7 +368,7 @@ export class AttackEffectsManager {
         for (let i = 0; i < shardCount; i++) {
             const shard = document.createElement('div');
             shard.className = 'ice-shard';
-            shard.innerHTML = 'â„ï¸';
+            shard.innerHTML = '❄️';
             
             // Random angle for each shard
             const angle = (360 / shardCount) * i + (Math.random() * 30 - 15);
@@ -519,7 +536,7 @@ export class AttackEffectsManager {
         return 0;
     }
     
-    // Ensure CSS for attack effects
+    // Ensure CSS for attack effects including shield damage numbers
     ensureAttackEffectsCSS() {
         if (document.getElementById('attackEffectsCSS')) return;
         
@@ -579,6 +596,21 @@ export class AttackEffectsManager {
                 will-change: transform, opacity;
                 mix-blend-mode: screen;
             }
+
+            /* Shield Damage Numbers */
+            .damage-number.shield_damage {
+                color: #00ccff !important;
+                text-shadow: 
+                    2px 2px 0 #000000,
+                    0 0 10px #00ccff,
+                    0 0 20px #0099cc !important;
+                border: 2px solid #00ccff;
+                background: rgba(0, 204, 255, 0.2) !important;
+            }
+
+            .damage-number.shield_damage::before {
+                content: "🛡️ ";
+            }
         `;
         
         document.head.appendChild(style);
@@ -591,6 +623,11 @@ export class AttackEffectsManager {
         // Initialize the arrow system after AttackEffectsManager is ready
         if (this.arrowSystem) {
             this.arrowSystem.init();
+        }
+
+        // Initialize FutureTechFists artifact
+        if (this.futureTechFistsArtifact) {
+            this.futureTechFistsArtifact.init();
         }
     }
     
@@ -618,7 +655,12 @@ export class AttackEffectsManager {
             this.skullmaelsGreatswordArtifact = null;
         }
 
-        // NEW: Arrow System cleanup
+        if (this.futureTechFistsArtifact) {
+            this.futureTechFistsArtifact.cleanup();
+            this.futureTechFistsArtifact = null;
+        }
+
+        // Arrow System cleanup
         if (this.arrowSystem) {
             this.arrowSystem.cleanup();
             this.arrowSystem = null;

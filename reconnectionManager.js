@@ -281,11 +281,15 @@ export class ReconnectionManager {
                     gameState.hostVacarnState,
                     gameState.hostDelayedArtifactEffects,
                     gameState.hostSemiState,
+                    gameState.hostHeinzState,
                     gameState.hostPermanentArtifacts,
                     gameState.guestPermanentArtifacts,
                     gameState.hostMagicSapphiresUsed,
                     gameState.hostMagicRubiesUsed,
-                    gameState.hostAreaCard
+                    gameState.hostBirthdayPresentCounter,
+                    gameState.hostAreaCard,
+                    gameState.hostGraveyardState,
+                    gameState.hostInventingState 
                 );                
             } else if (!this.isHost && gameState.guestSelected) {                
                 this.heroSelection.selectedCharacter = gameState.guestSelected;
@@ -320,11 +324,15 @@ export class ReconnectionManager {
                     gameState.guestVacarnState,
                     gameState.guestDelayedArtifactEffects,
                     gameState.guestSemiState,
+                    gameState.guestHeinzState,
                     gameState.guestPermanentArtifacts,
                     gameState.hostPermanentArtifacts, 
                     guestMagicSapphireValue,
                     guestMagicRubyValue,
-                    gameState.guestAreaCard
+                    gameState.guestBirthdayPresentCounter,
+                    gameState.guestAreaCard,
+                    gameState.guestGraveyardState,
+                    gameState.guestInventingState 
                 );
             }
                 
@@ -466,7 +474,7 @@ export class ReconnectionManager {
             this.heroSelection.actionManager.resetActions();
         }
 
-        // Restore magnetic glove state
+        // Restore special modes
         if (this.isHost && gameState.hostMagneticGloveState) {
             if (window.magneticGloveArtifact) {
                 await window.magneticGloveArtifact.restoreMagneticGloveState(this.heroSelection, gameState.hostMagneticGloveState);
@@ -474,6 +482,24 @@ export class ReconnectionManager {
         } else if (!this.isHost && gameState.guestMagneticGloveState) {
             if (window.magneticGloveArtifact) {
                 await window.magneticGloveArtifact.restoreMagneticGloveState(this.heroSelection, gameState.guestMagneticGloveState);
+            }
+        }
+        if (this.isHost && gameState.hostFutureTechLampState) {
+            if (window.futureTechLampArtifact) {
+                await window.futureTechLampArtifact.restoreLampState(this.heroSelection, gameState.hostFutureTechLampState);
+            }
+        } else if (!this.isHost && gameState.guestFutureTechLampState) {
+            if (window.futureTechLampArtifact) {
+                await window.futureTechLampArtifact.restoreLampState(this.heroSelection, gameState.guestFutureTechLampState);
+            }
+        }
+        if (this.isHost && gameState.hostFutureTechCopyDeviceState) {
+            if (window.futureTechCopyDeviceArtifact) {
+                await window.futureTechCopyDeviceArtifact.restoreCopyDeviceState(this.heroSelection, gameState.hostFutureTechCopyDeviceState);
+            }
+        } else if (!this.isHost && gameState.guestFutureTechCopyDeviceState) {
+            if (window.futureTechCopyDeviceArtifact) {
+                await window.futureTechCopyDeviceArtifact.restoreCopyDeviceState(this.heroSelection, gameState.guestFutureTechCopyDeviceState);
             }
         }
 
@@ -568,6 +594,43 @@ export class ReconnectionManager {
             // Initialize Semi state if no saved data
             if (this.heroSelection.semiEffectManager) {
                 this.heroSelection.semiEffectManager.reset();
+            }
+        }
+        if (this.isHost && gameState.hostHeinzState) {
+            if (this.heroSelection.heinzEffectManager) {
+                const heinzRestored = this.heroSelection.heinzEffectManager.importHeinzState(gameState.hostHeinzState);
+            }
+        } else if (!this.isHost && gameState.guestHeinzState) {
+            if (this.heroSelection.heinzEffectManager) {
+                const heinzRestored = this.heroSelection.heinzEffectManager.importHeinzState(gameState.guestHeinzState);
+            }
+        } else {
+            // Initialize Heinz state if no saved data
+            if (this.heroSelection.heinzEffectManager) {
+                this.heroSelection.heinzEffectManager.reset();
+            }
+        }
+
+
+        // Restore Abilities
+        if (this.isHost && gameState.hostInventingState) {
+            if (this.heroSelection.inventingAbility) {
+                const inventingRestored = this.heroSelection.inventingAbility.importState(gameState.hostInventingState);
+                if (inventingRestored) {
+                    console.log('🔧 Host Inventing state restored during reconnection');
+                }
+            }
+        } else if (!this.isHost && gameState.guestInventingState) {
+            if (this.heroSelection.inventingAbility) {
+                const inventingRestored = this.heroSelection.inventingAbility.importState(gameState.guestInventingState);
+                if (inventingRestored) {
+                    console.log('🔧 Guest Inventing state restored during reconnection');
+                }
+            }
+        } else {
+            // Initialize Inventing state if no saved data
+            if (this.heroSelection.inventingAbility) {
+                this.heroSelection.inventingAbility.reset();
             }
         }
 

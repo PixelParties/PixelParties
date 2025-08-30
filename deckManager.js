@@ -225,7 +225,6 @@ export class DeckManager {
                                  onerror="this.src='./Cards/placeholder.png'">
                             <div class="card-name">${cardDisplayName}</div>
                             ${cardCount > 1 ? `<div class="card-count-badge">${cardCount}</div>` : ''}
-                            ${isRewardCard ? '<div class="reward-indicator">⭐</div>' : ''}
                         </div>
                     `;
                 } else if (uniqueCards.length <= 9) {

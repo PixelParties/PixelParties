@@ -73,6 +73,10 @@ export class BattleManager {
         // Deck data
         this.playerDeck = null;
         this.opponentDeck = null;
+
+        // Graveyard data
+        this.playerGraveyard = null;
+        this.opponentGraveyard = null;
         
         // Spell System
         this.spellSystem = null;
@@ -90,7 +94,8 @@ export class BattleManager {
         this.skeletonDeathKnightManager = null;
         this.skeletonReaperManager = null;
         this.archerManager = null;
-        this.royalCorgiManager = null; 
+        this.royalCorgiManager = null;
+        this.futureTechMechManager = null;
         
         // Attack effects
         this.attackEffectsManager = null;
@@ -319,7 +324,11 @@ export class BattleManager {
         playerDeck = null,
         opponentDeck = null,
         playerAreaCard = null,
-        opponentAreaCard = null) {
+        opponentAreaCard = null,
+        playerGraveyard = null,
+        opponentGraveyard = null,
+        playerBirthdayPresentCounter = null,
+        opponentBirthdayPresentCounter = null) {
         
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;
@@ -332,6 +341,8 @@ export class BattleManager {
         this.roomManager = roomManager;
         this.isAuthoritative = isHost;
 
+        this.playerBirthdayPresentCounter = playerBirthdayPresentCounter || 0;
+        this.opponentBirthdayPresentCounter = opponentBirthdayPresentCounter || 0;
 
         this.checkpointSystem = getCheckpointSystem();
         this.checkpointSystem.init(this, roomManager, isHost);
@@ -365,6 +376,14 @@ export class BattleManager {
         this.opponentEquips = opponentEquips;
         this.playerAreaCard = playerAreaCard;
         this.opponentAreaCard = opponentAreaCard;
+
+        // In case of weird data desync/transferral issues: These next few assignments initially did not exist and were added for consistency's sake.
+        this.playerHand = playerHand;
+        this.opponentHand = opponentHand;
+        this.playerDeck = playerDeck;
+        this.opponentDeck = opponentDeck;
+        this.playerGraveyard = playerGraveyard;     
+        this.opponentGraveyard = opponentGraveyard;
         
         // Store effective stats
         this.playerEffectiveStats = playerEffectiveStats;
@@ -402,12 +421,6 @@ export class BattleManager {
         
         this.combatManager = new BattleCombatManager(this);
         
-        // Verify initialization
-        if (!this.combatManager) {
-        } else if (!this.combatManager.battleManager) {
-        } else if (this.combatManager.battleManager !== this) {
-        } else {
-        }
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
@@ -502,6 +515,9 @@ export class BattleManager {
             if (heroData) {
                 const hero = new Hero(heroData, position, side, absoluteSide);
                 
+                // Initialize shield system for hero
+                hero.currentShield = 0; // All heroes start with 0 shield
+                
                 // Set abilities first (needed for creature HP calculations)
                 if (abilities && abilities[position]) {
                     hero.setAbilities(abilities[position]);
@@ -567,10 +583,8 @@ export class BattleManager {
                         if (bonuses.hpBonus > 0 || bonuses.totalAttackBonus > 0) {
                         }
                     }
-                } else {
-                    // No pre-calculated stats available - Hero constructor already set base stats
                 }
-                
+
                 // Store the hero
                 heroesObj[position] = hero;
                 
@@ -1524,6 +1538,41 @@ export class BattleManager {
         return await this.combatManager.authoritative_applyDamage(damageResult, context);
     }
 
+    verifyAndFixShieldDisplays() {
+        ['left', 'center', 'right'].forEach(position => {
+            ['player', 'opponent'].forEach(side => {
+                const heroes = side === 'player' ? this.playerHeroes : this.opponentHeroes;
+                const hero = heroes[position];
+                
+                if (hero && hero.currentShield > 0) {                    
+                    // Force update the health bar
+                    this.updateHeroHealthBar(side, position, hero.currentHp, hero.maxHp);
+                    
+                    // Verify the visual elements exist
+                    const heroElement = this.getHeroElement(side, position);
+                    if (heroElement) {
+                        const healthBar = heroElement.querySelector('.health-bar');
+                        const shieldBar = healthBar ? healthBar.querySelector('.shield-bar') : null;
+                        const hpText = healthBar ? healthBar.querySelector('.hp-text') : null;
+                        
+                        if (!shieldBar) {
+                            console.warn(`⚠️ Missing shield bar for ${hero.name}, forcing recreation`);
+                            this.updateHeroHealthBar(side, position, hero.currentHp, hero.maxHp);
+                        }
+                        
+                        if (hpText && !hpText.textContent.includes('🛡️')) {
+                            console.warn(`⚠️ HP text missing shield info for ${hero.name}, fixing`);
+                            this.updateHeroHealthBar(side, position, hero.currentHp, hero.maxHp);
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+
+
+
     // Guest handlers that remain in battleManager
     guest_handleStatusEffectChange(data) {
         if (this.statusEffectsManager) {
@@ -1965,7 +2014,6 @@ export class BattleManager {
     }
 
     guest_handleCreatureAction(data) {
-        // This remains here as it uses battleManager internals
         const { position, playerCreature, opponentCreature } = data;
         
         const shakePromises = [];
@@ -1984,7 +2032,6 @@ export class BattleManager {
     }
 
     guest_handleActorAction(data) {
-        // This remains here as it uses battleManager internals
         const { position, playerActor, opponentActor } = data;
         
         const shakePromises = [];
@@ -2003,7 +2050,6 @@ export class BattleManager {
     }
 
     guest_handleHeroTurnExecution(data) {
-        // This remains here as it uses battleManager internals
         return this.guest_handleCombinedTurnExecution(data);
     }
 
@@ -2017,7 +2063,6 @@ export class BattleManager {
     guest_handleMoniaProtectionEffect(data) {
         if (this.isAuthoritative)return;
 
-        // Initialize Monia effect if needed
         if (!this.moniaEffect)this.moniaEffect = new MoniaHeroEffect(this);
         
         this.moniaEffect.handleGuestProtectionEffect(data);
@@ -2028,8 +2073,6 @@ export class BattleManager {
             this.damageSourceManager.handleGuestStoneskinReduction(data);
         }
     }
-
-
 
     guest_handleGatheringStormDamage(data) {
         if (this.isAuthoritative) {
@@ -2044,6 +2087,15 @@ export class BattleManager {
             });
         } catch (error) {
             console.error('Error importing gathering storm handler:', error);
+        }
+    }
+
+    guest_handleFutureTechFistsShield(data) {
+        if (this.isAuthoritative) return;
+
+        // Use the existing instance from AttackEffectsManager
+        if (this.attackEffectsManager && this.attackEffectsManager.futureTechFistsArtifact) {
+            this.attackEffectsManager.futureTechFistsArtifact.handleGuestShieldGeneration(data);
         }
     }
 
@@ -2421,6 +2473,11 @@ export class BattleManager {
         const healthFill = heroElement.querySelector('.health-fill');
         const healthBar = heroElement.querySelector('.health-bar');
         
+        // Get hero object directly and read shield from hero, not combat manager
+        const heroes = side === 'player' ? this.playerHeroes : this.opponentHeroes;
+        const hero = heroes[position];
+        const currentShield = hero ? (hero.currentShield || 0) : 0; // Read directly from hero
+        
         if (healthFill) {
             const percentage = Math.max(0, (currentHp / maxHp) * 100);
             healthFill.style.width = `${percentage}%`;
@@ -2435,6 +2492,7 @@ export class BattleManager {
         }
         
         if (healthBar) {
+            // Update or create HP text
             let hpText = healthBar.querySelector('.hp-text');
             if (!hpText) {
                 hpText = document.createElement('div');
@@ -2453,7 +2511,59 @@ export class BattleManager {
                 `;
                 healthBar.appendChild(hpText);
             }
-            hpText.textContent = `${currentHp}/${maxHp}`;
+            
+            // Update HP text with shield info
+            if (currentShield > 0) {
+                hpText.textContent = `${currentHp}/${maxHp} (+${currentShield} 🛡️)`;
+                hpText.style.color = '#00ccff';
+                hpText.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 204, 255, 0.6)';
+            } else {
+                hpText.textContent = `${currentHp}/${maxHp}`;
+                hpText.style.color = 'white';
+                hpText.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.8)';
+            }
+
+            // Add shield bar if hero has shield - IMPROVED WITH FORCE UPDATE
+            if (currentShield > 0) {
+                let shieldBar = healthBar.querySelector('.shield-bar');
+                if (!shieldBar) {
+                    shieldBar = document.createElement('div');
+                    shieldBar.className = 'shield-bar';
+                    shieldBar.style.cssText = `
+                        position: absolute;
+                        top: -4px;
+                        left: 0;
+                        right: 0;
+                        height: 4px;
+                        background: linear-gradient(90deg, #00ccff 0%, #0099cc 100%);
+                        border-radius: 2px;
+                        border: 1px solid rgba(0, 204, 255, 0.8);
+                        box-shadow: 0 0 6px rgba(0, 204, 255, 0.6);
+                        z-index: 11;
+                    `;
+                    healthBar.appendChild(shieldBar);
+                }
+                
+                // Force shield bar to be visible and updated
+                shieldBar.style.display = 'block';
+                shieldBar.style.opacity = '1';
+                
+                // Add shield glow to health bar
+                healthBar.style.boxShadow = '0 0 10px rgba(0, 204, 255, 0.5)';
+                healthBar.setAttribute('data-has-shield', 'true');
+                
+            } else {
+                // Remove or hide shield bar if no shield
+                const shieldBar = healthBar.querySelector('.shield-bar');
+                if (shieldBar) {
+                    shieldBar.style.display = 'none';
+                    shieldBar.style.opacity = '0';
+                }
+                
+                // Remove shield glow
+                healthBar.style.boxShadow = '';
+                healthBar.removeAttribute('data-has-shield');
+            }
         }
     }
 
@@ -2539,6 +2649,12 @@ export class BattleManager {
 
             // Set game phase to Reward BEFORE clearing battle states
             await this.setGamePhaseToReward();
+
+            // Transfer counters back to heroSelection
+            if (window.heroSelection) {               
+                // The opponent's counter becomes the player's reward source
+                window.heroSelection.opponentBirthdayPresentCounter = this.opponentBirthdayPresentCounter || 0;
+            }
 
             // Mark battle as ended with timestamp for reconnection detection
             if (this.roomManager && this.roomManager.getRoomRef()) {
@@ -2983,6 +3099,10 @@ export class BattleManager {
             this.crumTheClassPetManager.cleanup();
             this.crumTheClassPetManager = null;
         }
+        if (this.futureTechMechManager) {
+            this.futureTechMechManager.cleanup();
+            this.futureTechMechManager = null;
+        }
 
 
 
@@ -3044,10 +3164,10 @@ export class BattleManager {
     }
 
     clearAllBattleBonuses() {
-        
         let bonusesCleared = 0;
+        let shieldsCleared = 0;
         
-        // Clear bonuses from player heroes
+        // Clear bonuses and shields from player heroes
         ['left', 'center', 'right'].forEach(position => {
             if (this.playerHeroes[position]) {
                 const hero = this.playerHeroes[position];
@@ -3055,6 +3175,12 @@ export class BattleManager {
                     const summary = hero.getBattleBonusSummary();
                     hero.clearBattleBonuses();
                     bonusesCleared++;
+                }
+
+                // Clear shields
+                if (hero.currentShield > 0) {
+                    hero.currentShield = 0;
+                    shieldsCleared++;
                 }
             }
             
@@ -3065,14 +3191,22 @@ export class BattleManager {
                     hero.clearBattleBonuses();
                     bonusesCleared++;
                 }
+
+                // Clear shields
+                if (hero.currentShield > 0) {
+                    hero.currentShield = 0;
+                    shieldsCleared++;
+                }
             }
         });
         
         if (bonusesCleared > 0) {
-            
             // Add a combat log message
             this.addCombatLog(`🧹 Battle bonuses cleared from all heroes`, 'info');
-        } else {
+        }
+
+        if (shieldsCleared > 0) {
+            this.addCombatLog(`🛡️ All shield points cleared`, 'info');
         }
     }
 
@@ -3175,7 +3309,10 @@ export class BattleManager {
             const exported = {};
             for (const position in heroes) {
                 if (heroes[position]) {
-                    exported[position] = heroes[position].exportState();
+                    const heroState = heroes[position].exportState();
+                    // Ensure shield is included in export
+                    heroState.currentShield = heroes[position].currentShield || 0;
+                    exported[position] = heroState;
                 }
             }
             return exported;
@@ -3199,6 +3336,8 @@ export class BattleManager {
             opponentHand: this.opponentHand, 
             playerDeck: this.playerDeck,
             opponentDeck: this.opponentDeck,
+            playerGraveyard: this.playerGraveyard,
+            opponentGraveyard: this.opponentGraveyard, 
             battleLog: this.battleLog,
             globalEffects: this.globalEffects,
             heroEffects: this.heroEffects,
@@ -3209,6 +3348,8 @@ export class BattleManager {
             weatherEffects: this.weatherEffects,
             terrainModifiers: this.terrainModifiers,
             specialRules: this.specialRules,
+            playerBirthdayPresentCounter: this.playerBirthdayPresentCounter || 0,
+            opponentBirthdayPresentCounter: this.opponentBirthdayPresentCounter || 0,
             
             // Export randomness state
             randomnessState: this.randomnessManager.exportState(),
@@ -3224,6 +3365,7 @@ export class BattleManager {
         return baseState;
     }
 
+
     // Restore battle state from persistence data - UPDATED WITH BATTLELOG
     restoreBattleState(stateData) {
         try {
@@ -3236,7 +3378,10 @@ export class BattleManager {
                 const restored = {};
                 for (const position in savedHeroes) {
                     if (savedHeroes[position]) {
-                        restored[position] = Hero.fromSavedState(savedHeroes[position]);
+                        const hero = Hero.fromSavedState(savedHeroes[position]);
+                        // Restore shield data
+                        hero.currentShield = savedHeroes[position].currentShield || 0;
+                        restored[position] = hero;
                     }
                 }
                 return restored;
@@ -3269,6 +3414,12 @@ export class BattleManager {
             this.playerDeck = stateData.playerDeck || [];
             this.opponentDeck = stateData.opponentDeck || [];
 
+            this.playerGraveyard = stateData.playerGraveyard || [];
+            this.opponentGraveyard = stateData.opponentGraveyard || [];
+            
+            this.playerBirthdayPresentCounter = stateData.playerBirthdayPresentCounter || 0;
+            this.opponentBirthdayPresentCounter = stateData.opponentBirthdayPresentCounter || 0;
+
             if (stateData.randomnessState) {
                 this.randomnessManager.importState(stateData.randomnessState);
             }
@@ -3293,6 +3444,7 @@ export class BattleManager {
             
             return true;
         } catch (error) {
+            console.error('Error restoring battle state:', error);
             return false;
         }
     }
@@ -3500,6 +3652,23 @@ export class BattleManager {
         return (absoluteSide === myAbsoluteSide) ? this.getPlayerDeck() : this.getOpponentDeck();
     }
 
+    getPlayerGraveyard() {
+        return this.playerGraveyard || [];
+    }
+
+    getOpponentGraveyard() {
+        return this.opponentGraveyard || [];
+    }
+
+    getGraveyardBySide(side) {
+        return side === 'player' ? this.getPlayerGraveyard() : this.getOpponentGraveyard();
+    }
+
+    getGraveyardByAbsoluteSide(absoluteSide) {
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        return (absoluteSide === myAbsoluteSide) ? this.getPlayerGraveyard() : this.getOpponentGraveyard();
+    }
+
     // Utility delay function
     delay(ms) {
         if (this.speedManager) {
@@ -3512,7 +3681,7 @@ export class BattleManager {
         }
     }
 
-    // Reset battle manager - UPDATED WITH BATTLELOG RESET
+    // Reset battle manager
     reset() {
         this.battleActive = false;
         this.currentTurn = 0;
@@ -3539,6 +3708,8 @@ export class BattleManager {
         this.opponentSpellbooks = null; 
         this.playerCreatures = null;
         this.opponentCreatures = null;
+        this.playerGraveyard = null; 
+        this.opponentGraveyard = null; 
 
         
         this.randomnessManager.reset();
@@ -3647,6 +3818,10 @@ export class BattleManager {
         if (this.crumTheClassPetManager) {
             this.crumTheClassPetManager.cleanup();
             this.crumTheClassPetManager = null;
+        }
+        if (this.futureTechMechManager) {
+            this.futureTechMechManager.cleanup();
+            this.futureTechMechManager = null;
         }
 
 

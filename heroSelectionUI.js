@@ -1042,6 +1042,18 @@ export class HeroSelectionUI {
                 };
                 const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
                 
+                // Check if this is an Inventing ability and get counter count
+                let inventingCounterHTML = '';
+                if (ability.name === 'Inventing' && window.heroSelection && window.heroSelection.inventingAbility) {
+                    const counterCount = window.heroSelection.inventingAbility.getCountersForPosition(position, zoneNumber);
+                    inventingCounterHTML = `
+                        <div class="inventing-counter-display" data-position="${position}" data-zone="${zoneNumber}">
+                            <span class="inventing-counter-icon">🔧</span>
+                            <span class="inventing-counter-value">${counterCount}</span>
+                        </div>
+                    `;
+                }
+                
                 return `
                     <div class="ability-zone filled" 
                         data-position="${position}" 
@@ -1054,6 +1066,7 @@ export class HeroSelectionUI {
                             onmouseleave="window.hideCardTooltip()"
                             onerror="this.src='./Cards/placeholder.png'">
                         <div class="ability-stack-count">${stackCount}</div>
+                        ${inventingCounterHTML}
                     </div>
                 `;
             } else {
@@ -1242,7 +1255,10 @@ export class HeroSelectionUI {
         const areaSlot = window.heroSelection.areaHandler ? 
             window.heroSelection.areaHandler.createAreaSlotHTML() : 
             '<div class="area-slot empty"><div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div></div>';
-        
+
+        // Create the discard pile slot
+        const discardPileSlot = this.createDiscardPileSlotHTML();
+
         // Create the hero team slots
         const leftSlot = this.createTeamSlotHTML('left', battleFormation.left);
         const centerSlot = this.createTeamSlotHTML('center', battleFormation.center);
@@ -1293,10 +1309,13 @@ export class HeroSelectionUI {
                         <p class="drag-hint">🌍 Drag Area cards to the Area zone!</p>
                     </div>
                     
-                    <!-- UPDATED: Decoupled Area and Hero slots -->
+                    <!-- Decoupled Area, Discard Pile, and Hero slots -->
                     <div class="team-slots-container">
                         <!-- Area slot - positioned independently -->
                         ${areaSlot}
+                        
+                        <!-- Discard pile slot - positioned below area -->
+                        ${discardPileSlot}
                         
                         <!-- Hero slots - wrapped separately -->
                         <div class="hero-slots-container">
@@ -1341,27 +1360,50 @@ export class HeroSelectionUI {
         `;
     }
 
+    // Create discard pile slot HTML
+    createDiscardPileSlotHTML() {
+        return `
+            <div class="discard-pile-slot empty" 
+                id="discardPileSlot"
+                ondragover="window.onDiscardPileDragOver(event)"
+                ondrop="window.onDiscardPileDrop(event)"
+                ondragleave="window.onDiscardPileDragLeave(event)"
+                ondragenter="window.onDiscardPileDragEnter(event)"
+                onmouseenter="window.onDiscardPileHoverEnter(this)"
+                onmouseleave="window.onDiscardPileHoverLeave()">
+                <div class="discard-placeholder">
+                    <div class="discard-icon">🗑️</div>
+                    <div class="discard-label">Discard Pile</div>
+                </div>
+            </div>
+        `;
+    }
+
     // Update the battle formation UI after drag/drop
     updateBattleFormationUI() {
-        const teamSlotsContainer = document.querySelector('.team-slots-container');
-        if (teamSlotsContainer && window.heroSelection) {
+        const heroSlotsContainer = document.querySelector('.hero-slots-container');
+        if (heroSlotsContainer && window.heroSelection) {
             const battleFormation = window.heroSelection.formationManager.getBattleFormation();
             
-            // Create area slot using AreaHandler
-            const areaSlot = window.heroSelection.areaHandler ? 
-                window.heroSelection.areaHandler.createAreaSlotHTML() : 
-                '<div class="area-slot empty"><div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div></div>';
+            // Only update the hero slots, not the entire team-slots-container
+            const leftSlot = this.createTeamSlotHTML('left', battleFormation.left);
+            const centerSlot = this.createTeamSlotHTML('center', battleFormation.center);
+            const rightSlot = this.createTeamSlotHTML('right', battleFormation.right);
             
-            teamSlotsContainer.innerHTML = `
-                ${areaSlot}
-                ${this.createTeamSlotHTML('left', battleFormation.left)}
-                ${this.createTeamSlotHTML('center', battleFormation.center)}
-                ${this.createTeamSlotHTML('right', battleFormation.right)}
+            heroSlotsContainer.innerHTML = `
+                ${leftSlot}
+                ${centerSlot}
+                ${rightSlot}
             `;
             
             // Update hero stats after UI refresh
             setTimeout(() => {
                 this.refreshHeroStats();
+                
+                // Also update Inventing counter displays
+                if (window.heroSelection && window.heroSelection.inventingAbility) {
+                    window.heroSelection.inventingAbility.updateInventingCounterDisplays();
+                }
             }, 50);
         }
     }
@@ -3110,6 +3152,140 @@ if (typeof document !== 'undefined' && !document.getElementById('abilityErrorSty
         }
     `;
     document.head.appendChild(style);
+}
+
+// Global discard pile drag and drop handlers
+function onDiscardPileDragEnter(event) {
+    // Only handle hand card drags
+    if (window.handManager && window.handManager.isHandDragging()) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const discardSlot = event.currentTarget;
+        discardSlot.classList.add('discard-drop-ready');
+        discardSlot.classList.remove('discard-drop-invalid');
+        
+        return false;
+    }
+}
+
+function onDiscardPileDragOver(event) {
+    // Only handle hand card drags
+    if (window.handManager && window.handManager.isHandDragging()) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        event.dataTransfer.dropEffect = 'move';
+        
+        return false;
+    }
+}
+
+function onDiscardPileDragLeave(event) {
+    const discardSlot = event.currentTarget;
+    const rect = discardSlot.getBoundingClientRect();
+    
+    const x = event.clientX;
+    const y = event.clientY;
+    const margin = 10;
+    
+    // Only remove classes if we're actually leaving the discard pile area
+    if (x < rect.left - margin || x > rect.right + margin || 
+        y < rect.top - margin || y > rect.bottom + margin) {
+        
+        discardSlot.classList.remove('discard-drop-ready', 'discard-drop-invalid');
+    }
+}
+
+async function onDiscardPileDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const discardSlot = event.currentTarget;
+    
+    // Clean up visual states
+    discardSlot.classList.remove('discard-drop-ready', 'discard-drop-invalid');
+    
+    // Check if it's a card being dropped from hand
+    if (window.handManager && window.handManager.isHandDragging()) {
+        const dragState = window.handManager.getHandDragState();
+        const cardIndex = dragState.draggedCardIndex;
+        const cardName = dragState.draggedCardName;
+        
+        // Use the existing disenchant functionality
+        if (window.handManager) {
+            const cardElement = dragState.draggedElement;
+            const success = await window.handManager.disenchantCard(cardIndex, cardName, cardElement);
+            
+            if (success) {
+                // End the drag operation
+                window.handManager.endHandCardDrag();
+                
+                // Show brief success feedback on the discard pile
+                const feedback = document.createElement('div');
+                feedback.className = 'discard-success-feedback';
+                feedback.innerHTML = `
+                    <div class="discard-success-content">
+                        <span class="discard-success-icon">💰</span>
+                        <span class="discard-success-text">+2 Gold</span>
+                    </div>
+                `;
+                
+                feedback.style.cssText = `
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    z-index: 10001;
+                    pointer-events: none;
+                    animation: discardSuccessFeedback 2s ease-out;
+                    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.5);
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                `;
+                
+                discardSlot.appendChild(feedback);
+                
+                setTimeout(() => {
+                    feedback.remove();
+                }, 2000);
+            } else {
+                // Handle failure case
+                window.handManager.endHandCardDrag();
+            }
+            
+            return success;
+        }
+    }
+    
+    return false;
+}
+
+function onDiscardPileHoverEnter(discardPileElement) {
+    if (window.showGraveyardTooltip) {
+        window.showGraveyardTooltip(discardPileElement);
+    }
+}
+
+function onDiscardPileHoverLeave() {
+    if (window.hideGraveyardTooltip) {
+        window.hideGraveyardTooltip();
+    }
+}
+
+// Export the global functions
+if (typeof window !== 'undefined') {
+    window.onDiscardPileDragEnter = onDiscardPileDragEnter;
+    window.onDiscardPileDragOver = onDiscardPileDragOver;
+    window.onDiscardPileDragLeave = onDiscardPileDragLeave;
+    window.onDiscardPileDrop = onDiscardPileDrop;
+    window.onDiscardPileHoverEnter = onDiscardPileHoverEnter;
+    window.onDiscardPileHoverLeave = onDiscardPileHoverLeave;
 }
 
 export default HeroSelectionUI;

@@ -347,7 +347,7 @@ export class ArtifactHandler {
     }
 
     isDraggableArtifact(cardName) {
-        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald'];
+        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore'];
         return draggableArtifacts.includes(cardName);
     }
 
@@ -356,7 +356,7 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing'];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent'];
 
         return clickableArtifacts.includes(cardName);
     }
@@ -382,7 +382,12 @@ export class ArtifactHandler {
             'MagicRuby', 
             'MagicEmerald',
             'CloudPillow', 
-            'StormRing'
+            'StormRing',
+            'FutureTechLamp',
+            'FutureTechFists', 
+            'FutureTechCopyDevice',
+            'BirthdayPresent',
+            'AncientTechInfiniteEnergyCore'
         ];
         
         // Convert card names to proper module names using the existing method

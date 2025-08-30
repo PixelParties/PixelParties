@@ -149,6 +149,25 @@ export class AreaHandler {
             return false;
         }
 
+        // === DOM TRACKING SYSTEM ===
+        const trackAreaSlotLocation = (step) => {
+            const areaSlot = document.querySelector('.area-slot');
+            const teamContainer = document.querySelector('.team-slots-container');
+            const heroContainer = document.querySelector('.hero-slots-container');
+            
+            console.log(`=== STEP ${step} ===`);
+            console.log('Area slot exists:', !!areaSlot);
+            console.log('Area slot parent:', areaSlot?.parentElement?.className || 'none');
+            console.log('In team container?', teamContainer?.contains(areaSlot) || false);
+            console.log('In hero container?', heroContainer?.contains(areaSlot) || false);
+            console.log('Area slot classes:', areaSlot?.className || 'none');
+            
+            return areaSlot;
+        };
+
+        // Track initial state
+        let areaSlot = trackAreaSlotLocation('INITIAL');
+
         // Check if replacing an existing area card
         const isReplacement = this.areaCard !== null;
         const previousAreaName = isReplacement ? this.areaCard.name : null;
@@ -161,24 +180,21 @@ export class AreaHandler {
             effects: cardInfo.effects || []
         };
 
-        // Initialize GatheringStorm with counters using gatheringStorm.js
+        // Initialize GatheringStorm with counters
         if (cardName === 'GatheringStorm') {
-            // If replacing an existing GatheringStorm, preserve its counters
             if (isReplacement && previousAreaName === 'GatheringStorm' && this.areaCard.stormCounters) {
                 newAreaCard.stormCounters = this.areaCard.stormCounters;
             } else {
-                // Initialize new GatheringStorm using the external function
                 import('../Spells/gatheringStorm.js').then(({ initializeGatheringStormArea }) => {
                     initializeGatheringStormArea(newAreaCard);
                 }).catch(error => {
-                    // Fallback initialization
                     newAreaCard.stormCounters = 1;
                 });
-                newAreaCard.stormCounters = 1; // Immediate initialization
+                newAreaCard.stormCounters = 1;
             }
         }
 
-        // Handle action costs (only if this card requires an action)
+        // Handle action costs
         if (cardInfo.action && this.heroSelection.actionManager) {
             const actionCheck = this.heroSelection.actionManager.canPlayActionCard(cardInfo);
             if (!actionCheck.canPlay) {
@@ -188,13 +204,31 @@ export class AreaHandler {
             this.heroSelection.actionManager.consumeAction();
         }
 
-        // Set the new area card (replaces any existing one)
+        // Set the new area card
         this.setAreaCard(newAreaCard);
+        areaSlot = trackAreaSlotLocation('AFTER SET_AREA_CARD');
 
         // Remove card from hand
         this.heroSelection.handManager.removeCardFromHandByIndex(cardIndex);
+        areaSlot = trackAreaSlotLocation('AFTER REMOVE_FROM_HAND');
 
-        // Show appropriate success message
+        // Update area slot display FIRST - before other UI updates
+        this.updateAreaSlotDisplay();
+        areaSlot = trackAreaSlotLocation('AFTER AREA_UPDATE');
+
+        // Now call other updates one by one with tracking
+        this.heroSelection.updateHandDisplay();
+        areaSlot = trackAreaSlotLocation('AFTER HAND_UPDATE');
+
+        this.heroSelection.updateActionDisplay();
+        areaSlot = trackAreaSlotLocation('AFTER ACTION_UPDATE');
+
+        // THIS is the most likely culprit - let's track before and after
+        console.log('🔍 About to call updateBattleFormationUI...');
+        this.heroSelection.updateBattleFormationUI();
+        areaSlot = trackAreaSlotLocation('AFTER FORMATION_UPDATE');
+
+        // Generate success message
         const formattedName = this.formatCardName(cardName);
         let successMessage;
         
@@ -223,14 +257,72 @@ export class AreaHandler {
         
         this.showAreaDropResult(successMessage, true);
 
-        // Update UI and save state
-        this.heroSelection.updateHandDisplay(); // ← ADD THIS LINE
-        this.heroSelection.updateActionDisplay(); // ← ADD THIS LINE (for action cost display)
-        this.heroSelection.updateBattleFormationUI();
         await this.heroSelection.saveGameState();
+        areaSlot = trackAreaSlotLocation('AFTER SAVE_STATE');
+
         await this.heroSelection.sendFormationUpdate();
+        areaSlot = trackAreaSlotLocation('AFTER SEND_UPDATE');
 
         this.heroSelection.handManager.endHandCardDrag();
+        areaSlot = trackAreaSlotLocation('FINAL');
+
+        return true;
+    }
+
+    // Add this to the AreaHandler class
+    updateAreaSlotDisplay() {
+        // Find the correct parent container
+        const teamSlotsContainer = document.querySelector('.team-slots-container');
+        const heroSlotsContainer = document.querySelector('.hero-slots-container');
+        
+        if (!teamSlotsContainer) {
+            console.error('Team slots container not found');
+            return false;
+        }
+
+        // Find existing area slot and verify its location
+        let existingAreaSlot = document.querySelector('.area-slot');
+        
+        if (existingAreaSlot) {
+            // Check if it's in the wrong container and fix it
+            if (heroSlotsContainer && heroSlotsContainer.contains(existingAreaSlot)) {
+                console.warn('Area slot found in hero container - moving to correct location');
+                
+                // Remove from wrong location and recreate in correct location
+                existingAreaSlot.remove();
+                existingAreaSlot = null;
+            } else if (!teamSlotsContainer.contains(existingAreaSlot)) {
+                console.warn('Area slot not in team container - moving to correct location');
+                
+                // Move to correct location
+                teamSlotsContainer.insertBefore(existingAreaSlot, teamSlotsContainer.firstChild);
+            }
+        }
+
+        // Create or update area slot
+        if (!existingAreaSlot) {
+            // Recreate area slot in correct container
+            const areaSlotHTML = this.createAreaSlotHTML();
+            teamSlotsContainer.insertAdjacentHTML('afterbegin', areaSlotHTML);
+            existingAreaSlot = teamSlotsContainer.querySelector('.area-slot');
+        } else {
+            // Update existing area slot content
+            const areaCard = this.getAreaCard();
+            const newSlotClass = areaCard ? 'area-slot filled' : 'area-slot empty';
+            const newAreaCardHTML = areaCard ? this.createAreaCardHTML(areaCard) : 
+                '<div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div>';
+            
+            existingAreaSlot.className = newSlotClass;
+            existingAreaSlot.setAttribute('data-slot-type', 'area');
+            existingAreaSlot.innerHTML = newAreaCardHTML;
+            
+            // Restore event handlers
+            existingAreaSlot.ondragover = (event) => window.onAreaSlotDragOver(event);
+            existingAreaSlot.ondrop = (event) => window.onAreaSlotDrop(event);
+            existingAreaSlot.ondragleave = (event) => window.onAreaSlotDragLeave(event);
+            existingAreaSlot.ondragenter = (event) => window.onAreaSlotDragEnter(event);
+        }
+
         return true;
     }
 

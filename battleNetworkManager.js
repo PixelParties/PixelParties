@@ -727,6 +727,12 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'future_tech_mech_special_attack':
+                if (bm.futureTechMechManager) {
+                    bm.futureTechMechManager.handleGuestSpecialAttack(data);
+                }
+                break;
+
             case 'monia_protection_effect':
                 bm.guest_handleMoniaProtectionEffect(data);
                 break;
@@ -968,8 +974,6 @@ export class BattleNetworkManager {
                 }
                 break;
                 
-
-                
             case 'resistance_used':
                 if (bm.resistanceManager) {
                     bm.resistanceManager.handleGuestResistanceUsed(data);
@@ -990,6 +994,20 @@ export class BattleNetworkManager {
 
             case 'gathering_storm_damage':
                 bm.guest_handleGatheringStormDamage(data);
+                break;
+
+            case 'future_tech_fists_shield':
+                bm.guest_handleFutureTechFistsShield(data);
+                break;
+
+            case 'hero_shield_changed':
+                if (bm.combatManager) {
+                    bm.combatManager.guest_handleShieldChanged(data);
+                }
+                break;
+
+            case 'damage_applied_with_shields':
+                this.guest_handleDamageAppliedWithShields(data);
                 break;
         }
     }
@@ -1033,6 +1051,92 @@ export class BattleNetworkManager {
             if (died && oldHp > 0) {
                 bm.handleHeroDeath(localTarget);
             }
+        }
+    }
+
+    guest_handleDamageAppliedWithShields(data) {
+        const bm = this.battleManager;
+        const { 
+            targetAbsoluteSide, targetPosition, 
+            totalDamage, shieldDamage, hpDamage,
+            oldHp, newHp, maxHp, currentShield, died, targetName 
+        } = data;
+        
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        const localTarget = targetLocalSide === 'player' 
+            ? bm.playerHeroes[targetPosition]
+            : bm.opponentHeroes[targetPosition];
+
+        if (localTarget) {
+            // Update hero HP and shield - EXACT VALUES FROM HOST
+            localTarget.currentHp = newHp;
+            localTarget.currentShield = currentShield; // Use exact value from host
+            localTarget.alive = !died;
+            
+            // Create damage numbers for shield and HP separately
+            if (shieldDamage > 0) {
+                bm.animationManager.createDamageNumber(
+                    targetLocalSide, 
+                    targetPosition, 
+                    shieldDamage, 
+                    maxHp, 
+                    'shield_damage'
+                );
+            }
+            
+            if (hpDamage > 0) {
+                bm.animationManager.createDamageNumber(
+                    targetLocalSide, 
+                    targetPosition, 
+                    hpDamage, 
+                    maxHp, 
+                    'attack'
+                );
+            }
+            
+            // CRITICAL: Update health bar immediately after setting shield value
+            bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
+            
+            // DEFENSIVE: Force another update after animation delay
+            setTimeout(() => {
+                bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
+            }, 50);
+            
+            // Add combat log messages
+            if (died) {
+                if (shieldDamage > 0) {
+                    bm.addCombatLog(
+                        `💥 ${targetName} takes ${totalDamage} damage (${shieldDamage} to shield, ${hpDamage} to HP) and is defeated!`,
+                        targetLocalSide === 'player' ? 'error' : 'success'
+                    );
+                } else {
+                    bm.addCombatLog(
+                        `💥 ${targetName} takes ${totalDamage} damage and is defeated!`,
+                        targetLocalSide === 'player' ? 'error' : 'success'
+                    );
+                }
+            } else {
+                if (shieldDamage > 0) {
+                    bm.addCombatLog(
+                        `🩸 ${targetName} takes ${totalDamage} damage (${shieldDamage} to shield, ${hpDamage} to HP)!`,
+                        targetLocalSide === 'player' ? 'error' : 'success'
+                    );
+                } else {
+                    bm.addCombatLog(
+                        `🩸 ${targetName} takes ${totalDamage} damage! (${oldHp} → ${newHp} HP)`,
+                        targetLocalSide === 'player' ? 'error' : 'success'
+                    );
+                }
+            }
+            
+            if (died && oldHp > 0) {
+                bm.handleHeroDeath(localTarget);
+            }
+            
+            // DEBUG: Verify shield was applied correctly
+            console.log(`🛡️ Guest damage handler: ${targetName} shield updated to ${currentShield}`);
         }
     }
 

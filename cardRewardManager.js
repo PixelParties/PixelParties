@@ -208,9 +208,9 @@ export class CardRewardManager {
                         const killCount = killTracker.getKillCount('player', position);
                         
                         if (killCount > 0) {
-                            // Calculate bonuses: swordCount * killCount * 3 attack, * 10 HP
-                            const attackGain = swordCount * killCount * 3;
-                            const hpGain = swordCount * killCount * 10;
+                            // Calculate bonuses: swordCount * killCount * 1 attack, * 3 HP
+                            const attackGain = swordCount * killCount * 1;
+                            const hpGain = swordCount * killCount * 3;
                             
                             breakdown.swordBonuses.push({
                                 heroName: hero.name,

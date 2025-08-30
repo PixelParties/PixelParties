@@ -8,6 +8,21 @@ export const cloudPillowArtifact = {
     async handleClick(cardIndex, cardName, heroSelection) {
         console.log(`Cloud Pillow activated at index ${cardIndex}`);
         
+        // Check if player can afford the artifact
+        const cardInfo = heroSelection.getCardInfo(cardName);
+        const cost = cardInfo?.cost || 0;
+        const playerGold = heroSelection.getGoldManager().getPlayerGold();
+        
+        if (playerGold < cost) {
+            this.showError(`You need ${cost} Gold to use CloudPillow!`);
+            return;
+        }
+        
+        // Charge the gold
+        if (cost > 0) {
+            heroSelection.getGoldManager().addPlayerGold(-cost, 'cloud_pillow_use');
+        }
+        
         // Consume the card and add to permanent list
         await this.consumeCard(cardIndex, heroSelection);
     },
@@ -93,6 +108,26 @@ export const cloudPillowArtifact = {
         
         setTimeout(() => {
             activationBurst.remove();
+        }, 3000);
+    },
+    
+    // Show error message
+    showError(message) {
+        const error = document.createElement('div');
+        error.className = 'cloud-pillow-error';
+        error.innerHTML = `
+            <div class="error-content">
+                <span class="error-icon">⚠️</span>
+                <span class="error-text">${message}</span>
+            </div>
+        `;
+        
+        document.body.appendChild(error);
+        
+        setTimeout(() => {
+            if (error.parentNode) {
+                error.remove();
+            }
         }, 3000);
     },
     
@@ -486,6 +521,53 @@ if (typeof document !== 'undefined' && !document.getElementById('cloudPillowStyl
         @keyframes fadeInUp {
             0% { opacity: 0; transform: translateY(10px); }
             100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Error Message */
+        .cloud-pillow-error {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 10001;
+            animation: cloudPillowError 3s ease-out forwards;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .cloud-pillow-error .error-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .cloud-pillow-error .error-icon {
+            font-size: 24px;
+        }
+        
+        @keyframes cloudPillowError {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            10% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+            90% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.9);
+            }
         }
         
         /* Card glow in hand */

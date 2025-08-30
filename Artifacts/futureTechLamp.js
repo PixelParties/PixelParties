@@ -43,7 +43,7 @@ export const futureTechLampArtifact = {
         }
         
         // Calculate number of choices based on FutureTechLamp cards in graveyard
-        const numChoices = min(9, this.calculateNumberOfChoices());
+        const numChoices = this.calculateNumberOfChoices();
         console.log(`🔮 Generating ${numChoices} card choices based on graveyard count`);
         
         // Generate or use saved card choices
@@ -112,9 +112,10 @@ export const futureTechLampArtifact = {
         }
         
         const lampCardsInGraveyard = window.graveyardManager.getCardCount('FutureTechLamp');
-        const numChoices = lampCardsInGraveyard + 1;
+        const uncappedChoices = lampCardsInGraveyard + 1;
+        const numChoices = Math.min(uncappedChoices, 9); // Cap at 9 maximum choices
         
-        console.log(`🔮 Found ${lampCardsInGraveyard} FutureTechLamp cards in graveyard, generating ${numChoices} choices`);
+        console.log(`🔮 Found ${lampCardsInGraveyard} FutureTechLamp cards in graveyard, generating ${numChoices} choices (max 9)`);
         return numChoices;
     },
 

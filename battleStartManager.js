@@ -153,7 +153,7 @@ export class BattleStartManager {
                 bm.necromancyManager.initializeNecromancyStackDisplays();
             }
 
-            bm.addCombatLog('⚡ Hero battle start effects applied', 'info');
+            bm.addCombatLog('âš¡ Hero battle start effects applied', 'info');
         } catch (error) {
             console.error('Error applying hero start effects:', error);
         }
@@ -162,6 +162,17 @@ export class BattleStartManager {
         try {
             const { FutureTechDroneCreature } = await import('./Creatures/futureTechDrone.js');
             FutureTechDroneCreature.applyStartOfBattleHPBonuses(bm);
+            
+            // Re-render creatures after Future Tech Drone effects
+            if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
+                bm.battleScreen.renderCreaturesAfterInit();
+            }
+
+            // Update necromancy displays after HP changes
+            if (bm.necromancyManager) {
+                bm.necromancyManager.initializeNecromancyStackDisplays();
+            }
+            
         } catch (error) {
             console.error('Error applying Future Tech Drone effects:', error);
         }

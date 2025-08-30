@@ -43,7 +43,7 @@ export const futureTechLampArtifact = {
         }
         
         // Calculate number of choices based on FutureTechLamp cards in graveyard
-        const numChoices = this.calculateNumberOfChoices();
+        const numChoices = min(9, this.calculateNumberOfChoices());
         console.log(`🔮 Generating ${numChoices} card choices based on graveyard count`);
         
         // Generate or use saved card choices

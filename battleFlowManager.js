@@ -447,10 +447,11 @@ export class BattleFlowManager {
     buildActorList(hero, canAct) {
         const actors = [];
         
-        if (!canAct || !hero) return actors;
+        // If there's no hero at all, return empty actors
+        if (!hero) return actors;
         
-        // Add living creatures in NORMAL order (first creature first)
-        // This matches the targeting order where heroes target the first creature first
+        // Add living creatures regardless of hero's alive status
+        // Creatures can act even if their hero is dead
         const livingCreatures = hero.creatures.filter(c => c.alive);
         
         // Process creatures in normal order - first creature acts first
@@ -462,18 +463,20 @@ export class BattleFlowManager {
                 type: 'creature',
                 name: creature.name,
                 data: creature,
-                index: originalIndex, // Keep the original index for targeting
+                index: originalIndex,
                 hero: hero
             });
         }
         
-        // Add hero last (after all creatures have acted)
-        actors.push({
-            type: 'hero',
-            name: hero.name,
-            data: hero,
-            hero: hero
-        });
+        // Only add hero if they can act (are alive)
+        if (canAct && hero.alive) {
+            actors.push({
+                type: 'hero',
+                name: hero.name,
+                data: hero,
+                hero: hero
+            });
+        }
         
         return actors;
     }

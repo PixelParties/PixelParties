@@ -739,7 +739,7 @@ const CARD_DATABASE = {
         name: 'TrialOfCoolness',
         image: './Cards/All/TrialOfCoolness.png',
         cardType: 'Spell',
-        level: 2,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'Fighting',

@@ -87,7 +87,7 @@ export const magneticGloveArtifact = {
             }
         }
         
-        // IMPORTANT: Clear exclusive artifact state FIRST
+        // Clear exclusive artifact state FIRST
         if (window.artifactHandler) {
             window.artifactHandler.clearExclusiveArtifactActive();
         }
@@ -143,6 +143,15 @@ export const magneticGloveArtifact = {
         window.cancelMagneticGlove = async () => {
             await this.exitMagneticGloveMode(heroSelection, true);
         };
+        
+        // Add keyboard event listener for Escape key
+        this.keyboardHandler = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                window.cancelMagneticGlove();
+            }
+        };
+        document.addEventListener('keydown', this.keyboardHandler);
     },
 
     // Hide notification UI
@@ -155,6 +164,12 @@ export const magneticGloveArtifact = {
         // Clean up global function
         if (window.cancelMagneticGlove) {
             delete window.cancelMagneticGlove;
+        }
+        
+        // Clean up keyboard event listener
+        if (this.keyboardHandler) {
+            document.removeEventListener('keydown', this.keyboardHandler);
+            this.keyboardHandler = null;
         }
     },
 
@@ -221,7 +236,7 @@ export const magneticGloveArtifact = {
 
     // Handle selecting a card from the deck
     async selectDeckCard(heroSelection, cardName) {
-        console.log(`🧲 Selected card from deck: ${cardName}`);
+        console.log(`Selected card from deck: ${cardName}`);
         
         // Check if hand is full before adding
         if (heroSelection.getHandManager().isHandFull()) {
@@ -233,15 +248,21 @@ export const magneticGloveArtifact = {
         const success = heroSelection.addCardToHand(cardName);
         
         if (success) {
-            console.log(`🧲 Added ${cardName} to hand`);
+            console.log(`Added ${cardName} to hand`);
+            
+            // ADD TO GRAVEYARD NOW - only on successful completion
+            if (heroSelection && heroSelection.graveyardManager) {
+                heroSelection.graveyardManager.addCard('MagneticGlove');
+                console.log('Added MagneticGlove to graveyard');
+            }
             
             // Show success feedback
             this.showCardSelectedFeedback(cardName);
             
-            // Exit Magnetic Glove Mode (not cancelled, so exclusive state is cleared)
+            // Exit Magnetic Glove Mode (successful completion)
             await this.exitMagneticGloveMode(heroSelection, false);
         } else {
-            console.error(`🧲 Failed to add ${cardName} to hand`);
+            console.error(`Failed to add ${cardName} to hand`);
             this.showError('Could not add card to hand. Please try again.');
         }
     },
@@ -440,6 +461,17 @@ export const magneticGloveArtifact = {
         this.highlightDeckCards(false);
         this.disableToBattleButton(false);
         this.removeDeckCardClickHandlers();
+        
+        // Clean up global functions
+        if (window.cancelMagneticGlove) {
+            delete window.cancelMagneticGlove;
+        }
+        
+        // Clean up keyboard handler
+        if (this.keyboardHandler) {
+            document.removeEventListener('keydown', this.keyboardHandler);
+            this.keyboardHandler = null;
+        }
     },
 
     // Emergency exit (for error recovery)
@@ -457,6 +489,15 @@ export const magneticGloveArtifact = {
             this.highlightDeckCards(false);
             this.disableToBattleButton(false);
             this.removeDeckCardClickHandlers();
+            
+            // Clean up global functions and keyboard handler
+            if (window.cancelMagneticGlove) {
+                delete window.cancelMagneticGlove;
+            }
+            if (this.keyboardHandler) {
+                document.removeEventListener('keydown', this.keyboardHandler);
+                this.keyboardHandler = null;
+            }
             
             // Try to update UI
             if (heroSelection.updateHandDisplay) {

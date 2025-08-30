@@ -114,6 +114,12 @@ export const magicCobaltArtifact = {
             discardedCardName = handManager.removeCardFromHandByIndex(cardIndex);
             console.log(`Magic Cobalt: Only card in hand, removed Magic Cobalt itself`);
         }
+
+        // Add the discarded card to graveyard
+        if (discardedCardName && heroSelection && heroSelection.graveyardManager) {
+            heroSelection.graveyardManager.addCard(discardedCardName);
+            console.log(`Magic Cobalt: Added ${discardedCardName} to graveyard`);
+        }
         
         // Show visual feedback
         this.showMagicCobaltAnimation(cardIndex, heroCount, totalCost, discardedCardName);

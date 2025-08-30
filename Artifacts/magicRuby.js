@@ -104,6 +104,11 @@ export const magicRubyArtifact = {
             discardedCardName = handManager.removeCardFromHandByIndex(cardIndex);
             console.log(`Magic Ruby: Only card in hand, removed Magic Ruby itself`);
         }
+
+        if (discardedCardName && heroSelection && heroSelection.graveyardManager) {
+            heroSelection.graveyardManager.addCard(discardedCardName);
+            console.log(`Magic Ruby: Added ${discardedCardName} to graveyard`);
+        }
         
         // Show visual feedback
         this.showMagicRubyAnimation(cardIndex, rubyCost, discardedCardName, newMaxHandSize);

@@ -251,6 +251,11 @@ export const magicTopazArtifact = {
             discardedCardName = handManager.removeCardFromHandByIndex(state.cardIndex);
             console.log(`💎 MagicTopaz: Only card in hand, removed MagicTopaz itself`);
         }
+
+        if (discardedCardName && heroSelection && heroSelection.graveyardManager) {
+            heroSelection.graveyardManager.addCard(discardedCardName);
+            console.log(`Magic Topaz: Added ${discardedCardName} to graveyard`);
+        }
         
         // Charge the gold
         if (state.cost > 0) {

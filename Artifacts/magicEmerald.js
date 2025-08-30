@@ -251,6 +251,11 @@ export const magicEmeraldArtifact = {
             discardedCardName = handManager.removeCardFromHandByIndex(state.cardIndex);
             console.log(`💚 MagicEmerald: Only card in hand, removed MagicEmerald itself`);
         }
+
+        if (discardedCardName && heroSelection && heroSelection.graveyardManager) {
+            heroSelection.graveyardManager.addCard(discardedCardName);
+            console.log(`Magic Emerald: Added ${discardedCardName} to graveyard`);
+        }
         
         // Charge the gold
         if (state.cost > 0) {

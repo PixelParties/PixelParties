@@ -99,6 +99,11 @@ export const magicSapphireArtifact = {
             discardedCardName = handManager.removeCardFromHandByIndex(cardIndex);
             console.log(`Magic Sapphire: Only card in hand, removed Magic Sapphire itself`);
         }
+
+        if (discardedCardName && heroSelection && heroSelection.graveyardManager) {
+            heroSelection.graveyardManager.addCard(discardedCardName);
+            console.log(`Magic Sapphire: Added ${discardedCardName} to graveyard`);
+        }
         
         // Show visual feedback
         this.showMagicSapphireAnimation(cardIndex, sapphireCost, discardedCardName);

@@ -115,6 +115,12 @@ export const magicAmethystArtifact = {
             console.log(`Magic Amethyst: Only card in hand, removed Magic Amethyst itself`);
         }
         
+        // Add the discarded card to graveyard
+        if (discardedCardName && heroSelection && heroSelection.graveyardManager) {
+            heroSelection.graveyardManager.addCard(discardedCardName);
+            console.log(`Magic Amethyst: Added ${discardedCardName} to graveyard`);
+        }
+
         // Show visual feedback
         this.showMagicAmethystAnimation(cardIndex, heroCount, totalCost, discardedCardName);
         

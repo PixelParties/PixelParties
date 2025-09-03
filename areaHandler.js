@@ -1,9 +1,13 @@
-// areaHandler.js - Area Card Management Module
+// areaHandler.js - Area Card Management Module with Smart Counter Display Updates
 export class AreaHandler {
     constructor() {
         this.areaCard = null;
         this.opponentAreaCard = null;
         this.heroSelection = null;
+        
+        // Add state tracking for smart updates
+        this.lastAreaCardState = null;
+        this.lastCounterValues = {};
     }
 
     init(heroSelection) {
@@ -20,6 +24,97 @@ export class AreaHandler {
             window.onAreaCardDragStart = (event, cardDataJson) => this.onAreaCardDragStart(event, cardDataJson);
             window.onAreaCardDragEnd = (event) => this.onAreaCardDragEnd(event);
         }
+    }
+
+    // Generate a state hash for comparison
+    generateAreaStateHash(areaCard) {
+        if (!areaCard) return null;
+        
+        return {
+            name: areaCard.name,
+            stormCounters: areaCard.stormCounters || 0,
+            doomCounters: areaCard.doomCounters || 0,
+            // Add other counter types as needed
+        };
+    }
+
+    // Check if area card or counters have changed
+    hasAreaChanged() {
+        const currentState = this.generateAreaStateHash(this.areaCard);
+        
+        // Compare with last known state
+        if (!this.lastAreaCardState && !currentState) {
+            return false; // Both null, no change
+        }
+        
+        if (!this.lastAreaCardState || !currentState) {
+            return true; // One is null, other isn't - change detected
+        }
+        
+        // Deep comparison - only trigger if meaningful changes
+        const hasRealChange = (
+            this.lastAreaCardState.name !== currentState.name ||
+            Math.abs((this.lastAreaCardState.doomCounters || 0) - (currentState.doomCounters || 0)) > 0
+        );        
+        return hasRealChange;
+    }
+
+    // Update the cached state
+    updateCachedState() {
+        this.lastAreaCardState = this.generateAreaStateHash(this.areaCard);
+    }
+
+    // Smart update that only regenerates when necessary
+    smartUpdateAreaDisplay() {
+        const hasChanged = this.hasAreaChanged();
+        
+        if (!hasChanged) {
+            return false;
+        }
+                
+        // Perform full slot update
+        const success = this.updateAreaSlotDisplay();
+        
+        if (success) {
+            // Update cached state after successful update
+            this.updateCachedState();
+        }
+        
+        return success;
+    }
+
+    // Lightweight counter-only update
+    updateCountersOnly() {        
+        const playerAreaSlot = document.getElementById('player-area-slot');
+        if (!playerAreaSlot) return false;
+        
+        const currentArea = this.getAreaCard();
+        if (!currentArea) {
+            // No area card, remove any existing counters
+            this.removeExistingCounters(playerAreaSlot);
+            return false;
+        }
+        
+        // Remove existing counters
+        this.removeExistingCounters(playerAreaSlot);
+        
+        // Create new counter if needed
+        const counterElement = this.createAreaCounterDisplay(currentArea);
+        
+        if (counterElement) {
+            const areaCardContainer = playerAreaSlot.querySelector('.area-card');
+            if (areaCardContainer) {
+                areaCardContainer.style.position = 'relative';
+                areaCardContainer.style.overflow = 'visible';
+                areaCardContainer.appendChild(counterElement);
+                
+                requestAnimationFrame(() => {
+                    counterElement.classList.add('counter-appeared');
+                });
+            }
+        }
+        
+        return true;
     }
 
     isAreaCard(cardName) {
@@ -39,7 +134,7 @@ export class AreaHandler {
             '<div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div>';
         
         return `
-            <div class="${slotClass}" data-slot-type="area"
+            <div class="${slotClass}" id="player-area-slot" data-slot-type="area"
                 ondragover="window.onAreaSlotDragOver(event)"
                 ondrop="window.onAreaSlotDrop(event)"
                 ondragleave="window.onAreaSlotDragLeave(event)"
@@ -103,20 +198,6 @@ export class AreaHandler {
         }
     }
 
-    async onAreaSlotDrop(event) {
-        event.preventDefault();
-        const slot = event.currentTarget;
-        slot.classList.remove('area-drop-ready', 'area-drop-invalid');
-        
-        if (this.heroSelection?.handManager?.isHandDragging()) {
-            const dragState = this.heroSelection.handManager.getHandDragState();
-            if (this.isAreaCard(dragState.draggedCardName)) {
-                return await this.handleAreaCardDrop(dragState.draggedCardName, dragState.draggedCardIndex);
-            }
-        }
-        return false;
-    }
-
     onAreaCardDragStart(event, cardDataJson) {
         // Handle existing area card dragging
         try {
@@ -149,25 +230,6 @@ export class AreaHandler {
             return false;
         }
 
-        // === DOM TRACKING SYSTEM ===
-        const trackAreaSlotLocation = (step) => {
-            const areaSlot = document.querySelector('.area-slot');
-            const teamContainer = document.querySelector('.team-slots-container');
-            const heroContainer = document.querySelector('.hero-slots-container');
-            
-            console.log(`=== STEP ${step} ===`);
-            console.log('Area slot exists:', !!areaSlot);
-            console.log('Area slot parent:', areaSlot?.parentElement?.className || 'none');
-            console.log('In team container?', teamContainer?.contains(areaSlot) || false);
-            console.log('In hero container?', heroContainer?.contains(areaSlot) || false);
-            console.log('Area slot classes:', areaSlot?.className || 'none');
-            
-            return areaSlot;
-        };
-
-        // Track initial state
-        let areaSlot = trackAreaSlotLocation('INITIAL');
-
         // Check if replacing an existing area card
         const isReplacement = this.areaCard !== null;
         const previousAreaName = isReplacement ? this.areaCard.name : null;
@@ -193,6 +255,19 @@ export class AreaHandler {
                 newAreaCard.stormCounters = 1;
             }
         }
+        // Initialize DoomClock with counters
+        if (cardName === 'DoomClock') {
+            if (isReplacement && previousAreaName === 'DoomClock' && this.areaCard.doomCounters !== undefined) {
+                newAreaCard.doomCounters = this.areaCard.doomCounters;
+            } else {
+                import('../Spells/doomClock.js').then(({ initializeDoomClockArea }) => {
+                    initializeDoomClockArea(newAreaCard);
+                }).catch(error => {
+                    newAreaCard.doomCounters = 0;
+                });
+                newAreaCard.doomCounters = 0;
+            }
+        }
 
         // Handle action costs
         if (cardInfo.action && this.heroSelection.actionManager) {
@@ -206,27 +281,18 @@ export class AreaHandler {
 
         // Set the new area card
         this.setAreaCard(newAreaCard);
-        areaSlot = trackAreaSlotLocation('AFTER SET_AREA_CARD');
 
         // Remove card from hand
         this.heroSelection.handManager.removeCardFromHandByIndex(cardIndex);
-        areaSlot = trackAreaSlotLocation('AFTER REMOVE_FROM_HAND');
 
-        // Update area slot display FIRST - before other UI updates
+        // Update area slot display FIRST - this is definitely a change, so use full update
         this.updateAreaSlotDisplay();
-        areaSlot = trackAreaSlotLocation('AFTER AREA_UPDATE');
+        this.updateCachedState(); // Update cache after successful drop
 
-        // Now call other updates one by one with tracking
+        // Now call other updates
         this.heroSelection.updateHandDisplay();
-        areaSlot = trackAreaSlotLocation('AFTER HAND_UPDATE');
-
         this.heroSelection.updateActionDisplay();
-        areaSlot = trackAreaSlotLocation('AFTER ACTION_UPDATE');
-
-        // THIS is the most likely culprit - let's track before and after
-        console.log('🔍 About to call updateBattleFormationUI...');
         this.heroSelection.updateBattleFormationUI();
-        areaSlot = trackAreaSlotLocation('AFTER FORMATION_UPDATE');
 
         // Generate success message
         const formattedName = this.formatCardName(cardName);
@@ -258,18 +324,27 @@ export class AreaHandler {
         this.showAreaDropResult(successMessage, true);
 
         await this.heroSelection.saveGameState();
-        areaSlot = trackAreaSlotLocation('AFTER SAVE_STATE');
-
         await this.heroSelection.sendFormationUpdate();
-        areaSlot = trackAreaSlotLocation('AFTER SEND_UPDATE');
-
         this.heroSelection.handManager.endHandCardDrag();
-        areaSlot = trackAreaSlotLocation('FINAL');
 
         return true;
     }
 
-    // Add this to the AreaHandler class
+    async onAreaSlotDrop(event) {
+        event.preventDefault();
+        const slot = event.currentTarget;
+        slot.classList.remove('area-drop-ready', 'area-drop-invalid');
+        
+        if (this.heroSelection?.handManager?.isHandDragging()) {
+            const dragState = this.heroSelection.handManager.getHandDragState();
+            if (this.isAreaCard(dragState.draggedCardName)) {
+                return await this.handleAreaCardDrop(dragState.draggedCardName, dragState.draggedCardIndex);
+            }
+        }
+        return false;
+    }
+
+    // Updated area slot display method with smart update integration
     updateAreaSlotDisplay() {
         // Find the correct parent container
         const teamSlotsContainer = document.querySelector('.team-slots-container');
@@ -280,8 +355,8 @@ export class AreaHandler {
             return false;
         }
 
-        // Find existing area slot and verify its location
-        let existingAreaSlot = document.querySelector('.area-slot');
+        // Find existing area slot by ID and verify its location
+        let existingAreaSlot = document.getElementById('player-area-slot');
         
         if (existingAreaSlot) {
             // Check if it's in the wrong container and fix it
@@ -304,13 +379,23 @@ export class AreaHandler {
             // Recreate area slot in correct container
             const areaSlotHTML = this.createAreaSlotHTML();
             teamSlotsContainer.insertAdjacentHTML('afterbegin', areaSlotHTML);
-            existingAreaSlot = teamSlotsContainer.querySelector('.area-slot');
+            existingAreaSlot = document.getElementById('player-area-slot');
+            
+            // Force counter update for new slot
+            setTimeout(() => this.updateCountersOnly(), 50);
         } else {
             // Update existing area slot content
             const areaCard = this.getAreaCard();
             const newSlotClass = areaCard ? 'area-slot filled' : 'area-slot empty';
             const newAreaCardHTML = areaCard ? this.createAreaCardHTML(areaCard) : 
                 '<div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div>';
+
+            
+            // Log before innerHTML replacement
+            const hadCounters = existingAreaSlot.querySelectorAll('.area-counter-bubble').length > 0;
+            if (hadCounters) {
+                console.error('⚠️ About to replace innerHTML of slot that has counters!');
+            }
             
             existingAreaSlot.className = newSlotClass;
             existingAreaSlot.setAttribute('data-slot-type', 'area');
@@ -321,68 +406,170 @@ export class AreaHandler {
             existingAreaSlot.ondrop = (event) => window.onAreaSlotDrop(event);
             existingAreaSlot.ondragleave = (event) => window.onAreaSlotDragLeave(event);
             existingAreaSlot.ondragenter = (event) => window.onAreaSlotDragEnter(event);
+        
+            if (hadCounters) {
+                console.error('💥 innerHTML replaced - counters lost!');
+            }
+            
+            // Update counters only (don't call updateAreaDisplay to avoid removing counters)
+            setTimeout(() => this.updateCountersOnly(), 50);
         }
 
         return true;
     }
 
+    // Completely redesigned counter display system
+    createAreaCounterDisplay(areaCard) {
+        if (!areaCard) return null;
+
+        let counterData = null;
+
+        // Determine counter data based on area card type
+        if (areaCard.name === 'GatheringStorm' && areaCard.stormCounters > 1) {
+            counterData = {
+                type: 'storm',
+                value: `x${areaCard.stormCounters}`,
+                className: 'area-counter-storm',
+                color: '#4a90e2',
+                shadowColor: '74, 144, 226'
+            };
+        } else if (areaCard.name === 'DoomClock') {
+            const doomCounters = areaCard.doomCounters || 0;
+            counterData = {
+                type: 'doom',
+                value: `${doomCounters}`,
+                className: 'area-counter-doom',
+                color: doomCounters >= 10 ? '#FF0000' : doomCounters >= 8 ? '#DC143C' : '#8B0000',
+                shadowColor: doomCounters >= 10 ? '255, 0, 0' : doomCounters >= 8 ? '220, 20, 60' : '139, 0, 0'
+            };
+        }
+
+        if (!counterData) return null;
+
+        // Create the counter element with enhanced positioning
+        const counterElement = document.createElement('div');
+        counterElement.className = `area-counter-bubble ${counterData.className}`;
+        counterElement.setAttribute('data-counter-type', counterData.type);
+        counterElement.textContent = counterData.value;
+
+        // Apply comprehensive styling for proper positioning and appearance
+        counterElement.style.cssText = `
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            min-width: 28px;
+            min-height: 28px;
+            background: linear-gradient(135deg, ${counterData.color} 0%, ${this.darkenColor(counterData.color, 0.2)} 100%);
+            color: white;
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+            font-size: 12px;
+            font-weight: 900;
+            z-index: 1000;
+            box-shadow: 
+                0 4px 12px rgba(${counterData.shadowColor}, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                0 0 0 1px rgba(0, 0, 0, 0.2);
+            text-shadow: 
+                1px 1px 2px rgba(0, 0, 0, 0.8),
+                0 0 8px rgba(${counterData.shadowColor}, 0.8);
+            letter-spacing: 0.5px;
+            animation: counterPulse 3s ease-in-out infinite;
+            pointer-events: none;
+            user-select: none;
+            transform-origin: center center;
+            white-space: nowrap;
+            overflow: visible;
+        `;
+
+        return counterElement;
+    }
+
+    // Helper method to darken a color
+    darkenColor(color, amount) {
+        if (color.startsWith('#')) {
+            const hex = color.slice(1);
+            const rgb = [
+                parseInt(hex.slice(0, 2), 16),
+                parseInt(hex.slice(2, 4), 16),
+                parseInt(hex.slice(4, 6), 16)
+            ];
+            const darkened = rgb.map(c => Math.max(0, Math.floor(c * (1 - amount))));
+            return `#${darkened.map(c => c.toString(16).padStart(2, '0')).join('')}`;
+        }
+        return color;
+    }
+
+    // Enhanced area display update method - now smarter about when to remove counters
     updateAreaDisplay() {
-        // Find area slot in the UI
-        const areaSlot = document.querySelector('.area-slot');
-        if (!areaSlot) return;
+        // Find the PLAYER'S area slot specifically using unique ID
+        const playerAreaSlot = document.getElementById('player-area-slot');
+        if (!playerAreaSlot) {
+            console.warn('Player area slot not found for counter display update');
+            return;
+        }
         
         const currentArea = this.getAreaCard();
-        if (!currentArea) return;
         
-        // If it's a GatheringStorm, update the display to show counters
-        if (currentArea.name === 'GatheringStorm' && currentArea.stormCounters > 1) {
-            // Add a counter display overlay
-            let counterDisplay = areaSlot.querySelector('.storm-counter-display');
-            
-            if (!counterDisplay) {
-                counterDisplay = document.createElement('div');
-                counterDisplay.className = 'storm-counter-display';
-                counterDisplay.style.cssText = `
-                    position: absolute;
-                    top: -10px;
-                    right: -10px;
-                    width: 30px;
-                    height: 30px;
-                    background: linear-gradient(135deg, #4a90e2, #7b68ee);
-                    color: white;
-                    border: 2px solid #fff;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 14px;
-                    font-weight: bold;
-                    z-index: 10;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-                    animation: counterPulse 2s ease-in-out infinite;
-                `;
-                areaSlot.appendChild(counterDisplay);
+        if (!currentArea) {
+            // Remove counters only if no area card
+            this.removeExistingCounters(playerAreaSlot);
+            return;
+        }
+
+        // Check if counter already exists and is correct
+        const existingCounter = playerAreaSlot.querySelector('.area-counter-bubble');
+        const counterElement = this.createAreaCounterDisplay(currentArea);
+        
+        if (counterElement) {
+            // Only remove and recreate if the counter content would be different
+            if (!existingCounter || existingCounter.textContent !== counterElement.textContent) {
+                this.removeExistingCounters(playerAreaSlot);
                 
-                // Add CSS for pulse animation if not already present
-                if (!document.getElementById('stormCounterStyles')) {
-                    const style = document.createElement('style');
-                    style.id = 'stormCounterStyles';
-                    style.textContent = `
-                        @keyframes counterPulse {
-                            0%, 100% { transform: scale(1); opacity: 1; }
-                            50% { transform: scale(1.1); opacity: 0.8; }
-                        }
-                    `;
-                    document.head.appendChild(style);
+                const areaCardContainer = playerAreaSlot.querySelector('.area-card');
+                if (areaCardContainer) {
+                    // Ensure the container has relative positioning
+                    areaCardContainer.style.position = 'relative';
+                    areaCardContainer.style.overflow = 'visible';
+                    
+                    // Append the counter to the area card container
+                    areaCardContainer.appendChild(counterElement);
+                    
+                    // Add a brief animation for new counters
+                    requestAnimationFrame(() => {
+                        counterElement.classList.add('counter-appeared');
+                    });
+                } else {
+                    console.warn('Area card container not found for counter positioning');
                 }
             }
-            
-            counterDisplay.textContent = `${currentArea.stormCounters}x`;
+        } else {
+            // No counter needed, remove any existing ones
+            this.removeExistingCounters(playerAreaSlot);
         }
     }
 
+    // Remove existing counter displays
+    removeExistingCounters(areaSlot) {
+        if (!areaSlot) return;
+        
+        const existingCounters = areaSlot.querySelectorAll('.area-counter-bubble, .storm-counter-display, .doom-counter-display');
+        existingCounters.forEach(counter => counter.remove());
+    }
+
+    // Force counter update (useful for external calls)
+    forceCounterUpdate() {
+        setTimeout(() => {
+            this.updateCountersOnly();
+        }, 100);
+    }
+
     showAreaDropResult(message, success) {
-        const areaSlot = document.querySelector('.area-slot');
+        const areaSlot = document.getElementById('player-area-slot');
         if (!areaSlot) return;
         
         const feedback = document.createElement('div');
@@ -415,12 +602,24 @@ export class AreaHandler {
         if (!areaState) return false;
         this.areaCard = areaState.areaCard || null;
         this.opponentAreaCard = areaState.opponentAreaCard || null;
+        
+        // Update cached state after import
+        this.updateCachedState();
+        
+        // Force counter update after state import (for reconnection)
+        setTimeout(() => {
+            this.updateCountersOnly();
+        }, 200);
+        
         return true;
     }
 
     reset() {
         this.areaCard = null;
         this.opponentAreaCard = null;
+        // Reset state tracking
+        this.lastAreaCardState = null;
+        this.lastCounterValues = {};
     }
 
     getFormationUpdateData() {
@@ -431,6 +630,9 @@ export class AreaHandler {
         if (data.areaCard) {
             this.opponentAreaCard = data.areaCard;
         }
+        
+        // Use smart update for network updates
+        this.smartUpdateAreaDisplay();
     }
 
     getBattleInitData() {
@@ -438,7 +640,7 @@ export class AreaHandler {
     }
 }
 
-// CSS injection
+// Enhanced CSS injection with proper counter styling
 if (typeof document !== 'undefined' && !document.getElementById('areaStyles')) {
     const style = document.createElement('style');
     style.id = 'areaStyles';
@@ -449,8 +651,165 @@ if (typeof document !== 'undefined' && !document.getElementById('areaStyles')) {
             80% { opacity: 1; transform: translateX(-50%) translateY(0); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
         }
+
+        /* Enhanced area counter bubble styling */
+        .area-counter-bubble {
+            position: absolute !important;
+            top: -12px !important;
+            right: -12px !important;
+            z-index: 1000 !important;
+            min-width: 28px !important;
+            min-height: 28px !important;
+            border-radius: 50% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+            font-weight: 900 !important;
+            pointer-events: none !important;
+            user-select: none !important;
+            white-space: nowrap !important;
+            overflow: visible !important;
+            transform-origin: center center !important;
+        }
+
+        .area-counter-bubble.counter-appeared {
+            animation: counterAppear 0.5s ease-out;
+        }
+
+        @keyframes counterAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0.3) rotate(-180deg);
+            }
+            70% {
+                opacity: 1;
+                transform: scale(1.2) rotate(0deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+
+        @keyframes counterPulse {
+            0%, 100% { 
+                transform: scale(1);
+                filter: brightness(1);
+            }
+            50% { 
+                transform: scale(1.1);
+                filter: brightness(1.2);
+            }
+        }
+
+        /* Specific styling for storm counters */
+        .area-counter-storm {
+            animation: counterPulse 3s ease-in-out infinite;
+        }
+
+        /* Specific styling for doom counters with urgency indicators */
+        .area-counter-doom {
+            animation: counterPulse 2s ease-in-out infinite;
+        }
+
+        /* Enhanced positioning context for area cards */
+        .area-card {
+            position: relative !important;
+            overflow: visible !important;
+        }
+
+        .area-card-image-container {
+            position: relative !important;
+            overflow: visible !important;
+        }
+
+        /* Ensure area slot doesn't clip counters */
+        .area-slot {
+            overflow: visible !important;
+        }
+
+        .area-slot.filled {
+            overflow: visible !important;
+        }
+
+        /* Make sure team slots container allows overflow for counters */
+        .team-slots-container {
+            overflow: visible !important;
+        }
+
+        /* Responsive adjustments for counters */
+        @media (max-width: 768px) {
+            .area-counter-bubble {
+                min-width: 24px !important;
+                min-height: 24px !important;
+                font-size: 10px !important;
+                top: -10px !important;
+                right: -10px !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .area-counter-bubble {
+                min-width: 20px !important;
+                min-height: 20px !important;
+                font-size: 9px !important;
+                top: -8px !important;
+                right: -8px !important;
+            }
+        }
     `;
     document.head.appendChild(style);
+}
+
+
+if (typeof document !== 'undefined') {
+    // Create a mutation observer to track area counter removals
+    const areaObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList') {
+                // Check if any area counter was removed
+                mutation.removedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.classList && node.classList.contains('area-counter-bubble')) {
+                            console.error('🔥 AREA COUNTER REMOVED FROM DOM!', {
+                                removedCounter: node,
+                                counterText: node.textContent,
+                                parentElement: mutation.target,
+                                stackTrace: new Error().stack
+                            });
+                        }
+                        
+                        // Also check if a container with counters was removed
+                        const childCounters = node.querySelectorAll && node.querySelectorAll('.area-counter-bubble');
+                        if (childCounters && childCounters.length > 0) {
+                            console.error('🔥 CONTAINER WITH COUNTERS REMOVED!', {
+                                removedContainer: node,
+                                childCounters: childCounters.length,
+                                parentElement: mutation.target,
+                                stackTrace: new Error().stack
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    });
+    
+    // Start observing when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            areaObserver.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+    } else {
+        areaObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
 }
 
 export default AreaHandler;

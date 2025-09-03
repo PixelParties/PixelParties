@@ -1,5 +1,6 @@
-// battleStartManager.js - Centralized Battle Start Effects Manager
+// battleStartManager.js - Centralized Battle Start Effects Manager (FIXED)
 // Handles all effects that trigger at the beginning of combat
+// FIXED: Race condition in delayed artifact effect clearing
 
 import { applyArrowStartOfBattleEffects } from './arrowSystem.js';
 
@@ -153,7 +154,7 @@ export class BattleStartManager {
                 bm.necromancyManager.initializeNecromancyStackDisplays();
             }
 
-            bm.addCombatLog('âš¡ Hero battle start effects applied', 'info');
+            bm.addCombatLog('⚡ Hero battle start effects applied', 'info');
         } catch (error) {
             console.error('Error applying hero start effects:', error);
         }
@@ -178,7 +179,7 @@ export class BattleStartManager {
         }
     }
 
-    // Phase 5: Apply delayed artifact effects (like Poisoned Meat)
+    // Phase 5: Apply delayed artifact effects (BloodSoakedCoin, PoisonedMeat, etc.)
     async applyDelayedArtifactEffects() {
         const bm = this.battleManager;
         
@@ -186,12 +187,104 @@ export class BattleStartManager {
             const delayedEffects = await bm.getBothPlayersDelayedEffects();
             
             if (delayedEffects) {
-                const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
-                await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, bm);
-                bm.addCombatLog('⏳ Delayed artifact effects applied', 'info');
+                // Apply BloodSoakedCoin effects (blood toll damage) - NO CLEARING
+                try {
+                    const { applyBothPlayersBloodTollEffectsNoClear } = await import('./Artifacts/bloodSoakedCoin.js');
+                    if (applyBothPlayersBloodTollEffectsNoClear) {
+                        // Use new no-clear version if available
+                        await applyBothPlayersBloodTollEffectsNoClear(delayedEffects.host, delayedEffects.guest, bm);
+                    } else {
+                        // Fallback to original function (which includes clearing)
+                        const { applyBothPlayersBloodTollEffects } = await import('./Artifacts/bloodSoakedCoin.js');
+                        await applyBothPlayersBloodTollEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    }
+                    bm.addCombatLog('🩸 Blood toll effects applied from both players', 'info');
+                } catch (error) {
+                    console.error('Error applying BloodSoakedCoin effects:', error);
+                }
+
+                // Apply PoisonedMeat effects (poison application) - NO CLEARING
+                try {
+                    const { applyBothPlayersDelayedEffectsNoClear } = await import('./Artifacts/poisonedMeat.js');
+                    if (applyBothPlayersDelayedEffectsNoClear) {
+                        // Use new no-clear version if available
+                        await applyBothPlayersDelayedEffectsNoClear(delayedEffects.host, delayedEffects.guest, bm);
+                    } else {
+                        // Fallback to original function (which includes clearing)
+                        const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
+                        await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    }
+                    bm.addCombatLog('🥩 Poison curse effects applied from both players', 'info');
+                } catch (error) {
+                    console.error('Error applying PoisonedMeat effects:', error);
+                }
+
+                // This prevents the race condition where individual clearing functions overwrite each other
+                await this.clearAllProcessedDelayedEffects(delayedEffects.host, delayedEffects.guest);
+
+                bm.addCombatLog('⏳ All delayed artifact effects processed', 'success');
             }
         } catch (error) {
             console.error('Error applying delayed artifact effects:', error);
+        }
+    }
+
+    // Centralized clearing function to prevent race condition
+    async clearAllProcessedDelayedEffects(hostEffects, guestEffects) {
+        const bm = this.battleManager;
+        
+        if (!bm.roomManager || !bm.roomManager.getRoomRef()) {
+            return;
+        }
+        
+        try {
+            const roomRef = bm.roomManager.getRoomRef();
+            
+            // Filter out ALL processed delayed artifact effect types in one pass
+            const filteredHostEffects = hostEffects ? hostEffects.filter(
+                effect => !(
+                    // BloodSoakedCoin effects
+                    (effect.type === 'damage_all_player_heroes' && effect.source === 'BloodSoakedCoin') ||
+                    // PoisonedMeat effects
+                    (effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+                    // Add more delayed effect types here as needed
+                )
+            ) : [];
+            
+            const filteredGuestEffects = guestEffects ? guestEffects.filter(
+                effect => !(
+                    // BloodSoakedCoin effects
+                    (effect.type === 'damage_all_player_heroes' && effect.source === 'BloodSoakedCoin') ||
+                    // PoisonedMeat effects
+                    (effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+                    // Add more delayed effect types here as needed
+                )
+            ) : [];
+            
+            // CRITICAL FIX: Update local heroSelection state for the HOST
+            if (window.heroSelection && bm.isHost) {
+                window.heroSelection.delayedArtifactEffects = filteredHostEffects || [];
+            }
+            
+            // NEW: Send message to GUEST to clear their local state too
+            if (bm.sendBattleUpdate) {
+                bm.sendBattleUpdate('delayed_effects_cleared', {
+                    clearedHostEffects: (hostEffects || []).length - filteredHostEffects.length,
+                    clearedGuestEffects: (guestEffects || []).length - filteredGuestEffects.length,
+                    newGuestEffects: filteredGuestEffects,
+                    timestamp: Date.now()
+                });
+            }
+            
+            // Single Firebase write removes all processed delayed effect types
+            await roomRef.child('gameState').update({
+                hostDelayedArtifactEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
+                guestDelayedArtifactEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
+                allDelayedEffectsProcessedAt: Date.now()
+            });
+                        
+        } catch (error) {
+            console.error('Error clearing processed delayed effects (centralized):', error);
         }
     }
 

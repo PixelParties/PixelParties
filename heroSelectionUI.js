@@ -2,8 +2,6 @@
 
 export class HeroSelectionUI {
     constructor() {
-        console.log('HeroSelectionUI initialized');
-        
         // Add tooltip hover persistence tracking (hero only)
         this.tooltipHideTimeout = null;
         this.currentTooltipPosition = null;
@@ -174,7 +172,6 @@ export class HeroSelectionUI {
     showHeroSpellbookTooltip(position, heroElement) {
         // Prevent tooltips during any drag operation
         if (window.heroSelection?.formationManager?.isDragging()) {
-            console.log('🚫 Tooltip blocked - hero drag in progress');
             return;
         }
         
@@ -791,15 +788,6 @@ export class HeroSelectionUI {
         // Use the enhanced stat calculation that includes ability bonuses
         const effectiveStats = window.heroSelection.calculateEffectiveHeroStats(slotPosition);
         if (effectiveStats) {
-            // Log the stat bonuses for debugging if there are any
-            if (effectiveStats.bonuses.hpBonus > 0 || effectiveStats.bonuses.attackBonus > 0) {
-                const formation = window.heroSelection.formationManager?.getBattleFormation();
-                const hero = formation?.[slotPosition];
-                if (hero) {
-                    console.log(`📊 ${hero.name} effective stats: ${effectiveStats.maxHp} HP (+${effectiveStats.bonuses.hpBonus}), ${effectiveStats.attack} ATK (+${effectiveStats.bonuses.attackBonus})`);
-                }
-            }
-            
             return {
                 currentHp: effectiveStats.currentHp,
                 maxHp: effectiveStats.maxHp,
@@ -815,9 +803,6 @@ export class HeroSelectionUI {
         
         const hero = formation[slotPosition];
         
-        // DEBUG: Log hero data to help troubleshoot
-        console.log(`Getting fallback stats for hero at ${slotPosition}:`, hero);
-        
         // Check if this is a Hero instance with stats, or just character data
         if (hero.currentHp !== undefined && hero.maxHp !== undefined && hero.atk !== undefined) {
             // This is a proper Hero instance
@@ -832,7 +817,6 @@ export class HeroSelectionUI {
                 attack: currentAttack
             };
             
-            console.log(`Hero stats found:`, stats);
             return stats;
         } else {
             // This might be basic character data, try to get stats from card database
@@ -844,14 +828,32 @@ export class HeroSelectionUI {
                     attack: heroInfo.atk
                 };
                 
-                console.log(`Hero stats from database:`, stats);
                 return stats;
             }
         }
         
         // Fallback - no stats available
-        console.warn(`No stats available for hero at position ${slotPosition}:`, hero);
         return null;
+    }
+
+    createCreatureTooltipData(creatureName, creatureData = null) {
+        // Get creature info from card database
+        const cardInfo = creatureData || (window.heroSelection?.getCardInfo ? window.heroSelection.getCardInfo(creatureName) : null);
+        
+        const tooltipData = {
+            imagePath: `./Cards/All/${creatureName}.png`,
+            displayName: this.formatCardName(creatureName),
+            cardType: 'creature'
+        };
+        
+        // Add creature stats if it's a creature spell with HP
+        if (cardInfo && (cardInfo.cardType === 'Spell' || cardInfo.cardType === 'Token') && cardInfo.subtype === 'Creature' && cardInfo.hp) {
+            tooltipData.creatureStats = {
+                maxHp: cardInfo.hp
+            };
+        }
+        
+        return tooltipData;
     }
 
     // Create hero stats display HTML
@@ -921,20 +923,8 @@ export class HeroSelectionUI {
 
     // Update all hero stats in the formation
     updateAllHeroStats() {
-        console.log('🔄 Updating all hero stats with ability bonuses...');
-        
         ['left', 'center', 'right'].forEach(position => {
             this.updateHeroStats(position);
-            
-            // Log the updated stats for debugging
-            const stats = this.getHeroStats(position);
-            if (stats && stats.bonuses && (stats.bonuses.hpBonus > 0 || stats.bonuses.attackBonus > 0)) {
-                const formation = window.heroSelection?.formationManager?.getBattleFormation();
-                const hero = formation?.[position];
-                if (hero) {
-                    console.log(`✅ Updated ${hero.name} (${position}): ${stats.maxHp} HP, ${stats.attack} ATK`);
-                }
-            }
         });
     }
 
@@ -957,6 +947,15 @@ export class HeroSelectionUI {
             };
             const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
             tooltipEvents = `onmouseenter="window.showCardTooltip('${cardDataJson}', this)" onmouseleave="window.hideCardTooltip()"`;
+        }
+        
+        // NEW: Add hero hover events for team building mode (on the image itself)
+        let heroHoverEvents = '';
+        if (isDraggable && includeAbilityZones && slotPosition) {
+            heroHoverEvents = `
+                onmouseenter="window.handleHeroHoverEnter('${slotPosition}', this)"
+                onmouseleave="window.handleHeroHoverLeave()"
+            `;
         }
         
         let dragEvents = '';
@@ -1007,6 +1006,7 @@ export class HeroSelectionUI {
                         alt="${character.name}" 
                         class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''}"
                         ${tooltipEvents}
+                        ${heroHoverEvents}
                         ${dragEvents}
                         ${heroClickEvents}
                         onerror="this.src='./Cards/Characters/placeholder.png'">
@@ -1093,11 +1093,9 @@ export class HeroSelectionUI {
         if (creatures && creatures.length > 0) {
             creaturesHTML += creatures.map((creature, index) => {
                 const creatureSprite = `./Creatures/${creature.name}.png`;
-                const cardData = {
-                    imagePath: creature.image,
-                    displayName: this.formatCardName(creature.name),
-                    cardType: 'creature'
-                };
+                
+                // Create enhanced creature tooltip data with stats
+                const cardData = this.createCreatureTooltipData(creature.name, creature);
                 const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
                 
                 // Prepare creature data for drag operations
@@ -1155,22 +1153,15 @@ export class HeroSelectionUI {
     createTeamSlotHTML(position, character = null, createCharacterCardFn = null, heroAbilitiesManager = null) {
         const slotClass = character ? 'team-slot filled' : 'team-slot empty';
         
-        // Create character HTML WITHOUT tooltip events (we'll handle them at the slot level)
+        // Create character HTML WITHOUT tooltip events (we'll handle them at the image level)
         const characterHTML = character ? 
             this.createCharacterCardHTML(character, false, false, false, true, position, true, heroAbilitiesManager || window.heroSelection?.heroAbilitiesManager) : 
             '<div class="slot-placeholder">Empty Slot</div>';
-        
-        // Add mouse events at the slot level
-        const mouseEvents = character ? `
-            onmouseenter="window.handleHeroHoverEnter('${position}', this)"
-            onmouseleave="window.handleHeroHoverLeave()"
-        ` : '';
         
         // Add drag handlers for both hero swapping AND ability attachment
         return `
             <div class="${slotClass}" 
                 data-position="${position}"
-                ${mouseEvents}
                 ondragover="window.onTeamSlotDragOver(event, '${position}')"
                 ondrop="window.onTeamSlotDrop(event, '${position}')"
                 ondragleave="window.onTeamSlotDragLeave(event)"
@@ -1182,12 +1173,7 @@ export class HeroSelectionUI {
 
     // Generate selection screen HTML
     generateSelectionHTML(playerCharacters) {
-        console.log('generateSelectionHTML called');
-        console.log('Player characters length:', playerCharacters.length);
-        console.log('Player characters:', playerCharacters.map(c => c.name));
-        
         if (playerCharacters.length === 0) {
-            console.log('No player characters available, showing waiting message...');
             return `
                 <div class="hero-selection-waiting">
                     <h2>⚔️ Preparing Battle Arena...</h2>
@@ -1196,15 +1182,11 @@ export class HeroSelectionUI {
             `;
         }
 
-        console.log('Generating character cards HTML...');
         const playerCardsHTML = playerCharacters
             .map(char => {
-                console.log('Creating card for character:', char.name);
                 return this.createCharacterCardHTML(char, true, false);
             })
             .join('');
-
-        console.log('Generated player cards HTML length:', playerCardsHTML.length);
 
         const fullHTML = `
             <div class="hero-selection-container">
@@ -1238,7 +1220,6 @@ export class HeroSelectionUI {
             </div>
         `;
 
-        console.log('Generated full selection HTML length:', fullHTML.length);
         return fullHTML;
     }
 
@@ -1527,8 +1508,6 @@ function onTeamSlotDragOver(event, position) {
             let existingTooltip = slot.querySelector('.ability-drop-tooltip');
             
             if (!existingTooltip) {
-                console.log('🎯 Creating new centered tooltip for', position);
-                
                 // Validate the drag operation
                 const handled = window.onTeamSlotAbilityDragOver(event, position);
                 
@@ -1568,13 +1547,6 @@ function onTeamSlotDragOver(event, position) {
                 // Track current tooltip and slot
                 currentTooltip = tooltip;
                 currentTooltipSlot = slot;
-                
-                console.log('🎯 Centered tooltip created:', {
-                    message: tooltipInfo.message,
-                    length: tooltipInfo.message.length,
-                    longText: tooltipInfo.message.length > 30,
-                    canDrop: tooltipInfo.canDrop
-                });
                 
             } else {
                 // Tooltip already exists, just update the classes
@@ -1899,7 +1871,6 @@ function onTeamSlotDragLeave(event) {
         if (currentTooltipSlot === slot) {
             const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip'); 
             if (tooltip) {
-                console.log('🎯 Removing tooltip on drag leave');
                 tooltip.remove();
             }
             currentTooltip = null;
@@ -1981,7 +1952,6 @@ if (typeof document !== 'undefined') {
     document.addEventListener('dragend', function(event) {
         // If we still have tooltips after a drag operation ends, clean them up
         if (currentTooltip || document.querySelector('.ability-drop-tooltip')) {
-            console.log('🎯 Global dragend cleanup triggered');
             cleanupAllAbilityTooltips();
             
             // Also clean up visual states
@@ -2064,12 +2034,9 @@ function onCreatureDragStart(event, creatureDataJson) {
                             document.body.removeChild(tempImg);
                         }
                     }, 100);
-                } else {
-                    console.warn('Canvas appears to be empty, using fallback drag image');
                 }
                 
             } catch (canvasError) {
-                console.warn('Failed to create custom drag image:', canvasError);
                 // Fallback will use the original element (showing full spritesheet)
             }
         }
@@ -2104,10 +2071,7 @@ function onCreatureDragStart(event, creatureDataJson) {
         // Add visual feedback
         event.target.closest('.creature-icon').classList.add('creature-dragging');
         
-        console.log(`Started dragging creature ${creatureData.name} from ${creatureData.heroPosition}[${creatureData.index}]`);
-        
     } catch (error) {
-        console.error('Error starting creature drag:', error);
         event.preventDefault();
         return false;
     }
@@ -2136,8 +2100,6 @@ function onCreatureDragEnd(event) {
     creatureContainers.forEach(container => {
         container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
     });
-    
-    console.log('Creature drag ended');
 }
 
 // Creature container drag over handler
@@ -2199,7 +2161,6 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Only handle creature drags
     if (!creatureDragState.isDragging) {
-        console.log('⚠ Global creatureDragState.isDragging is false, returning');
         return false;
     }
     
@@ -2209,35 +2170,26 @@ async function onCreatureContainerDrop(event, heroPosition) {
     
     // Allow drops within same hero OR if Guard Change mode is active
     if (!isSameHero && !isGuardChangeActive) {
-        console.log('⚠ Cannot move creature to different hero - Guard Change mode not active');
         return false;
     }
     
     // Check if target hero exists (for cross-hero moves)
     if (!isSameHero && window.heroSelection?.heroCreatureManager) {
         const hasTargetHero = window.heroSelection.heroCreatureManager.hasHeroAtPosition(heroPosition);
-        console.log('🔍 hasTargetHero:', hasTargetHero);
         if (!hasTargetHero) {
-            console.log(`⚠ Cannot move creature to ${heroPosition} - no hero at that position`);
             return false;
         }
     }
     
     // Handle the drop using the creature manager
     if (window.heroSelection && window.heroSelection.heroCreatureManager) {
-        console.log('🎯 About to call handleCreatureDrop...');
-        
         const success = window.heroSelection.heroCreatureManager.handleCreatureDrop(
             heroPosition,
             event.clientX,
             container
         );
         
-        console.log('🎯 handleCreatureDrop returned:', success);
-        
         if (success) {
-            console.log('✅ Move successful, updating UI...');
-            
             // Update the UI
             if (window.heroSelection.updateBattleFormationUI) {
                 window.heroSelection.updateBattleFormationUI();
@@ -2252,19 +2204,11 @@ async function onCreatureContainerDrop(event, heroPosition) {
             if (window.heroSelection.sendFormationUpdate) {
                 await window.heroSelection.sendFormationUpdate();
             }
-            
-            // Log successful cross-hero move
-            if (!isSameHero) {
-                console.log(`🛡️ Guard Change: Successfully moved creature from ${creatureDragState.draggedFromHero} to ${heroPosition}`);
-            }
-        } else {
-            console.log('⚠ Move failed');
         }
         
         return success;
     }
     
-    console.log('⚠ No heroSelection or heroCreatureManager found');
     return false;
 }
 
@@ -2335,8 +2279,6 @@ window.handleHeroHoverLeave = function() {
 
 // Global ability click handler
 async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount) {
-    console.log(`Ability clicked: ${abilityName} at ${heroPosition} zone ${zoneNumber}, stack count: ${stackCount}`);
-    
     // Handle specific abilities
     switch(abilityName) {
         case 'Leadership':
@@ -2351,8 +2293,6 @@ async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount)
                     await leadershipAbility.handleClick(heroPosition, stackCount);
                 }
             } catch (error) {
-                console.error('Failed to handle Leadership ability:', error);
-                
                 // Show error feedback to user
                 const abilityZone = document.querySelector(`.ability-zone[data-position="${heroPosition}"][data-zone="${zoneNumber}"]`);
                 if (abilityZone) {
@@ -2370,7 +2310,7 @@ async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount)
                 const { adventurousnessAbility } = await import('./Abilities/adventurousness.js');
                 adventurousnessAbility.handleClick(heroPosition, stackCount);
             } catch (error) {
-                console.error('Failed to load Adventurousness ability handler:', error);
+                // Handle error
             }
             break;
             
@@ -2380,14 +2320,29 @@ async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount)
                 const { navigationAbility } = await import('./Abilities/navigation.js');
                 await navigationAbility.handleClick(heroPosition, stackCount);
             } catch (error) {
-                console.error('Failed to load Navigation ability handler:', error);
+                // Handle error
+            }
+            break;
+
+        case 'Occultism':
+            // Handle Occultism ability
+            try {
+                if (window.occultismAbility) {
+                    await window.occultismAbility.handleClick(heroPosition, stackCount);
+                }
+            } catch (error) {
+                // Show error feedback to user
+                const abilityZone = document.querySelector(`.ability-zone[data-position="${heroPosition}"][data-zone="${zoneNumber}"]`);
+                if (abilityZone) {
+                    abilityZone.classList.add('ability-error');
+                    setTimeout(() => {
+                        abilityZone.classList.remove('ability-error');
+                    }, 1000);
+                }
             }
             break;
             
         default:
-            // For other abilities, just log for now
-            console.log(`No specific handler for ${abilityName} yet`);
-            
             // Visual feedback for click
             const abilityZone = document.querySelector(`.ability-zone[data-position="${heroPosition}"][data-zone="${zoneNumber}"]`);
             if (abilityZone) {
@@ -2419,8 +2374,6 @@ function handleVacarnClick(event, heroPosition, heroName) {
     if (heroName !== 'Vacarn' || !window.heroSelection?.vacarnEffectManager) {
         return;
     }
-    
-    console.log(`💀 Vacarn clicked at position ${heroPosition}`);
     
     // Start bury mode
     window.heroSelection.vacarnEffectManager.startBuryMode(heroPosition, window.heroSelection);
@@ -2460,10 +2413,7 @@ if (typeof window !== 'undefined') {
 
 // Global function to toggle hero spell enabled state
 window.toggleHeroSpell = function(heroPosition, spellIndex) {
-    console.log(`🎯 Toggling spell at ${heroPosition}[${spellIndex}]`);
-    
     if (!window.heroSelection || !window.heroSelection.heroSpellbookManager) {
-        console.error('⚠ Hero selection or spellbook manager not available');
         return;
     }
     
@@ -2471,11 +2421,8 @@ window.toggleHeroSpell = function(heroPosition, spellIndex) {
     const newState = window.heroSelection.heroSpellbookManager.toggleSpellEnabled(heroPosition, spellIndex);
     
     if (newState !== false && newState !== true) {
-        console.error('⚠ Failed to toggle spell');
         return;
     }
-    
-    console.log(`✅ Spell toggled to: ${newState ? 'enabled' : 'disabled'}`);
     
     // Refresh the tooltip to show the updated state
     if (window.heroSelection.heroSelectionUI && window.heroSelection.heroSelectionUI.refreshCurrentTooltip) {

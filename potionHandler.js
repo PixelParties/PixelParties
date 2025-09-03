@@ -39,7 +39,8 @@ export class PotionHandler {
             'SwordInABottle',
             'AcidVial',
             'ElixirOfQuickness',
-            'CloudInABottle', 
+            'CloudInABottle',
+            'OverflowingChalice',
         ];
         
         return knownPotions.includes(cardName);
@@ -380,11 +381,32 @@ export class PotionHandler {
 
             case 'CloudInABottle':
                 return await this.handleCloudInABottleEffects(effects, playerRole, battleManager);
+
+            case 'OverflowingChalice':
+                return await this.handleOverflowingChaliceEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
                 console.log(`No battle effect defined for potion: ${potionName}`);
                 return 0;
+        }
+    }
+
+    async handleOverflowingChaliceEffects(effects, playerRole, battleManager) {
+        try {
+            const { OverflowingChalicePotion } = await import('./Potions/overflowingChalice.js');
+            const overflowingChalicePotion = new OverflowingChalicePotion();
+            
+            const effectsProcessed = await overflowingChalicePotion.handlePotionEffectsForPlayer(
+                effects, playerRole, battleManager
+            );
+            
+            console.log(`🏆 OverflowingChalice delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating OverflowingChalice effects for ${playerRole}:`, error);
+            return effects.length;
         }
     }
 

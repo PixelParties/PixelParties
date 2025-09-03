@@ -355,21 +355,17 @@ export class BattleSpellSystem {
         
         // Check for Storm Ring negation before executing AOE spells
         try {
-            console.log('🌩️ Attempting to import Storm Ring module...'); // ADD THIS
             const { checkStormRingNegation } = await import('./Artifacts/stormRing.js');
-            console.log('✅ Storm Ring module imported successfully'); // ADD THIS
             
             const negationResult = await checkStormRingNegation(hero, spell, this.battleManager);
-            console.log('🎲 Storm Ring negation result:', negationResult); // ADD THIS
             
             if (negationResult.negated) {
                 // Spell was negated by Storm Ring - don't execute it
-                console.log('⛈️ Spell was negated by Storm Ring!'); // ADD THIS
                 return;
             }
         } catch (error) {
             // Storm Ring module not available or error occurred, continue with spell execution
-            console.log('❌ Storm Ring check failed:', error); // MODIFY EXISTING
+            console.error('❌ Storm Ring check failed:', error);
         }
         
         // Check if we have a specific implementation for this spell

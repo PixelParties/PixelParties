@@ -66,7 +66,8 @@ export class CardPreviewManager {
 
         // Check if this is a character card with stats
         const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
-        
+        const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats;
+
         // Build the card HTML with sprite-positioned stats
         let cardHTML = `
             <div class="large-card-tooltip ${isCharacterWithStats ? 'character-with-stats' : ''}">
@@ -88,6 +89,17 @@ export class CardPreviewManager {
                         </div>
                         <div class="tooltip-sprite-stat attack-stat">
                             <span class="stat-value">${stats.attack}</span>
+                        </div>
+                    </div>
+            `;
+        }
+
+        if (isCreatureWithStats) {
+            const stats = cardData.creatureStats;
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat hp-stat" style="left: 130px;">
+                            <span class="stat-value">${stats.maxHp}</span>
                         </div>
                     </div>
             `;
@@ -127,7 +139,8 @@ export class CardPreviewManager {
         
         // Check if this is a character card with stats
         const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
-        
+        const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats; // NEW
+
         // Build the card HTML with sprite-positioned stats
         let cardHTML = `
             <div class="large-card-tooltip ${isCharacterWithStats ? 'character-with-stats' : ''}">
@@ -148,6 +161,17 @@ export class CardPreviewManager {
                         </div>
                         <div class="tooltip-sprite-stat attack-stat">
                             <span class="stat-value">${stats.attack}</span>
+                        </div>
+                    </div>
+            `;
+        }
+
+        if (isCreatureWithStats) {
+            const stats = cardData.creatureStats;
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat hp-stat" style="left: 130px;">
+                            <span class="stat-value">${stats.maxHp}</span>
                         </div>
                     </div>
             `;

@@ -76,12 +76,9 @@ export class ReconnectionManager {
         }
     }
 
-    async handleVictoryReconnection(gameState) {
-        console.log('🏆 RECONNECTION: Handling victory reconnection');
-        
+    async handleVictoryReconnection(gameState) {        
         // Ensure we have the battle data needed for victory display
         if (!this.heroSelection.selectedCharacter || !this.heroSelection.opponentSelectedCharacter) {
-            console.log('🏆 RECONNECTION: Missing character data, falling back to formation');
             await this.setGamePhase('Formation');
             return await this.handleFormationReconnection(gameState);
         }
@@ -89,12 +86,9 @@ export class ReconnectionManager {
         // Get victory data from game state
         const victoryData = gameState.victoryData;
         if (!victoryData) {
-            console.log('🏆 RECONNECTION: No victory data available, falling back to formation');
             await this.setGamePhase('Formation');
             return await this.handleFormationReconnection(gameState);
         }
-
-        console.log('🏆 RECONNECTION: Found victory data:', victoryData);
 
         // Transition to victory state
         this.heroSelection.stateMachine.transitionTo(
@@ -128,12 +122,9 @@ export class ReconnectionManager {
             finalScore: victoryData.finalScore || { player: 0, opponent: 0 }
         };
 
-        console.log('🏆 RECONNECTION: Prepared winner display data:', winnerDisplayData);
-
         // Show victory screen after UI settles
         setTimeout(() => {
             if (this.heroSelection.victoryScreen) {
-                console.log('🏆 RECONNECTION: Displaying victory screen');
                 this.heroSelection.victoryScreen.showVictoryScreen(winnerDisplayData, this.heroSelection);
             } else {
                 console.error('🏆 RECONNECTION: Victory screen not available');
@@ -289,8 +280,11 @@ export class ReconnectionManager {
                     gameState.hostBirthdayPresentCounter,
                     gameState.hostAreaCard,
                     gameState.hostGraveyardState,
-                    gameState.hostInventingState 
-                );                
+                    gameState.hostInventingState,
+                    gameState.hostOccultismState,
+                    gameState.hostGraveWormState
+                );  
+
             } else if (!this.isHost && gameState.guestSelected) {                
                 this.heroSelection.selectedCharacter = gameState.guestSelected;
                 
@@ -332,14 +326,24 @@ export class ReconnectionManager {
                     gameState.guestBirthdayPresentCounter,
                     gameState.guestAreaCard,
                     gameState.guestGraveyardState,
-                    gameState.guestInventingState 
+                    gameState.guestInventingState,
+                    gameState.guestOccultismState,
+                    gameState.guestGraveWormState
                 );
             }
                 
             if (gameState.hostAreaCard || gameState.guestAreaCard) {
-                console.log('🌍 Area card data found in gameState, verifying restoration...');
                 const currentAreaCard = this.heroSelection.areaHandler.getAreaCard();
-                console.log('🌍 Current area card after restoration:', currentAreaCard);
+                
+                // Restore doom counters from saved data
+                const playerAreaCard = this.isHost ? gameState.hostAreaCard : gameState.guestAreaCard;
+                const opponentAreaCard = this.isHost ? gameState.guestAreaCard : gameState.hostAreaCard;
+                
+                import('./Spells/doomClock.js').then(({ restoreDoomCountersFromSavedData }) => {
+                    restoreDoomCountersFromSavedData(this.heroSelection, playerAreaCard, opponentAreaCard);
+                }).catch(error => {
+                    console.error('Error restoring doom counters:', error);
+                });
                 
                 // Force UI update for area slot
                 setTimeout(() => {
@@ -532,10 +536,14 @@ export class ReconnectionManager {
         if (this.isHost && gameState.hostNicolasState) {
             if (this.heroSelection.nicolasEffectManager) {
                 const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.hostNicolasState);
+                if (nicolasRestored) {
+                }
             }
         } else if (!this.isHost && gameState.guestNicolasState) {
             if (this.heroSelection.nicolasEffectManager) {
                 const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.guestNicolasState);
+                if (nicolasRestored) {
+                }
             }
         } else {
             // Initialize Nicolas state if no saved data
@@ -595,7 +603,7 @@ export class ReconnectionManager {
             if (this.heroSelection.semiEffectManager) {
                 this.heroSelection.semiEffectManager.reset();
             }
-        }
+        }        
         if (this.isHost && gameState.hostHeinzState) {
             if (this.heroSelection.heinzEffectManager) {
                 const heinzRestored = this.heroSelection.heinzEffectManager.importHeinzState(gameState.hostHeinzState);
@@ -611,26 +619,55 @@ export class ReconnectionManager {
             }
         }
 
+        // Restore GraveWorm state
+        if (this.isHost && gameState.hostGraveWormState) {
+            if (this.heroSelection.graveWormCreature) {
+                const graveWormRestored = this.heroSelection.graveWormCreature.importState(gameState.hostGraveWormState);
+                if (graveWormRestored) {
+                    console.log('Host GraveWorm state restored during reconnection');
+                }
+            }
+        } else if (!this.isHost && gameState.guestGraveWormState) {
+            if (this.heroSelection.graveWormCreature) {
+                const graveWormRestored = this.heroSelection.graveWormCreature.importState(gameState.guestGraveWormState);
+                if (graveWormRestored) {
+                    console.log('Guest GraveWorm state restored during reconnection');
+                }
+            }
+        } else {
+            // Initialize GraveWorm state if no saved data
+            if (this.heroSelection.graveWormCreature) {
+                this.heroSelection.graveWormCreature.reset();
+            }
+        }
 
         // Restore Abilities
         if (this.isHost && gameState.hostInventingState) {
             if (this.heroSelection.inventingAbility) {
-                const inventingRestored = this.heroSelection.inventingAbility.importState(gameState.hostInventingState);
-                if (inventingRestored) {
-                    console.log('🔧 Host Inventing state restored during reconnection');
-                }
+                this.heroSelection.inventingAbility.importState(gameState.hostInventingState);
             }
         } else if (!this.isHost && gameState.guestInventingState) {
             if (this.heroSelection.inventingAbility) {
-                const inventingRestored = this.heroSelection.inventingAbility.importState(gameState.guestInventingState);
-                if (inventingRestored) {
-                    console.log('🔧 Guest Inventing state restored during reconnection');
-                }
+                this.heroSelection.inventingAbility.importState(gameState.guestInventingState);
             }
         } else {
-            // Initialize Inventing state if no saved data
             if (this.heroSelection.inventingAbility) {
                 this.heroSelection.inventingAbility.reset();
+            }
+        }
+
+        if (this.isHost && gameState.hostOccultismState) {
+            if (this.heroSelection.occultismAbility) {
+                this.heroSelection.occultismAbility.importState(gameState.hostOccultismState);
+            }
+        }
+        else if (!this.isHost && gameState.guestOccultismState) {
+            if (this.heroSelection.occultismAbility) {
+                this.heroSelection.occultismAbility.importState(gameState.guestOccultismState);
+            }
+        } else {
+            if (this.heroSelection.occultismAbility) {
+                this.heroSelection.occultismAbility.reset();
             }
         }
 
@@ -1421,6 +1458,15 @@ export class ReconnectionManager {
                 this.heroSelection.stateMachine.states.SELECTING_HERO,
                 { source: 'reconnection', hasSelection: false }
             );
+        }
+
+        // Clear battle ready states when returning to formation
+        if (this.roomManager && this.roomManager.getRoomRef()) {
+            const updateKey = this.isHost ? 'hostBattleReady' : 'guestBattleReady';
+            await this.roomManager.getRoomRef().child('gameState').update({
+                [updateKey]: false,
+                [`${updateKey}Time`]: null
+            });
         }
         
         // Check selection complete with speed-aware delay

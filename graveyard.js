@@ -1,15 +1,24 @@
 // graveyard.js - Graveyard Management Module
 
+// Import token checking function from card database
+import { isToken } from './cardDatabase.js';
+
 export class GraveyardManager {
     constructor() {
         this.graveyard = []; // Array of card names in order of discard
     }
 
-    // Add a card to the graveyard
+    // Add a card to the graveyard - UPDATED TO EXCLUDE TOKENS
     addCard(cardName) {
         if (!cardName || typeof cardName !== 'string') {
             console.error('Invalid card name provided to graveyard');
             return false;
+        }
+
+        // Check if card is a Token - if so, ignore it completely
+        if (isToken(cardName)) {
+            console.log(`Token card ${cardName} discarded but not added to graveyard (tokens are removed from game)`);
+            return true; // Return true because this is expected behavior
         }
 
         this.graveyard.push(cardName);

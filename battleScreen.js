@@ -63,7 +63,7 @@ export class BattleScreen {
         opponentGraveyard = null,
         playerBirthdayPresentCounter = null,
         opponentBirthdayPresentCounter = null) { 
-        
+            
         this.isHost = isHost;
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;

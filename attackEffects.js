@@ -547,8 +547,6 @@ export class AttackEffectsManager {
 
         // Reset other effects if needed
         this._skeletonSummonedThisAttack = false;
-
-        console.log('🔄 AttackEffectsManager reset for new battle');
     }
 
     /**
@@ -588,8 +586,6 @@ export class AttackEffectsManager {
         if (state.arrowSystem && this.arrowSystem) {
             this.arrowSystem.importArrowState(state.arrowSystem);
         }
-
-        console.log('🔄 AttackEffectsManager state imported from checkpoint');
     }
     
     // Ensure CSS for attack effects including shield damage numbers

@@ -347,7 +347,7 @@ export class ArtifactHandler {
     }
 
     isDraggableArtifact(cardName) {
-        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore'];
+        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore', 'BloodSoakedCoin'];
         return draggableArtifacts.includes(cardName);
     }
 
@@ -356,7 +356,7 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent'];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent', 'BloodSoakedCoin'];
 
         return clickableArtifacts.includes(cardName);
     }
@@ -387,7 +387,8 @@ export class ArtifactHandler {
             'FutureTechFists', 
             'FutureTechCopyDevice',
             'BirthdayPresent',
-            'AncientTechInfiniteEnergyCore'
+            'AncientTechInfiniteEnergyCore',
+            'BloodSoakedCoin'
         ];
         
         // Convert card names to proper module names using the existing method

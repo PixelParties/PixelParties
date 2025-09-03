@@ -94,6 +94,19 @@ const CARD_DATABASE = {
         ability1: 'Adventurousness',
         ability2: 'SupportMagic'
     },
+    'Kyli': {
+        name: 'Kyli',
+        image: './Cards/Characters/Kyli.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 40,
+        ability1: 'Biomancy',
+        ability2: 'Occultism'
+    },
     'Medea': {
         name: 'Medea',
         image: './Cards/Characters/Medea.png',
@@ -1494,6 +1507,98 @@ const CARD_DATABASE = {
         subtype: null,
         exclusive: true
     },
+    'BloodSoakedCoin': {
+        name: 'BloodSoakedCoin',
+        image: './Cards/All/BloodSoakedCoin.png',
+        cardType: 'Artifact',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+
+
+    // KYLI
+    'Occultism': {
+        name: 'Occultism',
+        image: './Cards/All/Occultism.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'Biomancy': {
+        name: 'Biomancy',
+        image: './Cards/All/Biomancy.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'OverflowingChalice': {
+        name: 'OverflowingChalice',
+        image: './Cards/All/OverflowingChalice.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'DoomClock': {
+        name: 'DoomClock',
+        image: './Cards/All/DoomClock.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: 'Area'
+    },
+    'TheRootOfAllEvil': {
+        name: 'TheRootOfAllEvil',
+        image: './Cards/All/TheRootOfAllEvil.png',
+        cardType: 'Spell',
+        level: 6,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 200,
+        physicalAttack: false
+    },
+    'GraveWorm': {
+        name: 'GraveWorm',
+        image: './Cards/All/GraveWorm.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 20,
+        physicalAttack: true
+    },
+
+
+
+
+
+
+    // TOKENS
+    'BiomancyToken': {
+        name: 'BiomancyToken',
+        image: './Cards/All/BiomancyToken.png',
+        cardType: 'Token',
+        level: 0,
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Creature',
+        hp: 10,
+        physicalAttack: true
+    },
 };
 
 /**
@@ -1641,12 +1746,12 @@ export function getAllHeroes() {
 }
 
 /**
- * Get all non-hero cards (ability cards)
- * @returns {Object[]} Array of all non-hero card information objects
+ * Get all non-Hero, non-Token cards
+ * @returns {Object[]} Array of all non-hero, non-token card information objects
  */
 export function getAllAbilityCards() {
     return Object.values(CARD_DATABASE)
-        .filter(card => card.cardType !== 'hero')
+        .filter(card => card.cardType !== 'hero' && card.cardType !== 'Token')
         .map(card => ({ ...card })); // Return copies
 }
 
@@ -1658,6 +1763,16 @@ export function getAllAbilityCards() {
 export function isHero(cardName) {
     const cardInfo = CARD_DATABASE[cardName];
     return cardInfo && cardInfo.cardType === 'hero';
+}
+
+/**
+ * Check if a card is a token
+ * @param {string} cardName - The name of the card to check
+ * @returns {boolean} True if card is a token, false otherwise
+ */
+export function isToken(cardName) {
+    const cardInfo = CARD_DATABASE[cardName];
+    return cardInfo && cardInfo.cardType === 'Token';
 }
 
 /**
@@ -1677,7 +1792,8 @@ export function getHeroInfo(heroName) {
 export function getDatabaseStats() {
     const cards = Object.values(CARD_DATABASE);
     const heroes = cards.filter(card => card.cardType === 'hero');
-    const abilityCards = cards.filter(card => card.cardType !== 'hero');
+    const tokens = cards.filter(card => card.cardType === 'Token');
+    const abilityCards = cards.filter(card => card.cardType !== 'hero' && card.cardType !== 'Token');
     const types = [...new Set(cards.map(card => card.cardType))];
     const spellSchools = [...new Set(cards.map(card => card.spellSchool))];
     const subtypes = [...new Set(cards.map(card => card.subtype))];
@@ -1686,6 +1802,7 @@ export function getDatabaseStats() {
     return {
         totalCards: cards.length,
         totalHeroes: heroes.length,
+        totalTokens: tokens.length,
         totalAbilityCards: abilityCards.length,
         uniqueTypes: types.length,
         types: types,
@@ -1703,7 +1820,8 @@ export function getDatabaseStats() {
 // Log database initialization
 const initStats = Object.keys(CARD_DATABASE).length;
 const heroCount = Object.values(CARD_DATABASE).filter(card => card.cardType === 'hero').length;
-const abilityCount = initStats - heroCount;
+const tokenCount = Object.values(CARD_DATABASE).filter(card => card.cardType === 'Token').length;
+const abilityCount = initStats - heroCount - tokenCount;
 
 // Export the database for debugging purposes (read-only)
 export const CARD_DB_DEBUG = Object.freeze(CARD_DATABASE);

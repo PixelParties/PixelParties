@@ -30,14 +30,14 @@ export class GameManager {
         this.webRTCManager.registerMessageHandler('character_selection', (data) => {
             if (this.heroSelection) {
                 this.heroSelection.receiveCharacterSelection(data.data);
-                window.updateHeroSelectionUI();
+                this.smartUpdateUI('character_selection');
             }
         });
 
         this.webRTCManager.registerMessageHandler('character_selected', (data) => {
             if (this.heroSelection) {
                 this.heroSelection.receiveOpponentSelection(data.data);
-                window.updateHeroSelectionUI();
+                this.smartUpdateUI('character_selected');
             }
         });
         
@@ -47,51 +47,12 @@ export class GameManager {
                 this.turnTracker.receiveTurnSync(data.data);
             }
         });
-
-        // Victory screen handler
-        this.webRTCManager.registerMessageHandler('victory_achieved', (data) => {
-            if (this.heroSelection && this.heroSelection.victoryScreen) {
-                // Convert winner from sender's perspective to receiver's perspective
-                const senderIsHost = this.roomManager.getIsHost() !== true; // Sender is opposite of receiver
-                let actualWinner;
-                
-                if (data.data.winner === 'player') {
-                    // Sender won - from receiver's perspective, opponent won
-                    actualWinner = 'opponent';
-                } else if (data.data.winner === 'opponent') {
-                    // Sender's opponent won - from receiver's perspective, player won  
-                    actualWinner = 'player';
-                } else {
-                    // Fallback: assume data contains absolute role info
-                    const myAbsoluteSide = this.roomManager.getIsHost() ? 'host' : 'guest';
-                    actualWinner = data.data.winner === myAbsoluteSide ? 'player' : 'opponent';
-                }
-                
-                // Get correct formation data for display
-                const winnerFormation = actualWinner === 'player' ? 
-                    this.heroSelection.formationManager.getBattleFormation() : 
-                    this.heroSelection.formationManager.getOpponentBattleFormation();
-                
-                const winnerData = {
-                    playerName: data.data.winnerName,
-                    heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
-                    isLocalPlayer: actualWinner === 'player'
-                };
-                
-                // Transition to victory state and show victory screen
-                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
-                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
-            }
-        });
-
-        // Handler for formation updates
+        
+        // Handler for formation updates - NO LONGER TRIGGERS FULL UI REGENERATION
         this.webRTCManager.registerMessageHandler('formation_update', (data) => {
             if (this.heroSelection) {
                 this.heroSelection.receiveFormationUpdate(data.data);
-                // Update UI if in team building phase
-                if (this.heroSelection.getCurrentPhase() === 'team_building') {
-                    window.updateHeroSelectionUI();
-                }
+                this.handleFormationUpdateOnly(); // NEW: Targeted update only
             }
         });
 
@@ -118,6 +79,8 @@ export class GameManager {
         this.webRTCManager.registerMessageHandler('battle_ready', (data) => {
             if (this.heroSelection) {
                 this.heroSelection.receiveBattleReady(data);
+                // Don't trigger full UI regeneration for battle ready changes
+                this.handleTargetedUpdates('battle_ready');
             }
         });
 
@@ -167,7 +130,6 @@ export class GameManager {
         });
 
         this.webRTCManager.registerMessageHandler('sid_card_theft', (data) => {
-            console.log('🎭 GAMEMANAGER: Received sid_card_theft message:', data);
             if (this.heroSelection && this.heroSelection.cardRewardManager) {
                 this.heroSelection.cardRewardManager.handleTheftMessage(data, this.heroSelection);
             } else {
@@ -188,9 +150,94 @@ export class GameManager {
                 console.error('🎭 GAMEMANAGER: No heroSelection or cardRewardManager available');
             }
         });
+
+        // Victory exit handler - let victory screen handle this
+        this.webRTCManager.registerMessageHandler('victory_exit', (data) => {
+            if (this.heroSelection && this.heroSelection.victoryScreen) {
+                this.heroSelection.victoryScreen.handleOpponentVictoryExit();
+            }
+        });
     }
 
-    // Setup Firebase listener for game data (fallback when P2P fails)
+    // NEW: Intelligent UI update that only regenerates when necessary
+    smartUpdateUI(updateType) {
+        if (!this.heroSelection) return;
+        
+        const currentPhase = this.heroSelection.getCurrentPhase();
+        
+        // Determine if full UI regeneration is needed
+        const needsFullRegeneration = this.shouldRegenerateUI(updateType, currentPhase);
+        
+        if (needsFullRegeneration) {
+            window.updateHeroSelectionUI();
+        } else {
+            // Handle targeted updates if needed
+            this.handleTargetedUpdates(updateType);
+        }
+    }
+
+    // NEW: Determine if full UI regeneration is necessary
+    shouldRegenerateUI(updateType, currentPhase) {
+        // Only regenerate for major state changes that affect the current player's view
+        
+        switch (updateType) {
+            case 'character_selection':
+            case 'character_selected':
+                // These affect the selection screen, regenerate if in selection phase
+                return currentPhase === 'selection';
+                
+            case 'formation_update':
+                // Formation updates should NOT trigger full UI regeneration
+                return false;
+                
+            case 'battle_transition':
+                // Battle transitions need full regeneration
+                return true;
+                
+            case 'battle_ready':
+                // Battle ready state changes should not trigger full regeneration
+                return false;
+                
+            default:
+                return false;
+        }
+    }
+
+    // Handle formation updates without full UI regeneration
+    handleFormationUpdateOnly() {
+        // Just update the opponent formation display, not the entire UI
+        
+        // The receiveFormationUpdate() has already processed the data
+        // No need to regenerate the entire team building screen
+        
+        // If we need to update specific elements, do it here:
+        // - Update opponent hero display (if visible)
+        // - Update battle button state (if needed)
+        // - But DON'T regenerate the player's area slot
+    }
+
+    // Handle other targeted updates
+    handleTargetedUpdates(updateType) {
+        switch (updateType) {
+            case 'battle_ready':
+                this.updateBattleButtonStateOnly();
+                break;
+            
+            // Add other specific update cases as needed
+        }
+    }
+
+    // Update only battle button state
+    updateBattleButtonStateOnly() {
+        // Update just the battle button without touching the rest of the UI
+        const toBattleBtn = document.querySelector('.to-battle-button');
+        if (toBattleBtn && this.heroSelection) {
+            // Let the existing battle state logic handle the button state
+            // This is much safer than regenerating the entire UI
+        }
+    }
+
+    // Setup Firebase listener for game data (fallback when P2P fails) - UPDATED with selective UI updates
     setupFirebaseGameDataListener() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) return;
 
@@ -228,19 +275,17 @@ export class GameManager {
                 entries.slice(-25).forEach(id => this.processedMessages.add(id));
             }
 
-            // Handle the message based on type
+            // Handle the message based on type - UPDATED with selective UI updates
             if (message.type === 'character_selection' && this.heroSelection) {
                 this.heroSelection.receiveCharacterSelection(message.data);
-                window.updateHeroSelectionUI();
+                this.smartUpdateUI('character_selection');
             } else if (message.type === 'character_selected' && this.heroSelection) {
                 this.heroSelection.receiveOpponentSelection(message.data);
-                window.updateHeroSelectionUI();
+                this.smartUpdateUI('character_selected');
             } else if (message.type === 'formation_update' && this.heroSelection) {
-                // Handle formation updates via Firebase fallback
+                // Handle formation updates via Firebase fallback - NO FULL UI REGENERATION
                 this.heroSelection.receiveFormationUpdate(message.data);
-                if (this.heroSelection.getCurrentPhase() === 'team_building') {
-                    window.updateHeroSelectionUI();
-                }
+                this.handleFormationUpdateOnly(); // NEW: Targeted update only
             } else if (message.type === 'life_update' && this.heroSelection && this.heroSelection.getLifeManager()) {
                 const lifeManager = this.heroSelection.getLifeManager();
                 // Update opponent's view of the lives (reversed perspective)
@@ -259,6 +304,8 @@ export class GameManager {
                 }
             } else if (message.type === 'battle_ready' && this.heroSelection) {
                 this.heroSelection.receiveBattleReady(message.data);
+                // Don't trigger full UI regeneration for battle ready changes
+                this.handleTargetedUpdates('battle_ready');
             } else if (message.type === 'battle_start' && this.heroSelection && this.heroSelection.getBattleScreen()) {
                 // Handle battle start via Firebase fallback
                 this.heroSelection.getBattleScreen().receiveBattleStart(message.data);
@@ -666,7 +713,7 @@ export class GameManager {
             if (heroContainer) {
                 heroContainer.innerHTML = `
                     <div class="loading-heroes">
-                        <h2>❌ Failed to Load Heroes</h2>
+                        <h2>⚠ Failed to Load Heroes</h2>
                         <p>Using fallback battle mode...</p>
                     </div>
                 `;
@@ -727,7 +774,7 @@ export class GameManager {
             this.uiManager.showStatus('🏳️ Game ended - returned to lobby', 'connected');
             
         } catch (error) {
-            this.uiManager.showStatus('❌ Error ending game', 'error');
+            this.uiManager.showStatus('⚠ Error ending game', 'error');
         }
     }
 

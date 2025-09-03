@@ -528,33 +528,43 @@ export class BattleManager {
                     hero.setSpellbook(spellbooks[position]);
                 }
                 
-                // Add creatures with health (including Summoning Magic bonuses)
-                if (creatures && creatures[position]) {
-                    const creaturesWithHealth = creatures[position].map(creature => {
-                        const creatureInfo = getCardInfo(creature.name);
-                        const baseHp = creatureInfo?.hp || 10;
-                        
-                        let hpMultiplier = 1.0;
-                        if (hero.hasAbility('SummoningMagic')) {
-                            const summoningMagicLevel = hero.getAbilityStackCount('SummoningMagic');
-                            hpMultiplier = 1 + (0.25 * summoningMagicLevel);
-                        }
-                        
-                        const finalHp = Math.floor(baseHp * hpMultiplier);
-                        
-                        // Create clean creature object without status effects
-                        const { statusEffects, ...cleanCreature } = creature;
-                        
-                        return {
-                            ...cleanCreature,
-                            currentHp: finalHp,
-                            maxHp: finalHp,
-                            atk: creatureInfo?.atk || 0,
-                            alive: true,
-                            type: 'creature'  
-                        };
-                    });
-                    hero.setCreatures(creaturesWithHealth);
+                // Add creatures with health (including Kyli bonuses AND Summoning Magic bonuses)
+                if (creatures && creatures.hasOwnProperty(position)) {
+                    if (creatures[position] && Array.isArray(creatures[position]) && creatures[position].length > 0) {
+                        const creaturesWithHealth = creatures[position].map(creature => {
+                            const creatureInfo = getCardInfo(creature.name);
+                            
+                            // Use creature's existing HP if modified by Kyli, otherwise use database
+                            const baseHp = creature.hp !== undefined ? creature.hp : (creatureInfo?.hp || 10);
+                            const baseCurrentHp = creature.currentHp !== undefined ? creature.currentHp : baseHp;
+                            
+                            let hpMultiplier = 1.0;
+                            if (hero.hasAbility('SummoningMagic')) {
+                                const summoningMagicLevel = hero.getAbilityStackCount('SummoningMagic');
+                                hpMultiplier = 1 + (0.25 * summoningMagicLevel);
+                            }
+                            
+                            // Apply Summoning Magic bonus to the already-modified HP (if any)
+                            const finalMaxHp = Math.floor(baseHp * hpMultiplier);
+                            const finalCurrentHp = Math.floor(baseCurrentHp * hpMultiplier);
+                            
+                            // Create clean creature object without status effects
+                            const { statusEffects, ...cleanCreature } = creature;
+                            
+                            return {
+                                ...cleanCreature,
+                                currentHp: finalCurrentHp,
+                                maxHp: finalMaxHp,
+                                atk: creatureInfo?.atk || 0,
+                                alive: true,
+                                type: 'creature'  
+                            };
+                        });
+                        hero.setCreatures(creaturesWithHealth);
+                    } else {
+                        // Handle null case or empty array - set empty creatures
+                        hero.setCreatures([]);
+                    }
                     hero.initializeNecromancyStacks();
                 }
                 
@@ -565,7 +575,7 @@ export class BattleManager {
                     hero.setEquipment([]);
                 }
                 
-                // CRITICAL: Transfer burning finger stacks from permanent to battle hero
+                // Transfer burning finger stacks from permanent to battle hero
                 if (heroData.burningFingerStack !== undefined) {
                     hero.burningFingerStack = heroData.burningFingerStack;
                 }
@@ -581,6 +591,7 @@ export class BattleManager {
                     if (effectiveStats[position].bonuses) {
                         const bonuses = effectiveStats[position].bonuses;
                         if (bonuses.hpBonus > 0 || bonuses.totalAttackBonus > 0) {
+                            // Debug logging can be added here if needed
                         }
                     }
                 }
@@ -1924,51 +1935,6 @@ export class BattleManager {
         }
     }
 
-    guest_handleGrinningCatCardGift(data) {
-        if (this.isAuthoritative) {
-            return;
-        }
-
-        if (!this.grinningCatManager) {
-            import('./Creatures/grinningCat.js').then(({ default: GrinningCatCreature }) => {
-                this.grinningCatManager = new GrinningCatCreature(this);
-                this.grinningCatManager.handleGuestCardGift(data);
-            });
-        } else {
-            this.grinningCatManager.handleGuestCardGift(data);
-        }
-    }
-
-    guest_handleCrumExtraAction(data) {
-        if (this.isAuthoritative) {
-            return;
-        }
-
-        if (!this.crumTheClassPetManager) {
-            import('./Creatures/crumTheClassPet.js').then(({ default: CrumTheClassPetCreature }) => {
-                this.crumTheClassPetManager = new CrumTheClassPetCreature(this);
-                this.crumTheClassPetManager.handleGuestExtraAction(data);
-            });
-        } else {
-            this.crumTheClassPetManager.handleGuestExtraAction(data);
-        }
-    }
-
-    guest_handleMoonlightButterflyAttack(data) {
-        if (this.isAuthoritative) {
-            return;
-        }
-
-        if (!this.moonlightButterflyManager) {
-            import('./Creatures/moonlightButterfly.js').then(({ default: MoonlightButterflyCreature }) => {
-                this.moonlightButterflyManager = new MoonlightButterflyCreature(this);
-                this.moonlightButterflyManager.handleGuestMoonlightAttack(data);
-            });
-        } else {
-            this.moonlightButterflyManager.handleGuestMoonlightAttack(data);
-        }
-    }
-
     // Helper method to get attacker name from sync data
     getAttackerNameFromSyncData(attackerAbsoluteSide, attackerPosition) {
         const myAbsoluteSide = this.isHost ? 'host' : 'guest';
@@ -2633,6 +2599,27 @@ export class BattleManager {
             this.kazenaEffect.transferCountersToFormation(this);
         }
 
+        // Transfer area card counters back to heroSelection
+        if (window.heroSelection && window.heroSelection.areaHandler) {
+            // Sync player area card with updated counters
+            if (this.playerAreaCard) {
+                // SAFETY CHECK: Reset DoomClock counters if they're 12 or higher
+                if (this.playerAreaCard.name === 'DoomClock' && this.playerAreaCard.doomCounters >= 12) {
+                    this.playerAreaCard.doomCounters = 0;
+                }
+                window.heroSelection.areaHandler.setAreaCard(this.playerAreaCard);
+            }
+            
+            // Sync opponent area card with updated counters  
+            if (this.opponentAreaCard) {
+                // SAFETY CHECK: Reset DoomClock counters if they're 12 or higher
+                if (this.opponentAreaCard.name === 'DoomClock' && this.opponentAreaCard.doomCounters >= 12) {
+                    this.opponentAreaCard.doomCounters = 0;
+                }
+                window.heroSelection.areaHandler.opponentAreaCard = this.opponentAreaCard;
+            }
+        }
+
         this.battleActive = false;
         
         if (this.isAuthoritative) {
@@ -2713,9 +2700,11 @@ export class BattleManager {
                 } catch (error) {
                 }
             }
-            
-            if (window.heroSelection) {
-                window.heroSelection.clearProcessedDelayedEffects();
+
+            // Sync doom counters to guest
+            if (this.isAuthoritative) {
+                const { syncDoomCountersAfterBattle } = await import('./Spells/doomClock.js');
+                syncDoomCountersAfterBattle(this);
             }
             
             const battleEndData = {
@@ -3102,6 +3091,10 @@ export class BattleManager {
         if (this.futureTechMechManager) {
             this.futureTechMechManager.cleanup();
             this.futureTechMechManager = null;
+        }
+        if (this.graveWormManager) {
+            this.graveWormManager.cleanup();
+            this.graveWormManager = null;
         }
 
 
@@ -3822,6 +3815,10 @@ export class BattleManager {
         if (this.futureTechMechManager) {
             this.futureTechMechManager.cleanup();
             this.futureTechMechManager = null;
+        }
+        if (this.graveWormManager) {
+            this.graveWormManager.cleanup();
+            this.graveWormManager = null;
         }
 
 

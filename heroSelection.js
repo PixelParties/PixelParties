@@ -25,14 +25,21 @@ import { graveyardManager } from './graveyard.js';
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
 import { inventingAbility } from './Abilities/inventing.js';
+import { occultismAbility } from './Abilities/occultism.js';
+import { biomancyAbility } from './Abilities/biomancy.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
 import { VacarnEffectManager } from './Heroes/vacarn.js';
 import { SemiEffectManager } from './Heroes/semi.js';
 import { HeinzEffectManager } from './Heroes/heinz.js';
+import { KyliEffectManager } from './Heroes/kyli.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
+
+import { resetDoomClockCountersIfNeeded } from './Spells/doomClock.js';
+
+import { GraveWormCreature } from './Creatures/graveWorm.js';
 
 
 export class HeroSelection {
@@ -94,6 +101,10 @@ export class HeroSelection {
         this.vacarnEffectManager = new VacarnEffectManager();
         this.semiEffectManager = new SemiEffectManager();
         this.heinzEffectManager = new HeinzEffectManager();
+        this.kyliEffectManager = new KyliEffectManager();
+
+        
+        this.graveWormCreature = new GraveWormCreature(this);
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
@@ -140,6 +151,7 @@ export class HeroSelection {
                 // Callback for when creature state changes
                 this.updateBattleFormationUI();
                 await this.saveGameState();
+                await this.sendFormationUpdate();
             }
         );
 
@@ -161,9 +173,11 @@ export class HeroSelection {
         // Expose handManager to window for HTML event handlers
         if (typeof window !== 'undefined') {
             window.handManager = this.handManager;
-            window.potionHandler = this.potionHandler; // Expose potion handler
-            // Make leadership ability available globally
+            window.potionHandler = this.potionHandler;
+            
             window.leadershipAbility = leadershipAbility;
+            window.occultismAbility = occultismAbility; 
+            window.biomancyAbility = biomancyAbility;
         }
 
         this.initializeStatUpdateSystem();
@@ -181,6 +195,7 @@ export class HeroSelection {
             'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechCopyDevice', 'FutureTechFists', 'FutureTechLamp'],
             'Ida': ['BottledFlame', 'BurningFinger',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
             'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
+            'Kyli': ['Biomancy',  'Occultism', 'MonsterInABottle', 'OverflowingChalice', 'BloodSoakedCoin', 'DoomClock', 'GraveWorm', 'TheRootOfAllEvil'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
@@ -197,6 +212,7 @@ export class HeroSelection {
         // Individual Abilities
         this.trainingAbility = trainingAbility;
         this.inventingAbility = inventingAbility;
+        this.occultismAbility = occultismAbility;
 
 
         // Initialize individual systems
@@ -205,6 +221,7 @@ export class HeroSelection {
             setTimeout(() => {
                 this.initializeTrainingSystem();
                 this.initializeGatheringStormSystem();
+                this.initializeDoomClockSystem(); 
             }, 0);
         }
     }
@@ -263,7 +280,13 @@ export class HeroSelection {
         import('./Spells/gatheringStorm.js').then(({ initializeGatheringStormSystem }) => {
             initializeGatheringStormSystem();
         }).catch(error => {
-            console.error('Failed to initialize GatheringStorm system:', error);
+        });
+    }
+    initializeDoomClockSystem() {
+        import('./Spells/doomClock.js').then(({ initializeDoomClockSystem }) => {
+            initializeDoomClockSystem();
+        }).catch(error => {
+            console.error('Failed to initialize DoomClock system:', error);
         });
     }
 
@@ -562,6 +585,10 @@ export class HeroSelection {
             if (this.heroAbilitiesManager) {
                 this.heroAbilitiesManager.resetTurnBasedTracking();
             }
+            // Reset Occultism usage for new turn
+            if (this.occultismAbility) {
+                this.occultismAbility.resetTurnBasedTracking();
+            }
             
             // Reset Nicolas effect usage for new turn
             if (this.nicolasEffectManager) {
@@ -580,10 +607,20 @@ export class HeroSelection {
             if (this.heinzEffectManager) {
                 this.heinzEffectManager.resetForNewTurn();
             }
+    
+            // Reset Kyli effect usage for new turn
+            if (this.kyliEffectManager) {
+                this.kyliEffectManager.resetForNewTurn();
+            }
             
             // Reset Inventing ability turn-based tracking
             if (this.inventingAbility) {
                 this.inventingAbility.resetTurn();
+            }
+            
+            // Reset GraveWorm turn tracking for new turn
+            if (this.graveWormCreature) {
+                this.graveWormCreature.resetTurnBasedTracking();
             }
 
             // Reset birthday present counter to 0 at start of each turn
@@ -612,7 +649,8 @@ export class HeroSelection {
             const characterFiles = [
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
-                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png'
+                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
+                'Kyli.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -648,7 +686,8 @@ export class HeroSelection {
             const characterFiles = [
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
-                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png'
+                'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
+                'Kyli.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -885,6 +924,12 @@ export class HeroSelection {
                 if (this.goldManager) {
                     gameState.hostGoldData = sanitizeForFirebase(this.goldManager.exportGoldData());
                 }
+
+                
+                // Save GraveWorm state for host
+                if (this.graveWormCreature) {
+                    gameState.hostGraveWormState = sanitizeForFirebase(this.graveWormCreature.exportState());
+                }
                 
                 // Save abilities
                 const abilitiesState = this.heroAbilitiesManager.exportAbilitiesState();
@@ -981,6 +1026,9 @@ export class HeroSelection {
                 if (this.inventingAbility) {
                     gameState.hostInventingState = sanitizeForFirebase(this.inventingAbility.exportState());
                 }
+                if (this.occultismAbility) {
+                    gameState.hostOccultismState = sanitizeForFirebase(this.occultismAbility.exportState());
+                }
                 
                 // Magic gems count
                 gameState.hostMagicSapphiresUsed = sanitizeForFirebase(this.magicSapphiresUsed || 0);
@@ -1074,6 +1122,12 @@ export class HeroSelection {
                     gameState.guestFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
                 }
 
+                
+                // Save GraveWorm state for guest
+                if (this.graveWormCreature) {
+                    gameState.guestGraveWormState = sanitizeForFirebase(this.graveWormCreature.exportState());
+                }
+
 
 
                 // Save potion state for guest (now includes active effects)
@@ -1104,6 +1158,9 @@ export class HeroSelection {
                 // Abilities
                 if (this.inventingAbility) {
                     gameState.guestInventingState = sanitizeForFirebase(this.inventingAbility.exportState());
+                }
+                if (this.occultismAbility) {
+                    gameState.guestOccultismState = sanitizeForFirebase(this.occultismAbility.exportState());
                 }
 
 
@@ -1187,7 +1244,12 @@ export class HeroSelection {
     }
 
     // Helper method to restore player-specific data
-        restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, magicSapphiresUsedData = null, magicRubiesUsedData = null, birthdayPresentCounterData = null, areaCardData = null, graveyardData = null, inventingData = null) {
+    restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, 
+        nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, 
+        heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, 
+        magicSapphiresUsedData = null, magicRubiesUsedData = null, birthdayPresentCounterData = null, 
+        areaCardData = null, graveyardData = null, inventingData = null, occultismData = null, 
+        graveWormData = null) {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1237,6 +1299,9 @@ export class HeroSelection {
 
         // Restore area card data
         if (areaCardData && this.areaHandler) {
+            // Reset DoomClock counters if >= 12 before restoring
+            resetDoomClockCountersIfNeeded(areaCardData);
+            
             const areaState = { areaCard: areaCardData, opponentAreaCard: null };
             this.areaHandler.importAreaState(areaState);
         }
@@ -1279,6 +1344,21 @@ export class HeroSelection {
             // Initialize Heinz state if no saved data
             if (this.heinzEffectManager) {
                 this.heinzEffectManager.reset();
+            }
+        }
+
+
+            
+        // Restore GraveWorm state
+        if (graveWormData && this.graveWormCreature) {
+            const graveWormRestored = this.graveWormCreature.importState(graveWormData);
+            if (graveWormRestored) {
+                console.log('GraveWorm state restored from saved data');
+            }
+        } else {
+            // Initialize GraveWorm state if no saved data
+            if (this.graveWormCreature) {
+                this.graveWormCreature.reset();
             }
         }
 
@@ -1406,6 +1486,9 @@ export class HeroSelection {
 
     // Enhanced start character selection process
     async startSelection() {
+        window._debugHostHeroes = ['', '', '']; // '' = random
+        window._debugGuestHeroes = [''];             // Missing slots = random
+
         if (this.allPreviewCharacters.length < 6) { 
             return false;
         }
@@ -1466,13 +1549,40 @@ export class HeroSelection {
             this.initializeLifeManagerWithTurnTracker();
         }
         
-        // Generate new character selection using PREVIEW characters
-        const selectedIndices = this.getRandomUniqueIndices(this.allPreviewCharacters.length, 6);
-        const allSelectedCharacters = selectedIndices.map(index => this.allPreviewCharacters[index]); // Use preview characters
-        
-        // Split into two groups of 3 (host gets first 3, guest gets last 3)
-        this.playerCharacters = allSelectedCharacters.slice(0, 3);
-        this.opponentCharacters = allSelectedCharacters.slice(3, 6);
+        // Generate new character selection using PREVIEW characters with debug support
+        // Check for debug hero arrays
+        const debugHost = (window._debugHostHeroes || []).filter(h => h && h.trim() !== '');
+        const debugGuest = (window._debugGuestHeroes || []).filter(h => h && h.trim() !== '');
+
+        if (debugHost.length > 0 || debugGuest.length > 0) {
+            // Get specified heroes
+            const getHeroByName = (name) => this.allPreviewCharacters.find(char => char.name === name);
+            const hostChars = debugHost.map(getHeroByName).filter(Boolean);
+            const guestChars = debugGuest.map(getHeroByName).filter(Boolean);
+            
+            // Get remaining heroes for random selection
+            const usedNames = [...debugHost, ...debugGuest];
+            const remaining = this.allPreviewCharacters.filter(char => !usedNames.includes(char.name));
+            
+            // Fill remaining slots randomly
+            const needRandom = 6 - hostChars.length - guestChars.length;
+            const randomIndices = this.getRandomUniqueIndices(remaining.length, needRandom);
+            const randomChars = randomIndices.map(i => remaining[i]);
+            
+            // Build final arrays (pad to 3 each)
+            this.playerCharacters = [...hostChars, ...randomChars.slice(0, 3 - hostChars.length)];
+            this.opponentCharacters = [...guestChars, ...randomChars.slice(3 - hostChars.length)];
+            
+            console.log('Debug hero selection - Host:', this.playerCharacters.map(c => c.name), 'Guest:', this.opponentCharacters.map(c => c.name));
+        } else {
+            // Normal random selection
+            const selectedIndices = this.getRandomUniqueIndices(this.allPreviewCharacters.length, 6);
+            const allSelectedCharacters = selectedIndices.map(index => this.allPreviewCharacters[index]);
+            
+            // Split into two groups of 3 (host gets first 3, guest gets last 3)
+            this.playerCharacters = allSelectedCharacters.slice(0, 3);
+            this.opponentCharacters = allSelectedCharacters.slice(3, 6);
+        }
 
         // IMPORTANT: Save the character assignments immediately after generation
         await this.saveGameState();
@@ -1664,7 +1774,7 @@ export class HeroSelection {
                 graveyard: graveyardData,
                 birthdayPresentCounter: this.birthdayPresentCounter || 0,
                 playerAreaCard: areaFormationData.playerAreaCard,
-                opponentAreaCard: areaFormationData.opponentAreaCard,
+                opponentAreaCard: areaFormationData.opponentAreaCard, 
                 ...areaFormationData
             });
         }
@@ -1702,6 +1812,8 @@ export class HeroSelection {
         if (data.creatures) {
             // Store for later use when battle starts
             this.opponentCreaturesData = data.creatures;
+        }else{
+            this.opponentCreaturesData = null;
         }
         
         // Store opponent equipment if included
@@ -1729,17 +1841,34 @@ export class HeroSelection {
         // Store opponent area data if included
         if (data.playerAreaCard !== undefined) {
             this.opponentAreaCardData = data.playerAreaCard; // Opponent's area card
+            
+            // Reset DoomClock counters if >= 12
+            resetDoomClockCountersIfNeeded(this.opponentAreaCardData);
         }
 
         // Handle area card data through areaHandler
-        if (this.areaHandler) {
-            // Pass the full data object so areaHandler can extract what it needs
-            this.areaHandler.handleFormationUpdateReceived(data); 
-        }
-        
-        // Store opponent birthday present counter if included
-        if (data.birthdayPresentCounter !== undefined) {
-            this.opponentBirthdayPresentCounterData = data.birthdayPresentCounter;
+        if (this.areaHandler) {           
+            // Check if we have counters before the update
+            const existingAreaSlot = document.getElementById('player-area-slot');
+            const hadCountersBefore = existingAreaSlot ? 
+                existingAreaSlot.querySelectorAll('.area-counter-bubble').length : 0;
+                
+            if (hadCountersBefore > 0) {
+                console.warn('⚠️ Area slot has counters before formation update processing');
+            }
+            
+            this.areaHandler.handleFormationUpdateReceived(data);
+            
+            // Check if counters are gone after the update
+            const hasCountersAfter = existingAreaSlot ? 
+                existingAreaSlot.querySelectorAll('.area-counter-bubble').length : 0;
+                
+            if (hadCountersBefore > 0 && hasCountersAfter === 0) {
+                console.error('💥 COUNTERS LOST DURING FORMATION UPDATE!', {
+                    before: hadCountersBefore,
+                    after: hasCountersAfter
+                });
+            }
         }
     }
 
@@ -1985,6 +2114,23 @@ export class HeroSelection {
             // STEP 1: Set game phase to Formation immediately
             await this.setGamePhase('Formation');
             
+            // ===== SYNC AREA CARD DATA FROM BATTLE SCREEN =====
+            if (this.battleScreen && this.battleScreen.battleManager) {
+                const battleManager = this.battleScreen.battleManager;
+                
+                // Sync player area card back to areaHandler
+                if (battleManager.playerAreaCard) {
+                    resetDoomClockCountersIfNeeded(battleManager.playerAreaCard);
+                    this.areaHandler.setAreaCard(battleManager.playerAreaCard);
+                }
+                
+                // The opponent area card sync happens via formation updates
+                if (battleManager.opponentAreaCard) {
+                    resetDoomClockCountersIfNeeded(battleManager.opponentAreaCard);
+                    this.areaHandler.opponentAreaCard = battleManager.opponentAreaCard;
+                }
+            }
+            
             // ===== CLEAR POTION EFFECTS WHEN RETURNING TO FORMATION =====
             if (this.potionHandler) {
                 try {
@@ -1997,9 +2143,10 @@ export class HeroSelection {
             if (window.birthdayPresentArtifact) {
                 window.birthdayPresentArtifact.processBirthdayPresentEffectsAfterBattle(this);
             }
-            
-            if (window.heroSelection) {
-                window.heroSelection.clearProcessedDelayedEffects();
+
+            // ===== PROCESS KYLI NATURE BOND EMPOWERMENT =====
+            if (this.kyliEffectManager) {
+                await this.kyliEffectManager.processPostBattleEmpowerment(this);
             }
             
             // STEP 2: IMMEDIATE UI UPDATES (no waiting for Firebase)
@@ -2212,15 +2359,15 @@ export class HeroSelection {
                 
                 // Only HOST should mark battle as started
                 if (this.isHost) {
-                    // CRITICAL: Set ALL battle flags atomically to prevent race conditions
+                    // Set ALL battle flags atomically to prevent race conditions
                     await roomRef.child('gameState').update({
                         battleStarted: true,
                         battleStartTime: Date.now(),
-                        battleEndedAt: null,        // Clear previous battle end timestamp
-                        battleActive: true,         // Mark battle as active
-                        gamePhase: 'Battle',        // Set phase atomically
+                        battleEndedAt: null,
+                        battleActive: true,
+                        gamePhase: 'Battle',
                         gamePhaseUpdated: Date.now(),
-                        battlePaused: false         // Ensure not paused
+                        battlePaused: false
                     });                   
                     // Send battle start signal via P2P
                     if (this.gameDataSender) {
@@ -2863,25 +3010,6 @@ export class HeroSelection {
         }
     }
 
-    // Clear processed delayed artifact effects
-    clearProcessedDelayedEffects() {
-        if (this.delayedArtifactEffects && this.delayedArtifactEffects.length > 0) {
-            // Filter out processed PoisonedMeat effects
-            const filteredEffects = this.delayedArtifactEffects.filter(
-                effect => !(effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
-            );
-            
-            const removedCount = this.delayedArtifactEffects.length - filteredEffects.length;
-            this.delayedArtifactEffects = filteredEffects;
-            
-            if (removedCount > 0) {                
-                // Save updated state to Firebase
-                this.saveGameState().then(() => {
-                });
-            }
-        }
-    }
-
     // Process opponent draw effects at turn start
     processOpponentDrawEffects() {
         if (!this.delayedArtifactEffects || this.delayedArtifactEffects.length === 0) {
@@ -3337,11 +3465,17 @@ export class HeroSelection {
         if (this.heinzEffectManager) {
             this.heinzEffectManager.reset();
         }
+        if (this.kyliEffectManager) {
+            this.kyliEffectManager.reset();
+        }
 
 
         // Reset Abilities
         if (this.inventingAbility) {
             this.inventingAbility.reset();
+        }
+        if (this.occultismAbility) {
+            this.occultismAbility.reset();
         }
         
         // Reset Artifact handlers
@@ -3350,6 +3484,11 @@ export class HeroSelection {
         }
         if (this.ancientTechInfiniteEnergyCoreEffect) {
             this.ancientTechInfiniteEnergyCoreEffect.reset();
+        }
+
+        // Reset Creature handlers
+        if (this.graveWormCreature) {
+            this.graveWormCreature.reset();
         }
 
         
@@ -3514,10 +3653,21 @@ export class HeroSelection {
                 this.graveyardManager.getGraveyard().filter(card => card === 'FutureTechMech').length : 0;
             
             effectiveSpellLevel = Math.max(0, baseSpellLevel - levelReduction);
-            
-            // Don't return early - let the normal spell school level checking continue
-            // The effectiveSpellLevel will be used in the comparison below
         }
+        if (spellCardName === 'TheRootOfAllEvil') {
+            // Count all creatures the player owns across all heroes
+            const formation = this.formationManager.getBattleFormation();
+            let totalCreatures = 0;
+            ['left', 'center', 'right'].forEach(pos => {
+                if (formation[pos]) {
+                    const heroCreatures = this.heroCreatureManager.getHeroCreatures(pos);
+                    totalCreatures += heroCreatures.length;
+                }
+            });
+            
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - totalCreatures);
+        }
+
 
         // Check 4: Compare levels with the effective requirement
         if (totalSpellSchoolLevel < effectiveSpellLevel) {
@@ -3952,7 +4102,6 @@ function hideCardTooltip() {
 
 // Global function to update UI based on current phase
 function updateHeroSelectionUI() {
-    
     if (!window.heroSelection) {
         return;
     }
@@ -3982,8 +4131,67 @@ function updateHeroSelectionUI() {
             break;
             
         case 'team_building':
+            // PRESERVE AREA COUNTERS DURING UI REGENERATION
+            const existingAreaSlot = document.getElementById('player-area-slot');
+            let savedCounters = [];
+            let savedAreaCardName = null;
+            
+            if (existingAreaSlot) {
+                // Save existing counters
+                const counterElements = existingAreaSlot.querySelectorAll('.area-counter-bubble');
+                savedCounters = Array.from(counterElements).map(counter => ({
+                    outerHTML: counter.outerHTML,
+                    textContent: counter.textContent,
+                    className: counter.className
+                }));
+                
+                // Get the area card name to verify we're restoring to the same area
+                const areaCard = existingAreaSlot.querySelector('[data-area-card]');
+                if (areaCard) {
+                    savedAreaCardName = areaCard.getAttribute('data-area-card');
+                }
+            }
+            
+            // Regenerate the UI
             const teamBuildingHTML = window.heroSelection.heroSelectionUI.generateTeamBuildingHTML();
             heroContainer.innerHTML = teamBuildingHTML;
+            
+            // RESTORE AREA COUNTERS AFTER UI REGENERATION
+            if (savedCounters.length > 0) {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    const newAreaSlot = document.getElementById('player-area-slot');
+                    if (newAreaSlot) {
+                        const newAreaCard = newAreaSlot.querySelector('[data-area-card]');
+                        const newAreaCardName = newAreaCard ? newAreaCard.getAttribute('data-area-card') : null;
+                        
+                        // Only restore if it's the same area card
+                        if (newAreaCardName === savedAreaCardName) {
+                            const areaCardContainer = newAreaSlot.querySelector('.area-card');
+                            if (areaCardContainer) {
+                                areaCardContainer.style.position = 'relative';
+                                areaCardContainer.style.overflow = 'visible';
+                                
+                                // Restore each counter
+                                savedCounters.forEach((counterData, index) => {
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = counterData.outerHTML;
+                                    const restoredCounter = tempDiv.firstChild;
+                                    
+                                    if (restoredCounter) {
+                                        areaCardContainer.appendChild(restoredCounter);
+                                        
+                                        // Re-add the appear animation
+                                        requestAnimationFrame(() => {
+                                            restoredCounter.classList.add('counter-appeared');
+                                        });
+                                    }
+                                });
+                            }
+                        } 
+                    }
+                }, 10);
+            }
             
             // Ensure gold display is created after team building UI is rendered
             setTimeout(() => {

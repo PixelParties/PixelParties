@@ -316,9 +316,12 @@ export class CheckpointSystem {
             states.kazenaEffect = this.battleManager.kazenaEffect.exportKazenaState();
         }
 
-        // Gathering Storm Effect State
+        // Area Effect States
         if (this.battleManager.gatheringStormEffect) {
             states.gatheringStormEffect = this.battleManager.gatheringStormEffect.exportState();
+        }
+        if (this.battleManager.doomClockEffect) {
+            states.doomClockEffect = this.battleManager.doomClockEffect.exportState();
         }
         
         // Speed Manager State
@@ -826,6 +829,20 @@ export class CheckpointSystem {
                 });
             } else {
                 this.battleManager.gatheringStormEffect.importState(managerStates.gatheringStormEffect);
+            }
+        }
+        // Restore DoomClock Effect
+        if (managerStates.doomClockEffect) {
+            // Import the DoomClock effect class if needed
+            if (!this.battleManager.doomClockEffect) {
+                import('./Spells/doomClock.js').then(({ DoomClockEffect }) => {
+                    this.battleManager.doomClockEffect = new DoomClockEffect();
+                    this.battleManager.doomClockEffect.importState(managerStates.doomClockEffect);
+                }).catch(error => {
+                    console.error('Error importing DoomClock effect:', error);
+                });
+            } else {
+                this.battleManager.doomClockEffect.importState(managerStates.doomClockEffect);
             }
         }
     }

@@ -19,6 +19,9 @@ export class HeroCreatureManager {
         this.handManager = null;
         this.formationManager = null;
         this.onStateChange = null; // Callback for when state changes
+
+        // Sacrifice event callback (will be set by GraveWorm system)
+        this.onCreatureSacrificed = null;
         
         // Drag state for creature reordering
         this.dragState = {
@@ -467,6 +470,37 @@ export class HeroCreatureManager {
             draggedFromIndex: null,
             draggedElement: null
         };
+    }
+
+    // Sacrifice a creature (removes it and triggers sacrifice events)
+    sacrificeCreature(heroPosition, creatureIndex, source = 'unknown') {
+        if (!this.heroCreatures.hasOwnProperty(heroPosition)) {
+            console.error(`Invalid hero position: ${heroPosition}`);
+            return null;
+        }
+
+        const creatures = this.heroCreatures[heroPosition];
+        if (creatureIndex < 0 || creatureIndex >= creatures.length) {
+            console.error(`Invalid creature index: ${creatureIndex}`);
+            return null;
+        }
+
+        const sacrificedCreature = creatures[creatureIndex];
+        
+        // Remove the creature using existing method
+        const removedCreature = this.removeCreatureFromHero(heroPosition, creatureIndex);
+        
+        if (removedCreature && this.onCreatureSacrificed) {
+            // Trigger sacrifice event for listeners (like GraveWorm)
+            this.onCreatureSacrificed({
+                heroPosition: heroPosition,
+                creatureIndex: creatureIndex,
+                creature: removedCreature,
+                source: source
+            });
+        }
+        
+        return removedCreature;
     }
 
     // Control creature animations

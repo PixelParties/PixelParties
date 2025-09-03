@@ -1,18 +1,167 @@
-// victoryScreen.js - Enhanced Victory celebration screen with advanced particle effects
+// victoryScreen.js - Enhanced Victory celebration screen with proper winner detection
 export class VictoryScreen {
     constructor() {
         this.heroSelection = null;
         this.isActive = false;
+        this.hasShownVictory = false; // Prevent multiple victory screens
         this.fireworksInterval = null;
         this.confettiInterval = null;
         this.sparkleInterval = null;
         this.particleAnimations = [];
     }
 
+    // Initialize victory screen with heroSelection reference
+    init(heroSelection) {
+        this.heroSelection = heroSelection;
+        
+        // Register for victory messages if we have gameDataSender
+        if (heroSelection && heroSelection.gameDataSender) {
+            // Register message handler for opponent victory
+            if (heroSelection.webRTCManager) {
+                heroSelection.webRTCManager.registerMessageHandler('victory_achieved', (data) => {
+                    this.handleVictoryMessage(data);
+                });
+            }
+        }
+    }
+
+    // Handle victory message from opponent
+    handleVictoryMessage(data) {
+        // Don't show victory screen if we already showed one
+        if (this.hasShownVictory || this.isActive) {
+            return;
+        }
+
+        const { winner, winnerName } = data.data;
+        
+        // Determine if the sender won (opponent from our perspective)
+        let localWinner, winnerFormation;
+        
+        if (winner === 'player') {
+            // Sender won - they are our opponent
+            localWinner = 'opponent';
+            winnerFormation = this.heroSelection.formationManager.getOpponentBattleFormation();
+        } else {
+            // Sender's opponent won - that's us
+            localWinner = 'player';  
+            winnerFormation = this.heroSelection.formationManager.getBattleFormation();
+        }
+
+        // Create winner data
+        const winnerData = {
+            playerName: winnerName,
+            heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
+            isLocalPlayer: localWinner === 'player'
+        };
+
+        // Show victory screen
+        this.showVictoryScreen(winnerData, this.heroSelection);
+    }
+
+    // Show victory screen when local player wins (called from battleManager)
+    showLocalVictory(lifeChangeData) {
+        // Don't show victory screen if we already showed one
+        if (this.hasShownVictory || this.isActive) {
+            return;
+        }
+
+        const winner = lifeChangeData.winner; // 'player' or 'opponent'
+        
+        // Get winner's formation data
+        const winnerFormation = winner === 'player' ? 
+            this.heroSelection.formationManager.getBattleFormation() : 
+            this.heroSelection.formationManager.getOpponentBattleFormation();
+        
+        // Get winner's name
+        let winnerName;
+        if (winner === 'player') {
+            winnerName = this.getCurrentUsername();
+        } else {
+            winnerName = this.getOpponentUsername();
+        }
+        
+        const winnerData = {
+            playerName: winnerName,
+            heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
+            isLocalPlayer: winner === 'player'
+        };
+
+        // Save victory data to Firebase for reconnection support
+        this.saveVictoryDataToFirebase({
+            winner: winner === 'player' ? 'host' : 'guest', // Convert to absolute side
+            winnerName: winnerName,
+            trophies: lifeChangeData.trophies,
+            timestamp: Date.now()
+        });
+        
+        // Send victory message to opponent
+        if (this.heroSelection.gameDataSender) {
+            this.heroSelection.gameDataSender('victory_achieved', {
+                winner: winner, // Send our local perspective
+                winnerName: winnerName,
+                trophies: lifeChangeData.trophies
+            });
+        }
+        
+        // Transition to victory state and show victory screen
+        if (this.heroSelection.stateMachine) {
+            this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+        }
+        
+        this.showVictoryScreen(winnerData, this.heroSelection);
+    }
+
+    // Get current player username
+    getCurrentUsername() {
+        if (this.heroSelection && this.heroSelection.uiManager) {
+            return this.heroSelection.uiManager.getCurrentUsername();
+        }
+        return 'You';
+    }
+
+    // Get opponent username  
+    getOpponentUsername() {
+        if (this.heroSelection && this.heroSelection.roomManager) {
+            const room = this.heroSelection.roomManager.getCurrentRoom();
+            const isHost = this.heroSelection.roomManager.getIsHost();
+            
+            if (room) {
+                return isHost ? (room.guestName || 'Opponent') : (room.hostName || 'Opponent');
+            }
+        }
+        return 'Opponent';
+    }
+
+    // Save victory data to Firebase
+    async saveVictoryDataToFirebase(victoryData) {
+        if (!this.heroSelection || !this.heroSelection.roomManager) {
+            return;
+        }
+
+        try {
+            const roomRef = this.heroSelection.roomManager.getRoomRef();
+            if (roomRef) {
+                await roomRef.child('gameState').update({
+                    gamePhase: 'Victory',
+                    gamePhaseUpdated: Date.now(),
+                    victoryData: victoryData
+                });
+            }
+        } catch (error) {
+            // Silent error handling
+        }
+    }
+
     // Show victory screen for the winner
     showVictoryScreen(winnerData, heroSelection) {
+        // Prevent multiple victory screens
+        if (this.hasShownVictory || this.isActive) {
+            return;
+        }
+
         this.heroSelection = heroSelection;
         this.isActive = true;
+        this.hasShownVictory = true;
         
         // Clear any existing victory screen
         this.hideVictoryScreen();
@@ -45,6 +194,10 @@ export class VictoryScreen {
     createVictoryHTML(winnerData) {
         const { playerName, heroes, isLocalPlayer } = winnerData;
         
+        // Customize message based on whether local player won
+        const titleText = isLocalPlayer ? "Victory!" : `${playerName} Wins!`;
+        const subtitleText = isLocalPlayer ? "Congratulations! You are victorious!" : "Well fought! Better luck next time!";
+        
         return `
             <div class="victory-container">
                 <!-- Particle effects containers -->
@@ -56,8 +209,8 @@ export class VictoryScreen {
                 <!-- Main victory content -->
                 <div class="victory-content">
                     <div class="victory-header">
-                        <h1 class="victory-title">${playerName} is the Winner!</h1>
-                        <div class="victory-subtitle">${isLocalPlayer ? 'Congratulations!' : 'Well played!'}</div>
+                        <h1 class="victory-title ${isLocalPlayer ? 'victory-player' : 'victory-opponent'}">${titleText}</h1>
+                        <div class="victory-subtitle">${subtitleText}</div>
                     </div>
                     
                     <div class="victory-heroes">
@@ -434,6 +587,13 @@ export class VictoryScreen {
         this.exitToLobby();
     }
 
+    // Reset victory screen state (called when starting new game)
+    reset() {
+        this.hideVictoryScreen();
+        this.hasShownVictory = false;
+        this.isActive = false;
+    }
+
     ensureVictoryStyles() {
         if (document.getElementById('victoryStyles')) return;
         
@@ -499,12 +659,22 @@ export class VictoryScreen {
                 font-weight: 900;
                 margin: 0 0 20px 0;
                 text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+                background-size: 200% 200%;
+                animation: victoryTitleShimmer 3s ease-in-out infinite;
+            }
+            
+            .victory-title.victory-player {
                 background: linear-gradient(45deg, #ffd700, #ffed4a, #ffd93d);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
-                background-size: 200% 200%;
-                animation: victoryTitleShimmer 3s ease-in-out infinite;
+            }
+            
+            .victory-title.victory-opponent {
+                background: linear-gradient(45deg, #ff6b6b, #ff8a80, #ffab91);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
             }
             
             .victory-subtitle {

@@ -53,9 +53,6 @@ export class BattleCombatManager {
                 changeType: 'gain'
             });
         }
-        
-        // DEBUG: Log shield addition
-        console.log(`🛡️ Shield added: ${hero.name} gained ${amount} shield (${oldShield} → ${hero.currentShield})`);
     }
 
     /**

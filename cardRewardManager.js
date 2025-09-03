@@ -34,7 +34,10 @@ export class CardRewardManager {
             { name: 'Cecilia', image: './Cards/Characters/Cecilia.png' },
             { name: 'Darge', image: './Cards/Characters/Darge.png' },
             { name: 'Gon', image: './Cards/Characters/Gon.png' },
+            { name: 'Heinz', image: './Cards/Characters/Heinz.png' },
             { name: 'Ida', image: './Cards/Characters/Ida.png' },
+            { name: 'Kazena', image: './Cards/Characters/Kazena.png' },
+            { name: 'Kyli', image: './Cards/Characters/Kyli.png' },
             { name: 'Medea', image: './Cards/Characters/Medea.png' },
             { name: 'Monia', image: './Cards/Characters/Monia.png' },
             { name: 'Nicolas', image: './Cards/Characters/Nicolas.png' },
@@ -50,7 +53,10 @@ export class CardRewardManager {
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
+            'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechFists', 'FutureTechLamp', 'FutureTechCopyDevice'],
             'Ida': ['BottledFlame', 'BurningFinger', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
+            'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
+            'Kyli': ['Biomancy',  'Occultism', 'MonsterInABottle', 'OverflowingChalice', 'BloodSoakedCoin', 'DoomClock', 'GraveWorm', 'TheRootOfAllEvil'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
@@ -358,23 +364,15 @@ export class CardRewardManager {
             }, 3000);
         }
 
-        console.log('🎂 DEBUG: Birthday Present counter check');
-        console.log('🎂 heroSelection.opponentBirthdayPresentCounter:', heroSelection.opponentBirthdayPresentCounter);
-        console.log('🎂 heroSelection.opponentBirthdayPresentCounterData:', heroSelection.opponentBirthdayPresentCounterData);
-        console.log('🎂 Available heroSelection fields:', Object.keys(heroSelection).filter(k => k.includes('birthday') || k.includes('Birthday')));
-
         // Check for Birthday Present bonus cards from opponent
         let birthdayPresentBonusCards = 0;
 
         // Use the correct field name and add fallback
         const opponentCounter = heroSelection.opponentBirthdayPresentCounter || heroSelection.opponentBirthdayPresentCounterData || 0;
-        console.log('🎂 Final opponent counter value:', opponentCounter);
 
         if (opponentCounter > 0) {
             birthdayPresentBonusCards = opponentCounter;
-            
-            console.log('🎂 Processing birthday present bonus cards:', birthdayPresentBonusCards);
-            
+                        
             // Add bonus cards to hand
             if (this.handManager) {
                 this.handManager.drawCards(birthdayPresentBonusCards);

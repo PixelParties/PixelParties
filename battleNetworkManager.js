@@ -698,7 +698,9 @@ export class BattleNetworkManager {
                 break;
 
             case 'moonlight_butterfly_attack':
-                bm.guest_handleMoonlightButterflyAttack(data);
+                if (bm.moonlightButterflyManager) {
+                    bm.moonlightButterflyManager.handleGuestMoonlightAttack(data);
+                }
                 break;
 
             case 'royal_corgi_card_draw':
@@ -714,7 +716,9 @@ export class BattleNetworkManager {
                 break;
 
             case 'crum_extra_action':
-                bm.guest_handleCrumExtraAction(data);
+                if (bm.crumTheClassPetManager) {
+                    bm.crumTheClassPetManager.handleGuestExtraAction(data);
+                }
                 break;
 
             case 'alice_laser_effect':
@@ -730,6 +734,42 @@ export class BattleNetworkManager {
             case 'future_tech_mech_special_attack':
                 if (bm.futureTechMechManager) {
                     bm.futureTechMechManager.handleGuestSpecialAttack(data);
+                }
+                break;
+
+            case 'root_of_all_evil_special_attack':
+                if (bm.theRootOfAllEvilManager) {
+                    bm.theRootOfAllEvilManager.handleGuestSpecialAttack(data);
+                } else {
+                    // Initialize manager if it doesn't exist
+                    try {
+                        const { TheRootOfAllEvilCreature } = await import('./Creatures/theRootOfAllEvil.js');
+                        bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
+                        bm.theRootOfAllEvilManager.handleGuestSpecialAttack(data);
+                    } catch (error) {
+                        console.warn('Could not initialize TheRootOfAllEvil manager for guest:', error);
+                    }
+                }
+                break;
+
+            case 'graveworm_bite_attack':
+                if (bm.graveWormManager) {
+                    bm.graveWormManager.handleGuestBiteAttack(data);
+                }
+                break;
+
+            case 'biomancy_token_vine_attack':
+                if (bm.biomancyTokenManager) {
+                    bm.biomancyTokenManager.handleGuestVineAttack(data);
+                } else {
+                    // Initialize manager if it doesn't exist
+                    try {
+                        const { BiomancyTokenCreature } = await import('./Creatures/biomancyToken.js');
+                        bm.biomancyTokenManager = new BiomancyTokenCreature(bm);
+                        bm.biomancyTokenManager.handleGuestVineAttack(data);
+                    } catch (error) {
+                        console.warn('Could not initialize BiomancyToken manager for guest:', error);
+                    }
                 }
                 break;
 
@@ -875,6 +915,12 @@ export class BattleNetworkManager {
                 });
                 break;
 
+            case 'blood_soaked_coin_damage_animation':
+                import('./Artifacts/bloodSoakedCoin.js').then(({ handleGuestBloodSoakedCoinDamage }) => {
+                    handleGuestBloodSoakedCoinDamage(data, this.battleManager);
+                });
+                break;
+
             case 'flame_arrow_impact':
                 bm.guest_handleFlameArrowImpact(data);
                 break;
@@ -996,6 +1042,51 @@ export class BattleNetworkManager {
                 bm.guest_handleGatheringStormDamage(data);
                 break;
 
+            case 'doom_clock_start':
+                await bm.guest_handleDoomClockStart(data);
+                break;
+                
+            case 'doom_clock_start':
+                import('./Spells/doomClock.js').then(({ handleGuestDoomClockStart }) => {
+                    handleGuestDoomClockStart(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error importing doom clock handler:', error);
+                });
+                break;
+                
+            case 'doom_clock_increment':
+                import('./Spells/doomClock.js').then(({ handleGuestDoomClockIncrement }) => {
+                    handleGuestDoomClockIncrement(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error importing doom clock handler:', error);
+                });
+                break;
+                
+            case 'doom_clock_triggered':
+                import('./Spells/doomClock.js').then(({ handleGuestDoomClockTriggered }) => {
+                    handleGuestDoomClockTriggered(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error importing doom clock handler:', error);
+                });
+                break;
+
+            case 'doom_clock_visual_effects':
+                if (data.grayOutHeroes) {
+                    // Ensure we can gray out heroes even if doomClockEffect isn't initialized yet
+                    if (this.battleManager.doomClockEffect) {
+                        this.battleManager.doomClockEffect.grayOutAllHeroes(this.battleManager);
+                    } else {
+                        // Fallback: gray out heroes directly
+                        const allHeroElements = document.querySelectorAll('.hero-card, .character-card');
+                        allHeroElements.forEach(heroElement => {
+                            heroElement.style.filter = 'grayscale(100%) brightness(0.6)';
+                            heroElement.style.opacity = '0.7';
+                            heroElement.style.transition = 'all 0.5s ease-out';
+                        });
+                    }
+                }
+                break;
+
             case 'future_tech_fists_shield':
                 bm.guest_handleFutureTechFistsShield(data);
                 break;
@@ -1008,6 +1099,10 @@ export class BattleNetworkManager {
 
             case 'damage_applied_with_shields':
                 this.guest_handleDamageAppliedWithShields(data);
+                break;
+
+            case 'delayed_effects_cleared':
+                this.guest_handleDelayedEffectsCleared(data);
                 break;
         }
     }
@@ -1134,9 +1229,22 @@ export class BattleNetworkManager {
             if (died && oldHp > 0) {
                 bm.handleHeroDeath(localTarget);
             }
+        }
+    }
+
+    guest_handleDelayedEffectsCleared(data) {
+        const bm = this.battleManager;
+        if (bm.isAuthoritative) return; // Only process on guest side
+        
+        const { clearedHostEffects, clearedGuestEffects, newGuestEffects } = data;
+        
+        // Update the guest's local heroSelection state
+        if (window.heroSelection) {
+            window.heroSelection.delayedArtifactEffects = newGuestEffects || [];
             
-            // DEBUG: Verify shield was applied correctly
-            console.log(`🛡️ Guest damage handler: ${targetName} shield updated to ${currentShield}`);
+            if (clearedGuestEffects > 0) {
+                bm.addCombatLog(`🧹 Cleared ${clearedGuestEffects} processed artifact effects`, 'info');
+            }
         }
     }
 
@@ -1428,10 +1536,6 @@ export class BattleNetworkManager {
             } catch (error) {
                 // Error clearing potion effects
             }
-        }
-        
-        if (window.heroSelection) {
-            window.heroSelection.clearProcessedDelayedEffects();
         }
 
         // Update guest's deck manager with modified deck

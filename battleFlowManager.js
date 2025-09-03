@@ -3,6 +3,8 @@
 
 import CavalryCreature from './Creatures/cavalry.js';
 import BattleStartManager from './battleStartManager.js';
+import { DoomClockEffect, applyDoomClockBattleEffects, processDoomClockRoundCompletion } from './Spells/doomClock.js';
+
 
 export class BattleFlowManager {
     constructor(battleManager) {
@@ -128,6 +130,22 @@ export class BattleFlowManager {
             const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
             bm.futureTechMechManager = new FutureTechMechCreature(bm);
 
+            const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
+            bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
+
+            // Initialize GraveWorm manager
+            const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
+            bm.graveWormManager = new GraveWormCreature(bm);
+
+
+
+
+            
+
+            // Initialize Biomancy Token manager
+            const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
+            bm.biomancyTokenManager = new BiomancyTokenCreature(bm);
+
         } catch (error) {
             // Initialize fallback null managers to prevent undefined errors
             if (!bm.jigglesManager) bm.jigglesManager = null;
@@ -139,6 +157,10 @@ export class BattleFlowManager {
             if (!bm.crumTheClassPetManager) bm.crumTheClassPetManager = null;
             if (!bm.coldHeartedYukiOnnaManager) bm.coldHeartedYukiOnnaManager = null;
             if (!bm.futureTechMechManager) bm.futureTechMechManager = null;
+            if (!bm.graveWormManager) bm.graveWormManager = null;
+
+            
+            if (!bm.biomancyTokenManager) bm.biomancyTokenManager = null;
         }
 
         try {
@@ -178,6 +200,14 @@ export class BattleFlowManager {
         // APPLY ALL START-OF-BATTLE EFFECTS (CENTRALIZED)
         // ============================================
         await this.battleStartManager.applyAllStartOfBattleEffects();
+
+        // Initialize area effects
+        if (!bm.doomClockEffect) {
+            await applyDoomClockBattleEffects(bm);
+        } else {
+            // DoomClock already exists (likely from reconnection), just re-verify area cards
+            bm.doomClockEffect.initializeDoomClock(bm);
+        }
         
         // Final visual refresh after all start effects
         await this.battleStartManager.refreshAllVisuals();
@@ -290,6 +320,18 @@ export class BattleFlowManager {
                         if (this.checkBattleEnd()) break;
                     } catch (error) {
                         console.error('Error applying end-of-round storm damage:', error);
+                    }
+                }
+
+                // Process Doom Clock round completion (only if battle hasn't ended)
+                if (!this.checkBattleEnd()) {
+                    try {
+                        const battleEndedByDoom = await processDoomClockRoundCompletion(bm);
+                        if (battleEndedByDoom) {
+                            break; // Exit the battle loop - doom clock forced draw
+                        }
+                    } catch (error) {
+                        console.error('Error processing Doom Clock round completion:', error);
                     }
                 }
                 
@@ -596,6 +638,11 @@ export class BattleFlowManager {
                 const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
                 const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
                 const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
+                const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
+                const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
+
+                
+                const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
 
                 if (JigglesCreature.isJiggles(playerActor.name)) {
                     if (bm.jigglesManager) {
@@ -727,6 +774,28 @@ export class BattleFlowManager {
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                         bm.addCombatLog(`🤖 ${playerActor.name} activates!`, 'success');
                     }
+                } else if (BiomancyTokenCreature.isBiomancyToken(playerActor.name)) {
+                    if (bm.biomancyTokenManager) {
+                        actions.push(bm.biomancyTokenManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🌿 ${playerActor.name} activates!`, 'success');
+                    }
+                } else if (TheRootOfAllEvilCreature.isTheRootOfAllEvil(playerActor.name)) {
+                    if (!bm.theRootOfAllEvilManager) {
+                        bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
+                    }
+                    actions.push(bm.theRootOfAllEvilManager.executeSpecialAttack(playerActor, position));
+                    hasSpecialAttacks = true;
+                } else if (GraveWormCreature.isGraveWorm(playerActor.name)) {
+                    if (bm.graveWormManager) {
+                        actions.push(bm.graveWormManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                        bm.addCombatLog(`🪱 ${playerActor.name} activates!`, 'success');
+                    }
                 } else {
                     actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                     bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
@@ -756,6 +825,11 @@ export class BattleFlowManager {
                 const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
                 const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
                 const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
+                const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
+                const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
+
+                
+                const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
 
                 if (JigglesCreature.isJiggles(opponentActor.name)) {
                     if (bm.jigglesManager) {
@@ -880,6 +954,28 @@ export class BattleFlowManager {
                     } else {
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
                         bm.addCombatLog(`🤖 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else if (BiomancyTokenCreature.isBiomancyToken(opponentActor.name)) {
+                    if (bm.biomancyTokenManager) {
+                        actions.push(bm.biomancyTokenManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🌿 ${opponentActor.name} activates!`, 'error');
+                    }
+                } else if (TheRootOfAllEvilCreature.isTheRootOfAllEvil(opponentActor.name)) {
+                    if (!bm.theRootOfAllEvilManager) {
+                        bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
+                    }
+                    actions.push(bm.theRootOfAllEvilManager.executeSpecialAttack(opponentActor, position));
+                    hasSpecialAttacks = true;
+                } else if (GraveWormCreature.isGraveWorm(opponentActor.name)) {
+                    if (bm.graveWormManager) {
+                        actions.push(bm.graveWormManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                        bm.addCombatLog(`🪱 ${opponentActor.name} activates!`, 'error');
                     }
                 } else {
                     actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));

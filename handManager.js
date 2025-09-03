@@ -22,16 +22,16 @@ export class HandManager {
 
         // ===== TEST HELPER FLAGS =====
         // Set to false to disable test functionality completely
-        this.ENABLE_TEST_HELPERS = false;
+        this.ENABLE_TEST_HELPERS = true;
         // Set to false if you only want to disable the auto-add feature
         this.AUTO_ADD_TEST_CARD = true;
         // Up to 5 test cards to add (empty strings mean no card in that slot)
         this.TEST_CARD_NAMES = [
-            'FutureTechFists',  // Card slot 1
-            'FutureTechFists',                // Card slot 2 (empty)
-            'FutureTechFists',                // Card slot 3 (empty)
-            'FutureTechFists',                // Card slot 4 (empty)
-            'FutureTechFists'                 // Card slot 5 (empty)
+            '',  // Card slot 1
+            '',                // Card slot 2 (empty)
+            '',                // Card slot 3 (empty)
+            '',                // Card slot 4 (empty)
+            ''                 // Card slot 5 (empty)
         ];
     }
 
@@ -1011,8 +1011,18 @@ async function onHandCardClick(event, cardIndex, cardName) {
         
         // Add to graveyard if successfully activated
         if (result && window.heroSelection && window.heroSelection.graveyardManager) {
-            window.heroSelection.graveyardManager.addCard(cardName);
-            await window.heroSelection.autoSave(); // Save the graveyard state
+            // Check if Biomancy should intercept this potion
+            let intercepted = false;
+            if (window.biomancyAbility) {
+                intercepted = window.biomancyAbility.handlePotionActivation(window.heroSelection, cardName);
+            }
+            
+            // Only add to graveyard if not intercepted by Biomancy
+            if (!intercepted) {
+                window.heroSelection.graveyardManager.addCard(cardName);
+            }
+            
+            await window.heroSelection.autoSave(); // Save the state
         }
         return;
     }
@@ -1416,7 +1426,17 @@ async function onHandCardDragEnd(event) {
                             
                             // Add to graveyard if successfully activated
                             if (result && window.heroSelection && window.heroSelection.graveyardManager) {
-                                window.heroSelection.graveyardManager.addCard(dragState.draggedCardName);
+                                // Check if Biomancy should intercept this potion
+                                let intercepted = false;
+                                if (window.biomancyAbility) {
+                                    intercepted = window.biomancyAbility.handlePotionActivation(window.heroSelection, dragState.draggedCardName);
+                                }
+                                
+                                // Only add to graveyard if not intercepted by Biomancy
+                                if (!intercepted) {
+                                    window.heroSelection.graveyardManager.addCard(dragState.draggedCardName);
+                                }
+                                
                                 await window.heroSelection.autoSave(); // Save the graveyard state
                             }
                         }

@@ -61,7 +61,7 @@ export class TheStormbladeEffect {
         const enemySide = attacker.side === 'player' ? 'opponent' : 'player';
         
         // Apply wind swaps to enemy heroes (don't await - let it run in parallel)
-        const animationPromise = this.applyStormbladeWindSwaps(enemySide, stormbladeCount, attacker);
+        const animationPromise = this.applyStormbladeWindSwaps(enemySide, stormbladeCount, attacker, defender, damage);
         
         // Track this animation
         this.trackAnimation(animationPromise);
@@ -118,7 +118,7 @@ export class TheStormbladeEffect {
     }
     
     // Apply wind swaps to target side (adapted from CrusadersHookshot)
-    async applyStormbladeWindSwaps(targetSide, stormbladeCount, attacker) {
+    async applyStormbladeWindSwaps(targetSide, stormbladeCount, attacker, defender = null, damage = 0) {
         const sideLabel = targetSide === 'player' ? 'Player' : 'Opponent';
         const attackerLabel = attacker.side === 'player' ? 'Player' : 'Opponent';
         
@@ -129,9 +129,34 @@ export class TheStormbladeEffect {
             this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
         
         const livingPositions = [];
+        
+        // Determine if defender is a hero on this side who will DIE from this attack
+        let excludeDefenderPosition = null;
+        if (defender && defender.type === 'hero' && defender.hero && damage > 0) {
+            const defenderSide = defender.hero.side;
+            if (defenderSide === targetSide) {
+                const defenderHero = defender.hero;
+                // Calculate if this hero will die from the damage (considering shields)
+                const totalDefense = defenderHero.currentHp + (defenderHero.currentShield || 0);
+                const willDieFromAttack = totalDefense - damage <= 0;
+                
+                if (willDieFromAttack) {
+                    excludeDefenderPosition = defenderHero.position;
+                    console.log(`🌪️ Excluding dying defender ${defenderHero.name} at ${excludeDefenderPosition} (${defenderHero.currentHp}+${defenderHero.currentShield || 0} HP vs ${damage} damage)`);
+                } else {
+                    console.log(`🌪️ Defender ${defenderHero.name} will survive attack (${defenderHero.currentHp}+${defenderHero.currentShield || 0} HP vs ${damage} damage) - including in swap pool`);
+                }
+            }
+        }
+        
         ['left', 'center', 'right'].forEach(position => {
             if (heroes[position] && heroes[position].alive) {
-                livingPositions.push(position);
+                // CRITICAL FIX: Only exclude the defender if they will DIE from this attack
+                if (position !== excludeDefenderPosition) {
+                    livingPositions.push(position);
+                } else {
+                    console.log(`🌪️ Skipping defender position ${position} - hero will die from this attack`);
+                }
             }
         });
 
@@ -178,6 +203,15 @@ export class TheStormbladeEffect {
             }
 
             if (position1 && position2 && position1 !== position2) {
+                // FINAL VALIDATION: Double-check both heroes are actually alive before swapping
+                const hero1 = heroes[position1];
+                const hero2 = heroes[position2];
+                
+                if (!hero1 || !hero1.alive || !hero2 || !hero2.alive) {
+                    console.log(`🌪️ Swap validation failed - one hero is dead: ${position1}(${hero1?.alive}) ↔ ${position2}(${hero2?.alive})`);
+                    continue; // Skip this swap attempt
+                }
+                
                 console.log(`🌪️ Wind Swap #${i + 1}: Swapping ${position1} ↔ ${position2}`);
                 
                 // Generate unique swap ID for tracking using deterministic randomness
@@ -195,6 +229,15 @@ export class TheStormbladeEffect {
                         side: attacker.side,
                         absoluteSide: attacker.absoluteSide
                     },
+                    defenderInfo: defender ? {
+                        type: defender.type,
+                        heroName: defender.hero ? defender.hero.name : null,
+                        heroPosition: defender.hero ? defender.hero.position : null,
+                        heroSide: defender.hero ? defender.hero.side : null,
+                        absoluteSide: defender.hero ? defender.hero.absoluteSide : null,
+                        damage: damage,
+                        willDie: excludeDefenderPosition === (defender.hero ? defender.hero.position : null)
+                    } : null,
                     swapId: swapId
                 };
                 
@@ -222,6 +265,38 @@ export class TheStormbladeEffect {
                     await this.battleManager.delay(swapDelay);
                 }
             }
+        }
+    }
+    
+    // Validate and defeat any heroes with 0 HP that aren't marked as defeated
+    validateAndDefeatZeroHpHeroes(side) {
+        const heroes = side === 'player' ? 
+            this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+        
+        let heroesDefeated = 0;
+        
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = heroes[position];
+            if (hero && hero.alive && hero.currentHp <= 0) {
+                console.log(`🌪️ POST-SWAP VALIDATION: ${hero.name} at ${position} has ${hero.currentHp} HP but is still alive - defeating immediately!`);
+                
+                // Mark hero as defeated
+                hero.alive = false;
+                
+                // Apply defeated visual state
+                this.battleManager.handleHeroDeath(hero);
+                
+                heroesDefeated++;
+                
+                this.battleManager.addCombatLog(
+                    `💀 ${hero.name} collapses after the wind swap - they had no strength left!`,
+                    'error'
+                );
+            }
+        });
+        
+        if (heroesDefeated > 0) {
+            console.log(`🌪️ Post-swap validation defeated ${heroesDefeated} hero(s) with 0 HP`);
         }
     }
     
@@ -253,7 +328,7 @@ export class TheStormbladeEffect {
         // Animate the wind effect (this takes about 1600ms total)
         await this.animateWindSwap(side, position1, position2);
 
-        // ===== SWAP IN HERO REFERENCES =====
+        // ===== SWAP IN HERO REFERENCES ONLY =====
         heroes[position1] = hero2;
         heroes[position2] = hero1;
         
@@ -261,17 +336,8 @@ export class TheStormbladeEffect {
         hero1.position = position2;
         hero2.position = position1;
         
-        // ===== SWAP IN FORMATION DATA FOR PERSISTENCE =====
-        const formation = side === 'player' ? 
-            this.battleManager.playerFormation : 
-            this.battleManager.opponentFormation;
-        
-        // Swap the formation data
-        const tempFormationData = formation[position1];
-        formation[position1] = formation[position2];
-        formation[position2] = tempFormationData;
-        
-        console.log(`🌪️ Updated formation - ${position1} now has ${formation[position1]?.name}, ${position2} now has ${formation[position2]?.name}`);
+        // REMOVED: Formation data swapping - this was causing the persistent bug
+        // TheStormblade should NOT modify persistent formation data
         
         // ===== SWAP ABILITIES, SPELLBOOKS, CREATURES, AND EQUIPMENT DATA =====
         if (side === 'player') {
@@ -378,11 +444,14 @@ export class TheStormbladeEffect {
             console.log(`🌪️ Saved wind-swapped positions to persistence`);
         }
         
-        console.log(`🌪️ Wind-swapped ${hero1.name} to ${position2} and ${hero2.name} to ${position1} (including formations)`);
+        console.log(`🌪️ Wind-swapped ${hero1.name} to ${position2} and ${hero2.name} to ${position1} (battle state only)`);
     }
     
     // Animate wind swap between two heroes
     async animateWindSwap(side, position1, position2) {
+        // Initial delay to let players process what's about to happen
+        await this.battleManager.delay(250);
+        
         // Ensure CSS is loaded
         this.ensureWindAnimationCSS();
         
@@ -434,6 +503,9 @@ export class TheStormbladeEffect {
         // Clean up
         windEffect1.remove();
         windEffect2.remove();
+        
+        // Final delay to let players see the result
+        await this.battleManager.delay(300);
     }
     
     // Create wind effect between two points
@@ -684,7 +756,14 @@ export class TheStormbladeEffect {
     handleGuestWindSwap(data) {
         console.log('🌪️ Guest handling wind swap:', data);
         
-        const { targetSide, position1, position2, windNumber, totalWinds, attackerInfo } = data;
+        const { targetSide, position1, position2, windNumber, totalWinds, attackerInfo, defenderInfo } = data;
+        
+        // Log defender exclusion for debugging (only if they will die)
+        if (defenderInfo && defenderInfo.heroPosition && defenderInfo.willDie) {
+            console.log(`🌪️ Guest aware of excluded dying defender: ${defenderInfo.heroName} at ${defenderInfo.heroPosition} (${defenderInfo.damage} damage)`);
+        } else if (defenderInfo && defenderInfo.heroPosition && !defenderInfo.willDie) {
+            console.log(`🌪️ Guest aware defender ${defenderInfo.heroName} at ${defenderInfo.heroPosition} survived and is eligible for swaps`);
+        }
         
         // Log initial effect if first wind
         if (windNumber === 1) {

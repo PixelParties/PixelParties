@@ -47,7 +47,7 @@ export const magicTopazArtifact = {
         // Disable "To Battle!" button
         this.disableToBattleButton(true);
         
-        // Add click handlers to deck cards
+        // Add click handlers to deck cards - this will now force refresh all handlers
         this.addDeckCardClickHandlers(heroSelection);
         
         // Save game state to persist the mode
@@ -164,9 +164,15 @@ export const magicTopazArtifact = {
         }
     },
 
-    // Add click handlers to deck cards
+    // ENHANCED: Add click handlers to deck cards with cleanup first
     addDeckCardClickHandlers(heroSelection) {
+        // FIRST: Clean up any existing Topaz handlers to prevent duplicates
+        this.removeDeckCardClickHandlers();
+        
+        // THEN: Add fresh handlers to all current deck cards
         const deckCards = document.querySelectorAll('.card-slot:not(.empty-slot)');
+        
+        console.log(`💎 MagicTopaz: Adding click handlers to ${deckCards.length} deck cards`);
         
         deckCards.forEach(cardSlot => {
             const cardImage = cardSlot.querySelector('img');
@@ -182,23 +188,64 @@ export const magicTopazArtifact = {
                     cardSlot.addEventListener('click', clickHandler);
                     cardSlot.setAttribute('data-topaz-handler', 'true');
                     cardSlot.style.cursor = 'pointer';
+                    
+                    // Add visual feedback that this card is clickable for Topaz
+                    cardSlot.classList.add('topaz-clickable');
+                } else {
+                    console.warn('💎 MagicTopaz: Could not extract card name from image path:', cardImage.src);
                 }
+            } else {
+                console.warn('💎 MagicTopaz: Card slot found without image element');
             }
         });
+        
+        console.log(`💎 MagicTopaz: Successfully added handlers to deck cards`);
     },
 
-    // Remove click handlers from deck cards
+    // ENHANCED: Remove click handlers from deck cards with better cleanup
     removeDeckCardClickHandlers() {
         const deckCards = document.querySelectorAll('[data-topaz-handler="true"]');
+        console.log(`💎 MagicTopaz: Removing click handlers from ${deckCards.length} deck cards`);
+        
         deckCards.forEach(cardSlot => {
             // Create a new element to remove all event listeners
             const newElement = cardSlot.cloneNode(true);
             cardSlot.parentNode.replaceChild(newElement, cardSlot);
             
-            // Clean up attributes
+            // Clean up attributes and styling
             newElement.removeAttribute('data-topaz-handler');
             newElement.style.cursor = '';
+            newElement.classList.remove('topaz-clickable');
         });
+    },
+
+    // NEW: Force refresh deck card handlers (call this if you suspect handlers are missing)
+    refreshDeckCardHandlers(heroSelection) {
+        console.log('💎 MagicTopaz: Force refreshing deck card handlers');
+        
+        // Only refresh if we're actually in Topaz mode
+        if (this.isInTopazMode(heroSelection)) {
+            this.addDeckCardClickHandlers(heroSelection);
+        }
+    },
+
+    // NEW: Validate that all deck cards have proper handlers
+    validateDeckCardHandlers() {
+        const deckCards = document.querySelectorAll('.card-slot:not(.empty-slot)');
+        const handledCards = document.querySelectorAll('[data-topaz-handler="true"]');
+        
+        const validation = {
+            totalDeckCards: deckCards.length,
+            handledCards: handledCards.length,
+            isValid: deckCards.length === handledCards.length,
+            missingHandlers: deckCards.length - handledCards.length
+        };
+        
+        if (!validation.isValid) {
+            console.warn(`💎 MagicTopaz: Handler validation failed - ${validation.missingHandlers} cards missing handlers`);
+        }
+        
+        return validation;
     },
 
     // Handle selecting a card from the deck for removal
@@ -459,7 +506,7 @@ export const magicTopazArtifact = {
         // Disable "To Battle!" button
         this.disableToBattleButton(true);
         
-        // Add click handlers to deck cards
+        // Add click handlers to deck cards - this will now force refresh all handlers
         this.addDeckCardClickHandlers(heroSelection);
         
         console.log('MagicTopaz: Topaz Mode restored successfully with exclusive registration');
@@ -520,7 +567,7 @@ export const magicTopazArtifact = {
     }
 };
 
-// Enhanced CSS styles for Topaz with exclusive artifact integration
+// Enhanced CSS styles for Topaz with exclusive artifact integration and clickable cards
 if (typeof document !== 'undefined' && !document.getElementById('topazStyles')) {
     const style = document.createElement('style');
     style.id = 'topazStyles';
@@ -597,6 +644,33 @@ if (typeof document !== 'undefined' && !document.getElementById('topazStyles')) 
             transform: scale(1.08) !important;
             box-shadow: 0 0 25px rgba(255, 142, 83, 0.8) !important;
             border-color: #ff6b6b !important;
+        }
+        
+        /* NEW: Clickable card styling */
+        .card-slot.topaz-clickable {
+            position: relative;
+        }
+
+        .card-slot.topaz-clickable::before {
+            content: "👆";
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 20px;
+            z-index: 10;
+            animation: topazClickableFloat 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 3px rgba(255, 107, 107, 0.8));
+        }
+
+        @keyframes topazClickableFloat {
+            0%, 100% { 
+                transform: translateY(0) scale(1); 
+                opacity: 0.7; 
+            }
+            50% { 
+                transform: translateY(-3px) scale(1.1); 
+                opacity: 1; 
+            }
         }
         
         /* Disabled To Battle Button */

@@ -57,7 +57,7 @@ export const magneticGloveArtifact = {
         // Disable "To Battle!" button
         this.disableToBattleButton(true);
         
-        // Add click handlers to deck cards
+        // Add click handlers to deck cards - this will now force refresh all handlers
         this.addDeckCardClickHandlers(heroSelection);
         
         // Save game state to persist the mode
@@ -197,9 +197,15 @@ export const magneticGloveArtifact = {
         }
     },
 
-    // Add click handlers to deck cards
+    // ENHANCED: Add click handlers to deck cards with cleanup first
     addDeckCardClickHandlers(heroSelection) {
+        // FIRST: Clean up any existing MagneticGlove handlers to prevent duplicates
+        this.removeDeckCardClickHandlers();
+        
+        // THEN: Add fresh handlers to all current deck cards
         const deckCards = document.querySelectorAll('.card-slot:not(.empty-slot)');
+        
+        console.log(`🧲 MagneticGlove: Adding click handlers to ${deckCards.length} deck cards`);
         
         deckCards.forEach(cardSlot => {
             const cardImage = cardSlot.querySelector('img');
@@ -215,28 +221,69 @@ export const magneticGloveArtifact = {
                     cardSlot.addEventListener('click', clickHandler);
                     cardSlot.setAttribute('data-magnetic-glove-handler', 'true');
                     cardSlot.style.cursor = 'pointer';
+                    
+                    // Add visual feedback that this card is clickable for MagneticGlove
+                    cardSlot.classList.add('magnetic-glove-clickable');
+                } else {
+                    console.warn('🧲 MagneticGlove: Could not extract card name from image path:', cardImage.src);
                 }
+            } else {
+                console.warn('🧲 MagneticGlove: Card slot found without image element');
             }
         });
+        
+        console.log(`🧲 MagneticGlove: Successfully added handlers to deck cards`);
     },
 
-    // Remove click handlers from deck cards
+    // ENHANCED: Remove click handlers from deck cards with better cleanup
     removeDeckCardClickHandlers() {
         const deckCards = document.querySelectorAll('[data-magnetic-glove-handler="true"]');
+        console.log(`🧲 MagneticGlove: Removing click handlers from ${deckCards.length} deck cards`);
+        
         deckCards.forEach(cardSlot => {
             // Create a new element to remove all event listeners
             const newElement = cardSlot.cloneNode(true);
             cardSlot.parentNode.replaceChild(newElement, cardSlot);
             
-            // Clean up attributes
+            // Clean up attributes and styling
             newElement.removeAttribute('data-magnetic-glove-handler');
             newElement.style.cursor = '';
+            newElement.classList.remove('magnetic-glove-clickable');
         });
+    },
+
+    // NEW: Force refresh deck card handlers (call this if you suspect handlers are missing)
+    refreshDeckCardHandlers(heroSelection) {
+        console.log('🧲 MagneticGlove: Force refreshing deck card handlers');
+        
+        // Only refresh if we're actually in MagneticGlove mode
+        if (this.isInMagneticGloveMode(heroSelection)) {
+            this.addDeckCardClickHandlers(heroSelection);
+        }
+    },
+
+    // NEW: Validate that all deck cards have proper handlers
+    validateDeckCardHandlers() {
+        const deckCards = document.querySelectorAll('.card-slot:not(.empty-slot)');
+        const handledCards = document.querySelectorAll('[data-magnetic-glove-handler="true"]');
+        
+        const validation = {
+            totalDeckCards: deckCards.length,
+            handledCards: handledCards.length,
+            isValid: deckCards.length === handledCards.length,
+            missingHandlers: deckCards.length - handledCards.length
+        };
+        
+        if (!validation.isValid) {
+            console.warn(`🧲 MagneticGlove: Handler validation failed - ${validation.missingHandlers} cards missing handlers`);
+        }
+        
+        return validation;
     },
 
     // Handle selecting a card from the deck
     async selectDeckCard(heroSelection, cardName) {
-        console.log(`Selected card from deck: ${cardName}`);
+        console.log(`🧲 Selected card from deck: ${cardName}`);
         
         // Check if hand is full before adding
         if (heroSelection.getHandManager().isHandFull()) {
@@ -248,12 +295,12 @@ export const magneticGloveArtifact = {
         const success = heroSelection.addCardToHand(cardName);
         
         if (success) {
-            console.log(`Added ${cardName} to hand`);
+            console.log(`🧲 Added ${cardName} to hand`);
             
             // ADD TO GRAVEYARD NOW - only on successful completion
             if (heroSelection && heroSelection.graveyardManager) {
                 heroSelection.graveyardManager.addCard('MagneticGlove');
-                console.log('Added MagneticGlove to graveyard');
+                console.log('🧲 Added MagneticGlove to graveyard');
             }
             
             // Show success feedback
@@ -262,7 +309,7 @@ export const magneticGloveArtifact = {
             // Exit Magnetic Glove Mode (successful completion)
             await this.exitMagneticGloveMode(heroSelection, false);
         } else {
-            console.error(`Failed to add ${cardName} to hand`);
+            console.error(`🧲 Failed to add ${cardName} to hand`);
             this.showError('Could not add card to hand. Please try again.');
         }
     },
@@ -433,7 +480,7 @@ export const magneticGloveArtifact = {
         // Disable "To Battle!" button
         this.disableToBattleButton(true);
         
-        // Add click handlers to deck cards
+        // Add click handlers to deck cards - this will now force refresh all handlers
         this.addDeckCardClickHandlers(heroSelection);
         
         console.log('🧲 Magnetic Glove Mode restored successfully with exclusive registration');
@@ -511,7 +558,7 @@ export const magneticGloveArtifact = {
     }
 };
 
-// Enhanced CSS styles for Magnetic Glove with exclusive artifact integration
+// Enhanced CSS styles for Magnetic Glove with exclusive artifact integration and clickable cards
 if (typeof document !== 'undefined' && !document.getElementById('magneticGloveStyles')) {
     const style = document.createElement('style');
     style.id = 'magneticGloveStyles';
@@ -588,6 +635,33 @@ if (typeof document !== 'undefined' && !document.getElementById('magneticGloveSt
             transform: scale(1.08) !important;
             box-shadow: 0 0 25px rgba(118, 75, 162, 0.8) !important;
             border-color: #667eea !important;
+        }
+        
+        /* NEW: Clickable card styling */
+        .card-slot.magnetic-glove-clickable {
+            position: relative;
+        }
+
+        .card-slot.magnetic-glove-clickable::before {
+            content: "👆";
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 20px;
+            z-index: 10;
+            animation: magneticGloveClickableFloat 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 3px rgba(102, 126, 234, 0.8));
+        }
+
+        @keyframes magneticGloveClickableFloat {
+            0%, 100% { 
+                transform: translateY(0) scale(1); 
+                opacity: 0.7; 
+            }
+            50% { 
+                transform: translateY(-3px) scale(1.1); 
+                opacity: 1; 
+            }
         }
         
         /* Disabled To Battle Button */

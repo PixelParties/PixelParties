@@ -39,7 +39,7 @@ export class FutureTechFistsArtifact {
         }
 
         // Calculate shield amount (10 per FutureTechFists card in graveyard)
-        const shieldAmount = futureTechFistsCount * 10;
+        const shieldAmount = futureTechFistsCount * 5;
 
         // Increment usage counter
         this.usageCount++;

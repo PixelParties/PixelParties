@@ -1,5 +1,9 @@
 // coolPresents.js - CoolPresents Artifact Handler Module
 
+import { getAllAbilityCards } from '../cardDatabase.js';
+
+
+
 export const coolPresentsArtifact = {
     // Card name this artifact handles
     cardName: 'CoolPresents',
@@ -25,11 +29,13 @@ export const coolPresentsArtifact = {
     
     // Core logic to consume card and award random cards
     async consumeAndReward(cardIndex, heroSelection) {
+        console.log("Cool Presents Checmpoint -1");
         if (!heroSelection) {
             console.error('No heroSelection instance available');
             return;
         }
         
+        console.log("Cool Presents Checmpoint -2");
         // Get managers
         const handManager = heroSelection.getHandManager();
         const goldManager = heroSelection.getGoldManager();
@@ -40,6 +46,7 @@ export const coolPresentsArtifact = {
             return;
         }
         
+        console.log("Cool Presents Checmpoint -3");
         // Get cost from card database
         const cardInfo = heroSelection.getCardInfo(this.cardName);
         const cost = cardInfo?.cost || 4; // Fallback cost if not defined
@@ -54,6 +61,7 @@ export const coolPresentsArtifact = {
             return;
         }
         
+        console.log("Cool Presents Checmpoint -4");
         // Spend the gold (use negative amount to subtract)
         goldManager.addPlayerGold(-cost, 'CoolPresents');
         
@@ -67,6 +75,7 @@ export const coolPresentsArtifact = {
             return;
         }
         
+        console.log("Cool Presents Checmpoint -5");
         // Get 3 random cards
         const randomCards = this.getRandomCards(this.cardCount, heroSelection);
         
@@ -75,6 +84,7 @@ export const coolPresentsArtifact = {
             return;
         }
         
+        console.log("Cool Presents Checmpoint -6");
         // Add cards to deck
         randomCards.forEach(cardName => {
             deckManager.addCardReward(cardName);
@@ -166,8 +176,10 @@ export const coolPresentsArtifact = {
     
     // Get random cards from the card database
     getRandomCards(count, heroSelection) {
+        console.log("Cool Presents Checkpoint 0");
         try {
             // Get all available card names
+        console.log("Cool Presents Checkpoint 0.5");
             const cardDatabase = heroSelection.getCardInfo ? heroSelection : null;
             if (!cardDatabase) {
                 console.error('Cannot access card database');
@@ -202,39 +214,52 @@ export const coolPresentsArtifact = {
         }
     },
     
-    // Get list of eligible cards (excluding heroes and the artifact itself)
+    // Get list of eligible cards (excluding heroes, tokens, and the artifact itself)
     getEligibleCards(heroSelection) {
-        // Hardcoded list of good reward cards (mix of abilities, spells, and artifacts)
-        const eligibleCards = [
-            // Abilities
-            'Fighting', 'Toughness', 'Leadership', 'Alchemy', 'DestructionMagic', 
-            'SummoningMagic', 'DecayMagic', 'Necromancy', 'Thieving', 'Adventurousness',
-            'Navigation', 'Wealth', 'Charme', 'Diplomacy', 'MagicArts', 'Resistance', 'SupportMagic',
+        console.log("COOL PRESENTS CHECKPOINT 1");
+        try {
+            // Get all available cards from database (same as reward system)
+            console.log('Debug: heroSelection object:', heroSelection);
+            console.log('Debug: heroSelection.getAllAbilityCards exists?', !!heroSelection.getAllAbilityCards);
+
+            const allCards = heroSelection.getAllAbilityCards ? 
+                heroSelection.getAllAbilityCards() : 
+                (typeof getAllAbilityCards !== 'undefined' ? getAllAbilityCards() : []);
+
+            console.log('Debug: allCards result:', allCards);
+            console.log('Debug: allCards length:', allCards.length);
+
+            if (allCards.length === 0) {
+                console.error('No cards found from getAllAbilityCards()');
+                return [];
+            }
             
-            // Spells
-            'Fireball', 'Icebolt', 'Challenge', 'HeavyHit', 'ThievingStrike', 'RainOfArrows',
-            'PoisonPollen', 'ToxicFumes', 'VenomInfusion', 'UltimateDestroyerPunch', 'HealingMelody',
-            'Stoneskin', 'TrialOfCoolness', 'LootThePrincess', 'PhoenixBombardment',
+            // Filter out inappropriate cards and extract card names
+            const eligibleCardNames = allCards
+                .filter(card => {
+                    // Exclude heroes (already filtered by getAllAbilityCards)
+                    // Exclude CoolPresents itself
+                    return card && 
+                           card.name && 
+                           card.name !== 'CoolPresents';
+                })
+                .map(card => card.name);
             
-            // Creatures
-            'Archer', 'FrontSoldier', 'Cavalry', 'RoyalCorgi', 'BurningSkeleton', 'SkeletonArcher',
-            'SkeletonMage', 'SkeletonReaper', 'MoonlightButterfly', 'CrumTheClassPet',
+            console.log(`CoolPresents: Found ${eligibleCardNames.length} eligible cards from database`);
+            return eligibleCardNames;
             
-            // Potions
-            'LifeSerum', 'PoisonVial', 'BottledFlame', 'BottledLightning', 'ElixirOfStrength',
-            'ElixirOfImmortality', 'SwordInABottle', 'ExperimentalPotion', 'BoulderInABottle',
+        } catch (error) {
+            console.error('Error getting eligible cards from database:', error);
             
-            // Artifacts
-            'MagicCobalt', 'MagicTopaz', 'MagicEmerald', 'HeartOfIce', 'WantedPoster',
-            'CoolCheese', 'CrashLanding', 'TheMastersSword', 'TheStormblade', 'BladeOfTheFrostbringer',
-            'FieldStandard', 'Juice', 'DarkGear'
-        ];
-        
-        // Filter out cards that don't exist or are inappropriate
-        return eligibleCards.filter(cardName => {
-            const cardInfo = heroSelection.getCardInfo(cardName);
-            return cardInfo && cardInfo.cardType !== 'hero' && cardName !== 'CoolPresents';
-        });
+            // Fallback to a minimal safe list if database access fails
+            return [
+                'Fighting', 'Leadership', 'Alchemy', 'DestructionMagic', 'SummoningMagic',
+                'Fireball', 'Icebolt', 'Challenge', 'HeavyHit', 'LifeSerum'
+            ].filter(cardName => {
+                const cardInfo = heroSelection.getCardInfo(cardName);
+                return cardInfo && cardInfo.cardType !== 'hero' && cardInfo.cardType !== 'Token';
+            });
+        }
     },
     
     // Show cool presents opening animation (updated to include cost)

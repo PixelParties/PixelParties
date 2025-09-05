@@ -47,7 +47,7 @@ export const magicEmeraldArtifact = {
         // Disable "To Battle!" button
         this.disableToBattleButton(true);
         
-        // Add click handlers to deck cards
+        // Add click handlers to deck cards - this will now force refresh all handlers
         this.addDeckCardClickHandlers(heroSelection);
         
         // Save game state to persist the mode
@@ -164,9 +164,15 @@ export const magicEmeraldArtifact = {
         }
     },
 
-    // Add click handlers to deck cards
+    // ENHANCED: Add click handlers to deck cards with cleanup first
     addDeckCardClickHandlers(heroSelection) {
+        // FIRST: Clean up any existing Emerald handlers to prevent duplicates
+        this.removeDeckCardClickHandlers();
+        
+        // THEN: Add fresh handlers to all current deck cards
         const deckCards = document.querySelectorAll('.card-slot:not(.empty-slot)');
+        
+        console.log(`💚 MagicEmerald: Adding click handlers to ${deckCards.length} deck cards`);
         
         deckCards.forEach(cardSlot => {
             const cardImage = cardSlot.querySelector('img');
@@ -182,23 +188,64 @@ export const magicEmeraldArtifact = {
                     cardSlot.addEventListener('click', clickHandler);
                     cardSlot.setAttribute('data-emerald-handler', 'true');
                     cardSlot.style.cursor = 'pointer';
+                    
+                    // Add visual feedback that this card is clickable for Emerald
+                    cardSlot.classList.add('emerald-clickable');
+                } else {
+                    console.warn('💚 MagicEmerald: Could not extract card name from image path:', cardImage.src);
                 }
+            } else {
+                console.warn('💚 MagicEmerald: Card slot found without image element');
             }
         });
+        
+        console.log(`💚 MagicEmerald: Successfully added handlers to deck cards`);
     },
 
-    // Remove click handlers from deck cards
+    // ENHANCED: Remove click handlers from deck cards with better cleanup
     removeDeckCardClickHandlers() {
         const deckCards = document.querySelectorAll('[data-emerald-handler="true"]');
+        console.log(`💚 MagicEmerald: Removing click handlers from ${deckCards.length} deck cards`);
+        
         deckCards.forEach(cardSlot => {
             // Create a new element to remove all event listeners
             const newElement = cardSlot.cloneNode(true);
             cardSlot.parentNode.replaceChild(newElement, cardSlot);
             
-            // Clean up attributes
+            // Clean up attributes and styling
             newElement.removeAttribute('data-emerald-handler');
             newElement.style.cursor = '';
+            newElement.classList.remove('emerald-clickable');
         });
+    },
+
+    // NEW: Force refresh deck card handlers (call this if you suspect handlers are missing)
+    refreshDeckCardHandlers(heroSelection) {
+        console.log('💚 MagicEmerald: Force refreshing deck card handlers');
+        
+        // Only refresh if we're actually in Emerald mode
+        if (this.isInEmeraldMode(heroSelection)) {
+            this.addDeckCardClickHandlers(heroSelection);
+        }
+    },
+
+    // NEW: Validate that all deck cards have proper handlers
+    validateDeckCardHandlers() {
+        const deckCards = document.querySelectorAll('.card-slot:not(.empty-slot)');
+        const handledCards = document.querySelectorAll('[data-emerald-handler="true"]');
+        
+        const validation = {
+            totalDeckCards: deckCards.length,
+            handledCards: handledCards.length,
+            isValid: deckCards.length === handledCards.length,
+            missingHandlers: deckCards.length - handledCards.length
+        };
+        
+        if (!validation.isValid) {
+            console.warn(`💚 MagicEmerald: Handler validation failed - ${validation.missingHandlers} cards missing handlers`);
+        }
+        
+        return validation;
     },
 
     // Handle selecting a card from the deck for duplication
@@ -459,7 +506,7 @@ export const magicEmeraldArtifact = {
         // Disable "To Battle!" button
         this.disableToBattleButton(true);
         
-        // Add click handlers to deck cards
+        // Add click handlers to deck cards - this will now force refresh all handlers
         this.addDeckCardClickHandlers(heroSelection);
         
         console.log('MagicEmerald: Emerald Mode restored successfully with exclusive registration');
@@ -520,7 +567,7 @@ export const magicEmeraldArtifact = {
     }
 };
 
-// Enhanced CSS styles for Emerald with exclusive artifact integration
+// Enhanced CSS styles for Emerald with exclusive artifact integration and clickable cards
 if (typeof document !== 'undefined' && !document.getElementById('emeraldStyles')) {
     const style = document.createElement('style');
     style.id = 'emeraldStyles';
@@ -597,6 +644,33 @@ if (typeof document !== 'undefined' && !document.getElementById('emeraldStyles')
             transform: scale(1.08) !important;
             box-shadow: 0 0 25px rgba(32, 201, 151, 0.8) !important;
             border-color: #28a745 !important;
+        }
+        
+        /* NEW: Clickable card styling */
+        .card-slot.emerald-clickable {
+            position: relative;
+        }
+
+        .card-slot.emerald-clickable::before {
+            content: "👆";
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            font-size: 20px;
+            z-index: 10;
+            animation: emeraldClickableFloat 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 3px rgba(40, 167, 69, 0.8));
+        }
+
+        @keyframes emeraldClickableFloat {
+            0%, 100% { 
+                transform: translateY(0) scale(1); 
+                opacity: 0.7; 
+            }
+            50% { 
+                transform: translateY(-3px) scale(1.1); 
+                opacity: 1; 
+            }
         }
         
         /* Disabled To Battle Button */

@@ -310,9 +310,6 @@ export async function applyBothPlayersDelayedEffects(hostEffects, guestEffects, 
             await poisonPlayerTargets(battleManager, guestPoisonEffects, 'guest');
         }
     }
-    
-    // Clear the processed effects from Firebase
-    await clearProcessedDelayedEffects(battleManager, hostEffects, guestEffects);
 }
 
 // Apply poison to targets of a specific player (host or guest)
@@ -374,7 +371,7 @@ async function poisonPlayerTargets(battleManager, poisonEffects, playerSide) {
     await battleManager.delay(300);
 }
 
-// NEW: Clear processed delayed effects from Firebase
+// Clear processed delayed effects from Firebase
 async function clearProcessedDelayedEffects(battleManager, hostEffects, guestEffects) {
     if (!battleManager.roomManager || !battleManager.roomManager.getRoomRef()) {
         return;

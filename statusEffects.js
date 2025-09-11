@@ -608,17 +608,21 @@ export class StatusEffectsManager {
     // Process turn skip for stunned/frozen targets
     processTurnSkip(target, skipReason) {
         if (skipReason === 'stunned') {
-            this.removeStatusEffect(target, 'stunned', 1);
+            // Log the skip message first
             this.battleManager.addCombatLog(
                 `😵 ${target.name} is stunned and skips their turn!`,
                 target.side === 'player' ? 'error' : 'success'
             );
+            // Then remove the effect (which will trigger recovery message)
+            this.removeStatusEffect(target, 'stunned', 1);
         } else if (skipReason === 'frozen') {
-            this.removeStatusEffect(target, 'frozen', 1);
+            // Log the skip message first
             this.battleManager.addCombatLog(
                 `🧊 ${target.name} is frozen and skips their turn!`,
                 target.side === 'player' ? 'error' : 'success'
             );
+            // Then remove the effect (which will trigger recovery message)
+            this.removeStatusEffect(target, 'frozen', 1);
         }
     }
 

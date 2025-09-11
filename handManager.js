@@ -145,6 +145,16 @@ export class HandManager {
                     }
                 }
 
+                // Check if NonFungibleMonkee can trigger disenchant effect
+                if (window.nonFungibleMonkeeArtifact) {
+                    try {
+                        window.nonFungibleMonkeeArtifact.processDisenchantEffect(cardName, window.heroSelection);
+                    } catch (nfmError) {
+                        console.error('Error triggering NonFungibleMonkee disenchant effect:', nfmError);
+                        // Don't let NonFungibleMonkee errors prevent the disenchant from completing
+                    }
+                }
+
                 // Show success feedback
                 this.showDisenchantFeedback(cardElement, cardName);
                 
@@ -1935,6 +1945,12 @@ if (typeof window !== 'undefined') {
         window.potionHandler = module.potionHandler;
     }).catch(error => {
         console.error('Could not load potion handler:', error);
+    });
+
+    import('./Artifacts/nonFungibleMonkee.js').then(module => {
+        window.nonFungibleMonkeeArtifact = module.nonFungibleMonkeeArtifact;
+    }).catch(error => {
+        console.error('Could not load NonFungibleMonkee artifact:', error);
     });
     
     window.showActionError = showActionError;

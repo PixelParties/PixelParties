@@ -1,5 +1,5 @@
 // battleNetworkManager.js - Handles all network communication for battles
-// UPDATED: Uses pre-calculated Hero stats instead of manual calculations
+import { TeleportationPowderPotion } from './Potions/teleportationPowder.js';
 
 export class BattleNetworkManager {
     constructor(battleManager) {
@@ -490,6 +490,12 @@ export class BattleNetworkManager {
     async receiveBattleData(message) {
         const bm = this.battleManager;
         
+        // Add defensive check for malformed message
+        if (!message || typeof message !== 'object') {
+            console.error('❌ Received malformed battle message:', message);
+            return;
+        }
+        
         // Handle host-specific messages first
         if (bm.isAuthoritative) {
             if (message.type === 'guest_reconnection_ready') {
@@ -501,6 +507,12 @@ export class BattleNetworkManager {
         // Guest message processing
         const { type, data } = message;
         
+        // Add defensive check for missing type
+        if (!type) {
+            console.error('❌ Received battle message without type:', message);
+            return;
+        }
+        
         // Queue swap messages for sequential processing
         if (type === 'crusader_hookshot_swap' || type === 'stormblade_wind_swap') {
             this.queueSwapMessage(type, data);
@@ -509,8 +521,8 @@ export class BattleNetworkManager {
         
         // Handle all other message types normally
         switch (type) {
-            case 'turn_start':
-                this.guest_handleTurnStart(data);
+            case 'creature_state_sync':
+                this.guest_handleCreatureStateSync(data);
                 break;
                 
             case 'speed_change':
@@ -583,10 +595,6 @@ export class BattleNetworkManager {
 
             case 'deck_update':
                 this.handleDeckUpdate(data);
-                break;
-
-            case 'creature_state_sync':
-                this.guest_handleCreatureStateSync(data);
                 break;
 
             case 'necromancy_revival':
@@ -693,6 +701,12 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'cheeky_monkee_rock_throw':
+                if (bm.cheekyMonkeeManager) {
+                    bm.cheekyMonkeeManager.handleGuestRockThrow(data);
+                }
+                break;
+
             case 'creature_counter_update':
                 bm.guest_handleCreatureCounterUpdate(data);
                 break;
@@ -712,6 +726,12 @@ export class BattleNetworkManager {
             case 'grinning_cat_card_gift':
                 if (bm.grinningCatManager) {
                     bm.grinningCatManager.handleGuestCardGift(data);
+                }
+                break;
+
+            case 'crystal_well_exchange':
+                if (window.crystalWellManager) {
+                    window.crystalWellManager.handleGuestCrystalWellExchange(data, this.battleManager);
                 }
                 break;
 
@@ -775,6 +795,10 @@ export class BattleNetworkManager {
 
             case 'monia_protection_effect':
                 bm.guest_handleMoniaProtectionEffect(data);
+                break;
+
+            case 'nomu_shield_applied':
+                bm.guest_handleNomuShieldApplied(data);
                 break;
             
             case 'field_standard_effects_complete':
@@ -858,6 +882,20 @@ export class BattleNetworkManager {
                     this.battleManager.spellSystem.spellImplementations.has('BurningFinger')) {
                     const burningFingerSpell = this.battleManager.spellSystem.spellImplementations.get('BurningFinger');
                     burningFingerSpell.guest_handleStackUpdate(data);
+                }
+                break;
+
+            case 'hand_of_death_counter_update':
+                if (bm.spellSystem && bm.spellSystem.spellImplementations.has('HandOfDeath')) {
+                    const handOfDeathSpell = bm.spellSystem.spellImplementations.get('HandOfDeath');
+                    handOfDeathSpell.handleGuestDeathCounterUpdate(data);
+                }
+                break;
+
+            case 'hand_of_death_final_effect':
+                if (bm.spellSystem && bm.spellSystem.spellImplementations.has('HandOfDeath')) {
+                    const handOfDeathSpell = bm.spellSystem.spellImplementations.get('HandOfDeath');
+                    handOfDeathSpell.handleGuestFinalDeathEffect(data);
                 }
                 break;
 
@@ -958,11 +996,20 @@ export class BattleNetworkManager {
                 break;
 
             case 'immortal_revival':
-                bm.guest_handleImmortalRevival(data);
+                if (bm.combatManager) {
+                    bm.combatManager.guest_handleImmortalRevival(data);
+                }
                 break;
 
             case 'monster_bottle_creatures_created':
                 bm.guest_handleMonsterBottleCreaturesCreated(data);
+                break;
+
+            case 'creature_teleported':
+                if (data) {
+                    const teleportationPotion = new TeleportationPowderPotion();
+                    teleportationPotion.guest_handleCreatureTeleported(data, this.battleManager);
+                }
                 break;
 
             case 'heavy_hit_triggered':
@@ -1017,6 +1064,14 @@ export class BattleNetworkManager {
                     this.battleManager.spellSystem.spellImplementations.has('TrialOfCoolness')) {
                     const trialOfCoolnessSpell = this.battleManager.spellSystem.spellImplementations.get('TrialOfCoolness');
                     trialOfCoolnessSpell.handleGuestEffect(data);
+                }
+                break;
+
+            case 'critical_strike_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('CriticalStrike')) {
+                    const criticalStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('CriticalStrike');
+                    criticalStrikeSpell.handleGuestEffect(data);
                 }
                 break;
                 
@@ -1104,6 +1159,13 @@ export class BattleNetworkManager {
             case 'delayed_effects_cleared':
                 this.guest_handleDelayedEffectsCleared(data);
                 break;
+
+            case 'request_creature_sync':
+                if (bm.isAuthoritative) {
+                    console.log('📨 Guest requested creature sync:', data.reason);
+                    bm.sendCreatureStateSync();
+                }
+                break;
         }
     }
 
@@ -1142,6 +1204,11 @@ export class BattleNetworkManager {
 
             bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
             bm.animationManager.createDamageNumber(targetLocalSide, targetPosition, damage, maxHp, 'attack');
+            
+            // ADD THIS: HP bar message for guest
+            if (bm.battleScreen && bm.battleScreen.battleLog) {
+                bm.battleScreen.battleLog.addHpBarMessage(localTarget, localTarget.currentHp, localTarget.maxHp);
+            }
             
             if (died && oldHp > 0) {
                 bm.handleHeroDeath(localTarget);
@@ -1191,9 +1258,13 @@ export class BattleNetworkManager {
                 );
             }
             
-            // CRITICAL: Update health bar immediately after setting shield value
+            // Update health bar immediately after setting shield value
             bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
             
+            if (bm.battleScreen && bm.battleScreen.battleLog) {
+                bm.battleScreen.battleLog.addHpBarMessage(localTarget, localTarget.currentHp, localTarget.maxHp);
+            }
+
             // DEFENSIVE: Force another update after animation delay
             setTimeout(() => {
                 bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
@@ -1259,6 +1330,13 @@ export class BattleNetworkManager {
             necromancyArrayManipulation, debugInfo 
         } = data;
         
+        // Debug logging
+        console.log('🐛 Guest receiving creature damage:', {
+            creatureName, damage, oldHp, newHp, died,
+            originalCreatureIndex, currentCreatureIndex, finalCreatureIndex,
+            heroPosition, heroAbsoluteSide
+        });
+        
         // If creature was stolen, skip normal damage handling
         if (stolenByDarkGear) {
             return;
@@ -1272,60 +1350,106 @@ export class BattleNetworkManager {
             : bm.opponentHeroes[heroPosition];
 
         if (!localHero || !localHero.creatures) {
+            console.error('❌ Guest: No hero or creatures found at position:', heroPosition, heroLocalSide);
             return;
         }
 
-        // MOVEMENT-AWARE CREATURE FINDING: Try multiple strategies to find the correct creature
+        // IMPROVED CREATURE FINDING: Try multiple strategies with better validation
         let targetCreature = null;
         let targetCreatureIndex = -1;
 
-        // Strategy 1: Use currentCreatureIndex (most likely to be correct)
+        console.log('🔍 Guest searching for creature:', {
+            searchingFor: creatureName,
+            availableCreatures: localHero.creatures.map((c, i) => ({ index: i, name: c.name, hp: c.currentHp, alive: c.alive })),
+            searchIndices: { original: originalCreatureIndex, current: currentCreatureIndex }
+        });
+
+        // Strategy 1: Use currentCreatureIndex with name validation
         if (currentCreatureIndex >= 0 && currentCreatureIndex < localHero.creatures.length) {
             const candidateCreature = localHero.creatures[currentCreatureIndex];
-            if (candidateCreature && candidateCreature.name === creatureName) {
+            if (candidateCreature && candidateCreature.name === creatureName && candidateCreature.currentHp === oldHp) {
                 targetCreature = candidateCreature;
                 targetCreatureIndex = currentCreatureIndex;
+                console.log('✅ Found creature using currentCreatureIndex:', currentCreatureIndex);
             }
         }
 
-        // Strategy 2: Use originalCreatureIndex as fallback (in case movement hasn't been processed)
+        // Strategy 2: Use originalCreatureIndex with name validation
         if (!targetCreature && originalCreatureIndex >= 0 && originalCreatureIndex < localHero.creatures.length) {
             const candidateCreature = localHero.creatures[originalCreatureIndex];
-            if (candidateCreature && candidateCreature.name === creatureName) {
+            if (candidateCreature && candidateCreature.name === creatureName && candidateCreature.currentHp === oldHp) {
                 targetCreature = candidateCreature;
                 targetCreatureIndex = originalCreatureIndex;
+                console.log('✅ Found creature using originalCreatureIndex:', originalCreatureIndex);
             }
         }
 
-        // Strategy 3: Search by creature name and unique ID (last resort)
+        // Strategy 3: Search by name and HP match (most reliable for guest)
         if (!targetCreature) {
             for (let i = 0; i < localHero.creatures.length; i++) {
                 const creature = localHero.creatures[i];
-                if (creature.name === creatureName) {
-                    // If we have a unique ID, verify it matches
-                    if (creatureId && creature.addedAt) {
-                        const expectedId = `${creature.name}_${creature.addedAt}`;
-                        if (expectedId === creatureId) {
-                            targetCreature = creature;
-                            targetCreatureIndex = i;
-                            break;
-                        }
-                    } else {
-                        // No unique ID available, use first match by name
-                        targetCreature = creature;
-                        targetCreatureIndex = i;
-                        break;
-                    }
+                if (creature.name === creatureName && creature.currentHp === oldHp && creature.alive) {
+                    targetCreature = creature;
+                    targetCreatureIndex = i;
+                    console.log('✅ Found creature using name+HP search at index:', i);
+                    break;
                 }
             }
         }
 
-        // SAFETY CHECK: If we still can't find the creature, exit
+        // Strategy 4: Search by name only (last resort)
         if (!targetCreature) {
+            for (let i = 0; i < localHero.creatures.length; i++) {
+                const creature = localHero.creatures[i];
+                if (creature.name === creatureName && creature.alive) {
+                    targetCreature = creature;
+                    targetCreatureIndex = i;
+                    console.log('⚠️ Found creature using name-only search at index:', i, '(HP mismatch - expected:', oldHp, 'actual:', creature.currentHp, ')');
+                    break;
+                }
+            }
+        }
+
+        // If we still can't find the creature, log detailed error and request sync
+        if (!targetCreature) {
+            console.error('❌ Guest: Could not find creature for damage application:', {
+                searchingFor: creatureName,
+                heroPosition: heroPosition,
+                heroLocalSide: heroLocalSide,
+                expectedOldHp: oldHp,
+                availableCreatures: localHero.creatures.map((c, i) => ({ 
+                    index: i, 
+                    name: c.name, 
+                    currentHp: c.currentHp, 
+                    alive: c.alive,
+                    addedAt: c.addedAt 
+                })),
+                searchedIndices: { original: originalCreatureIndex, current: currentCreatureIndex }
+            });
+            
+            // Request a creature state sync from host
+            if (bm.gameDataSender) {
+                bm.gameDataSender('battle_data', {
+                    type: 'request_creature_sync',
+                    data: {
+                        reason: 'creature_not_found_for_damage',
+                        missingCreature: creatureName,
+                        heroPosition: heroPosition,
+                        timestamp: Date.now()
+                    }
+                });
+            }
             return;
         }
 
-        // Apply necromancy array manipulation if needed (unchanged)
+        console.log('✅ Guest found target creature:', {
+            name: targetCreature.name,
+            index: targetCreatureIndex,
+            oldHp: targetCreature.currentHp,
+            newHp: newHp
+        });
+
+        // Apply necromancy array manipulation if needed
         if (necromancyArrayManipulation && necromancyArrayManipulation.moveToEnd) {
             // Remove from current position
             const creature = localHero.creatures.splice(targetCreatureIndex, 1)[0];
@@ -1336,6 +1460,7 @@ export class BattleNetworkManager {
         }
 
         // APPLY DAMAGE to the correctly identified creature
+        const actualOldHp = targetCreature.currentHp;
         targetCreature.currentHp = newHp;
         
         // Handle death and revival status
@@ -1363,18 +1488,23 @@ export class BattleNetworkManager {
             // Creature survived
             targetCreature.alive = true;
             bm.addCombatLog(
-                `💥 ${creatureName} takes ${damage} damage!)`,
+                `💥 ${creatureName} takes ${damage} damage! (${actualOldHp} → ${newHp} HP)`,
                 heroLocalSide === 'player' ? 'error' : 'success'
             );
         }
 
         // Update visuals using the FINAL creature index
         const visualIndex = necromancyArrayManipulation ? finalCreatureIndex : targetCreatureIndex;
+        
         bm.updateCreatureHealthBar(heroLocalSide, heroPosition, visualIndex, newHp, maxHp);
         bm.animationManager.createDamageNumberOnCreature(heroLocalSide, heroPosition, visualIndex, damage, targetCreature.maxHp, debugInfo?.damageSource || 'attack');
         
+        if (bm.battleScreen && bm.battleScreen.battleLog) {
+            bm.battleScreen.battleLog.addHpBarMessage(targetCreature, targetCreature.currentHp, targetCreature.maxHp);
+        }
+
         // Handle visual death state (only if creature stayed dead)
-        if (died && !revivedByNecromancy && oldHp > 0) {
+        if (died && !revivedByNecromancy && actualOldHp > 0) {
             bm.handleCreatureDeath(localHero, targetCreature, visualIndex, heroLocalSide, heroPosition);
             
             // Remove health bar and HP text for defeated creature
@@ -1476,13 +1606,57 @@ export class BattleNetworkManager {
             return; // Only guests should process this
         }
         
-        // Apply the synced creature states
-        if (bm.checkpointSystem) {
-            bm.checkpointSystem.applyCreatureStatesFromSync(data);
-            
-            // Add log message
-            bm.addCombatLog('🔄 Creature states synchronized with host', 'system');
+        // Add defensive check for undefined data
+        if (!data) {
+            console.error('❌ Guest received creature sync with undefined data');
+            return;
         }
+        
+        console.log('🔄 Guest receiving creature state sync with proper perspective mapping...');
+        
+        // Map absolute sides to guest's relative sides
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        
+        // Guest perspective mapping:
+        // - hostHeroes from sync → guest's opponentHeroes 
+        // - guestHeroes from sync → guest's playerHeroes
+        
+        // Update guest's player heroes from the sync's guest data
+        if (data.guestHeroes) {
+            for (const position in data.guestHeroes) {
+                if (bm.playerHeroes[position] && data.guestHeroes[position].creatures) {
+                    console.log(`🔥 Guest updating own heroes at ${position}:`, data.guestHeroes[position].creatures.length, 'creatures');
+                    bm.playerHeroes[position].creatures = data.guestHeroes[position].creatures;
+                }
+            }
+        }
+        
+        // Update guest's opponent heroes from the sync's host data  
+        if (data.hostHeroes) {
+            for (const position in data.hostHeroes) {
+                if (bm.opponentHeroes[position] && data.hostHeroes[position].creatures) {
+                    console.log(`🔥 Guest updating opponent heroes at ${position}:`, data.hostHeroes[position].creatures.length, 'creatures');
+                    bm.opponentHeroes[position].creatures = data.hostHeroes[position].creatures;
+                }
+            }
+        }
+        
+        // Force re-render creatures on guest side
+        if (bm.battleScreen && bm.battleScreen.renderCreaturesAfterInit) {
+            bm.battleScreen.renderCreaturesAfterInit();
+        }
+        
+        // Update necromancy displays
+        if (bm.necromancyManager) {
+            bm.necromancyManager.initializeNecromancyStackDisplays();
+        }
+        
+        // Refresh creature visuals to show health bars
+        setTimeout(() => {
+            bm.refreshAllCreatureVisuals();
+        }, 100);
+        
+        console.log('✅ Guest creature state sync complete with perspective correction');
     }
 
     async guest_handleBattleEnd(data) {
@@ -1771,8 +1945,6 @@ export class BattleNetworkManager {
                 }
             });
         }
-        
-        bm.addCombatLog('🔄 Requesting battle state sync from host...', 'system');
     }
 
     /**
@@ -1785,17 +1957,9 @@ export class BattleNetworkManager {
         if (!bm.isAuthoritative) {
             return;
         }
-        
-        bm.addCombatLog('⚠️ Guest detected desync - resynchronizing...', 'warning');
-        
+               
         const { guestTurn, message, reason } = data;
-        
-        if (guestTurn !== bm.currentTurn) {
-            bm.addCombatLog(`🔄 Turn mismatch: Host(${bm.currentTurn}) vs Guest(${guestTurn})`, 'warning');
-        }
-        
-        bm.addCombatLog(`ℹ️ ${message}`, 'info');
-        
+                
         // Immediately resync the guest
         const success = await this.resyncGuest();
     }

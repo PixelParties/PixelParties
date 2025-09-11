@@ -3,6 +3,7 @@
 // FIXED: Race condition in delayed artifact effect clearing
 
 import { applyArrowStartOfBattleEffects } from './arrowSystem.js';
+import { NomuHeroEffect } from './Heroes/nomu.js';
 
 export class BattleStartManager {
     constructor(battleManager) {
@@ -18,6 +19,9 @@ export class BattleStartManager {
         }
 
         try {
+            // Phase 0: Nomu teleport shield effects (before all other effects)
+            await this.applyNomuShieldEffects();
+            
             // Phase 1: Arrow system initialization
             await this.applyArrowEffects();
 
@@ -41,12 +45,19 @@ export class BattleStartManager {
 
             // Phase 7: Permanent artifact effects
             await this.applyPermanentArtifactEffects();
-
-            bm.addCombatLog('✨ All battle start effects applied successfully', 'system');
-
         } catch (error) {
             console.error('Error applying battle start effects:', error);
-            bm.addCombatLog('⚠️ Some battle start effects failed to apply', 'warning');
+        }
+    }
+
+    // Phase 0: Apply Nomu teleport shield effects (before all other effects)
+    async applyNomuShieldEffects() {
+        const bm = this.battleManager;
+        
+        try {
+            await NomuHeroEffect.applyNomuShieldEffects(bm);
+        } catch (error) {
+            console.error('Error applying Nomu shield effects:', error);
         }
     }
 
@@ -56,7 +67,6 @@ export class BattleStartManager {
         
         try {
             applyArrowStartOfBattleEffects(bm);
-            bm.addCombatLog('🏹 Arrow effects initialized', 'info');
         } catch (error) {
             console.error('Error applying arrow start effects:', error);
         }
@@ -70,8 +80,6 @@ export class BattleStartManager {
             // Apply Gathering Storm effects
             const { applyGatheringStormBattleEffects } = await import('./Spells/gatheringStorm.js');
             await applyGatheringStormBattleEffects(bm);
-            
-            bm.addCombatLog('Area effects processed', 'info');
         } catch (error) {
             console.error('Error applying area effects:', error);
         }
@@ -103,11 +111,32 @@ export class BattleStartManager {
                     bm.necromancyManager.initializeNecromancyStackDisplays();
                 }
 
-                bm.addCombatLog('🧪 Potion effects applied from both players', 'info');
+                // Sync creature state to guest after potion effects
+                if (bm.isAuthoritative && bm.sendBattleUpdate) {
+                    bm.sendBattleUpdate('creature_state_sync', {
+                        hostHeroes: this.exportHeroesCreatureState(bm.playerHeroes),
+                        guestHeroes: this.exportHeroesCreatureState(bm.opponentHeroes),
+                        timestamp: Date.now(),
+                        reason: 'post_potion_effects'
+                    });
+                }
             }
         } catch (error) {
             console.error('Error applying potion effects:', error);
         }
+    }
+
+    // Helper method to export creature state
+    exportHeroesCreatureState(heroes) {
+        const exported = {};
+        for (const position in heroes) {
+            if (heroes[position]) {
+                exported[position] = {
+                    creatures: heroes[position].creatures || []
+                };
+            }
+        }
+        return exported;
     }
 
     // Phase 3: Apply diplomacy effects (creature recruitment)
@@ -127,8 +156,6 @@ export class BattleStartManager {
                 if (bm.necromancyManager) {
                     bm.necromancyManager.initializeNecromancyStackDisplays();
                 }
-
-                bm.addCombatLog('🤝 Diplomacy recruitment effects applied', 'info');
             }
         } catch (error) {
             console.error('Error applying diplomacy effects:', error);
@@ -153,8 +180,6 @@ export class BattleStartManager {
             if (bm.necromancyManager) {
                 bm.necromancyManager.initializeNecromancyStackDisplays();
             }
-
-            bm.addCombatLog('⚡ Hero battle start effects applied', 'info');
         } catch (error) {
             console.error('Error applying hero start effects:', error);
         }
@@ -198,7 +223,7 @@ export class BattleStartManager {
                         const { applyBothPlayersBloodTollEffects } = await import('./Artifacts/bloodSoakedCoin.js');
                         await applyBothPlayersBloodTollEffects(delayedEffects.host, delayedEffects.guest, bm);
                     }
-                    bm.addCombatLog('🩸 Blood toll effects applied from both players', 'info');
+                    //bm.addCombatLog('🩸 Blood toll effects applied from both players', 'info');
                 } catch (error) {
                     console.error('Error applying BloodSoakedCoin effects:', error);
                 }
@@ -214,15 +239,13 @@ export class BattleStartManager {
                         const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
                         await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, bm);
                     }
-                    bm.addCombatLog('🥩 Poison curse effects applied from both players', 'info');
+                    //bm.addCombatLog('🥩 Poison curse effects applied from both players', 'info');
                 } catch (error) {
                     console.error('Error applying PoisonedMeat effects:', error);
                 }
 
                 // This prevents the race condition where individual clearing functions overwrite each other
                 await this.clearAllProcessedDelayedEffects(delayedEffects.host, delayedEffects.guest);
-
-                bm.addCombatLog('⏳ All delayed artifact effects processed', 'success');
             }
         } catch (error) {
             console.error('Error applying delayed artifact effects:', error);
@@ -295,7 +318,6 @@ export class BattleStartManager {
         try {
             if (bm.crusaderArtifactsHandler) {
                 await bm.crusaderArtifactsHandler.applyStartOfBattleEffects();
-                bm.addCombatLog('⚔️ Equipment battle start effects applied', 'info');
             }
         } catch (error) {
             console.error('Error applying equipment start effects:', error);
@@ -330,8 +352,6 @@ export class BattleStartManager {
             } catch (error) {
                 console.error('Error applying Field Standard effects:', error);
             }
-
-            bm.addCombatLog('🏺 Permanent artifact effects applied', 'info');
         } catch (error) {
             console.error('Error applying permanent artifact effects:', error);
         }

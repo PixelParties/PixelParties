@@ -30,6 +30,9 @@ import CoolnessOverchargeSpell from './Spells/coolnessOvercharge.js';
 import { TrialOfCoolnessSpell } from './Spells/trialOfCoolness.js';
 import CurseSpell from './Spells/curse.js';
 import HasteSpell from './Spells/haste.js';
+import HandOfDeathSpell from './Spells/handOfDeath.js';
+import CriticalStrikeSpell from './Spells/criticalStrike.js';
+import DarkDealSpell from './Spells/darkDeal.js';
 
 
 
@@ -167,6 +170,18 @@ export class BattleSpellSystem {
         // Register Haste
         const haste = new HasteSpell(this.battleManager);
         this.spellImplementations.set('Haste', haste);
+
+        // Register HandOfDeath
+        const handOfDeath = new HandOfDeathSpell(this.battleManager);
+        this.spellImplementations.set('HandOfDeath', handOfDeath);
+
+        // Register CriticalStrike (Fighting spell)
+        const criticalStrike = new CriticalStrikeSpell(this.battleManager);
+        this.spellImplementations.set('CriticalStrike', criticalStrike);
+
+        // Register DarkDeal
+        const darkDeal = new DarkDealSpell(this.battleManager);
+        this.spellImplementations.set('DarkDeal', darkDeal);
     }
 
     // ============================================
@@ -174,7 +189,7 @@ export class BattleSpellSystem {
     // ============================================
 
     // Check if hero should cast a spell instead of attacking
-    checkSpellCasting(hero) {
+    async checkSpellCasting(hero) {
         if (!this.battleManager.isAuthoritative || !hero || !hero.alive) {
             return null;
         }
@@ -182,6 +197,16 @@ export class BattleSpellSystem {
         if (this.battleManager.statusEffectsManager && 
             !this.battleManager.statusEffectsManager.canCastSpells(hero)) {
             return null;
+        }
+        
+        // Check for Hand of Death channeling (overrides normal spell casting)
+        if (this.spellImplementations.has('HandOfDeath')) {
+            const handOfDeathSpell = this.spellImplementations.get('HandOfDeath');
+            if (handOfDeathSpell.shouldChannel(hero)) {
+                // Hero must channel instead of normal actions
+                await handOfDeathSpell.executeChannelingTurn(hero);
+                return null; // Prevent normal spell casting
+            }
         }
         
         // Get all spells this hero has (including duplicates)
@@ -322,6 +347,9 @@ export class BattleSpellSystem {
             logType
         );
         
+        // Create spell card visual effect
+        this.createSpellCardEffect(hero, spell);
+        
         // Track statistics
         this.spellsCastThisBattle++;
         this.spellCastHistory.push({
@@ -349,6 +377,106 @@ export class BattleSpellSystem {
         await this.executeSpellEffects(hero, spell);
     }
 
+    // Create spell card visual effect
+    createSpellCardEffect(hero, spell) {
+        const heroElement = this.battleManager.getHeroElement(hero.side, hero.position);
+        if (!heroElement) {
+            return;
+        }
+
+        // Ensure CSS exists
+        this.ensureSpellCardEffectCSS();
+
+        // Create the spell card effect container
+        const spellCardContainer = document.createElement('div');
+        spellCardContainer.className = 'spell-card-container';
+        
+        // Create spell card display
+        const cardDisplay = document.createElement('div');
+        cardDisplay.className = 'spell-card-display';
+        
+        // Get card image path
+        const cardImagePath = `./Cards/All/${spell.name}.png`;
+        
+        cardDisplay.innerHTML = `
+            <img src="${cardImagePath}" alt="${spell.name}" class="spell-card-image" 
+                 onerror="this.src='./Cards/placeholder.png'">
+        `;
+        
+        spellCardContainer.appendChild(cardDisplay);
+        
+        // Position on top of hero card
+        spellCardContainer.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 600;
+            pointer-events: none;
+            animation: spellCardEffect ${this.battleManager.getSpeedAdjustedDelay(2000)}ms ease-out forwards;
+        `;
+        
+        heroElement.appendChild(spellCardContainer);
+        
+        // Clean up after animation
+        const animationDuration = this.battleManager.getSpeedAdjustedDelay(2000);
+        setTimeout(() => {
+            if (spellCardContainer && spellCardContainer.parentNode) {
+                spellCardContainer.remove();
+            }
+        }, animationDuration);
+    }
+
+    // Ensure CSS for spell card effect exists
+    ensureSpellCardEffectCSS() {
+        if (document.getElementById('spellCardEffectCSS')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'spellCardEffectCSS';
+        style.textContent = `
+            @keyframes spellCardEffect {
+                0% {
+                    opacity: 0;
+                    transform: translateX(-50%) scale(0.3) translateY(20px);
+                }
+                25% {
+                    opacity: 1;
+                    transform: translateX(-50%) scale(1.1) translateY(-10px);
+                }
+                75% {
+                    opacity: 1;
+                    transform: translateX(-50%) scale(1.0) translateY(-5px);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translateX(-50%) scale(0.8) translateY(-30px);
+                }
+            }
+            
+            .spell-card-container {
+                will-change: transform, opacity;
+            }
+            
+            .spell-card-display {
+                position: relative;
+                width: 120px;
+                height: 168px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+                overflow: hidden;
+            }
+            
+            .spell-card-image {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 6px;
+            }
+        `;
+        
+        document.head.appendChild(style);
+    }
+
     // Placeholder for future spell effects implementation
     async executeSpellEffects(hero, spell) {
         const spellName = spell.name;
@@ -365,7 +493,7 @@ export class BattleSpellSystem {
             }
         } catch (error) {
             // Storm Ring module not available or error occurred, continue with spell execution
-            console.error('❌ Storm Ring check failed:', error);
+            console.error('⚠ Storm Ring check failed:', error);
         }
         
         // Check if we have a specific implementation for this spell
@@ -526,6 +654,9 @@ export class BattleSpellSystem {
             logType
         );
         
+        // Create spell card visual effect for guest
+        this.createGuestSpellCardEffect(heroAbsoluteSide, heroPosition, spellName);
+        
         // Track statistics on guest side too
         this.spellsCastThisBattle++;
         this.spellCastHistory.push({
@@ -537,6 +668,91 @@ export class BattleSpellSystem {
             spellSchool: spellSchool,
             turn: this.battleManager.currentTurn,
             timestamp: Date.now(),
+            isGuestSide: true
+        });
+    }
+
+    // Create spell card visual effect for guest side
+    createGuestSpellCardEffect(heroAbsoluteSide, heroPosition, spellName) {
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const heroLocalSide = (heroAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        const heroElement = this.battleManager.getHeroElement(heroLocalSide, heroPosition);
+        if (!heroElement) {
+            return;
+        }
+
+        // Ensure CSS exists
+        this.ensureSpellCardEffectCSS();
+
+        // Create the spell card effect container
+        const spellCardContainer = document.createElement('div');
+        spellCardContainer.className = 'spell-card-container';
+        
+        // Create spell card display
+        const cardDisplay = document.createElement('div');
+        cardDisplay.className = 'spell-card-display';
+        
+        // Get card image path
+        const cardImagePath = `./Cards/All/${spellName}.png`;
+        
+        cardDisplay.innerHTML = `
+            <img src="${cardImagePath}" alt="${spellName}" class="spell-card-image" 
+                 onerror="this.src='./Cards/placeholder.png'">
+        `;
+        
+        spellCardContainer.appendChild(cardDisplay);
+        
+        // Position above hero
+        spellCardContainer.style.cssText = `
+            position: absolute;
+            top: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 600;
+            pointer-events: none;
+            animation: spellCardEffect ${this.battleManager.getSpeedAdjustedDelay(2000)}ms ease-out forwards;
+        `;
+        
+        heroElement.appendChild(spellCardContainer);
+        
+        // Clean up after animation
+        const animationDuration = this.battleManager.getSpeedAdjustedDelay(2000);
+        setTimeout(() => {
+            if (spellCardContainer && spellCardContainer.parentNode) {
+                spellCardContainer.remove();
+            }
+        }, animationDuration);
+    }
+
+    // Handle fighting spell trigger on guest side
+    handleGuestFightingSpellTrigger(data) {
+        const { attackerAbsoluteSide, attackerPosition, attackerName, spellName, spellLevel } = data;
+        
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Format spell name with spaces (camelCase -> Spaced Words)
+        const formattedSpellName = this.formatSpellName(spellName);
+        
+        // Add to combat log (Fighting spells don't get the same log message as regular spells)
+        // They're usually logged by their own implementation, so we skip the log here
+        
+        // Create spell card visual effect for guest
+        this.createGuestSpellCardEffect(attackerAbsoluteSide, attackerPosition, spellName);
+        
+        // Track statistics on guest side
+        this.spellsCastThisBattle++;
+        this.spellCastHistory.push({
+            hero: attackerName,
+            heroPosition: attackerPosition,
+            heroSide: attackerAbsoluteSide,
+            spell: spellName,
+            spellLevel: spellLevel,
+            spellSchool: 'Fighting',
+            turn: this.battleManager.currentTurn,
+            timestamp: Date.now(),
+            isFightingSpell: true,
             isGuestSide: true
         });
     }
@@ -604,70 +820,6 @@ export class BattleSpellSystem {
         return stats;
     }
 
-    // Test spell casting probabilities (development only)
-    testSpellCastingProbabilities(hero, iterations = 1000) {
-        if (!this.battleManager.randomnessInitialized) {
-            return null;
-        }
-        
-        const allSpells = hero.getAllSpells();
-        if (!allSpells || allSpells.length === 0) {
-            return null;
-        }
-        
-        const results = {
-            hero: hero.name,
-            totalSpells: allSpells.length,
-            totalIterations: iterations,
-            spellsCast: 0,
-            attacksPerformed: 0,
-            spellBreakdown: {},
-            spellChances: {}
-        };
-        
-        // Calculate theoretical chances for each spell
-        const sortedSpells = this.sortSpellsByLevel(allSpells);
-        sortedSpells.forEach(spell => {
-            const chance = this.calculateSpellCastingChance(hero, spell);
-            results.spellChances[spell.name] = {
-                chance: chance,
-                percentage: (chance * 100).toFixed(2)
-            };
-        });
-        
-        // Save current randomness state
-        const originalState = this.battleManager.randomness.exportState();
-        
-        // Run test iterations
-        for (let i = 0; i < iterations; i++) {
-            const spellToCast = this.checkSpellCasting(hero);
-            
-            if (spellToCast) {
-                results.spellsCast++;
-                if (!results.spellBreakdown[spellToCast.name]) {
-                    results.spellBreakdown[spellToCast.name] = 0;
-                }
-                results.spellBreakdown[spellToCast.name]++;
-            } else {
-                results.attacksPerformed++;
-            }
-        }
-        
-        // Restore original randomness state
-        this.battleManager.randomness.importState(originalState);
-        
-        // Calculate percentages
-        results.spellCastPercentage = (results.spellsCast / iterations * 100).toFixed(2);
-        results.attackPercentage = (results.attacksPerformed / iterations * 100).toFixed(2);
-        
-        return results;
-    }
-
-    // Log current spell system status
-    logSystemStatus() {
-        // Status logging removed
-    }
-
     // ============================================
     // UTILITY METHODS
     // ============================================
@@ -691,6 +843,14 @@ export class BattleSpellSystem {
         // Remove generic spell CSS
         const genericCSS = document.getElementById('genericSpellCSS');
         if (genericCSS) genericCSS.remove();
+        
+        // Remove spell card effect CSS
+        const spellCardCSS = document.getElementById('spellCardEffectCSS');
+        if (spellCardCSS) spellCardCSS.remove();
+        
+        // Remove any remaining spell card effects
+        const effects = document.querySelectorAll('.spell-card-container');
+        effects.forEach(effect => effect.remove());
         
         this.battleManager = null;
         this.reset();

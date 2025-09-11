@@ -21,6 +21,7 @@ import VictoryScreen from './victoryScreen.js';
 import heroTooltipManager from './heroTooltips.js';
 import AreaHandler from './areaHandler.js'
 import { graveyardManager } from './graveyard.js';
+import { tagsManager } from './tags.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
@@ -38,8 +39,14 @@ import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
 
 import { resetDoomClockCountersIfNeeded } from './Spells/doomClock.js';
+import { crystalWellManager } from './Spells/crystalWell.js';
+import { initializeSpatialCreviceSystem } from './Spells/spatialCrevice.js';
 
 import { GraveWormCreature } from './Creatures/graveWorm.js';
+import { NimbleMonkeeCreature } from './Creatures/nimbleMonkee.js';
+import { ResilientMonkeeCreature } from './Creatures/resilientMonkee.js';
+import { CriminalMonkeeCreature } from './Creatures/criminalMonkee.js';
+
 
 
 export class HeroSelection {
@@ -59,10 +66,22 @@ export class HeroSelection {
         this.opponentPermanentArtifactsData = null;
         this.heroTooltipManager = heroTooltipManager;
         this.graveyardManager = graveyardManager;
+        this.tagsManager = tagsManager;
 
         this.magicSapphiresUsed = 0;
         this.magicRubiesUsed = 0;
-        this.birthdayPresentCounter = 0;
+        
+        
+        this.playerCounters = {
+            birthdayPresent: 0,
+            teleports: 0,
+            goldenBananas: 0 
+        };
+        this.opponentCounters = {
+            birthdayPresent: 0,
+            teleports: 0,
+            goldenBananas: 0 
+        };
 
 
         // Guard Change mode tracking
@@ -70,7 +89,7 @@ export class HeroSelection {
         
         this.stateMachine = new GameStateMachine();
         
-        // Store opponent abilities data with enhanced debugging
+        // Store opponent abilities data
         this.opponentAbilitiesData = null;
         
         // Initialize centralized turn tracker
@@ -105,6 +124,9 @@ export class HeroSelection {
 
         
         this.graveWormCreature = new GraveWormCreature(this);
+        this.nimbleMonkeeCreature = new NimbleMonkeeCreature(this);
+        this.resilientMonkeeCreature = new ResilientMonkeeCreature(this);
+        this.criminalMonkeeCreature = new CriminalMonkeeCreature(this);
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
@@ -190,7 +212,7 @@ export class HeroSelection {
         this.characterCards = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
-            'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
+            'Darge': ['Fighting', 'AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['DecayMagic', 'BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechCopyDevice', 'FutureTechFists', 'FutureTechLamp'],
             'Ida': ['BottledFlame', 'BurningFinger',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
@@ -199,9 +221,10 @@ export class HeroSelection {
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
+            'Nomu': ['MagicArts', 'Training', 'Teleport', 'Teleportal', 'StaffOfTheTeleporter', 'TeleportationPowder', 'PlanetInABottle', 'SpatialCrevice'],
             'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
-            'Tharx': ['Archer', 'Cavalry', 'Challenge', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
+            'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic']
         };
@@ -222,6 +245,7 @@ export class HeroSelection {
                 this.initializeTrainingSystem();
                 this.initializeGatheringStormSystem();
                 this.initializeDoomClockSystem(); 
+                this.initializeSpatialCreviceSystem();
             }, 0);
         }
     }
@@ -262,7 +286,7 @@ export class HeroSelection {
         // Set up battle state listener
         this.setupBattleStateListener();
         
-        // Add state change listener for debugging
+        // Add state change listener
         this.stateMachine.onStateChange((fromState, toState, context) => {
         });
 
@@ -282,11 +306,19 @@ export class HeroSelection {
         }).catch(error => {
         });
     }
+    
     initializeDoomClockSystem() {
         import('./Spells/doomClock.js').then(({ initializeDoomClockSystem }) => {
             initializeDoomClockSystem();
         }).catch(error => {
-            console.error('Failed to initialize DoomClock system:', error);
+        });
+    }
+
+    initializeSpatialCreviceSystem() {
+        import('./Spells/spatialCrevice.js').then(({ initializeSpatialCreviceSystem }) => {
+            initializeSpatialCreviceSystem();
+        }).catch(error => {
+            console.error('Failed to load SpatialCrevice system:', error);
         });
     }
 
@@ -542,7 +574,6 @@ export class HeroSelection {
             }
             
         } catch (error) {
-            // Error occurred but don't log it
         } finally {
             // Re-enable listener after a delay
             setTimeout(() => {
@@ -612,6 +643,9 @@ export class HeroSelection {
             if (this.kyliEffectManager) {
                 this.kyliEffectManager.resetForNewTurn();
             }
+
+            // Reset CrystalWell for new turn
+            crystalWellManager.resetForNewTurn();
             
             // Reset Inventing ability turn-based tracking
             if (this.inventingAbility) {
@@ -622,9 +656,15 @@ export class HeroSelection {
             if (this.graveWormCreature) {
                 this.graveWormCreature.resetTurnBasedTracking();
             }
+            // Reset NimbleMonkee turn tracking for new turn
+            if (this.nimbleMonkeeCreature) {
+                this.nimbleMonkeeCreature.resetTurnBasedTracking();
+            }
+            // Reset CriminalMonkee turn tracking for new turn
+            if (this.criminalMonkeeCreature) {
+                this.criminalMonkeeCreature.resetTurnBasedTracking();
+            }
 
-            // Reset birthday present counter to 0 at start of each turn
-            this.birthdayPresentCounter = 0;
 
             // Process any Birthday Present effects for opponent draws
             if (window.birthdayPresentArtifact) {
@@ -650,7 +690,7 @@ export class HeroSelection {
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
-                'Kyli.png'
+                'Kyli.png', 'Nomu.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -687,7 +727,7 @@ export class HeroSelection {
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
-                'Kyli.png'
+                'Kyli.png', 'Nomu.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -720,7 +760,7 @@ export class HeroSelection {
         }
     }
 
-    // Restore game state method with battle reconnection support and ability debugging
+    // Restore game state method with battle reconnection support
     async restoreGameState() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
             return false;
@@ -817,52 +857,6 @@ export class HeroSelection {
         }
     }
 
-    // Verify restored abilities for debugging
-    verifyRestoredAbilities(role) {
-        const currentAbilities = this.heroAbilitiesManager.exportAbilitiesState();
-        
-        // Count Fighting abilities specifically
-        let totalFighting = 0;
-        ['left', 'center', 'right'].forEach(position => {
-            const zones = currentAbilities.heroAbilityZones?.[position];
-            if (zones) {
-                let positionFighting = 0;
-                ['zone1', 'zone2', 'zone3'].forEach(zone => {
-                    if (zones[zone] && Array.isArray(zones[zone])) {
-                        const fightingCount = zones[zone].filter(a => a && a.name === 'Fighting').length;
-                        positionFighting += fightingCount;
-                    }
-                });
-                if (positionFighting > 0) {
-                    totalFighting += positionFighting;
-                }
-            }
-        });
-    }
-
-    // Verify opponent abilities for debugging
-    verifyOpponentAbilities(opponentRole) {
-        if (!this.opponentAbilitiesData) {
-            return;
-        }
-        
-        let totalOpponentFighting = 0;
-        ['left', 'center', 'right'].forEach(position => {
-            const abilities = this.opponentAbilitiesData[position];
-            if (abilities) {
-                let positionFighting = 0;
-                ['zone1', 'zone2', 'zone3'].forEach(zone => {
-                    if (abilities[zone] && Array.isArray(abilities[zone])) {
-                        positionFighting += abilities[zone].filter(a => a && a.name === 'Fighting').length;
-                    }
-                });
-                if (positionFighting > 0) {
-                    totalOpponentFighting += positionFighting;
-                }
-            }
-        });
-    }
-
     // Initialize life manager with turn tracker reference
     initializeLifeManagerWithTurnTracker() {
         if (this.lifeManager) {
@@ -873,8 +867,8 @@ export class HeroSelection {
         }
     }
 
-    // Save game state method with comprehensive ability verification and debugging
-    async saveGameState() {       
+    // Save game state method with comprehensive ability verification
+    async saveGameState() {
         if (!this.roomManager || !this.roomManager.getRoomRef()) {
             return false;
         }
@@ -930,6 +924,14 @@ export class HeroSelection {
                 if (this.graveWormCreature) {
                     gameState.hostGraveWormState = sanitizeForFirebase(this.graveWormCreature.exportState());
                 }
+                // Save NimbleMonkee state for host
+                if (this.nimbleMonkeeCreature) {
+                    gameState.hostNimbleMonkeeState = sanitizeForFirebase(this.nimbleMonkeeCreature.exportState());
+                }
+                // Save CriminalMonkee state for host
+                if (this.criminalMonkeeCreature) {
+                    gameState.hostCriminalMonkeeState = sanitizeForFirebase(this.criminalMonkeeCreature.exportState());
+                }
                 
                 // Save abilities
                 const abilitiesState = this.heroAbilitiesManager.exportAbilitiesState();
@@ -954,6 +956,9 @@ export class HeroSelection {
                 // Save Area
                 const hostAreaState = this.areaHandler.exportAreaState();
                 gameState.hostAreaCard = sanitizeForFirebase(hostAreaState.areaCard);
+
+                // Save CrystalWell state
+                gameState.hostCrystalWellState = sanitizeForFirebase(crystalWellManager.exportState());
 
                 // Save opponent abilities data if we have it
                 if (this.opponentAbilitiesData) {
@@ -995,6 +1000,13 @@ export class HeroSelection {
                 if (window.futureTechCopyDeviceArtifact) {
                     gameState.hostFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
                 }
+                
+                // Save teleport state for host
+                if (this.teleportState) {
+                    gameState.hostTeleportState = sanitizeForFirebase(this.teleportState);
+                } else {
+                    gameState.hostTeleportState = null; // Explicitly clear from Firebase
+                }
 
 
                 // Save potion state for host (now includes active effects)
@@ -1029,11 +1041,15 @@ export class HeroSelection {
                 if (this.occultismAbility) {
                     gameState.hostOccultismState = sanitizeForFirebase(this.occultismAbility.exportState());
                 }
+
+                if (this.opponentCounters) {
+                    gameState.guestOpponentCounters = sanitizeForFirebase(this.opponentCounters);
+                }
                 
                 // Magic gems count
                 gameState.hostMagicSapphiresUsed = sanitizeForFirebase(this.magicSapphiresUsed || 0);
                 gameState.hostMagicRubiesUsed = sanitizeForFirebase(this.magicRubiesUsed || 0); 
-                gameState.hostBirthdayPresentCounter = sanitizeForFirebase(this.birthdayPresentCounter || 0);
+                gameState.hostPlayerCounters = sanitizeForFirebase(this.playerCounters);
 
                 // Save delayed artifact effects for host
                 if (this.delayedArtifactEffects) {
@@ -1081,6 +1097,9 @@ export class HeroSelection {
                 const guestAreaState = this.areaHandler.exportAreaState();
                 gameState.guestAreaCard = sanitizeForFirebase(guestAreaState.areaCard);
 
+                // Save CrystalWell card
+                gameState.guestCrystalWellState = sanitizeForFirebase(crystalWellManager.exportState());
+
                 // Save opponent abilities data if we have it
                 if (this.opponentAbilitiesData) {
                     gameState.hostAbilitiesData = sanitizeForFirebase(this.opponentAbilitiesData);
@@ -1121,11 +1140,26 @@ export class HeroSelection {
                 if (window.futureTechCopyDeviceArtifact) {
                     gameState.guestFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
                 }
+                
+                // Save teleport state for guest  
+                if (this.teleportState) {
+                    gameState.guestTeleportState = sanitizeForFirebase(this.teleportState);
+                } else {
+                    gameState.guestTeleportState = null; // Explicitly clear from Firebase
+                }
 
                 
                 // Save GraveWorm state for guest
                 if (this.graveWormCreature) {
                     gameState.guestGraveWormState = sanitizeForFirebase(this.graveWormCreature.exportState());
+                }
+                // Save NimbleMonkee state for guest
+                if (this.nimbleMonkeeCreature) {
+                    gameState.guestNimbleMonkeeState = sanitizeForFirebase(this.nimbleMonkeeCreature.exportState());
+                }
+                // Save CriminalMonkee state for guest
+                if (this.criminalMonkeeCreature) {
+                    gameState.guestCriminalMonkeeState = sanitizeForFirebase(this.criminalMonkeeCreature.exportState());
                 }
 
 
@@ -1163,6 +1197,10 @@ export class HeroSelection {
                     gameState.guestOccultismState = sanitizeForFirebase(this.occultismAbility.exportState());
                 }
 
+                if (this.opponentCounters) {
+                    gameState.hostOpponentCounters = sanitizeForFirebase(this.opponentCounters); 
+                }
+
 
                 // Save Magic gems count
                 let magicSapphireValue = 0; 
@@ -1175,7 +1213,7 @@ export class HeroSelection {
 
                 let birthdayPresentValue = 0;
                 if (this.birthdayPresentCounter !== undefined && this.birthdayPresentCounter !== null) birthdayPresentValue = this.birthdayPresentCounter;
-                gameState.guestBirthdayPresentCounter = sanitizeForFirebase(birthdayPresentValue);
+                gameState.guestPlayerCounters = sanitizeForFirebase(this.playerCounters);
                 
                 
                 // Save delayed artifact effects for guest
@@ -1209,26 +1247,6 @@ export class HeroSelection {
         }
     }
 
-    // Verify abilities before saving for debugging
-    verifyAbilitiesBeforeSave(role, abilitiesState) {
-        let totalFightingToSave = 0;
-        ['left', 'center', 'right'].forEach(position => {
-            const zones = abilitiesState.heroAbilityZones?.[position];
-            if (zones) {
-                let positionFighting = 0;
-                ['zone1', 'zone2', 'zone3'].forEach(zone => {
-                    if (zones[zone] && Array.isArray(zones[zone])) {
-                        const fightingCount = zones[zone].filter(a => a && a.name === 'Fighting').length;
-                        positionFighting += fightingCount;
-                    }
-                });
-                if (positionFighting > 0) {
-                    totalFightingToSave += positionFighting;
-                }
-            }
-        });
-    }
-
     // Delegate turn operations to TurnTracker
     getCurrentTurn() {
         return this.turnTracker.getCurrentTurn();
@@ -1247,9 +1265,9 @@ export class HeroSelection {
     restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, 
         nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, 
         heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, 
-        magicSapphiresUsedData = null, magicRubiesUsedData = null, birthdayPresentCounterData = null, 
+        magicSapphiresUsedData = null, magicRubiesUsedData = null, playerCountersData = null, 
         areaCardData = null, graveyardData = null, inventingData = null, occultismData = null, 
-        graveWormData = null) {
+        graveWormData = null, crystalWellData = null, teleportData = null, opponentCountersData = null)  {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1297,6 +1315,13 @@ export class HeroSelection {
             this.potionHandler.updateAlchemyBonuses(this);
         }
 
+        // Restore opponent counters
+        if (opponentCountersData) {
+            this.opponentCounters = { ...opponentCountersData };
+        } else {
+            this.opponentCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0  };
+        }
+
         // Restore area card data
         if (areaCardData && this.areaHandler) {
             // Reset DoomClock counters if >= 12 before restoring
@@ -1304,6 +1329,19 @@ export class HeroSelection {
             
             const areaState = { areaCard: areaCardData, opponentAreaCard: null };
             this.areaHandler.importAreaState(areaState);
+        }
+
+        // Restore CrystalWell state
+        if (crystalWellData) {
+            crystalWellManager.importState(crystalWellData);
+        }
+
+        // ===== Restore teleport state =====
+
+        if (teleportData) {
+            this.teleportState = teleportData;
+        } else {
+            this.teleportState = null;
         }
 
         // ===== Restore Hero effect states =====
@@ -1336,10 +1374,7 @@ export class HeroSelection {
             }
         }        
         if (heinzData && this.heinzEffectManager) {
-            const heinzRestored = this.heinzEffectManager.importHeinzState(heinzData);
-            if (heinzRestored) {
-                // Debug info if needed
-            }
+            this.heinzEffectManager.importHeinzState(heinzData);
         } else {
             // Initialize Heinz state if no saved data
             if (this.heinzEffectManager) {
@@ -1352,9 +1387,6 @@ export class HeroSelection {
         // Restore GraveWorm state
         if (graveWormData && this.graveWormCreature) {
             const graveWormRestored = this.graveWormCreature.importState(graveWormData);
-            if (graveWormRestored) {
-                console.log('GraveWorm state restored from saved data');
-            }
         } else {
             // Initialize GraveWorm state if no saved data
             if (this.graveWormCreature) {
@@ -1459,12 +1491,15 @@ export class HeroSelection {
             }
         }
 
-        if (birthdayPresentCounterData !== null && birthdayPresentCounterData !== undefined) {
-            this.birthdayPresentCounter = birthdayPresentCounterData;
+        if (playerCountersData) {
+            this.playerCounters = { ...playerCountersData };
         } else {
-            if (this.birthdayPresentCounter === undefined || this.birthdayPresentCounter === null) {
-                this.birthdayPresentCounter = 0;
-            }
+            // Initialize default counters if no saved data
+            this.playerCounters = {
+                birthdayPresent: 0,
+                teleports: 0,
+                goldenBananas: 0 
+            };
         }
         
         // Initialize life manager with turn tracker after restoration
@@ -1484,10 +1519,10 @@ export class HeroSelection {
         setTimeout(() => this.refreshHeroStats(), 200);
     }
 
-    // Enhanced start character selection process
+    // Enhanced start character selection process  TEST HEROES HERE!!!
     async startSelection() {
         window._debugHostHeroes = ['', '', '']; // '' = random
-        window._debugGuestHeroes = [''];             // Missing slots = random
+        window._debugGuestHeroes = ['', ''];             // Missing slots = random
 
         if (this.allPreviewCharacters.length < 6) { 
             return false;
@@ -1573,7 +1608,6 @@ export class HeroSelection {
             this.playerCharacters = [...hostChars, ...randomChars.slice(0, 3 - hostChars.length)];
             this.opponentCharacters = [...guestChars, ...randomChars.slice(3 - hostChars.length)];
             
-            console.log('Debug hero selection - Host:', this.playerCharacters.map(c => c.name), 'Guest:', this.opponentCharacters.map(c => c.name));
         } else {
             // Normal random selection
             const selectedIndices = this.getRandomUniqueIndices(this.allPreviewCharacters.length, 6);
@@ -1584,7 +1618,7 @@ export class HeroSelection {
             this.opponentCharacters = allSelectedCharacters.slice(3, 6);
         }
 
-        // IMPORTANT: Save the character assignments immediately after generation
+        // Save the character assignments immediately after generation
         await this.saveGameState();
 
         // Send character selections to guest via P2P/Firebase
@@ -1772,7 +1806,7 @@ export class HeroSelection {
                 hand: handData,
                 deck: deckData,
                 graveyard: graveyardData,
-                birthdayPresentCounter: this.birthdayPresentCounter || 0,
+                playerCounters: this.playerCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0  },
                 playerAreaCard: areaFormationData.playerAreaCard,
                 opponentAreaCard: areaFormationData.opponentAreaCard, 
                 ...areaFormationData
@@ -1854,7 +1888,6 @@ export class HeroSelection {
                 existingAreaSlot.querySelectorAll('.area-counter-bubble').length : 0;
                 
             if (hadCountersBefore > 0) {
-                console.warn('⚠️ Area slot has counters before formation update processing');
             }
             
             this.areaHandler.handleFormationUpdateReceived(data);
@@ -1864,11 +1897,12 @@ export class HeroSelection {
                 existingAreaSlot.querySelectorAll('.area-counter-bubble').length : 0;
                 
             if (hadCountersBefore > 0 && hasCountersAfter === 0) {
-                console.error('💥 COUNTERS LOST DURING FORMATION UPDATE!', {
-                    before: hadCountersBefore,
-                    after: hasCountersAfter
-                });
             }
+        }
+
+        // Store opponent counters if included
+        if (data.playerCounters) {
+            this.opponentCounters = data.playerCounters;
         }
     }
 
@@ -1934,7 +1968,6 @@ export class HeroSelection {
                 
                 await roomRef.child('gameState').update(update);
             } catch (error) {
-                // Error occurred but don't log it
             }
         }
         
@@ -2262,7 +2295,6 @@ export class HeroSelection {
             await roomRef.child('gameState').update(updates);
             
         } catch (error) {
-            // Error occurred but don't log it
         }
     }
 
@@ -2696,14 +2728,7 @@ export class HeroSelection {
         
         const areaBattleData = this.areaHandler.getBattleInitData();
 
-        
-    
-        // Debug formation data before battle starts
-        const playerFormation = this.formationManager.getBattleFormation();
-        const opponentFormation = this.formationManager.getOpponentBattleFormation();
-
-        const playerBirthdayPresentCounter = this.birthdayPresentCounter || 0;
-        const opponentBirthdayPresentCounter = this.opponentBirthdayPresentCounterData || 0;
+        const opponentCounters = this.opponentCounterData || 0;
         
         // Initialize battle screen with all data        
         try {
@@ -2738,8 +2763,8 @@ export class HeroSelection {
                 areaBattleData.opponentAreaCard,
                 playerGraveyard,
                 opponentGraveyard,
-                playerBirthdayPresentCounter,
-                opponentBirthdayPresentCounter 
+                this.playerCounters,
+                opponentCounters      
             );
             return true;
             
@@ -3224,6 +3249,15 @@ export class HeroSelection {
                 return dialogShown;
             }
             
+            // Check if this is DarkDeal gold learning case
+            if (learnCheck.isDarkDealGoldLearning) {
+                this.handManager.endHandCardDrag();
+                
+                // Dynamically import and show DarkDeal dialog
+                this.showDarkDealGoldLearningDialog(targetSlot, spellCardName, cardIndex);
+                return true;
+            }
+            
             // Show error message for normal failure
             this.handManager.endHandCardDrag();
             this.showSpellDropResult(targetSlot, learnCheck.reason, false);
@@ -3255,6 +3289,29 @@ export class HeroSelection {
 
         this.handManager.endHandCardDrag();
         return success;
+    }
+
+    // Show DarkDeal gold learning dialog with dynamic import
+    async showDarkDealGoldLearningDialog(targetSlot, spellCardName, cardIndex) {
+        try {
+            // Dynamic import of DarkDeal module
+            const { DarkDealSpell } = await import('./Spells/darkDeal.js');
+            
+            // Show the dialog using the imported module
+            const dialogShown = DarkDealSpell.showGoldLearningDialog(
+                this, targetSlot, spellCardName, cardIndex
+            );
+            
+            if (!dialogShown) {
+                this.showSpellDropResult(targetSlot, 'Failed to show DarkDeal dialog', false);
+            }
+            
+            return dialogShown;
+        } catch (error) {
+            console.error('Failed to load DarkDeal module:', error);
+            this.showSpellDropResult(targetSlot, 'DarkDeal module not available', false);
+            return false;
+        }
     }
 
     updateActionDisplay() {
@@ -3447,6 +3504,9 @@ export class HeroSelection {
             this.areaHandler.reset();
         }
 
+        // Reset CrystalWell
+        crystalWellManager.reset();
+
         // Reset graveyard
         if (this.graveyardManager) {
             this.graveyardManager.reset();
@@ -3489,6 +3549,15 @@ export class HeroSelection {
         // Reset Creature handlers
         if (this.graveWormCreature) {
             this.graveWormCreature.reset();
+        }
+        if (this.nimbleMonkeeCreature) {
+            this.nimbleMonkeeCreature.reset();
+        }
+        if (this.criminalMonkeeCreature) {
+            this.criminalMonkeeCreature.reset();
+        }
+        if (this.resilientMonkeeCreature) {
+            this.resilientMonkeeCreature.reset();
         }
 
         
@@ -3537,7 +3606,6 @@ export class HeroSelection {
                 battleStarted: false,
                 battleStartTime: null
             }).catch(error => {
-                // Error occurred but don't log it
             });
         }
     }
@@ -3686,6 +3754,31 @@ export class HeroSelection {
                     return { 
                         canLearn: false, 
                         reason: `Semi needs ${semiCheck.goldCost} Gold to learn this (have ${semiCheck.playerGold})`
+                    };
+                }
+            }
+
+            // Special exception for DarkDeal - any hero can learn it for 10 Gold
+            if (spellCardName === 'DarkDeal') {
+                const playerGold = this.goldManager.getPlayerGold();
+                const darkDealCost = 10;
+                
+                if (playerGold >= darkDealCost) {
+                    return { 
+                        canLearn: false, 
+                        reason: `Spend ${darkDealCost} Gold on a Dark Deal?`,
+                        isDarkDealGoldLearning: true,
+                        darkDealData: {
+                            goldCost: darkDealCost,
+                            playerGold: playerGold,
+                            heroName: hero.name
+                        },
+                        heroName: hero.name
+                    };
+                } else {
+                    return { 
+                        canLearn: false, 
+                        reason: `You need ${darkDealCost} Gold for a Dark Deal (have ${playerGold})`
                     };
                 }
             }
@@ -3962,7 +4055,6 @@ function onHeroDragStart(event, characterJson, slotPosition) {
             // Fallback for older browsers
             event.dataTransfer.setData('text/plain', character.name);
         } catch (error) {
-            // Error occurred but don't log it
         }
     }
 }
@@ -4088,7 +4180,6 @@ function showCardTooltip(cardDataJson, element) {
             const cardData = JSON.parse(cardDataJson.replace(/&quot;/g, '"'));
             window.heroSelection.showCardTooltip(cardData, element);
         } catch (error) {
-            // Error occurred but don't log it
         }
     }
 }
@@ -4243,6 +4334,8 @@ if (typeof window !== 'undefined') {
             await window.heroSelection.handleToBattleClick();
         }
     };
+
+    window.tagsManager = tagsManager;
 }
 
 // Export for ES6 module compatibility

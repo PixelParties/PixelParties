@@ -347,7 +347,7 @@ export class ArtifactHandler {
     }
 
     isDraggableArtifact(cardName) {
-        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore', 'BloodSoakedCoin'];
+        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore', 'BloodSoakedCoin', 'StaffOfTheTeleporter', 'GoldenBananas' ];
         return draggableArtifacts.includes(cardName);
     }
 
@@ -356,7 +356,7 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent', 'BloodSoakedCoin'];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent', 'BloodSoakedCoin', 'StaffOfTheTeleporter', 'GoldenBananas' ];
 
         return clickableArtifacts.includes(cardName);
     }
@@ -388,7 +388,9 @@ export class ArtifactHandler {
             'FutureTechCopyDevice',
             'BirthdayPresent',
             'AncientTechInfiniteEnergyCore',
-            'BloodSoakedCoin'
+            'BloodSoakedCoin', 
+            'StaffOfTheTeleporter',
+            'GoldenBananas' 
         ];
         
         // Convert card names to proper module names using the existing method

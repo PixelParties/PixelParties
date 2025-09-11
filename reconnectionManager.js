@@ -126,8 +126,6 @@ export class ReconnectionManager {
         setTimeout(() => {
             if (this.heroSelection.victoryScreen) {
                 this.heroSelection.victoryScreen.showVictoryScreen(winnerDisplayData, this.heroSelection);
-            } else {
-                console.error('🏆 RECONNECTION: Victory screen not available');
             }
         }, this.getSpeedAdjustedDelay(200));
 
@@ -260,7 +258,10 @@ export class ReconnectionManager {
                     this.heroSelection.formationManager.initWithCharacter(this.heroSelection.selectedCharacter);
                 }
                 // If it IS battle reconnection, leave formations empty - they'll be restored from battle persistence
-                
+
+                // Check the specific teleport state for this player
+                const myTeleportState = this.isHost ? gameState.hostTeleportState : gameState.guestTeleportState;
+
                 this.heroSelection.restorePlayerData(
                     gameState.hostDeck, 
                     gameState.hostHand, 
@@ -277,12 +278,15 @@ export class ReconnectionManager {
                     gameState.guestPermanentArtifacts,
                     gameState.hostMagicSapphiresUsed,
                     gameState.hostMagicRubiesUsed,
-                    gameState.hostBirthdayPresentCounter,
+                    gameState.hostPlayerCounters,
                     gameState.hostAreaCard,
                     gameState.hostGraveyardState,
                     gameState.hostInventingState,
                     gameState.hostOccultismState,
-                    gameState.hostGraveWormState
+                    gameState.hostGraveWormState,
+                    gameState.hostCrystalWellState,
+                    gameState.hostTeleportState,
+                    gameState.guestPlayerCounters
                 );  
 
             } else if (!this.isHost && gameState.guestSelected) {                
@@ -305,7 +309,9 @@ export class ReconnectionManager {
                 
                 const guestMagicSapphireValue = gameState.guestMagicSapphiresUsed;
                 const guestMagicRubyValue = gameState.guestMagicRubiesUsed;
-                
+
+                // Check the specific teleport state for this player
+                const myTeleportState = this.isHost ? gameState.hostTeleportState : gameState.guestTeleportState;
 
                 this.heroSelection.restorePlayerData(
                     gameState.guestDeck, 
@@ -323,12 +329,15 @@ export class ReconnectionManager {
                     gameState.hostPermanentArtifacts, 
                     guestMagicSapphireValue,
                     guestMagicRubyValue,
-                    gameState.guestBirthdayPresentCounter,
+                    gameState.guestPlayerCounters,
                     gameState.guestAreaCard,
                     gameState.guestGraveyardState,
                     gameState.guestInventingState,
                     gameState.guestOccultismState,
-                    gameState.guestGraveWormState
+                    gameState.guestGraveWormState,
+                    gameState.guestCrystalWellState,
+                    gameState.guestTeleportState,
+                    gameState.hostPlayerCounters
                 );
             }
                 
@@ -342,7 +351,7 @@ export class ReconnectionManager {
                 import('./Spells/doomClock.js').then(({ restoreDoomCountersFromSavedData }) => {
                     restoreDoomCountersFromSavedData(this.heroSelection, playerAreaCard, opponentAreaCard);
                 }).catch(error => {
-                    console.error('Error restoring doom counters:', error);
+                    // Silent error handling
                 });
                 
                 // Force UI update for area slot
@@ -536,14 +545,10 @@ export class ReconnectionManager {
         if (this.isHost && gameState.hostNicolasState) {
             if (this.heroSelection.nicolasEffectManager) {
                 const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.hostNicolasState);
-                if (nicolasRestored) {
-                }
             }
         } else if (!this.isHost && gameState.guestNicolasState) {
             if (this.heroSelection.nicolasEffectManager) {
                 const nicolasRestored = this.heroSelection.nicolasEffectManager.importNicolasState(gameState.guestNicolasState);
-                if (nicolasRestored) {
-                }
             }
         } else {
             // Initialize Nicolas state if no saved data
@@ -560,10 +565,10 @@ export class ReconnectionManager {
                     const vacarnState = this.heroSelection.vacarnEffectManager.getState();
                     const buriedCount = Object.keys(vacarnState.buriedCreatures).length;
                     
-                    // If there are buried creatures, log what they are
+                    // If there are buried creatures, process what they are
                     if (buriedCount > 0) {
                         Object.entries(vacarnState.buriedCreatures).forEach(([position, data]) => {
-                            // Details available for debugging if needed
+                            // Details available for processing if needed
                         });
                     }
                 }
@@ -576,10 +581,10 @@ export class ReconnectionManager {
                     const vacarnState = this.heroSelection.vacarnEffectManager.getState();
                     const buriedCount = Object.keys(vacarnState.buriedCreatures).length;
                     
-                    // If there are buried creatures, log what they are
+                    // If there are buried creatures, process what they are
                     if (buriedCount > 0) {
                         Object.entries(vacarnState.buriedCreatures).forEach(([position, data]) => {
-                            // Details available for debugging if needed
+                            // Details available for processing if needed
                         });
                     }
                 }
@@ -623,21 +628,45 @@ export class ReconnectionManager {
         if (this.isHost && gameState.hostGraveWormState) {
             if (this.heroSelection.graveWormCreature) {
                 const graveWormRestored = this.heroSelection.graveWormCreature.importState(gameState.hostGraveWormState);
-                if (graveWormRestored) {
-                    console.log('Host GraveWorm state restored during reconnection');
-                }
             }
         } else if (!this.isHost && gameState.guestGraveWormState) {
             if (this.heroSelection.graveWormCreature) {
                 const graveWormRestored = this.heroSelection.graveWormCreature.importState(gameState.guestGraveWormState);
-                if (graveWormRestored) {
-                    console.log('Guest GraveWorm state restored during reconnection');
-                }
             }
         } else {
             // Initialize GraveWorm state if no saved data
             if (this.heroSelection.graveWormCreature) {
                 this.heroSelection.graveWormCreature.reset();
+            }
+        }
+        // Restore NimbleMonkee state
+        if (this.isHost && gameState.hostNimbleMonkeeState) {
+            if (this.heroSelection.nimbleMonkeeCreature) {
+                const nimbleMonkeeRestored = this.heroSelection.nimbleMonkeeCreature.importState(gameState.hostNimbleMonkeeState);
+            }
+        } else if (!this.isHost && gameState.guestNimbleMonkeeState) {
+            if (this.heroSelection.nimbleMonkeeCreature) {
+                const nimbleMonkeeRestored = this.heroSelection.nimbleMonkeeCreature.importState(gameState.guestNimbleMonkeeState);
+            }
+        } else {
+            // Initialize NimbleMonkee state if no saved data
+            if (this.heroSelection.nimbleMonkeeCreature) {
+                this.heroSelection.nimbleMonkeeCreature.reset();
+            }
+        }
+        // Restore CriminalMonkee state
+        if (this.isHost && gameState.hostCriminalMonkeeState) {
+            if (this.heroSelection.criminalMonkeeCreature) {
+                this.heroSelection.criminalMonkeeCreature.importState(gameState.hostCriminalMonkeeState);
+            }
+        } else if (!this.isHost && gameState.guestCriminalMonkeeState) {
+            if (this.heroSelection.criminalMonkeeCreature) {
+                this.heroSelection.criminalMonkeeCreature.importState(gameState.guestCriminalMonkeeState);
+            }
+        } else {
+            // Initialize CriminalMonkee state if no saved data
+            if (this.heroSelection.criminalMonkeeCreature) {
+                this.heroSelection.criminalMonkeeCreature.reset();
             }
         }
 
@@ -1459,6 +1488,33 @@ export class ReconnectionManager {
                 { source: 'reconnection', hasSelection: false }
             );
         }
+
+
+        // Check for active teleport state and restore if needed
+        if (hasPlayerSelected && this.heroSelection.teleportState) {
+        
+        // Let teleport.js handle its own reconnection logic
+        setTimeout(async () => {
+            // Ensure teleport module is available
+            if (window.teleportSpell) {
+                await window.teleportSpell.handleReconnection(this.heroSelection, this.getSpeedAdjustedDelay(500));
+            } else {
+                // Try to import teleport module if not available
+                try {
+                    const teleportModule = await import('./Spells/teleport.js');
+                    if (typeof window !== 'undefined') {
+                        window.teleportSpell = teleportModule.teleportSpell;
+                    }
+                    await window.teleportSpell.handleReconnection(this.heroSelection, this.getSpeedAdjustedDelay(500));
+                } catch (error) {
+                    // Clear invalid state
+                    this.heroSelection.teleportState = null;
+                    this.heroSelection.saveGameState();
+                }
+            }
+        }, this.getSpeedAdjustedDelay(500));
+    }
+
 
         // Clear battle ready states when returning to formation
         if (this.roomManager && this.roomManager.getRoomRef()) {

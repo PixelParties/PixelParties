@@ -9,8 +9,6 @@ export class BattleRandomnessManager {
         this.randomness = null;
         this.randomnessSeed = null;
         this.randomnessInitialized = false;
-        
-        console.log('🎲 BattleRandomnessManager created');
     }
     
     // ============================================
@@ -27,9 +25,7 @@ export class BattleRandomnessManager {
         this.randomness = new BattleRandomness(seed);
         this.randomnessSeed = this.randomness.originalSeed;
         this.randomnessInitialized = true;
-        
-        console.log(`🎲 Battle randomness initialized by host with seed: ${this.randomnessSeed.slice(0, 12)}...`);
-        
+                
         // Send seed to guest immediately
         this.battleManager.sendBattleUpdate('randomness_seed', {
             seed: this.randomnessSeed,
@@ -49,9 +45,7 @@ export class BattleRandomnessManager {
         this.randomness = new BattleRandomness(seed);
         this.randomnessSeed = seed;
         this.randomnessInitialized = true;
-        
-        console.log(`🎲 Battle randomness initialized by guest with received seed: ${seed.slice(0, 12)}...`);
-        
+                
         return true;
     }
     
@@ -264,7 +258,6 @@ export class BattleRandomnessManager {
     // Import state from persistence
     importState(randomnessState) {
         if (!randomnessState || !randomnessState.initialized) {
-            console.log('🎲 No randomness state to import');
             return false;
         }
         
@@ -279,8 +272,6 @@ export class BattleRandomnessManager {
             if (imported) {
                 this.randomnessSeed = this.randomness.originalSeed;
                 this.randomnessInitialized = true;
-                
-                console.log(`🎲 Randomness state imported: seed ${this.randomnessSeed.slice(0, 8)}..., ${randomnessState.callCount} calls made`);
                 return true;
             }
         } catch (error) {
@@ -295,7 +286,6 @@ export class BattleRandomnessManager {
         this.randomness = null;
         this.randomnessSeed = null;
         this.randomnessInitialized = false;
-        console.log('🎲 BattleRandomnessManager reset');
     }
     
     // Cleanup method

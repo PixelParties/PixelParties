@@ -23,8 +23,26 @@ export class GameManager {
             this.uiManager.showConnectionDetails(`🎮 ${data.message}<br>✅ Battle begins now!<br>⚔️ Fight for victory!`);
         });
 
-        this.webRTCManager.registerMessageHandler('game_surrender', (data) => {
-            this.uiManager.showConnectionDetails(`🏳️ ${data.message}<br>✅ Returned to lobby<br>🎮 Ready for next battle!`);
+        // Surrender victory handler - replaces old game_surrender handler
+        this.webRTCManager.registerMessageHandler('surrender_victory', (data) => {
+            console.log('🏳️ Received surrender victory message:', data); // Debug log
+            
+            if (this.heroSelection && this.heroSelection.victoryScreen) {
+                // The surrendering player is the loser, so we (the receiver) are the winner
+                const winnerData = {
+                    playerName: this.uiManager.getCurrentUsername(),
+                    heroes: this.getPlayerHeroes(),
+                    isLocalPlayer: true // We won because opponent surrendered
+                };
+                
+                console.log('🏆 Showing victory screen for winner:', winnerData); // Debug log
+                
+                // Show victory screen
+                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+            } else {
+                console.error('⚠️ Cannot show victory screen - missing heroSelection or victoryScreen');
+            }
         });
 
         this.webRTCManager.registerMessageHandler('character_selection', (data) => {
@@ -336,6 +354,20 @@ export class GameManager {
                 };
                 
                 // Transition to victory state and show victory screen
+                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+            } else if (message.type === 'surrender_victory' && this.heroSelection && this.heroSelection.victoryScreen) {
+                // Handle surrender victory via Firebase fallback
+                console.log('🏳️ Received surrender victory via Firebase:', message); // Debug log
+                
+                const winnerData = {
+                    playerName: this.uiManager.getCurrentUsername(),
+                    heroes: this.getPlayerHeroes(),
+                    isLocalPlayer: true // We won because opponent surrendered
+                };
+                
+                console.log('🏆 Showing victory screen via Firebase for winner:', winnerData); // Debug log
+                
                 this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
                 this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
             } else if (message.type === 'sid_card_theft' && this.heroSelection && this.heroSelection.cardRewardManager) {                
@@ -721,20 +753,31 @@ export class GameManager {
         }
     }
 
-    // Handle hero selection completion - FIXED to preserve existing hand
+    // Handle hero selection completion
     onHeroSelectionComplete(selectionData) {
         this.gameState = 'battle';
+        
+        // Check if this is a reconnection scenario
+        const isReconnection = this.heroSelection && 
+                            this.heroSelection.stateMachine && 
+                            (this.heroSelection.stateMachine.isInState(this.heroSelection.stateMachine.states.RECONNECTING) ||
+                            this.heroSelection.stateMachine.previousState === this.heroSelection.stateMachine.states.RECONNECTING ||
+                            this.heroSelection.stateMachine.isInState(this.heroSelection.stateMachine.states.TEAM_BUILDING) ||
+                            this.heroSelection.stateMachine.isInState(this.heroSelection.stateMachine.states.VIEWING_REWARDS));
         
         // Check if player already has a hand (from restored state)
         const currentHandSize = this.heroSelection ? this.heroSelection.getHandSize() : 0;
         
-        if (currentHandSize === 0) {
-            // Only draw initial hand if player doesn't already have cards
+        // Only draw initial hand if this is NOT a reconnection AND player doesn't already have cards
+        if (currentHandSize === 0 && !isReconnection) {
             if (this.heroSelection) {
+                console.log("FOUND IT!"); // This should only log for truly new games now
                 const drawnCards = this.heroSelection.drawInitialHand();
             }
-        } else {
-            // Player already has a hand (restored from save state)
+        } else if (isReconnection && currentHandSize === 0) {
+            // During reconnection with empty hand - this is expected in some game states
+            // Don't draw new cards, the empty hand might be intentional
+            console.log("Reconnection detected with empty hand - not drawing new cards");
         }
         
         // Update the battle formation UI to show the hand
@@ -748,33 +791,56 @@ export class GameManager {
             🎮 Hero Selection Complete!<br>
             ⚔️ Your Hero: ${selectionData.playerCharacter.name}<br>
             🛡️ Opponent Hero: ${selectionData.opponentCharacter.name}<br>
-            🃏 Hand: ${currentHandSize || 5} cards!<br>
-            🏟️ Battle ready to begin!
+            🃃 Hand: ${currentHandSize || 0} cards!<br>
+            🟢 Battle ready to begin!
         `);
     }
 
-    // Handle surrender
+    // Handle surrender with victory screen
     async handleSurrender() {
         try {
-            // Reset game state
+            // Get opponent info before surrendering
+            const opponentName = await this.getOpponentName();
+            const opponentHeroes = this.getOpponentHeroes();
+            
+            // Create winner data for opponent (they win because we surrendered)
+            const winnerData = {
+                playerName: opponentName,
+                heroes: opponentHeroes,
+                isLocalPlayer: false // We lost by surrendering
+            };
+            
+            // Save surrender victory data to Firebase
+            await this.saveSurrenderVictoryToFirebase(opponentName);
+            
+            // FIXED: Send surrender victory message using sendGameData() instead of sendMessage()
+            this.webRTCManager.sendGameData('surrender_victory', {
+                surrendererName: this.uiManager.getCurrentUsername(),
+                winnerName: opponentName,
+                timestamp: Date.now()
+            });
+            
+            // Show victory screen for the winner (opponent) on our side
+            if (this.heroSelection && this.heroSelection.victoryScreen) {
+                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+            }
+            
+            // Reset game state in room (this will be handled by victory screen exit)
             await this.roomManager.handleSurrender();
             
-            // Send surrender message through P2P
+        } catch (error) {
+            console.error('Error during surrender:', error);
+            // Fallback to original surrender behavior
+            await this.roomManager.handleSurrender();
             this.webRTCManager.sendMessage({
                 type: 'game_surrender',
                 message: `${this.uiManager.getCurrentUsername()} has surrendered! Returning to lobby...`,
                 from: this.roomManager.getIsHost() ? 'host' : 'guest',
                 timestamp: Date.now()
             });
-            
-            // Return to lobby
             this.returnToLobby();
-            
-            // Update status
             this.uiManager.showStatus('🏳️ Game ended - returned to lobby', 'connected');
-            
-        } catch (error) {
-            this.uiManager.showStatus('⚠ Error ending game', 'error');
         }
     }
 
@@ -950,6 +1016,67 @@ export class GameManager {
             }).catch(error => {
                 // Silently handle error - could not reset game phase during game manager reset
             });
+        }
+    }
+
+    // NEW HELPER METHODS for surrender victory
+
+    // Helper method to get opponent name
+    async getOpponentName() {
+        if (!this.roomManager) return 'Opponent';
+        
+        const snapshot = await this.roomManager.getRoomRef().once('value');
+        const room = snapshot.val();
+        const isHost = this.roomManager.getIsHost();
+        
+        if (room) {
+            return isHost ? (room.guestName || 'Opponent') : (room.hostName || 'Opponent');
+        }
+        return 'Opponent';
+    }
+
+    // Helper method to get player's heroes
+    getPlayerHeroes() {
+        if (!this.heroSelection || !this.heroSelection.formationManager) return [];
+        
+        const formation = this.heroSelection.formationManager.getBattleFormation();
+        return [formation.left, formation.center, formation.right].filter(h => h);
+    }
+
+    // Helper method to get opponent's heroes
+    getOpponentHeroes() {
+        if (!this.heroSelection || !this.heroSelection.formationManager) return [];
+        
+        const formation = this.heroSelection.formationManager.getOpponentBattleFormation();
+        return [formation.left, formation.center, formation.right].filter(h => h);
+    }
+
+    // Helper method to save surrender victory data to Firebase
+    async saveSurrenderVictoryToFirebase(winnerName) {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) return;
+        
+        try {
+            const isHost = this.roomManager.getIsHost();
+            const winnerSide = isHost ? 'guest' : 'host'; // Opponent wins
+            
+            const victoryData = {
+                winner: winnerSide,
+                winnerName: winnerName,
+                surrenderer: isHost ? 'host' : 'guest',
+                surrendererName: this.uiManager.getCurrentUsername(),
+                reason: 'surrender',
+                timestamp: Date.now()
+            };
+            
+            const roomRef = this.roomManager.getRoomRef();
+            await roomRef.child('gameState').update({
+                gamePhase: 'Victory',
+                gamePhaseUpdated: Date.now(),
+                victoryData: victoryData
+            });
+            
+        } catch (error) {
+            console.error('Error saving surrender victory data:', error);
         }
     }
 }

@@ -531,12 +531,6 @@ export class CheckpointSystem {
             // Store this as current checkpoint
             this.currentCheckpoint = checkpoint;
             
-            // Add restoration message to combat log
-            this.battleManager.addCombatLog(
-                `📋 Battle restored from checkpoint (Turn ${checkpoint.turnNumber})`,
-                'system'
-            );
-            
             // NEW: Sync creature states to guest after successful restoration
             if (this.isHost) {
                 await this.syncCreatureStatesToGuest();

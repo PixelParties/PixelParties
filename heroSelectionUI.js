@@ -282,7 +282,7 @@ export class HeroSelectionUI {
                 const spellName = this.formatCardName(spell.name);
                 const isEnabled = spell.enabled !== false; // Default to true for backward compatibility
                 
-                // NEW: Add click handler and disabled styling
+                // Add click handler and disabled styling
                 const disabledClass = !isEnabled ? 'spell-disabled' : '';
                 const clickHandler = `onclick="window.toggleHeroSpell('${position}', ${spellIndexInOriginal})"`;
                 
@@ -949,7 +949,7 @@ export class HeroSelectionUI {
             tooltipEvents = `onmouseenter="window.showCardTooltip('${cardDataJson}', this)" onmouseleave="window.hideCardTooltip()"`;
         }
         
-        // NEW: Add hero hover events for team building mode (on the image itself)
+        // Add hero hover events for team building mode (on the image itself)
         let heroHoverEvents = '';
         if (isDraggable && includeAbilityZones && slotPosition) {
             heroHoverEvents = `
@@ -993,6 +993,14 @@ export class HeroSelectionUI {
         // Add hero stats HTML if in team building mode (includeAbilityZones = true)
         const heroStatsHTML = includeAbilityZones && slotPosition ? 
             this.createHeroStatsHTML(slotPosition) : '';
+
+        // Add tags HTML if in selection mode (NOT in team building)
+        const tagsHTML = !includeAbilityZones && window.tagsManager ? 
+            window.tagsManager.createTagsHTML(character.name, {
+                size: 'small',
+                layout: 'horizontal',
+                animated: true
+            }) : '';
         
         return `
             <div class="character-card ${selectableClass} ${selectedClass} ${draggableClass} ${includeAbilityZones ? 'with-ability-zones' : ''}" 
@@ -1011,6 +1019,7 @@ export class HeroSelectionUI {
                         ${heroClickEvents}
                         onerror="this.src='./Cards/Characters/placeholder.png'">
                     ${heroStatsHTML}
+                    ${tagsHTML}
                 </div>
                 ${showCharacterName ? `<div class="character-name">${character.name}</div>` : ''}
                 ${abilityZonesHTML}
@@ -1045,7 +1054,10 @@ export class HeroSelectionUI {
                 // Check if this is an Inventing ability and get counter count
                 let inventingCounterHTML = '';
                 if (ability.name === 'Inventing' && window.heroSelection && window.heroSelection.inventingAbility) {
-                    const counterCount = window.heroSelection.inventingAbility.getCountersForPosition(position, zoneNumber);
+                    // Get hero name from position first
+                    const heroName = window.heroSelection.inventingAbility.getHeroNameFromPosition(position);
+                    const counterCount = heroName ? 
+                        window.heroSelection.inventingAbility.getCountersForHeroAndZone(heroName, zoneNumber) : 0;
                     inventingCounterHTML = `
                         <div class="inventing-counter-display" data-position="${position}" data-zone="${zoneNumber}">
                             <span class="inventing-counter-icon">🔧</span>
@@ -1200,13 +1212,6 @@ export class HeroSelectionUI {
                     
                     <div class="character-selection-grid">
                         ${playerCardsHTML}
-                    </div>
-                    
-                    <div class="selection-status">
-                        <div class="waiting-message">
-                            <span class="status-text">Choose your hero...</span>
-                            <div class="selection-spinner"></div>
-                        </div>
                     </div>
                 </div>
                 
@@ -1473,7 +1478,7 @@ let currentTooltipSlot = null;
 
 // Helper function to clean up any existing tooltips
 function cleanupAllAbilityTooltips() {
-    const allTooltips = document.querySelectorAll('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip');
+    const allTooltips = document.querySelectorAll('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip, .teleport-drop-tooltip');
     allTooltips.forEach(tooltip => tooltip.remove());
     currentTooltip = null;
     currentTooltipSlot = null;
@@ -1571,15 +1576,119 @@ function onTeamSlotDragOver(event, position) {
         // Check if it's a spell card
         if (window.heroSelection.heroSpellbookManager.isSpellCard(cardName)) {
             // Check if it's a global spell - if so, just prevent default and return
-            if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
-                event.preventDefault();
-                event.stopPropagation();
-                
-                // Add visual indicator that this is a global spell
-                const slot = event.currentTarget;
-                slot.classList.add('global-spell-hover');
-                
-                return; // Don't show any tooltips
+            if (window.heroSelection.heroSpellbookManager.isSpellCard(cardName)) {
+                // Check if it's a global spell - if so, just prevent default and return
+                if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
+                    // Special handling for Teleport - allow drop on heroes
+                    if (cardName === 'Teleport') {
+                        const slot = event.currentTarget;
+                        
+                        // Clean up tooltip from other slots if we're over a different slot
+                        if (currentTooltipSlot && currentTooltipSlot !== slot) {
+                            cleanupAllAbilityTooltips();
+                            if (currentTooltipSlot && currentTooltipSlot.classList) {
+                                currentTooltipSlot.classList.remove('teleport-drop-ready', 'teleport-drop-invalid');
+                            }
+                        }
+                        
+                        // Check if tooltip already exists for this slot
+                        let existingTooltip = slot.querySelector('.teleport-drop-tooltip');
+                        
+                        if (!existingTooltip) {
+                            // Use the teleport spell's canActivateOnHero method
+                            const canActivateResult = window.teleportSpell ? 
+                                window.teleportSpell.canActivateOnHero(window.heroSelection, position) : 
+                                { canActivate: false, reason: 'Teleport spell not loaded' };
+                            
+                            // Set visual state
+                            if (canActivateResult.canActivate) {
+                                slot.classList.add('teleport-drop-ready');
+                                slot.classList.remove('teleport-drop-invalid');
+                            } else {
+                                slot.classList.add('teleport-drop-invalid');
+                                slot.classList.remove('teleport-drop-ready');
+                            }
+                            
+                            // Create tooltip
+                            const tooltip = document.createElement('div');
+                            let tooltipClass = 'teleport-drop-tooltip';
+                            let tooltipMessage = '';
+                            
+                            if (canActivateResult.canActivate) {
+                                tooltipClass += ' can-teleport';
+                                tooltipMessage = `Teleport ${canActivateResult.targetHeroName} away!`;
+                            } else {
+                                tooltipClass += ' cannot-teleport';
+                                // Check if the reason is about no heroes having the required spell school
+                                if (canActivateResult.reason.includes('No Hero has')) {
+                                    tooltipMessage = 'No Hero can cast Teleport!';
+                                } else {
+                                    tooltipMessage = canActivateResult.reason;
+                                }
+                            }
+                            
+                            tooltip.className = tooltipClass;
+                            
+                            // Add long-text class if needed
+                            if (tooltipMessage.length > 30) {
+                                tooltip.className += ' long-text';
+                            }
+                            
+                            tooltip.textContent = tooltipMessage;
+                            
+                            // Style the tooltip
+                            tooltip.style.cssText = `
+                                position: absolute;
+                                top: -40px;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                padding: 8px 16px;
+                                border-radius: 4px;
+                                font-size: 14px;
+                                font-weight: bold;
+                                white-space: nowrap;
+                                z-index: 1000;
+                                pointer-events: none;
+                                animation: fadeIn 0.3s ease-out;
+                                border: 2px solid rgba(255, 255, 255, 0.3);
+                                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                            `;
+                            
+                            slot.appendChild(tooltip);
+                            
+                            // Track current tooltip and slot
+                            currentTooltip = tooltip;
+                            currentTooltipSlot = slot;
+                        } else {
+                            // Tooltip already exists, just update the classes
+                            const canActivateResult = window.teleportSpell ? 
+                                window.teleportSpell.canActivateOnHero(window.heroSelection, position) : 
+                                { canActivate: false };
+                            
+                            if (canActivateResult.canActivate) {
+                                slot.classList.add('teleport-drop-ready');
+                                slot.classList.remove('teleport-drop-invalid');
+                            } else {
+                                slot.classList.add('teleport-drop-invalid');
+                                slot.classList.remove('teleport-drop-ready');
+                            }
+                            
+                            // Update tracking
+                            currentTooltip = existingTooltip;
+                            currentTooltipSlot = slot;
+                        }
+                        
+                        return; 
+                    } else {
+                        // Other global spells show the hint
+                        const slot = event.currentTarget;
+                        slot.classList.add('global-spell-hover');
+                        return;
+                    }
+                }
             }
             
             event.preventDefault();
@@ -1610,6 +1719,9 @@ function onTeamSlotDragOver(event, position) {
                     // Special case for Semi gold learning
                     slot.classList.add('spell-drop-ready');
                     slot.classList.remove('spell-drop-invalid');
+                } else if (learnCheck.isDarkDealGoldLearning) {
+                    tooltipClass += ' darkdeal-gold-learn';
+                    tooltipMessage = learnCheck.reason;
                 } else {
                     slot.classList.add('spell-drop-invalid');
                     slot.classList.remove('spell-drop-ready');
@@ -1710,7 +1822,7 @@ function onTeamSlotDragOver(event, position) {
             return;
         }
 
-        // NEW: Check if it's an equip artifact card
+        // Check if it's an equip artifact card
         if (window.heroSelection.heroEquipmentManager && 
             window.heroSelection.heroEquipmentManager.isEquipArtifactCard(cardName)) {
             
@@ -1866,10 +1978,11 @@ function onTeamSlotDragLeave(event) {
         slot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
         slot.classList.remove('equip-drop-ready', 'equip-drop-invalid');
         slot.classList.remove('global-spell-hover');
+        slot.classList.remove('teleport-drop-ready', 'teleport-drop-invalid'); // Add this line
         
         // Remove tooltip if this is the current tooltip slot
         if (currentTooltipSlot === slot) {
-            const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip'); 
+            const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip, .teleport-drop-tooltip');
             if (tooltip) {
                 tooltip.remove();
             }
@@ -1897,6 +2010,12 @@ async function onTeamSlotDrop(event, targetSlot) {
     if (window.heroSelection && window.handManager && window.handManager.isHandDragging()) {
         const dragState = window.handManager.getHandDragState();
         const cardName = dragState.draggedCardName;
+    
+        // Check for global spell (including Teleport)
+        if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
+            const success = window.globalSpellManager.handleGlobalSpellDropOnHero(targetSlot, window.heroSelection);
+            return success;
+        }
         
         // Check for ability card
         if (window.heroSelection.heroAbilitiesManager?.isAbilityCard(cardName)) {
@@ -1911,7 +2030,7 @@ async function onTeamSlotDrop(event, targetSlot) {
             return success;
         }
         
-        // NEW: Check for equip artifact card
+        // Check for equip artifact card
         if (window.heroSelection.heroEquipmentManager?.isEquipArtifactCard(cardName)) {
             // Handle equipment drop through heroSelection
             const success = await window.heroSelection.handleEquipArtifactDrop(targetSlot);
@@ -2238,7 +2357,7 @@ window.showHeroSpellbookTooltip = function(position) {
 window.handleHeroHoverEnter = function(position, element) {
     if (!window.heroSelection) return;
     
-    // NEW: Don't show any tooltips during drag operations
+    // Don't show any tooltips during drag operations
     if (window.heroSelection.formationManager?.isDragging()) {
         return;
     }
@@ -3079,6 +3198,158 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
         .formation-spellbook-tooltip:not(.locked-mode) {
             pointer-events: none;
         }
+        /* Responsive adjustments - matching other displays */
+        @media (max-width: 768px) {
+            .permanent-artifacts-indicator {
+                top: 10px;
+                right: 10px;
+                padding: 5px 10px;
+                min-width: 70px;
+                min-height: 28px;
+            }
+            
+            .artifact-scroll-icon {
+                font-size: 16px;
+            }
+            
+            .artifact-count {
+                font-size: 14px;
+                letter-spacing: 0.5px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .permanent-artifacts-indicator {
+                padding: 4px 8px;
+                min-width: 60px;
+                min-height: 26px;
+                gap: 4px;
+            }
+            
+            .artifact-scroll-icon {
+                font-size: 14px;
+            }
+            
+            .artifact-count {
+                font-size: 12px;
+                letter-spacing: 0.3px;
+            }
+        }
+
+        /* Character Selection Tags Integration */
+        .character-card .card-tags-container {
+            margin-top: 6px;
+            margin-bottom: 8px;
+            padding: 0 8px;
+            max-width: 100%;
+        }
+
+        .character-card.character-selectable .card-tags-container {
+            opacity: 0.9;
+            transition: opacity 0.3s ease;
+        }
+
+        .character-card.character-selectable:hover .card-tags-container {
+            opacity: 1;
+        }
+
+        .character-card.character-selected .card-tags-container {
+            opacity: 1;
+        }
+
+        .character-card.character-selected .card-tag {
+            animation: selectedCharacterTagGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes selectedCharacterTagGlow {
+            from {
+                box-shadow: 
+                    0 2px 4px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+            to {
+                box-shadow: 
+                    0 4px 12px rgba(255, 255, 255, 0.4),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            }
+        }
+
+        /* Character selection grid adjustments to accommodate tags */
+        .character-selection-grid .character-card {
+            min-height: 240px; /* Increased to accommodate tags */
+        }
+
+        /* Teleport Drop Ready State */
+        .team-slot.teleport-drop-ready {
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.2) 0%, rgba(63, 81, 181, 0.2) 100%);
+            border-color: #9c27b0;
+            box-shadow: 0 0 15px rgba(156, 39, 176, 0.4);
+            animation: teleportDropPulse 1s ease-in-out infinite;
+        }
+
+        @keyframes teleportDropPulse {
+            0%, 100% { 
+                box-shadow: 0 0 15px rgba(156, 39, 176, 0.4);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(156, 39, 176, 0.7);
+            }
+        }
+
+
+        /* Teleport Drop States */
+        .team-slot.teleport-drop-ready {
+            background: linear-gradient(135deg, rgba(63, 81, 181, 0.2) 0%, rgba(156, 39, 176, 0.2) 100%);
+            border-color: #3f51b5;
+            box-shadow: 0 0 15px rgba(63, 81, 181, 0.4);
+            animation: teleportDropPulse 1s ease-in-out infinite;
+        }
+        
+        .team-slot.teleport-drop-invalid {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(229, 57, 53, 0.2) 100%);
+            border-color: #f44336;
+            box-shadow: 0 0 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        @keyframes teleportDropPulse {
+            0%, 100% { 
+                box-shadow: 0 0 15px rgba(63, 81, 181, 0.4);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(63, 81, 181, 0.7);
+            }
+        }
+        
+        .teleport-drop-tooltip {
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .teleport-drop-tooltip.can-teleport {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .teleport-drop-tooltip.cannot-teleport {
+            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .teleport-drop-tooltip.long-text {
+            max-width: 250px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        .spell-drop-tooltip.darkdeal-gold-learn {
+            background: linear-gradient(135deg, #6a1b9a 0%, #4a148c 100%);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 15px rgba(106, 27, 154, 0.4);
+        }
     `;
     document.head.appendChild(style);
 }
@@ -3233,6 +3504,7 @@ if (typeof window !== 'undefined') {
     window.onDiscardPileDrop = onDiscardPileDrop;
     window.onDiscardPileHoverEnter = onDiscardPileHoverEnter;
     window.onDiscardPileHoverLeave = onDiscardPileHoverLeave;
+    window.DarkDealSpell = DarkDealSpell;
 }
 
 export default HeroSelectionUI;

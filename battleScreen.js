@@ -19,7 +19,7 @@ export class BattleScreen {
         this.opponentAbilities = null;
         
         // Initialize BattleLog instance
-        this.battleLog = new BattleLog('combatLog', 100);
+        this.battleLog = new BattleLog('combatLog', 1000);
         
         // Initialize battle manager with synchronization support
         this.battleManager = new BattleManager();
@@ -49,20 +49,13 @@ export class BattleScreen {
         actionManager = null,
         playerCreatures = null, opponentCreatures = null,
         playerEquips = null, opponentEquips = null,
-        playerEffectiveStats = null,
-        opponentEffectiveStats = null,
-        playerPermanentArtifacts = null,
-        opponentPermanentArtifacts = null,
-        playerHand = null,
-        opponentHand = null,
-        playerDeck = null,
-        opponentDeck = null,
-        playerAreaCard = null,  
-        opponentAreaCard = null,
-        playerGraveyard = null,
-        opponentGraveyard = null,
-        playerBirthdayPresentCounter = null,
-        opponentBirthdayPresentCounter = null) { 
+        playerEffectiveStats = null, opponentEffectiveStats = null,
+        playerPermanentArtifacts = null, opponentPermanentArtifacts = null,
+        playerHand = null, opponentHand = null,
+        playerDeck = null, opponentDeck = null,
+        playerAreaCard = null, opponentAreaCard = null,
+        playerGraveyard = null, opponentGraveyard = null,
+        playerCounters = null, opponentCounters = null) { 
             
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -90,13 +83,12 @@ export class BattleScreen {
         this.opponentGraveyard = opponentGraveyard || [];
         this.playerAreaCard = playerAreaCard;
         this.opponentAreaCard = opponentAreaCard;
-        this.playerBirthdayPresentCounter = playerBirthdayPresentCounter || 0;
-        this.opponentBirthdayPresentCounter = opponentBirthdayPresentCounter || 0;
+        this.playerCounters = playerCounters || { birthdayPresent: 0 };
+        this.opponentCounters = opponentCounters || { birthdayPresent: 0 };
 
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
-            playerFormation,
-            opponentFormation,
+            playerFormation, opponentFormation,
             gameDataSender,
             isHost,
             this,
@@ -104,28 +96,17 @@ export class BattleScreen {
             goldManager,
             (result) => this.onBattleEnd(result),
             roomManagerForPersistence || roomManager,
-            playerAbilities,
-            opponentAbilities,
-            playerSpellbooks,
-            opponentSpellbooks,
-            playerCreatures, 
-            opponentCreatures,
-            playerEquips,
-            opponentEquips,
-            playerEffectiveStats,
-            opponentEffectiveStats,
-            this.playerPermanentArtifacts,
-            this.opponentPermanentArtifacts,
-            this.playerHand,
-            this.opponentHand,
-            this.playerDeck,
-            this.opponentDeck,
-            this.playerAreaCard,
-            this.opponentAreaCard,
-            this.playerGraveyard,
-            this.opponentGraveyard,
-            this.playerBirthdayPresentCounter,
-            this.opponentBirthdayPresentCounter 
+            playerAbilities, opponentAbilities,
+            playerSpellbooks, opponentSpellbooks,
+            playerCreatures,  opponentCreatures,
+            playerEquips, opponentEquips,
+            playerEffectiveStats, opponentEffectiveStats,
+            this.playerPermanentArtifacts, this.opponentPermanentArtifacts,
+            this.playerHand, this.opponentHand,
+            this.playerDeck, this.opponentDeck,
+            this.playerAreaCard, this.opponentAreaCard,
+            this.playerGraveyard, this.opponentGraveyard,
+            this.playerCounters, this.opponentCounters  
         );
     }
 
@@ -966,14 +947,15 @@ export class BattleScreen {
                         </div>
                     </div>
                     
-                    <!-- Combat Log Area - UPDATED for BattleLog integration -->
+                    <!-- Combat Log Area - UPDATED with creature toggle button -->
                     <div class="combat-log-section">
                         <div class="log-header">
                             <h3>📜 Combat Log</h3>
                             <div class="log-controls">
                                 <button id="logScrollTop" class="log-control-btn" title="Scroll to top">⬆️</button>
                                 <button id="logToggleAutoScroll" class="log-control-btn" title="Toggle auto-scroll">📌</button>
-                                <button id="logClear" class="log-control-btn" title="Clear log">🗑️</button>
+                                <button id="logToggleCombat" class="log-control-btn" title="Toggle combat messages">⚔️</button>
+                                <button id="logToggleCreature" class="log-control-btn" title="Toggle creature messages">👾</button>
                             </div>
                         </div>
                         <div class="combat-log-area" id="combatLog">
@@ -993,6 +975,79 @@ export class BattleScreen {
                 </div>
             </div>
         `;
+    }
+
+    // Updated initializeLogControls method to handle the new combat toggle button
+    initializeLogControls() {
+        // Set up log control buttons
+        setTimeout(() => {
+            const scrollTopBtn = document.getElementById('logScrollTop');
+            const toggleAutoScrollBtn = document.getElementById('logToggleAutoScroll');
+            const toggleCombatBtn = document.getElementById('logToggleCombat');
+            const toggleCreatureBtn = document.getElementById('logToggleCreature');
+            
+            if (scrollTopBtn) {
+                scrollTopBtn.addEventListener('click', () => {
+                    this.battleLog.scrollToTop();
+                });
+            }
+            
+            if (toggleAutoScrollBtn) {
+                toggleAutoScrollBtn.addEventListener('click', () => {
+                    const autoScroll = this.battleLog.toggleAutoScroll();
+                    toggleAutoScrollBtn.title = autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll';
+                    toggleAutoScrollBtn.style.opacity = autoScroll ? '1' : '0.5';
+                });
+            }
+            
+            if (toggleCombatBtn) {
+                // Set initial state based on battleLog
+                const initialCombatState = this.battleLog.getCombatMessagesEnabled();
+                toggleCombatBtn.textContent = initialCombatState ? '⚔️' : '🚫⚔️';
+                toggleCombatBtn.title = initialCombatState ? 'Hide combat messages' : 'Show combat messages';
+                
+                toggleCombatBtn.addEventListener('click', () => {
+                    const isEnabled = this.battleLog.toggleCombatMessages();
+                    
+                    // Update button appearance
+                    toggleCombatBtn.textContent = isEnabled ? '⚔️' : '🚫⚔️';
+                    toggleCombatBtn.title = isEnabled ? 'Hide combat messages' : 'Show combat messages';
+                    
+                    // Optional: Add visual feedback
+                    toggleCombatBtn.style.opacity = isEnabled ? '1' : '0.7';
+                    
+                    // Brief animation to show the toggle happened
+                    toggleCombatBtn.style.transform = 'scale(0.9)';
+                    setTimeout(() => {
+                        toggleCombatBtn.style.transform = 'scale(1)';
+                    }, 100);
+                });
+            }
+            
+            if (toggleCreatureBtn) {
+                // Set initial state based on battleLog
+                const initialCreatureState = this.battleLog.getCreatureMessagesEnabled();
+                toggleCreatureBtn.textContent = initialCreatureState ? '👾' : '🚫👾';
+                toggleCreatureBtn.title = initialCreatureState ? 'Hide creature messages' : 'Show creature messages';
+                
+                toggleCreatureBtn.addEventListener('click', () => {
+                    const isEnabled = this.battleLog.toggleCreatureMessages();
+                    
+                    // Update button appearance
+                    toggleCreatureBtn.textContent = isEnabled ? '👾' : '🚫👾';
+                    toggleCreatureBtn.title = isEnabled ? 'Hide creature messages' : 'Show creature messages';
+                    
+                    // Optional: Add visual feedback
+                    toggleCreatureBtn.style.opacity = isEnabled ? '1' : '0.7';
+                    
+                    // Brief animation to show the toggle happened
+                    toggleCreatureBtn.style.transform = 'scale(0.9)';
+                    setTimeout(() => {
+                        toggleCreatureBtn.style.transform = 'scale(1)';
+                    }, 100);
+                });
+            }
+        }, 150);
     }
 
     // Initialize speed control UI - NEW METHOD
@@ -1020,37 +1075,6 @@ export class BattleScreen {
         this.initializeLogControls();
         
         return success;
-    }
-
-    // Initialize log control buttons
-    initializeLogControls() {
-        // Set up log control buttons
-        setTimeout(() => {
-            const scrollTopBtn = document.getElementById('logScrollTop');
-            const toggleAutoScrollBtn = document.getElementById('logToggleAutoScroll');
-            const clearLogBtn = document.getElementById('logClear');
-            
-            if (scrollTopBtn) {
-                scrollTopBtn.addEventListener('click', () => {
-                    this.battleLog.scrollToTop();
-                });
-            }
-            
-            if (toggleAutoScrollBtn) {
-                toggleAutoScrollBtn.addEventListener('click', () => {
-                    const autoScroll = this.battleLog.toggleAutoScroll();
-                    toggleAutoScrollBtn.title = autoScroll ? 'Disable auto-scroll' : 'Enable auto-scroll';
-                    toggleAutoScrollBtn.style.opacity = autoScroll ? '1' : '0.5';
-                });
-            }
-            
-            if (clearLogBtn) {
-                clearLogBtn.addEventListener('click', () => {
-                    this.battleLog.clear();
-                    this.battleLog.addMessage('📝 Combat log cleared', 'system');
-                });
-            }
-        }, 150);
     }
 
     // UPDATED: Create individual battle hero slot using pre-calculated hero stats

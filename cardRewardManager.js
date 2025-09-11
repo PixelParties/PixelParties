@@ -5,6 +5,7 @@ import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js'
 import { killTracker } from './killTracker.js';
 import CharmeManager from './Abilities/charme.js';
 import { SidHeroEffect } from './Heroes/sid.js';
+import { CardRewardGenerator } from './cardRewardGenerator.js';
 
 import { calculateFormationWantedPosterBonuses, generateWantedPosterBonusHTML, getWantedPosterStyles } from './Artifacts/wantedPoster.js';
 
@@ -26,6 +27,9 @@ export class CardRewardManager {
         // Initialize thieving manager
         this.thievingManager = new ThievingManager();
 
+        // Initialize card reward generator
+        this.cardRewardGenerator = new CardRewardGenerator();
+
         this.sidHeroEffect = null;
         
         // Define all available heroes and their card sets
@@ -41,6 +45,7 @@ export class CardRewardManager {
             { name: 'Medea', image: './Cards/Characters/Medea.png' },
             { name: 'Monia', image: './Cards/Characters/Monia.png' },
             { name: 'Nicolas', image: './Cards/Characters/Nicolas.png' },
+            { name: 'Nomu', image: './Cards/Characters/Nomu.png' },
             { name: 'Semi', image: './Cards/Characters/Semi.png' },
             { name: 'Sid', image: './Cards/Characters/Sid.png' },
             { name: 'Tharx', image: './Cards/Characters/Tharx.png' },
@@ -51,7 +56,7 @@ export class CardRewardManager {
         this.heroCardSets = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
-            'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RacketArrow', 'RainbowsArrow', 'RainOfArrows'],
+            'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'Fighting', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechFists', 'FutureTechLamp', 'FutureTechCopyDevice'],
             'Ida': ['BottledFlame', 'BurningFinger', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
@@ -60,9 +65,10 @@ export class CardRewardManager {
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
+            'Nomu': ['MagicArts', 'Training', 'Teleport', 'Teleportal', 'StaffOfTheTeleporter', 'TeleportationPowder', 'PlanetInABottle', 'SpatialCrevice'],
             'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
-            'Tharx': ['Archer', 'Cavalry', 'Challenge', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
+            'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic']
         };
@@ -368,7 +374,8 @@ export class CardRewardManager {
         let birthdayPresentBonusCards = 0;
 
         // Use the correct field name and add fallback
-        const opponentCounter = heroSelection.opponentBirthdayPresentCounter || heroSelection.opponentBirthdayPresentCounterData || 0;
+        const opponentCounter = heroSelection.opponentCounters?.birthdayPresent || 
+                       heroSelection.opponentBirthdayPresentCounterData || 0;
 
         if (opponentCounter > 0) {
             birthdayPresentBonusCards = opponentCounter;
@@ -403,9 +410,12 @@ export class CardRewardManager {
             }
             
             // Clear the counter since it's been used
-            heroSelection.opponentBirthdayPresentCounter = 0;
-            if (heroSelection.opponentBirthdayPresentCounterData !== undefined) {
-                heroSelection.opponentBirthdayPresentCounterData = 0;
+            if (heroSelection.playerCounters) {
+                heroSelection.playerCounters.birthdayPresent = 0;
+            }
+            
+            if (heroSelection.opponentCounters) {
+                heroSelection.opponentCounters.birthdayPresent = 0;
             }
             
             // Store this for the breakdown display
@@ -1604,115 +1614,32 @@ export class CardRewardManager {
     }
 
     generateRewardCards(count = 3) {
-        const allCards = getAllAbilityCards();
-        
-        // Get current deck contents
-        const currentDeck = this.deckManager ? this.deckManager.getDeck() : [];
-        const currentDeckCardNames = currentDeck.map(card => 
-            typeof card === 'string' ? card : card.name
-        );
-        
-        // Separate cards by type and whether they're in deck
-        const abilityCards = allCards.filter(card => card.cardType === 'Ability');
-        const spellCards = allCards.filter(card => card.cardType === 'Spell');
-        const otherCards = allCards.filter(card => 
-            card.cardType !== 'Ability' && 
-            card.cardType !== 'Spell' && 
-            card.cardType !== 'hero'
-        ); // Artifacts, Potions, etc.
-        
-        const abilityCardsInDeck = abilityCards.filter(card => currentDeckCardNames.includes(card.name));
-        const abilityCardsNotInDeck = abilityCards.filter(card => !currentDeckCardNames.includes(card.name));
-        
-        const spellCardsInDeck = spellCards.filter(card => currentDeckCardNames.includes(card.name));
-        const spellCardsNotInDeck = spellCards.filter(card => !currentDeckCardNames.includes(card.name));
-        
-        const otherCardsInDeck = otherCards.filter(card => currentDeckCardNames.includes(card.name));
-        const otherCardsNotInDeck = otherCards.filter(card => !currentDeckCardNames.includes(card.name));
-        
-        const rewardCards = [];
-        
-        // First card: Always an Ability
-        const firstCard = this.selectCardByType(abilityCardsInDeck, abilityCardsNotInDeck, 'Ability');
-        if (firstCard) {
-            rewardCards.push(firstCard);
-        }
-        
-        // Second card: Always a Spell
-        const secondCard = this.selectCardByType(spellCardsInDeck, spellCardsNotInDeck, 'Spell');
-        if (secondCard) {
-            rewardCards.push(secondCard);
-        }
-        
-        // Third card: Anything except Ability, Spell, or Hero (so Artifacts, Potions, etc.)
-        const thirdCard = this.selectCardByType(otherCardsInDeck, otherCardsNotInDeck, 'Other');
-        if (thirdCard) {
-            rewardCards.push(thirdCard);
-        }
-        
-        // Fallback: if we don't have enough cards, fill with random available cards
-        while (rewardCards.length < count && allCards.length > 0) {
-            const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
-            if (!rewardCards.some(card => card.name === randomCard.name)) {
-                rewardCards.push(randomCard);
-            }
-        }
-        
-        return rewardCards;
-    }
-
-    // Helper method to select card based on 1/3 existing, 2/3 new ratio
-    selectCardByType(cardsInDeck, cardsNotInDeck, typeName) {
-        // 1/3 chance for existing card, 2/3 chance for new card
-        const useExistingCard = Math.random() < (1/3);
-        
-        let selectedCard = null;
-        
-        if (useExistingCard && cardsInDeck.length > 0) {
-            // Pick random card from deck
-            const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
-            selectedCard = cardsInDeck[randomIndex];
-        } else if (cardsNotInDeck.length > 0) {
-            // Pick random card not in deck
-            const randomIndex = Math.floor(Math.random() * cardsNotInDeck.length);
-            selectedCard = cardsNotInDeck[randomIndex];
-        } else if (cardsInDeck.length > 0) {
-            // Fallback: pick from existing cards if no new cards available
-            const randomIndex = Math.floor(Math.random() * cardsInDeck.length);
-            selectedCard = cardsInDeck[randomIndex];
-        }
-        
-        return selectedCard;
-    }
-
-    generateFallbackRewards(allCards, count) {
-        const rewardCards = [];
-        const usedIndices = new Set();
-        
-        const maxCards = Math.min(count, allCards.length);
-        
-        while (rewardCards.length < maxCards) {
-            const randomIndex = Math.floor(Math.random() * allCards.length);
-            
-            if (!usedIndices.has(randomIndex)) {
-                usedIndices.add(randomIndex);
-                rewardCards.push(allCards[randomIndex]);
-            }
-        }
-        
-        return rewardCards;
+        // Use the card reward generator with player counters for Monkee support
+        const playerCounters = this.heroSelection?.playerCounters || { goldenBananas: 0 };
+        return this.cardRewardGenerator.generateRewardCards(this.deckManager, playerCounters, count);
     }
 
     createHeroRewardHTML(hero, index) {
         const heroCards = this.heroCardSets[hero.name] || [];
         
+        // Add tags HTML using the existing tagsManager
+        const tagsHTML = window.tagsManager ? 
+            window.tagsManager.createTagsHTML(hero.name, {
+                size: 'small',
+                layout: 'horizontal',
+                animated: true
+            }) : '';
+        
         return `
-            <div class="reward-card" data-reward-index="${index}">
+            <div class="reward-card hero-reward-card" data-reward-index="${index}">
                 <div class="reward-card-inner">
-                    <img src="${hero.image}" 
-                         alt="${hero.name}" 
-                         class="hero-card-image"
-                         onerror="this.src='./Cards/Characters/placeholder.png'">
+                    <div class="reward-hero-image-container">
+                        <img src="${hero.image}" 
+                             alt="${hero.name}" 
+                             class="hero-card-image"
+                             onerror="this.src='./Cards/Characters/placeholder.png'">
+                        ${tagsHTML}
+                    </div>
                     <div class="reward-card-info">
                         <h3 class="reward-card-name">${hero.name}</h3>
                         <p class="reward-card-type">Hero Character</p>

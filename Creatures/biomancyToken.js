@@ -5,8 +5,8 @@ export class BiomancyTokenCreature {
         this.battleManager = battleManager;
         this.activeVineEffects = new Set(); // Track active vine effects for cleanup
         
-        // Biomancy Token stats
-        this.VINE_ANIMATION_TIME = 800; // 0.8 second vine animation
+        // Biomancy Token stats - UPDATED: 3x faster animation
+        this.VINE_ANIMATION_TIME = 100; // 0.267 second vine animation (was 800ms)
         
         // Inject CSS styles
         this.injectBiomancyTokenStyles();
@@ -35,7 +35,12 @@ export class BiomancyTokenCreature {
         
         this.battleManager.addCombatLog(
             `🌿 ${biomancyTokenCreature.name} channels its life force through writhing vines!`, 
-            attackerSide === 'player' ? 'success' : 'error'
+            attackerSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Use standard targeting system (reusing existing code)
@@ -47,7 +52,12 @@ export class BiomancyTokenCreature {
         if (!target) {
             this.battleManager.addCombatLog(
                 `💨 ${biomancyTokenCreature.name} finds no targets for its vine attack!`, 
-                'info'
+                'info',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
             );
             return;
         }
@@ -59,7 +69,12 @@ export class BiomancyTokenCreature {
         const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
         this.battleManager.addCombatLog(
             `🎯 ${biomancyTokenCreature.name} targets ${targetName} with thorned vines! (${damage} damage)`, 
-            attackerSide === 'player' ? 'success' : 'error'
+            attackerSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Send synchronization data to guest (reusing existing pattern)
@@ -111,7 +126,12 @@ export class BiomancyTokenCreature {
 
         this.battleManager.addCombatLog(
             `💥 The thorned vines strike true, dealing ${damage} damage!`, 
-            'info'
+            'info',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
     }
 
@@ -368,12 +388,12 @@ export class BiomancyTokenCreature {
                 creatureName: target.creature ? target.creature.name : null,
                 maxHp: target.type === 'hero' ? target.hero.maxHp : (target.creature ? target.creature.maxHp : 100)
             },
-            damage: damage, // CRITICAL: This is at the top level
+            damage: damage,
             animationTime: this.VINE_ANIMATION_TIME
         });
     }
 
-    // FIXED: Handle Biomancy Token vine attack on guest side
+    // Handle Biomancy Token vine attack on guest side
     handleGuestVineAttack(data) {
         const { biomancyTokenData, target, damage, animationTime } = data;
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
@@ -383,7 +403,12 @@ export class BiomancyTokenCreature {
         
         this.battleManager.addCombatLog(
             `🌿 ${biomancyTokenData.name} unleashes thorned vines!`, 
-            biomancyTokenLocalSide === 'player' ? 'success' : 'error'
+            biomancyTokenLocalSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // CRITICAL FIX: Add small delay to ensure proper timing and element availability
@@ -392,7 +417,7 @@ export class BiomancyTokenCreature {
         }, 50);
     }
 
-    // FIXED: Create vine attack on guest side with damage parameter
+    // Create vine attack on guest side with damage parameter
     async createGuestVineAttack(biomancyTokenData, targetData, damage, animationTime, myAbsoluteSide) {
         // Find target element using absoluteSide mapping
         const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
@@ -484,7 +509,7 @@ export class BiomancyTokenCreature {
         return targetElement;
     }
 
-    // FIXED: Execute guest vine animation with damage parameter
+    // Execute guest vine animation with damage parameter
     async executeGuestVineAnimation(targetElement, targetData, damage, animationTime, targetLocalSide) {
         try {
             // Ensure target element is still valid and in DOM
@@ -526,7 +551,12 @@ export class BiomancyTokenCreature {
             
             this.battleManager.addCombatLog(
                 `🎯 ${targetName} is entangled by thorned vines for ${damage} damage!`,
-                targetLocalSide === 'player' ? 'error' : 'success'
+                targetLocalSide === 'player' ? 'error' : 'success',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
             );
             
         } catch (error) {

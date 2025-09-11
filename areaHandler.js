@@ -1,4 +1,4 @@
-// areaHandler.js - Area Card Management Module with Smart Counter Display Updates
+// areaHandler.js - Area Card Management Module with Smart Counter Display Updates and MagicArts Integration
 export class AreaHandler {
     constructor() {
         this.areaCard = null;
@@ -230,6 +230,18 @@ export class AreaHandler {
             return false;
         }
 
+        
+        const canUseCheck = this.canAnyHeroUseAreaSpell(cardName);
+        if (!canUseCheck.canUse) {
+            const formattedSpellSchool = this.formatCardName(canUseCheck.spellSchool);
+            const formattedSpellName = this.formatCardName(cardName);
+            const errorMessage = `No hero can use ${formattedSpellName}! Requires ${formattedSpellSchool} level ${canUseCheck.requiredLevel}+.`;
+            
+            this.showAreaDropResult(errorMessage, false);
+            this.heroSelection.handManager.endHandCardDrag();
+            return false;
+        }
+
         // Check if replacing an existing area card
         const isReplacement = this.areaCard !== null;
         const previousAreaName = isReplacement ? this.areaCard.name : null;
@@ -267,6 +279,21 @@ export class AreaHandler {
                 });
                 newAreaCard.doomCounters = 0;
             }
+        }
+
+        // Reset CrystalWell when new area is placed
+        if (cardName === 'CrystalWell') {
+            const { crystalWellManager } = await import('../Spells/crystalWell.js');
+            crystalWellManager.resetForNewCrystalWell();
+        }
+
+        if (cardName === 'SpatialCrevice') {
+            // SpatialCrevice doesn't need special initialization like counters
+            import('../Spells/spatialCrevice.js').then(({ initializeSpatialCreviceArea }) => {
+                initializeSpatialCreviceArea(newAreaCard);
+            }).catch(error => {
+                console.error('Error initializing SpatialCrevice:', error);
+            });
         }
 
         // Handle action costs
@@ -325,9 +352,84 @@ export class AreaHandler {
 
         await this.heroSelection.saveGameState();
         await this.heroSelection.sendFormationUpdate();
+
+        // MagicArts redraw integration: Check for MagicArts redraw after successful area placement
+        try {
+            // Import the MagicArts redraw system
+            if (typeof window !== 'undefined' && window.magicArtsRedraw) {
+                // Use the existing global MagicArts redraw system
+                const redrawSuccess = await window.magicArtsRedraw.handleMagicArtsRedraw(cardName, this.heroSelection);
+                if (redrawSuccess) {
+                    console.log(`MagicArts redraw triggered for area spell: ${cardName}`);
+                }
+            } else {
+                // Fallback: try to import the module
+                const { magicArtsRedraw } = await import('../Abilities/magicArts.js');
+                const redrawSuccess = await magicArtsRedraw.handleMagicArtsRedraw(cardName, this.heroSelection);
+                if (redrawSuccess) {
+                    console.log(`MagicArts redraw triggered for area spell: ${cardName}`);
+                }
+            }
+        } catch (error) {
+            console.error('Error processing MagicArts redraw for area spell:', error);
+            // Don't fail the area placement if MagicArts processing fails
+        }
+
         this.heroSelection.handManager.endHandCardDrag();
 
         return true;
+    }
+
+    // Check if any hero can use this area spell
+    canAnyHeroUseAreaSpell(areaCardName) {
+        if (!this.heroSelection) return false;
+        
+        const cardInfo = this.heroSelection.getCardInfo(areaCardName);
+        if (!cardInfo || cardInfo.cardType !== 'Spell' || cardInfo.subtype !== 'Area') {
+            return false;
+        }
+        
+        const formation = this.heroSelection.formationManager.getBattleFormation();
+        const spellSchool = cardInfo.spellSchool;
+        const requiredLevel = cardInfo.level || 0;
+        
+        // Check each hero position
+        for (const position of ['left', 'center', 'right']) {
+            const hero = formation[position];
+            if (!hero) continue;
+            
+            // Count spell school abilities for this hero
+            const heroAbilities = this.heroSelection.heroAbilitiesManager.getHeroAbilities(position);
+            let totalSpellSchoolLevel = 0;
+            
+            ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                if (heroAbilities && heroAbilities[zone]) {
+                    heroAbilities[zone].forEach(ability => {
+                        if (ability && ability.name === spellSchool) {
+                            totalSpellSchoolLevel++;
+                        }
+                    });
+                }
+            });
+            
+            // If this hero meets the requirements, area spell can be used
+            if (totalSpellSchoolLevel >= requiredLevel) {
+                return {
+                    canUse: true,
+                    heroName: hero.name,
+                    heroPosition: position,
+                    hasLevel: totalSpellSchoolLevel,
+                    needsLevel: requiredLevel
+                };
+            }
+        }
+        
+        // No hero can use this area spell
+        return {
+            canUse: false,
+            spellSchool: spellSchool,
+            requiredLevel: requiredLevel
+        };
     }
 
     async onAreaSlotDrop(event) {

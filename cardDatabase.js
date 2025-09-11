@@ -14,7 +14,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 30,
         ability1: 'DestructionMagic',
-        ability2: 'SummoningMagic'
+        ability2: 'SummoningMagic',
+        tags: ["Summoner", "Damage Dealer", "Card Draw"]
     },
     'Cecilia': {
         name: 'Cecilia',
@@ -27,7 +28,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 80,
         ability1: 'Navigation',
-        ability2: 'Wealth'
+        ability2: 'Wealth',
+        tags: ["Attacker", "Gold Generation", "Damage Dealer"]
     },
     'Darge': {
         name: 'Darge',
@@ -40,7 +42,8 @@ const CARD_DATABASE = {
         hp: 350,
         atk: 80,
         ability1: 'Adventurousness',
-        ability2: 'Fighting'
+        ability2: 'Fighting',
+        tags: ["Attacker", "Sniper", "Damage Dealer"]
     },
     'Gon': {
         name: 'Gon',
@@ -53,7 +56,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'DecayMagic',
-        ability2: 'Resistance'
+        ability2: 'Resistance',
+        tags: ["Support", "Disruption", "Status Effects"]
     },
     'Heinz': {
         name: 'Heinz',
@@ -66,7 +70,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 10,
         ability1: 'Inventing',
-        ability2: 'Inventing'
+        ability2: 'Inventing',
+        tags: ["Setup", "Summoner", "Card Draw"]
     },
     'Ida': {
         name: 'Ida',
@@ -79,7 +84,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'DestructionMagic',
-        ability2: 'DestructionMagic'
+        ability2: 'DestructionMagic',
+        tags: ["Damage Dealer", "Area Damage", "Status Effects"]
     },
     'Kazena': {
         name: 'Kazena',
@@ -92,7 +98,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'Adventurousness',
-        ability2: 'SupportMagic'
+        ability2: 'SupportMagic',
+        tags: ["Card Draw", "Support", "Setup"]
     },
     'Kyli': {
         name: 'Kyli',
@@ -105,7 +112,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'Biomancy',
-        ability2: 'Occultism'
+        ability2: 'Occultism',
+        tags: ["Summoner", "Setup", "Attacker"]
     },
     'Medea': {
         name: 'Medea',
@@ -118,7 +126,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'Alchemy',
-        ability2: 'DecayMagic'
+        ability2: 'DecayMagic',
+        tags: ["Damage Dealer", "Status Effects", "Damage Over Time"]
     },
     'Monia': {
         name: 'Monia',
@@ -131,7 +140,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'Charme',
-        ability2: 'Fighting'
+        ability2: 'Fighting',
+        tags: ["Defense", "Support", "Attacker"]
     },
     'Nicolas': {
         name: 'Nicolas',
@@ -144,7 +154,22 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 40,
         ability1: 'Alchemy',
-        ability2: 'Alchemy'
+        ability2: 'Alchemy',
+        tags: ["Support", "Card Draw", "Potions"]
+    },
+    'Nomu': {
+        name: 'Nomu',
+        image: './Cards/Characters/Nomu.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 40,
+        ability1: 'MagicArts',
+        ability2: 'Training',
+        tags: ["Support", "Card Draw", "Defense"]
     },
     'Semi': {
         name: 'Semi',
@@ -157,7 +182,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 80,
         ability1: 'Adventurousness',
-        ability2: 'Adventurousness'
+        ability2: 'Adventurousness',
+        tags: ["Support", "Gold Gain", "Card Draw"]
     },
     'Sid': {
         name: 'Sid',
@@ -170,7 +196,8 @@ const CARD_DATABASE = {
         hp: 400,
         atk: 50,
         ability1: 'Thieving',
-        ability2: 'Thieving'
+        ability2: 'Thieving',
+        tags: ["Support", "Stealing", "Card Draw"]
     },
     'Tharx': {
         name: 'Tharx',
@@ -183,7 +210,8 @@ const CARD_DATABASE = {
         hp: 450,
         atk: 50,
         ability1: 'Leadership',
-        ability2: 'Leadership'
+        ability2: 'Leadership',
+        tags: ["Defense", "Summoner", "Support"]
     },
     'Toras': {
         name: 'Toras',
@@ -196,7 +224,8 @@ const CARD_DATABASE = {
         hp: 350,
         atk: 120,
         ability1: 'Fighting',
-        ability2: 'Fighting'
+        ability2: 'Fighting',
+        tags: ["Attacker", "Burst Damage", "Damage Dealer"]
     },
     'Vacarn': {
         name: 'Vacarn',
@@ -209,7 +238,8 @@ const CARD_DATABASE = {
         hp: 300,
         atk: 40,
         ability1: 'Leadership',
-        ability2: 'Necromancy'
+        ability2: 'Necromancy',
+        tags: ["Summoner", "Creature Spam", "Disruption"]
     },
 
     // CHARACTER-SPECIFIC CARDS - Alice's Cards
@@ -1052,7 +1082,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: 'Reaction'
+        subtype: null
     },
     'GuardChange': {
         name: 'GuardChange',
@@ -1138,7 +1168,7 @@ const CARD_DATABASE = {
         name: 'TheStormblade',
         image: './Cards/All/TheStormblade.png',
         cardType: 'Artifact',
-        cost: 10,
+        cost: 0,
         action: false,
         spellSchool: null,
         subtype: 'Equip'
@@ -1365,6 +1395,46 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: "Permanent"
     },
+    'CrystalWell': {
+        name: 'CrystalWell',
+        image: './Cards/All/CrystalWell.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: 'Area'
+    },
+    'HandOfDeath': {
+        name: 'HandOfDeath',
+        image: './Cards/All/HandOfDeath.png',
+        cardType: 'Spell',
+        level: 3,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
+        subtype: null
+    },
+    'CriticalStrike': {
+        name: 'CriticalStrike',
+        image: './Cards/All/CriticalStrike.png',
+        cardType: 'Spell',
+        level: 5,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
+    },
+    'DarkDeal': {
+        name: 'DarkDeal',
+        image: './Cards/All/DarkDeal.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'DecayMagic',
+        subtype: null
+    },
 
 
     //KAZENA
@@ -1583,6 +1653,150 @@ const CARD_DATABASE = {
 
 
 
+    // NOMU
+    'PlanetInABottle': {
+        name: 'PlanetInABottle',
+        image: './Cards/All/PlanetInABottle.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'TeleportationPowder': {
+        name: 'TeleportationPowder',
+        image: './Cards/All/TeleportationPowder.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'StaffOfTheTeleporter': {
+        name: 'StaffOfTheTeleporter',
+        image: './Cards/All/StaffOfTheTeleporter.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'Teleport': {
+        name: 'Teleport',
+        image: './Cards/All/Teleport.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: false,
+        spellSchool: 'MagicArts',
+        subtype: 'Reaction',
+        global: true
+    },
+    'Teleportal': {
+        name: 'Teleportal',
+        image: './Cards/All/Teleportal.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
+    },
+    'SpatialCrevice': {
+        name: 'SpatialCrevice',
+        image: './Cards/All/SpatialCrevice.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: 'Area'
+    },
+
+
+
+
+
+    
+
+
+
+    // MONKEES
+    'GoldenBananas': {
+        name: 'GoldenBananas',
+        image: './Cards/All/GoldenBananas.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'NonFungibleMonkee': {
+        name: 'NonFungibleMonkee',
+        image: './Cards/All/NonFungibleMonkee.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        archetype: 'Monkees'
+    },
+    'CheekyMonkee': {
+        name: 'CheekyMonkee',
+        image: './Cards/All/CheekyMonkee.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 40,
+        physicalAttack: true,
+        archetype: 'Monkees'
+    },
+    'ResilientMonkee': {
+        name: 'ResilientMonkee',
+        image: './Cards/All/ResilientMonkee.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 40,
+        physicalAttack: true,
+        archetype: 'Monkees'
+    },
+    'NimbleMonkee': {
+        name: 'NimbleMonkee',
+        image: './Cards/All/NimbleMonkee.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 1,
+        physicalAttack: true,
+        archetype: 'Monkees'
+    },
+    'CriminalMonkee': {
+        name: 'CriminalMonkee',
+        image: './Cards/All/CriminalMonkee.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 40,
+        physicalAttack: true,
+        archetype: 'Monkees'
+    },
+
+
+
 
 
 
@@ -1658,6 +1872,11 @@ export function getCardInfo(cardName) {
     // Only add aoe if it exists (for spell cards)
     if (cardInfo.aoe !== undefined) {
         baseInfo.aoe = cardInfo.aoe;
+    }
+    
+    // Only add archetype if it exists
+    if (cardInfo.archetype !== undefined) {
+        baseInfo.archetype = cardInfo.archetype;
     }
 
     // Add hero-specific properties if this is a hero card

@@ -12,8 +12,6 @@ export class BurningSkeletonCreature {
         
         // Inject CSS styles
         this.injectBurningSkeletonStyles();
-        
-        console.log('🔥 Burning Skeleton Creature module initialized');
     }
 
     // Check if a creature is Burning Skeleton
@@ -31,15 +29,9 @@ export class BurningSkeletonCreature {
         
         // Safety check: ensure Burning Skeleton is still alive
         if (!burningSkeletonCreature.alive || burningSkeletonCreature.currentHp <= 0) {
-            console.log(`Burning Skeleton is dead, cannot execute special attack`);
             return;
         }
         
-        this.battleManager.addCombatLog(
-            `🔥 ${burningSkeletonCreature.name} ignites its blade, preparing a blazing strike!`, 
-            attackerSide === 'player' ? 'success' : 'error'
-        );
-
         // Use standard targeting system (same as normal hero attacks)
         const target = this.battleManager.combatManager.authoritative_findTargetWithCreatures(
             position, 
@@ -49,7 +41,12 @@ export class BurningSkeletonCreature {
         if (!target) {
             this.battleManager.addCombatLog(
                 `💨 ${burningSkeletonCreature.name} finds no targets for its fire slash!`, 
-                'info'
+                'info',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
             );
             return;
         }
@@ -58,7 +55,12 @@ export class BurningSkeletonCreature {
         const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
         this.battleManager.addCombatLog(
             `🎯 ${burningSkeletonCreature.name} targets ${targetName} with a blazing slash!`, 
-            attackerSide === 'player' ? 'success' : 'error'
+            attackerSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Send synchronization data to guest BEFORE starting host animation
@@ -119,7 +121,12 @@ export class BurningSkeletonCreature {
 
         this.battleManager.addCombatLog(
             `💥 The blazing slash appears and strikes true, dealing ${this.SLASH_DAMAGE} damage and setting the target ablaze!`, 
-            'info'
+            'info',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
     }
 
@@ -273,7 +280,6 @@ export class BurningSkeletonCreature {
             
             document.body.appendChild(slashEffect);
             
-            console.log(`Created fire slash at target: ${slashAngle.toFixed(1)}°, animation time: ${adjustedAnimationTime}ms`);
             return slashEffect;
             
         } catch (error) {
@@ -539,7 +545,12 @@ export class BurningSkeletonCreature {
         
         this.battleManager.addCombatLog(
             `🔥 ${burningSkeletonData.name} unleashes a blazing slash!`, 
-            burningSkeletonLocalSide === 'player' ? 'success' : 'error'
+            burningSkeletonLocalSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Start guest animation immediately
@@ -623,7 +634,12 @@ export class BurningSkeletonCreature {
         
         this.battleManager.addCombatLog(
             `💀🔥 ${burningSkeletonCreature.name} erupts in a final blazing inferno as it dies!`, 
-            burningSkeletonSide === 'player' ? 'info' : 'info'
+            burningSkeletonSide === 'player' ? 'info' : 'info',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Find all enemy targets
@@ -632,14 +648,24 @@ export class BurningSkeletonCreature {
         if (allEnemyTargets.length === 0) {
             this.battleManager.addCombatLog(
                 `💨 ${burningSkeletonCreature.name}'s death flame storm finds no enemies!`, 
-                'info'
+                'info',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
             );
             return;
         }
 
         this.battleManager.addCombatLog(
             `🎯 Death flame storm targets ${allEnemyTargets.length} enemies simultaneously!`, 
-            'warning'
+            'warning',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Send death flame storm data to guest for synchronization
@@ -711,11 +737,6 @@ export class BurningSkeletonCreature {
         allTargets.forEach((target, index) => {
             const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
             
-            this.battleManager.addCombatLog(
-                `🔥 Death flame seeks ${targetName}!`, 
-                'warning'
-            );
-
             // Create slash effect and pass the attacking creature - FIXED
             slashPromises.push(this.executeDeathFlame(burningSkeletonElement, target, index, burningSkeletonCreature));
         });
@@ -723,11 +744,34 @@ export class BurningSkeletonCreature {
         // Wait for all slashes to complete
         await Promise.all(slashPromises);
 
-        // Add final message after all slashes complete
-        this.battleManager.addCombatLog(
-            `💥 ${burningSkeletonCreature.name}'s death flame storm complete! ${allTargets.length} enemies burned!`, 
-            'info'
-        );
+        // Count burned targets (in case resistance is added later)
+        let burnedCount = 0;
+        
+        allTargets.forEach(target => {
+            // For now, assume all targets are burned since there's no resistance check
+            // This makes the code future-proof if resistance is added later
+            if (target.type === 'hero' && target.hero.alive) {
+                burnedCount++;
+            } else if (target.type === 'creature' && target.creature.alive) {
+                burnedCount++;
+            }
+        });
+
+        // Add single consolidated log message
+        if (burnedCount > 0) {
+            this.battleManager.addCombatLog(
+                `🔥💀 The Burning Skeleton's final flame Burns ${burnedCount} target${burnedCount > 1 ? 's' : ''}!`, 
+                'warning',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
+            );
+        }
+
+        // Send consolidated update to guest
+        this.sendDeathFlameStormLogUpdate(burningSkeletonCreature, burnedCount);
     }
 
     // Execute a single death flame - ✅ FIXED: Now accepts attacking creature
@@ -769,12 +813,7 @@ export class BurningSkeletonCreature {
         // Clean up slash effect
         this.removeSlashEffect(slashEffect);
 
-        // Log the hit
-        const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
-        this.battleManager.addCombatLog(
-            `💥 Death flame strikes ${targetName} for ${this.SLASH_DAMAGE} damage and applies Burned!`, 
-            'warning'
-        );
+        // REMOVED: Individual log entry - now handled in executeDeathFlameStormAttack
     }
 
     // Send death flame storm data to guest for synchronization
@@ -804,6 +843,15 @@ export class BurningSkeletonCreature {
         });
     }
 
+    // Send consolidated log update to guest
+    sendDeathFlameStormLogUpdate(burningSkeletonCreature, burnedCount) {
+        this.battleManager.sendBattleUpdate('burning_skeleton_death_log', {
+            creatureName: burningSkeletonCreature.name,
+            burnedCount: burnedCount,
+            timestamp: Date.now()
+        });
+    }
+
     // Handle death flame storm on guest side
     async handleGuestDeathFlameStorm(data) {
         const { burningSkeletonData, targets, damage, burnedStacks, animationTime } = data;
@@ -812,16 +860,43 @@ export class BurningSkeletonCreature {
         
         this.battleManager.addCombatLog(
             `💀🔥 ${burningSkeletonData.name} erupts in a final blazing inferno as it dies!`, 
-            'info'
+            'info',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         this.battleManager.addCombatLog(
             `🎯 Death flame storm targets ${targets.length} enemies simultaneously!`, 
-            'warning'
+            'warning',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Start guest flame storm animation
         await this.createGuestDeathFlameStorm(burningSkeletonData, targets, animationTime, myAbsoluteSide);
+    }
+
+    // Handle guest-side consolidated log
+    handleGuestDeathFlameStormLog(data) {
+        const { creatureName, burnedCount } = data;
+        
+        if (burnedCount > 0) {
+            this.battleManager.addCombatLog(
+                `🔥💀 The Burning Skeleton's final flame Burns ${burnedCount} target${burnedCount > 1 ? 's' : ''}!`, 
+                'warning',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
+            );
+        }
     }
 
     // Create death flame storm on guest side
@@ -844,11 +919,6 @@ export class BurningSkeletonCreature {
         targetsData.forEach((targetData, index) => {
             const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
             
-            this.battleManager.addCombatLog(
-                `🔥 Death flame seeks ${targetName}!`, 
-                'warning'
-            );
-
             // Create slash effect (don't await - let them all execute simultaneously)
             slashPromises.push(this.executeGuestDeathFlame(burningSkeletonElement, targetData, index, animationTime, myAbsoluteSide));
         });
@@ -856,10 +926,14 @@ export class BurningSkeletonCreature {
         // Wait for all slashes to complete
         await Promise.all(slashPromises);
 
-        this.battleManager.addCombatLog(
-            `💥 ${burningSkeletonData.name}'s death flame storm complete! ${targetsData.length} enemies burned!`, 
-            'info'
-        );
+        // Count burned targets and add consolidated log (matching host behavior)
+        const burnedCount = targetsData.length;
+        if (burnedCount > 0) {
+            this.battleManager.addCombatLog(
+                `🔥💀 The Burning Skeleton's final flame Burns ${burnedCount} target${burnedCount > 1 ? 's' : ''}!`, 
+                'warning'
+            );
+        }
     }
 
     // Execute a single death flame on guest side
@@ -887,12 +961,7 @@ export class BurningSkeletonCreature {
             
             this.removeSlashEffect(slashEffect);
 
-            // Log damage (but don't apply - host handles that)
-            const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
-            this.battleManager.addCombatLog(
-                `💥 Death flame strikes ${targetName} for ${this.SLASH_DAMAGE} damage and applies Burned!`, 
-                'warning'
-            );
+            // REMOVED: Individual log entry - now handled via sendBattleUpdate
         }
     }
 
@@ -916,9 +985,7 @@ export class BurningSkeletonCreature {
     }
 
     // Clean up all active slash effects (called on battle end/reset)
-    cleanup() {
-        console.log(`Cleaning up ${this.activeSlashEffects.size} active Burning Skeleton slash effects`);
-        
+    cleanup() {        
         this.activeSlashEffects.forEach(slashEffect => {
             try {
                 if (slashEffect && slashEffect.parentNode) {
@@ -939,10 +1006,6 @@ export class BurningSkeletonCreature {
                     slashEffect.remove();
                 }
             });
-            
-            if (orphanedSlashes.length > 0) {
-                console.log(`Cleaned up ${orphanedSlashes.length} orphaned Burning Skeleton slash effects`);
-            }
         } catch (error) {
             console.warn('Error cleaning up orphaned slash effects:', error);
         }

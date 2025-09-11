@@ -1,4 +1,5 @@
 // ./Creatures/graveWorm.js - GraveWorm Creature with Self-Cloning on Ally Sacrifice + Bite Attack
+// Now with maximum 3 clones per sacrifice trigger
 
 import { getCardInfo } from '../cardDatabase.js';
 
@@ -12,10 +13,15 @@ export class GraveWormCreature {
         // Key: "heroPosition-creatureIndex", Value: turn number when triggered
         this.wormTriggeredThisTurn = new Map();
         
-        // GraveWorm animation timing
-        this.CLONE_ANIMATION_TIME = 800; // 0.8 second clone animation
+        // NEW: Track clones created per sacrifice event to cap at 3
+        this.currentSacrificeId = null; // Track current sacrifice event
+        this.clonesCreatedThisSacrifice = 0; // Track clones created for current sacrifice
+        this.MAX_CLONES_PER_SACRIFICE = 3; // Maximum clones per sacrifice trigger
+        
+        // GraveWorm animation timing - UPDATED: 3x faster animations
+        this.CLONE_ANIMATION_TIME = 267; // 0.267 second clone animation (was 800ms)
         this.BITE_DAMAGE = 10; // Bite damage amount
-        this.BITE_ANIMATION_TIME = 600; // 0.6 second bite animation
+        this.BITE_ANIMATION_TIME = 200; // 0.2 second bite animation (was 600ms)
         
         // Inject CSS styles
         this.injectGraveWormStyles();
@@ -23,7 +29,7 @@ export class GraveWormCreature {
         // Set up sacrifice event listener
         this.setupSacrificeListener();
         
-        console.log('🪱 GraveWorm Creature module initialized');
+        console.log('🪱 GraveWorm Creature module initialized with clone cap of', this.MAX_CLONES_PER_SACRIFICE);
     }
 
     // Check if a creature is GraveWorm
@@ -32,7 +38,7 @@ export class GraveWormCreature {
     }
 
     // ============================================
-    // BITE ATTACK FUNCTIONALITY
+    // BITE ATTACK FUNCTIONALITY (unchanged)
     // ============================================
 
     // Execute GraveWorm bite attack
@@ -51,7 +57,12 @@ export class GraveWormCreature {
         
         this.heroSelection.addCombatLog(
             `🪱 ${graveWormCreature.name} prepares to bite!`, 
-            attackerSide === 'player' ? 'success' : 'error'
+            attackerSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Use standard targeting system (reusing existing code)
@@ -63,7 +74,12 @@ export class GraveWormCreature {
         if (!target) {
             this.heroSelection.addCombatLog(
                 `💨 ${graveWormCreature.name} finds no targets for its bite!`, 
-                'info'
+                'info',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
             );
             return;
         }
@@ -72,7 +88,12 @@ export class GraveWormCreature {
         const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
         this.heroSelection.addCombatLog(
             `🎯 ${graveWormCreature.name} targets ${targetName} with a gruesome bite!`, 
-            attackerSide === 'player' ? 'success' : 'error'
+            attackerSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Send synchronization data to guest (reusing existing pattern)
@@ -124,7 +145,12 @@ export class GraveWormCreature {
 
         this.heroSelection.addCombatLog(
             `💥 The gruesome bite strikes true, dealing ${this.BITE_DAMAGE} damage!`, 
-            'info'
+            'info',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
     }
 
@@ -395,7 +421,12 @@ export class GraveWormCreature {
         
         this.heroSelection.addCombatLog(
             `🪱 ${graveWormData.name} unleashes a gruesome bite!`, 
-            graveWormLocalSide === 'player' ? 'success' : 'error'
+            graveWormLocalSide === 'player' ? 'success' : 'error',
+            null,
+            { 
+                isCreatureMessage: true,
+                isCreatureDeathMessage: false
+            }
         );
 
         // Start guest animation immediately
@@ -447,7 +478,12 @@ export class GraveWormCreature {
             const targetName = targetData.type === 'hero' ? targetData.heroName : targetData.creatureName;
             this.heroSelection.addCombatLog(
                 `🎯 ${targetName} is struck by the gruesome bite for ${this.BITE_DAMAGE} damage!`,
-                targetLocalSide === 'player' ? 'error' : 'success'
+                targetLocalSide === 'player' ? 'error' : 'success',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
             );
         } else {
             console.warn(`Guest: Target element not found for ${targetData.type} at ${targetLocalSide}-${targetData.position}`);
@@ -455,7 +491,7 @@ export class GraveWormCreature {
     }
 
     // ============================================
-    // EXISTING CLONING FUNCTIONALITY (unchanged)
+    // CLONING FUNCTIONALITY (MODIFIED WITH CAP)
     // ============================================
 
     // Set up sacrifice event listener
@@ -468,7 +504,7 @@ export class GraveWormCreature {
         }
     }
 
-    // Handle when a creature is sacrificed
+    // Handle when a creature is sacrificed (MODIFIED)
     handleCreatureSacrifice(sacrificeData) {
         const { heroPosition, creatureIndex, creature, source } = sacrificeData;
         
@@ -479,6 +515,13 @@ export class GraveWormCreature {
         }
         
         console.log(`🪱 GraveWorm witnessing sacrifice of ${creature.name} from ${heroPosition}[${creatureIndex}]`);
+        
+        // NEW: Reset clone counter for new sacrifice event
+        const sacrificeId = `${Date.now()}-${heroPosition}-${creatureIndex}-${creature.name}`;
+        this.currentSacrificeId = sacrificeId;
+        this.clonesCreatedThisSacrifice = 0;
+        
+        console.log(`🪱 Starting new sacrifice event (ID: ${sacrificeId}), clone cap: ${this.MAX_CLONES_PER_SACRIFICE}`);
         
         // Find all GraveWorms that can witness this sacrifice
         const currentTurn = this.heroSelection.getCurrentTurn();
@@ -496,9 +539,12 @@ export class GraveWormCreature {
                 }
             });
         });
+        
+        // Log final clone count for this sacrifice
+        console.log(`🪱 Sacrifice event complete: ${this.clonesCreatedThisSacrifice}/${this.MAX_CLONES_PER_SACRIFICE} clones created`);
     }
 
-    // Try to trigger a GraveWorm clone
+    // Try to trigger a GraveWorm clone (MODIFIED WITH CAP)
     tryTriggerGraveWormClone(heroPosition, creatureIndex, graveWorm, currentTurn, sacrificeData) {
         const wormKey = `${heroPosition}-${creatureIndex}`;
         
@@ -509,16 +555,25 @@ export class GraveWormCreature {
             return; // Already triggered this turn
         }
         
+        // NEW: Check if we've already hit the clone cap for this sacrifice
+        if (this.clonesCreatedThisSacrifice >= this.MAX_CLONES_PER_SACRIFICE) {
+            console.log(`🪱 GraveWorm at ${wormKey} cannot create clone - cap reached (${this.clonesCreatedThisSacrifice}/${this.MAX_CLONES_PER_SACRIFICE})`);
+            return; // Cap reached, no more clones
+        }
+        
         // Mark this GraveWorm as triggered this turn
         this.wormTriggeredThisTurn.set(wormKey, currentTurn);
         
-        console.log(`🪱 GraveWorm at ${wormKey} creating clone (turn ${currentTurn})`);
+        // Increment clone counter for this sacrifice
+        this.clonesCreatedThisSacrifice++;
+        
+        console.log(`🪱 GraveWorm at ${wormKey} creating clone ${this.clonesCreatedThisSacrifice}/${this.MAX_CLONES_PER_SACRIFICE} (turn ${currentTurn})`);
         
         // Create clone of the GraveWorm
         this.createGraveWormClone(heroPosition, graveWorm, sacrificeData);
     }
 
-    // Create an exact clone of the GraveWorm
+    // Create an exact clone of the GraveWorm (unchanged)
     async createGraveWormClone(heroPosition, originalWorm, sacrificeData) {
         // Get the full card info for GraveWorm to ensure we have all properties
         const cardInfo = getCardInfo('GraveWorm');
@@ -580,7 +635,7 @@ export class GraveWormCreature {
         }
     }
 
-    // Play GraveWorm cloning visual effect
+    // Play GraveWorm cloning visual effect (unchanged except animation time uses updated constant)
     playGraveWormCloneEffect(heroPosition, creatureIndex, sacrificeData) {
         // Find the new clone element
         const cloneElement = document.querySelector(
@@ -626,7 +681,7 @@ export class GraveWormCreature {
         }, this.CLONE_ANIMATION_TIME);
     }
 
-    // Format creature name for display
+    // Format creature name for display (unchanged)
     formatCreatureName(creatureName) {
         return creatureName
             .replace(/([A-Z])/g, ' $1')
@@ -634,20 +689,26 @@ export class GraveWormCreature {
             .trim();
     }
 
-    // Reset turn-based tracking (called by heroAbilitiesManager or similar)
+    // Reset turn-based tracking (MODIFIED)
     resetTurnBasedTracking() {
         console.log(`🪱 Resetting GraveWorm turn-based tracking (${this.wormTriggeredThisTurn.size} entries cleared)`);
         this.wormTriggeredThisTurn.clear();
+        
+        // NEW: Also reset sacrifice tracking on turn change
+        this.currentSacrificeId = null;
+        this.clonesCreatedThisSacrifice = 0;
     }
 
-    // Export state for saving (for reconnection persistence)
+    // Export state for saving (MODIFIED)
     exportState() {
         return {
-            wormTriggeredThisTurn: Array.from(this.wormTriggeredThisTurn.entries())
+            wormTriggeredThisTurn: Array.from(this.wormTriggeredThisTurn.entries()),
+            currentSacrificeId: this.currentSacrificeId,
+            clonesCreatedThisSacrifice: this.clonesCreatedThisSacrifice
         };
     }
 
-    // Import state for loading (for reconnection persistence)
+    // Import state for loading (MODIFIED)
     importState(state) {
         if (!state) return false;
 
@@ -655,17 +716,29 @@ export class GraveWormCreature {
             this.wormTriggeredThisTurn = new Map(state.wormTriggeredThisTurn);
             console.log(`🪱 Restored ${this.wormTriggeredThisTurn.size} GraveWorm turn triggers from saved state`);
         }
+        
+        // NEW: Restore sacrifice tracking
+        if (state.currentSacrificeId !== undefined) {
+            this.currentSacrificeId = state.currentSacrificeId;
+        }
+        
+        if (state.clonesCreatedThisSacrifice !== undefined) {
+            this.clonesCreatedThisSacrifice = state.clonesCreatedThisSacrifice;
+        }
 
         return true;
     }
 
-    // Reset for new game
+    // Reset for new game (MODIFIED)
     reset() {
         this.wormTriggeredThisTurn.clear();
+        // NEW: Reset sacrifice tracking
+        this.currentSacrificeId = null;
+        this.clonesCreatedThisSacrifice = 0;
         this.cleanup();
     }
 
-    // Clean up all active effects (called on battle end/reset)
+    // Clean up all active effects (unchanged)
     cleanup() {
         console.log(`🪱 Cleaning up ${this.activeWormEffects.size} active GraveWorm clone effects and ${this.activeBiteEffects.size} bite effects`);
         
@@ -720,7 +793,7 @@ export class GraveWormCreature {
         }
     }
 
-    // Inject CSS styles for GraveWorm effects
+    // Inject CSS styles for GraveWorm effects - UPDATED: Uses faster animation durations in CSS
     injectGraveWormStyles() {
         if (document.getElementById('graveWormCreatureStyles')) {
             return; // Already injected
@@ -754,7 +827,7 @@ export class GraveWormCreature {
                     0 0 20px rgba(139, 69, 19, 0.8),
                     0 0 40px rgba(101, 67, 33, 0.6),
                     inset 0 0 15px rgba(160, 82, 45, 0.4);
-                animation: cloneCircleAppearGraveWorm 0.8s ease-out;
+                animation: cloneCircleAppearGraveWorm 0.267s ease-out;
             }
 
             /* Cloning Particles - Dark earth tones */
@@ -773,7 +846,7 @@ export class GraveWormCreature {
                 box-shadow: 
                     0 0 6px rgba(139, 69, 19, 1),
                     0 0 12px rgba(139, 69, 19, 0.8);
-                animation: cloneParticleGraveWorm 0.8s ease-out;
+                animation: cloneParticleGraveWorm 0.267s ease-out;
             }
 
             /* Worm-like particles */
@@ -793,27 +866,27 @@ export class GraveWormCreature {
             .clone-particle-graveworm.particle-2 {
                 top: 35%;
                 left: 70%;
-                animation-delay: 0.1s;
+                animation-delay: 0.033s;
             }
             .clone-particle-graveworm.particle-3 {
                 top: 50%;
                 left: 75%;
-                animation-delay: 0.2s;
+                animation-delay: 0.067s;
             }
             .clone-particle-graveworm.particle-4 {
                 top: 65%;
                 left: 60%;
-                animation-delay: 0.3s;
+                animation-delay: 0.1s;
             }
             .clone-particle-graveworm.particle-5 {
                 top: 65%;
                 left: 40%;
-                animation-delay: 0.4s;
+                animation-delay: 0.133s;
             }
             .clone-particle-graveworm.particle-6 {
                 top: 35%;
                 left: 30%;
-                animation-delay: 0.5s;
+                animation-delay: 0.167s;
             }
 
             /* Sacrifice tribute text */
@@ -829,7 +902,7 @@ export class GraveWormCreature {
                 font-size: 10px;
                 font-weight: bold;
                 white-space: nowrap;
-                animation: tributeFadeInOut 2s ease-out;
+                animation: tributeFadeInOut 0.667s ease-out;
             }
 
             /* GraveWorm Bite Attack Effects */
@@ -844,7 +917,7 @@ export class GraveWormCreature {
                 box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.3);
             }
 
-            /* Keyframe Animations */
+            /* Keyframe Animations - UPDATED: 3x faster durations */
             @keyframes cloneCircleAppearGraveWorm {
                 0% {
                     transform: translate(-50%, -50%) scale(0) rotate(0deg);
@@ -908,7 +981,7 @@ export class GraveWormCreature {
 
             /* Add dark glow to GraveWorm during cloning */
             .creature-icon.cloning-graveworm {
-                animation: graveWormCloneGlow 0.8s ease-out;
+                animation: graveWormCloneGlow 0.267s ease-out;
             }
 
             .creature-icon.cloning-graveworm .creature-sprite {
@@ -930,7 +1003,7 @@ export class GraveWormCreature {
                 }
             }
 
-            /* GraveWorm Bite Attack Animations */
+            /* GraveWorm Bite Attack Animations - UPDATED: 3x faster durations */
             @keyframes graveWormBite {
                 0% { 
                     opacity: 0;
@@ -1000,7 +1073,7 @@ export class GraveWormCreature {
     }
 }
 
-// Static helper methods
+// Static helper methods (unchanged)
 export const GraveWormHelpers = {
     // Check if any creature in a list is GraveWorm
     hasGraveWormInList(creatures) {

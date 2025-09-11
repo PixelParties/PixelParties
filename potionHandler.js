@@ -41,6 +41,8 @@ export class PotionHandler {
             'ElixirOfQuickness',
             'CloudInABottle',
             'OverflowingChalice',
+            'PlanetInABottle',
+            'TeleportationPowder',
         ];
         
         return knownPotions.includes(cardName);
@@ -109,6 +111,99 @@ export class PotionHandler {
 
                 console.log('ElixirOfQuickness used successfully - drew extra card, no battle effects added');
                 return true;
+            }
+
+            // ===== SPECIAL HANDLING FOR PLANET IN A BOTTLE =====
+            if (cardName === 'PlanetInABottle') {
+                // PlanetInABottle: Place random Area Spell, draw 1 card, no battle effects
+                try {
+                    const { PlanetInABottlePotion } = await import('./Potions/planetInABottle.js');
+                    const planetBottle = new PlanetInABottlePotion();
+                    
+                    // Apply the planet effect (place random area)
+                    const planetSuccess = await planetBottle.applyPlanetInABottleEffect(heroSelection);
+                    
+                    if (planetSuccess) {
+                        // Draw 1 card (normal potion behavior)
+                        if (heroSelection.handManager && heroSelection.deckManager) {
+                            const drawnCards = heroSelection.handManager.drawCards(1);
+                            
+                            if (drawnCards.length > 0) {
+                                console.log(`Drew ${drawnCards[0]} after using PlanetInABottle`);
+                            } else {
+                                console.log('No cards available to draw after using PlanetInABottle');
+                            }
+                        }
+
+                        // Show special usage notification for PlanetInABottle
+                        this.showPotionUsage(cardName);
+
+                        // Update UI displays
+                        if (heroSelection.updateHandDisplay) {
+                            heroSelection.updateHandDisplay();
+                        }
+                        this.updatePotionDisplay();
+
+                        // Save game state
+                        if (heroSelection.autoSave) {
+                            await heroSelection.autoSave();
+                        }
+
+                        console.log('PlanetInABottle used successfully - placed random area, drew card, no battle effects added');
+                        return true;
+                    } else {
+                        // Planet effect failed, but potion was still consumed
+                        // Show error but don't restore potion count (already consumed)
+                        this.showPotionError('Failed to place Area Spell!', cardName);
+                        
+                        // Still draw a card as fallback
+                        if (heroSelection.handManager && heroSelection.deckManager) {
+                            const drawnCards = heroSelection.handManager.drawCards(1);
+                            if (drawnCards.length > 0) {
+                                console.log(`Drew ${drawnCards[0]} after failed PlanetInABottle (fallback)`);
+                            }
+                        }
+                        
+                        // Update UI
+                        if (heroSelection.updateHandDisplay) {
+                            heroSelection.updateHandDisplay();
+                        }
+                        this.updatePotionDisplay();
+                        
+                        // Save state
+                        if (heroSelection.autoSave) {
+                            await heroSelection.autoSave();
+                        }
+                        
+                        return true; // Still return true - potion was consumed
+                    }
+                } catch (error) {
+                    console.error('Error using PlanetInABottle:', error);
+                    
+                    // Show error but potion was still consumed
+                    this.showPotionError('Failed to use Planet in a Bottle!', cardName);
+                    
+                    // Fallback: still draw a card
+                    if (heroSelection.handManager && heroSelection.deckManager) {
+                        const drawnCards = heroSelection.handManager.drawCards(1);
+                        if (drawnCards.length > 0) {
+                            console.log(`Drew ${drawnCards[0]} after PlanetInABottle error (fallback)`);
+                        }
+                    }
+                    
+                    // Update UI
+                    if (heroSelection.updateHandDisplay) {
+                        heroSelection.updateHandDisplay();
+                    }
+                    this.updatePotionDisplay();
+                    
+                    // Save state
+                    if (heroSelection.autoSave) {
+                        await heroSelection.autoSave();
+                    }
+                    
+                    return true; // Still return true - potion was consumed
+                }
             }
 
             // ===== NORMAL POTION HANDLING (ALL OTHER POTIONS) =====
@@ -384,11 +479,44 @@ export class PotionHandler {
 
             case 'OverflowingChalice':
                 return await this.handleOverflowingChaliceEffects(effects, playerRole, battleManager);
+
+            case 'TeleportationPowder':
+                return await this.handleTeleportationPowderEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
                 console.log(`No battle effect defined for potion: ${potionName}`);
                 return 0;
+        }
+    }
+
+    async handleTeleportationPowderEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the TeleportationPowder module
+            const { TeleportationPowderPotion } = await import('./Potions/teleportationPowder.js');
+            const teleportationPowderPotion = new TeleportationPowderPotion();
+            
+            // Delegate everything to the TeleportationPowder module
+            const effectsProcessed = await teleportationPowderPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`🌀 TeleportationPowder delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating TeleportationPowder effects for ${playerRole}:`, error);
+            
+            // Fallback: log failure
+            const playerName = playerRole === 'host' ? 'Host' : 'Guest';
+            battleManager.addCombatLog(
+                `🌀 ${playerName}'s Teleportation Powder failed to activate properly`, 
+                'warning'
+            );
+            
+            return effects.length;
         }
     }
 

@@ -70,6 +70,39 @@ export class GlobalSpellManager {
         return cardInfo && cardInfo.cardType === 'Spell' && cardInfo.global === true;
     }
 
+    // Check if player has MagicArts level 1+ (for Teleportal action cost negation)
+    hasPlayerMagicArtsLevel1Plus(heroSelection) {
+        const formation = heroSelection.formationManager.getBattleFormation();
+        const heroPositions = ['left', 'center', 'right'].filter(pos => 
+            formation[pos] !== null && formation[pos] !== undefined
+        );
+        
+        for (const position of heroPositions) {
+            const hero = formation[position];
+            if (!hero) continue;
+            
+            // Get hero's abilities
+            const heroAbilities = heroSelection.heroAbilitiesManager.getHeroAbilities(position);
+            if (!heroAbilities) continue;
+            
+            // Count MagicArts abilities across all zones
+            let magicArtsLevel = 0;
+            ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                if (heroAbilities[zone] && Array.isArray(heroAbilities[zone])) {
+                    const zoneAbilities = heroAbilities[zone].filter(ability => ability && ability.name === 'MagicArts');
+                    magicArtsLevel += zoneAbilities.length;
+                }
+            });
+            
+            // If this hero has MagicArts level 1+, return true
+            if (magicArtsLevel >= 1) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
     // Handle clicking global spells
     async handleGlobalSpellActivation(cardIndex, cardName, heroSelection) {        
         const cardInfo = heroSelection.getCardInfo(cardName);
@@ -78,11 +111,27 @@ export class GlobalSpellManager {
             return false;
         }
         
+        // Check action requirements with special handling for Teleportal
         if (cardInfo.action && heroSelection.actionManager) {
-            const actionCheck = heroSelection.actionManager.canPlayActionCard(cardInfo);
-            if (!actionCheck.canPlay) {
-                window.showActionError(actionCheck.reason, window.event || { clientX: 0, clientY: 0 });
-                return false;
+            // Special case for Teleportal: skip action check if player has MagicArts 1+
+            if (cardName === 'Teleportal') {
+                const hasMagicArts1Plus = this.hasPlayerMagicArtsLevel1Plus(heroSelection);
+                if (!hasMagicArts1Plus) {
+                    // Only check for actions if MagicArts condition is not met
+                    const actionCheck = heroSelection.actionManager.canPlayActionCard(cardInfo);
+                    if (!actionCheck.canPlay) {
+                        window.showActionError(actionCheck.reason, window.event || { clientX: 0, clientY: 0 });
+                        return false;
+                    }
+                }
+                // If hasMagicArts1Plus is true, skip the action check entirely
+            } else {
+                // For all other action-requiring spells, do normal check
+                const actionCheck = heroSelection.actionManager.canPlayActionCard(cardInfo);
+                if (!actionCheck.canPlay) {
+                    window.showActionError(actionCheck.reason, window.event || { clientX: 0, clientY: 0 });
+                    return false;
+                }
             }
         }
         
@@ -96,8 +145,27 @@ export class GlobalSpellManager {
         if (cardName === 'TharxianHorse') {
             return await this.handleTharxianHorseClick(cardIndex, cardName, heroSelection);
         }
+        if (cardName === 'Teleportal') {
+            return await this.handleTeleportalClick(cardIndex, cardName, heroSelection);
+        }
         
         return false;
+    }
+
+    async handleTeleportalClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('teleportal');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('Teleportal spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load Teleportal spell:', error);
+            return false;
+        }
     }
 
     async handleGuardChangeClick(cardIndex, cardName, heroSelection) {
@@ -165,9 +233,18 @@ export class GlobalSpellManager {
         return this.isGlobalSpell(dragState.draggedCardName, heroSelection);
     }
 
-    handleGlobalSpellDropOnHero(targetSlot, heroSelection) {                
+    handleGlobalSpellDropOnHero(targetSlot, heroSelection) {
+        const dragState = heroSelection.handManager.getHandDragState();
+        const spellName = dragState.draggedCardName;
+        
         heroSelection.handManager.endHandCardDrag();
         
+        // Handle Teleport spell specifically
+        if (spellName === 'Teleport') {
+            return this.handleTeleportDropOnHero(targetSlot, heroSelection, dragState);
+        }
+        
+        // Other global spells show the generic message
         this.showSpellDropResult(targetSlot, 'Global spells must be clicked to activate!', false, heroSelection);
         return false;
     }
@@ -203,6 +280,28 @@ export class GlobalSpellManager {
         setTimeout(() => {
             feedback.remove();
         }, 2000);
+    }
+
+    async handleTeleportDropOnHero(targetSlot, heroSelection, dragState) {
+        try {
+            const spell = await this.loadSpell('teleport');
+            if (spell && spell.handleDrop) {
+                const result = await spell.handleDrop(
+                    targetSlot, 
+                    dragState.draggedCardIndex, 
+                    dragState.draggedCardName, 
+                    heroSelection, 
+                    this
+                );
+                return result;
+            } else {
+                console.error('Teleport spell missing handleDrop method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load Teleport spell:', error);
+            return false;
+        }
     }
 
     // Save and load state
@@ -310,7 +409,7 @@ if (typeof document !== 'undefined' && !document.getElementById('globalSpellMana
         }
         
         .hand-card[data-card-type="global-spell"]::before {
-            content: "🌍";
+            content: "🌐";
             position: absolute;
             top: 5px;
             left: 5px;
@@ -351,6 +450,20 @@ if (typeof document !== 'undefined' && !document.getElementById('globalSpellMana
                 opacity: 1;
                 transform: translateX(-50%) translateY(0);
             }
+        }
+
+        @keyframes teleportHintFade {
+            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            20% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
+        }
+
+        .teleport-hint-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
         }
     `;
     document.head.appendChild(style);

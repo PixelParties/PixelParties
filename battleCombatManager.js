@@ -7,6 +7,7 @@ import { AliceHeroEffect } from './Heroes/alice.js';
 import { MoniaHeroEffect } from './Heroes/monia.js';
 
 import { checkHeartOfIceEffects } from './Artifacts/heartOfIce.js';
+import { checkFuriousAngerReactions } from './Spells/furiousAnger.js';
 
 export class BattleCombatManager {
     constructor(battleManager) {
@@ -143,7 +144,7 @@ export class BattleCombatManager {
             hero.currentHp = Math.max(0, hero.currentHp - hpDamage);
             
             // Check if hero died
-            const died = hero.currentHp <= 0 && oldHp > 0;
+            const died = hero.currentHp <= 0;
             if (died) {
                 hero.alive = false;
             }
@@ -193,6 +194,221 @@ export class BattleCombatManager {
                 `🛡️ ${targetName} loses ${change} shield`,
                 targetLocalSide === 'player' ? 'error' : 'success'
             );
+        }
+    }
+
+    // ============================================
+    // CREATURE DAMAGE APPLICATION - MOVED FROM BATTLEMANAGER
+    // ============================================
+
+    // Apply damage to a creature
+    async authoritative_applyDamageToCreature(damageData, context = {}) {
+        if (!this.battleManager.isAuthoritative) return;
+        
+        const { hero, creature, creatureIndex, damage, position, side } = damageData;
+        const { source, attacker } = context;
+        
+        // Validate damage is a number
+        if (typeof damage !== 'number' || isNaN(damage)) {
+            return;
+        }
+        
+        // Find the creature's CURRENT index (after any movements)
+        const currentCreatureIndex = hero.creatures.indexOf(creature);
+        
+        if (currentCreatureIndex === -1) {
+            return;
+        }
+        
+        const oldHp = creature.currentHp;
+        const wasAlive = creature.alive;
+        
+        // Check for Monia protection before applying damage (SYNCHRONOUS)
+        let finalDamage = damage;
+        if (this.battleManager.isAuthoritative) {
+            finalDamage = MoniaHeroEffect.checkMoniaProtection(creature, damage, this.battleManager);
+
+            // Apply damage source modifications (stoneskin, etc.)
+            if (this.battleManager.damageSourceManager) {
+                const modificationResult = this.battleManager.damageSourceManager.applyDamageModifications(
+                    creature, finalDamage, context
+                );
+                finalDamage = modificationResult.finalDamage;
+            }
+            
+            // Validate that protection returned a valid number
+            if (typeof finalDamage !== 'number' || isNaN(finalDamage)) {
+                finalDamage = damage;
+            }
+        }
+        
+        creature.currentHp = Math.max(0, creature.currentHp - finalDamage);
+        
+        // Validate creature HP after damage
+        if (typeof creature.currentHp !== 'number' || isNaN(creature.currentHp)) {
+            creature.currentHp = Math.max(0, oldHp - finalDamage); // Fallback calculation
+        }
+        
+        const willDie = creature.currentHp <= 0;
+        
+        // Record kill IMMEDIATELY when creature HP drops to 0
+        if (willDie && wasAlive && attacker && this.battleManager.isAuthoritative) { 
+            recordKillWithVisualFeedback(this.battleManager, attacker, creature, 'creature'); 
+            
+            // UPDATED: Add creature death message with proper flags
+            this.battleManager.addCombatLog(
+                `💀 ${attacker.name} has slain ${creature.name}!`, 
+                attacker.side === 'player' ? 'success' : 'error',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: true  // Always show death messages!
+                }
+            );
+        }
+        
+        // Track damage dealt
+        if (!this.battleManager.totalDamageDealt[hero.absoluteSide]) {
+            this.battleManager.totalDamageDealt[hero.absoluteSide] = 0;
+        }
+        this.battleManager.totalDamageDealt[hero.absoluteSide] += finalDamage;
+
+        // Process clouded stack removal after damage is applied  
+        if (this.battleManager.statusEffectsManager && finalDamage > 0) {
+            this.battleManager.statusEffectsManager.processCloudedAfterDamage(creature, finalDamage);
+        }
+        
+        if (!context.aoe) {
+            // UPDATED: Add creature damage message with proper flags
+            this.battleManager.addCombatLog( 
+                `🩸 ${creature.name} takes ${finalDamage} damage! (${oldHp} → ${creature.currentHp} HP)`,
+                side === 'player' ? 'error' : 'success',
+                null,
+                { 
+                    isCreatureMessage: true,
+                    isCreatureDeathMessage: false
+                }
+            );
+            
+            if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
+                this.battleManager.battleScreen.battleLog.addHpBarMessage(creature, creature.currentHp, creature.maxHp);
+            }
+        }
+        
+        let finalCreatureIndex = currentCreatureIndex;
+        let revivedByNecromancy = false;
+        let stolenByDarkGear = false;  // Track if stolen
+        let necromancyArrayManipulation = null;
+        
+        // If creature died, handle death sequence
+        if (willDie && wasAlive) {
+            // Set creature as dead
+            creature.alive = false;
+            
+            // 1. Trigger death effects
+            this.battleManager.triggerCreatureDeathEffects(creature, hero, attacker, context); 
+            this.battleManager.checkForSkeletonMageReactions(creature, hero.side, 'creature'); 
+            
+            // 2. Check for Furious Anger
+            setTimeout(async () => {
+                await checkFuriousAngerReactions(creature, side, hero, this.battleManager); 
+            }, 100);
+            
+            // 3. Attempt necromancy revival
+            if (this.battleManager.necromancyManager && !context.preventRevival) {
+                const revivalResult = this.battleManager.necromancyManager.attemptNecromancyRevival(
+                    creature, hero, currentCreatureIndex, side, position
+                );
+                
+                if (revivalResult) {
+                    revivedByNecromancy = true;
+                    if (creature.counters !== undefined) {
+                        creature.counters = 0;
+                    }
+                    finalCreatureIndex = hero.creatures.indexOf(creature);
+                    necromancyArrayManipulation = {
+                        originalIndex: currentCreatureIndex,
+                        moveToEnd: true,
+                        newIndex: finalCreatureIndex
+                    };
+                    
+                    // Update visuals for revived creature
+                    this.battleManager.updateCreatureHealthBar(side, position, finalCreatureIndex, creature.currentHp, creature.maxHp); 
+                    this.battleManager.addCombatLog(
+                        `🧟 ${creature.name} rises again, but the kill still counts!`, 
+                        'info',
+                        null,
+                        { 
+                            isCreatureMessage: true,
+                            isCreatureDeathMessage: false
+                        }
+                    ); 
+                }
+            }
+            
+            // 4. If not revived, attempt Dark Gear stealing
+            if (!revivedByNecromancy) {
+                const { attemptDarkGearStealing } = await import('./Artifacts/darkGear.js');
+                stolenByDarkGear = await attemptDarkGearStealing(
+                    creature, hero, currentCreatureIndex, side, this.battleManager 
+                );
+                
+                if (stolenByDarkGear) {
+                    // DarkGear handles all the cleanup and removal
+                    // IMPORTANT: Don't update any visuals here - DarkGear does it all
+                    finalCreatureIndex = -1; // Creature is gone
+                }
+            }
+            
+            // 5. Only apply death visuals if creature wasn't stolen or revived
+            if (!revivedByNecromancy && !stolenByDarkGear) {
+                this.battleManager.handleCreatureDeathWithoutRevival(hero, creature, currentCreatureIndex, side, position); 
+            }
+        } else if (!willDie) {
+            // Creature survived, update health bar normally
+            this.battleManager.updateCreatureHealthBar(side, position, currentCreatureIndex, creature.currentHp, creature.maxHp); 
+        }
+        
+        // Only create damage number and send update if creature wasn't stolen
+        if (!stolenByDarkGear) {
+            const damageSource = context?.source || 'attack';
+            this.battleManager.animationManager.createDamageNumberOnCreature(side, position, finalCreatureIndex, finalDamage, creature.maxHp, damageSource); 
+            
+            // Send update to guest
+            this.battleManager.sendBattleUpdate('creature_damage_applied', { 
+                heroAbsoluteSide: hero.absoluteSide,
+                heroPosition: position,
+                originalCreatureIndex: creatureIndex,
+                currentCreatureIndex: currentCreatureIndex,
+                finalCreatureIndex: finalCreatureIndex,
+                creatureName: creature.name,
+                creatureId: creature.addedAt ? `${creature.name}_${creature.addedAt}` : creature.name,
+                damage: finalDamage,
+                oldHp: oldHp,
+                newHp: creature.currentHp,
+                maxHp: creature.maxHp,
+                died: willDie,
+                revivedByNecromancy: revivedByNecromancy,
+                stolenByDarkGear: stolenByDarkGear,  
+                necromancyArrayManipulation: necromancyArrayManipulation,
+                debugInfo: {
+                    heroCreatureCount: hero.creatures.length,
+                    damageSource: damageSource,
+                    wasOriginalIndexCorrect: creatureIndex === currentCreatureIndex,
+                    indexShift: currentCreatureIndex - creatureIndex
+                }
+            });
+        }
+        
+        // Save state
+        this.battleManager.saveBattleStateToPersistence().catch(error => {
+        });
+
+        // Sync Creature with guest
+        if (this.battleManager.isAuthoritative && !stolenByDarkGear) {
+            setTimeout(() => {
+                this.battleManager.sendCreatureStateSync();
+            }, 200); // Small delay to allow damage numbers to start animating
         }
     }
 
@@ -602,15 +818,43 @@ export class BattleCombatManager {
         
         // Log any ability effects for transparency (but don't recalculate)
         const modifiers = this.getHeroAbilityModifiers(hero);
-        if (modifiers.specialEffects.length > 0) {
+        /*if (modifiers.specialEffects.length > 0) {
             this.battleManager.addCombatLog(`⚔️ ${hero.name} abilities: ${modifiers.specialEffects.join(', ')}`, 'info');
-        }
+        }*/
         
         return damage;
     }
 
+
     // Execute hero actions
     async executeHeroActions(playerHeroActor, opponentHeroActor, position) {
+        // ============================================
+        // CHECK FOR HAND OF DEATH CHANNELING (overrides all actions)
+        // ============================================
+        
+        // Check if player hero should channel instead of normal actions
+        if (playerHeroActor && this.battleManager.spellSystem?.spellImplementations.has('HandOfDeath')) {
+            const handOfDeathSpell = this.battleManager.spellSystem.spellImplementations.get('HandOfDeath');
+            const playerChanneled = await handOfDeathSpell.checkAndExecuteChanneling(playerHeroActor, position);
+            if (playerChanneled) {
+                playerHeroActor = null; // Prevent normal actions
+            }
+        }
+        
+        // Check if opponent hero should channel instead of normal actions
+        if (opponentHeroActor && this.battleManager.spellSystem?.spellImplementations.has('HandOfDeath')) {
+            const handOfDeathSpell = this.battleManager.spellSystem.spellImplementations.get('HandOfDeath');
+            const opponentChanneled = await handOfDeathSpell.checkAndExecuteChanneling(opponentHeroActor, position);
+            if (opponentChanneled) {
+                opponentHeroActor = null; // Prevent normal actions
+            }
+        }
+        
+        // If both heroes are channeling, skip the rest of the action
+        if (!playerHeroActor && !opponentHeroActor) {
+            return;
+        }
+        
         // The battle end check was preventing final kills from being recorded
         
         const playerCanAttack = playerHeroActor !== null;
@@ -625,7 +869,7 @@ export class BattleCombatManager {
         if (playerCanAttack && this.battleManager.spellSystem) {
             // Create a version of the hero that only shows enabled spells for spell system
             const playerHeroForSpells = this.createHeroWithEnabledSpellsOnly(playerHeroActor.data);
-            playerSpellToCast = this.battleManager.spellSystem.checkSpellCasting(playerHeroForSpells);
+            playerSpellToCast = await this.battleManager.spellSystem.checkSpellCasting(playerHeroForSpells);
             if (playerSpellToCast) {
                 playerWillAttack = false; // Hero spent turn casting spell
             }
@@ -634,7 +878,7 @@ export class BattleCombatManager {
         if (opponentCanAttack && this.battleManager.spellSystem) {
             // Create a version of the hero that only shows enabled spells for spell system
             const opponentHeroForSpells = this.createHeroWithEnabledSpellsOnly(opponentHeroActor.data);
-            opponentSpellToCast = this.battleManager.spellSystem.checkSpellCasting(opponentHeroForSpells);
+            opponentSpellToCast = await this.battleManager.spellSystem.checkSpellCasting(opponentHeroForSpells);
             if (opponentSpellToCast) {
                 opponentWillAttack = false; // Hero spent turn casting spell
             }
@@ -659,7 +903,7 @@ export class BattleCombatManager {
             playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
             if (playerIsRanged) {
                 playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
-                this.battleManager.addCombatLog(`🹹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
             } else {
                 playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
             }
@@ -669,7 +913,7 @@ export class BattleCombatManager {
             opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
             if (opponentIsRanged) {
                 opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
-                this.battleManager.addCombatLog(`🹹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
             } else {
                 opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
             }
@@ -708,6 +952,20 @@ export class BattleCombatManager {
                 playerDamage = playerModResult.modifiedDamage;
                 playerEffectsTriggered = playerModResult.effectsTriggered;
             }
+
+            // Check for CriticalStrike damage modifier (final damage modification)
+            let playerCriticalStrikeData = null;
+            if (playerValidAttack) {
+                const critResult = this.checkCriticalStrikeDamageModifier(
+                    playerHeroActor.data,
+                    playerTarget.type === 'creature' ? playerTarget.creature : playerTarget.hero,
+                    playerDamage
+                );
+                playerDamage = critResult.modifiedDamage;
+                if (critResult.criticalStrikeTriggered) {
+                    playerCriticalStrikeData = critResult.effectData;
+                }
+            }
             
             if (opponentValidAttack && this.battleManager.attackEffectsManager) {
                 const opponentModResult = this.battleManager.attackEffectsManager.calculateDamageModifiers(
@@ -717,6 +975,19 @@ export class BattleCombatManager {
                 );
                 opponentDamage = opponentModResult.modifiedDamage;
                 opponentEffectsTriggered = opponentModResult.effectsTriggered;
+            }
+
+            let opponentCriticalStrikeData = null;
+            if (opponentValidAttack) {
+                const critResult = this.checkCriticalStrikeDamageModifier(
+                    opponentHeroActor.data,
+                    opponentTarget.type === 'creature' ? opponentTarget.creature : opponentTarget.hero,
+                    opponentDamage
+                );
+                opponentDamage = critResult.modifiedDamage;
+                if (critResult.criticalStrikeTriggered) {
+                    opponentCriticalStrikeData = critResult.effectData;
+                }
             }
             
             // Create turn data with potentially modified damage
@@ -751,14 +1022,16 @@ export class BattleCombatManager {
                     target: playerTarget, 
                     damage: playerDamage,
                     effectsTriggered: playerEffectsTriggered,
-                    isRanged: playerIsRanged  // Add ranged flag
+                    isRanged: playerIsRanged,
+                    criticalStrikeData: playerCriticalStrikeData 
                 } : null,
                 opponentValidAttack ? { 
                     hero: opponentHeroActor.data, 
                     target: opponentTarget, 
                     damage: opponentDamage,
                     effectsTriggered: opponentEffectsTriggered,
-                    isRanged: opponentIsRanged  // Add ranged flag
+                    isRanged: opponentIsRanged,
+                    criticalStrikeData: opponentCriticalStrikeData
                 } : null
             );
             
@@ -788,32 +1061,64 @@ export class BattleCombatManager {
             }
             
             // Log attacks with host first
-            if (this.battleScreen && this.battleScreen.battleLog) {
-                this.battleScreen.battleLog.logAttackMessage(hostAttack);
-                this.battleScreen.battleLog.logAttackMessage(guestAttack);
+            if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
+                this.battleManager.battleScreen.battleLog.logAttackMessage(hostAttack);
+                this.battleManager.battleScreen.battleLog.logAttackMessage(guestAttack);
             }
             
             // Both heroes attack - collision animation (meet in middle)
-            await this.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
+            await this.battleManager.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
             
             // ============================================
             // Apply damage modifier visual effects BEFORE damage
             // ============================================
-            if (this.attackEffectsManager) {
+            if (this.battleManager.attackEffectsManager) {
                 // Small delay to let attack animation reach target
-                await this.delay(100);
+                await this.battleManager.delay(100);
                 
                 if (playerAttack.effectsTriggered && playerAttack.effectsTriggered.length > 0) {
-                    this.attackEffectsManager.applyDamageModifierEffects(playerAttack.effectsTriggered);
+                    this.battleManager.attackEffectsManager.applyDamageModifierEffects(playerAttack.effectsTriggered);
                 }
                 if (opponentAttack.effectsTriggered && opponentAttack.effectsTriggered.length > 0) {
-                    this.attackEffectsManager.applyDamageModifierEffects(opponentAttack.effectsTriggered);
+                    this.battleManager.attackEffectsManager.applyDamageModifierEffects(opponentAttack.effectsTriggered);
                 }
                 
                 // Wait for effect animations
                 if (playerAttack.effectsTriggered?.length > 0 || opponentAttack.effectsTriggered?.length > 0) {
-                    await this.delay(400);
+                    await this.battleManager.delay(400);
                 }
+            }
+            
+            // ============================================
+            // Apply CriticalStrike visual effects if triggered
+            // ============================================
+            if (playerAttack && playerAttack.criticalStrikeData && this.battleManager.spellSystem) {
+                const criticalStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('CriticalStrike');
+                if (criticalStrikeSpell) {
+                    criticalStrikeSpell.createCriticalStrikeEffect(
+                        playerAttack.target.type === 'creature' ? playerAttack.target.creature : playerAttack.target.hero
+                    );
+                    
+                    // Sync to guest
+                    this.battleManager.sendBattleUpdate('critical_strike_triggered', playerAttack.criticalStrikeData);
+                }
+            }
+
+            if (opponentAttack && opponentAttack.criticalStrikeData && this.battleManager.spellSystem) {
+                const criticalStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('CriticalStrike');
+                if (criticalStrikeSpell) {
+                    criticalStrikeSpell.createCriticalStrikeEffect(
+                        opponentAttack.target.type === 'creature' ? opponentAttack.target.creature : opponentAttack.target.hero
+                    );
+                    
+                    // Sync to guest  
+                    this.battleManager.sendBattleUpdate('critical_strike_triggered', opponentAttack.criticalStrikeData);
+                }
+            }
+            
+            // Wait for CriticalStrike effects if any were triggered
+            if ((playerAttack?.criticalStrikeData || opponentAttack?.criticalStrikeData)) {
+                await this.battleManager.delay(200);
             }
             
             // Apply damage with potentially modified values - now includes ranged flag
@@ -821,8 +1126,8 @@ export class BattleCombatManager {
             this.applyAttackDamageToTarget(opponentAttack);
             
             await Promise.all([
-                this.animationManager.animateReturn(playerAttack.hero, 'player'),
-                this.animationManager.animateReturn(opponentAttack.hero, 'opponent')
+                this.battleManager.animationManager.animateReturn(playerAttack.hero, 'player'),
+                this.battleManager.animationManager.animateReturn(opponentAttack.hero, 'opponent')
             ]);
             
         } else if (playerAttack || opponentAttack) {
@@ -831,29 +1136,47 @@ export class BattleCombatManager {
             const side = playerAttack ? 'player' : 'opponent';
             
             // Log the single attack
-            if (this.battleScreen && this.battleScreen.battleLog) {
-                this.battleScreen.battleLog.logAttackMessage(attack);
+            if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
+                this.battleManager.battleScreen.battleLog.logAttackMessage(attack);
             }
             
-            await this.animationManager.animateHeroAttack(attack.hero, attack.target);
+            await this.battleManager.animationManager.animateHeroAttack(attack.hero, attack.target);
             
             // ============================================
             // Apply damage modifier visual effects BEFORE damage
             // ============================================
-            if (this.attackEffectsManager && attack.effectsTriggered && attack.effectsTriggered.length > 0) {
+            if (this.battleManager.attackEffectsManager && attack.effectsTriggered && attack.effectsTriggered.length > 0) {
                 // Small delay to let attack animation complete
-                await this.delay(100);
+                await this.battleManager.delay(100);
                 
-                this.attackEffectsManager.applyDamageModifierEffects(attack.effectsTriggered);
+                this.battleManager.attackEffectsManager.applyDamageModifierEffects(attack.effectsTriggered);
                 
                 // Wait for effect animation
-                await this.delay(400);
+                await this.battleManager.delay(400);
+            }
+            
+            // ============================================
+            // Apply CriticalStrike visual effect if triggered
+            // ============================================
+            if (attack && attack.criticalStrikeData && this.battleManager.spellSystem) {
+                const criticalStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('CriticalStrike');
+                if (criticalStrikeSpell) {
+                    criticalStrikeSpell.createCriticalStrikeEffect(
+                        attack.target.type === 'creature' ? attack.target.creature : attack.target.hero
+                    );
+                    
+                    // Sync to guest
+                    this.battleManager.sendBattleUpdate('critical_strike_triggered', attack.criticalStrikeData);
+                    
+                    // Wait for CriticalStrike effect
+                    await this.battleManager.delay(200);
+                }
             }
             
             // Apply damage with potentially modified value - now includes ranged flag
             this.applyAttackDamageToTarget(attack);
             
-            await this.animationManager.animateReturn(attack.hero, side);
+            await this.battleManager.animationManager.animateReturn(attack.hero, side);
         }
     }
 
@@ -865,7 +1188,7 @@ export class BattleCombatManager {
             const wasAlive = attack.target.creature.alive;
             
             // Apply damage to creature - this now handles kill tracking and necromancy revival internally
-            await this.battleManager.authoritative_applyDamageToCreature({
+            await this.authoritative_applyDamageToCreature({
                 hero: attack.target.hero,
                 creature: attack.target.creature,
                 creatureIndex: attack.target.creatureIndex,
@@ -933,10 +1256,10 @@ export class BattleCombatManager {
                 // Record kill if there's an attacker
                 if (this.battleManager.isAuthoritative) {
                     this.battleManager.killTracker.recordKill(attacker, defender, 'hero');
-                    this.battleManager.addCombatLog(
+                    /*this.battleManager.addCombatLog(
                         `💀 ${attacker.name} has slain ${defender.name}!`, 
                         attacker.side === 'player' ? 'success' : 'error'
-                    );
+                    );*/
                 }
             }
             
@@ -974,6 +1297,8 @@ export class BattleCombatManager {
 
     // Apply damage to target - UPDATED FOR SHIELDS
     async authoritative_applyDamage(damageResult, context = {}) {
+        console.log("CONTEXT: ");
+        console.log(context);
         if (!this.battleManager) {
             console.error('CRITICAL: Combat manager not initialized when applying damage!');
             return;
@@ -1104,10 +1429,10 @@ export class BattleCombatManager {
                 // Record kill if there's an attacker
                 if (context.attacker && this.battleManager.isAuthoritative) {
                     this.battleManager.killTracker.recordKill(context.attacker, target, 'hero');
-                    this.battleManager.addCombatLog(
+                    /*this.battleManager.addCombatLog(
                         `💀 ${context.attacker.name} has slain ${target.name}!`, 
                         context.attacker.side === 'player' ? 'success' : 'error'
-                    );
+                    );*/
                 }
             }
             
@@ -1132,7 +1457,7 @@ export class BattleCombatManager {
             if (creatureInfo) {
                 const { hero, creatureIndex, side, position } = creatureInfo;
                 
-                await this.battleManager.authoritative_applyDamageToCreature({
+                await this.authoritative_applyDamageToCreature({
                     hero: hero,
                     creature: target,
                     creatureIndex: creatureIndex,
@@ -1144,31 +1469,37 @@ export class BattleCombatManager {
         }
         
         // Add combat log entry with shield information
-        const logType = target.side === 'player' ? 'error' : 'success';
-        
-        if (damageApplication.died) {
-            if (damageApplication.shieldDamage > 0) {
-                this.battleManager.addCombatLog(
-                    `💥 ${target.name} takes ${finalDamage} damage (${damageApplication.shieldDamage} to shield, ${damageApplication.hpDamage} to HP) and is defeated!`,
-                    logType
-                );
+        if (!context.aoe) {
+            const logType = target.side === 'player' ? 'error' : 'success';
+
+            if (damageApplication.died) {
+                if (damageApplication.shieldDamage > 0) {
+                    /*this.battleManager.addCombatLog(
+                        `💥 ${target.name} takes ${finalDamage} damage (${damageApplication.shieldDamage} to shield, ${damageApplication.hpDamage} to HP) and is defeated!`,
+                        logType
+                    );*/
+                } else {
+                    /*this.battleManager.addCombatLog(
+                        `💥 ${target.name} takes ${finalDamage} damage and is defeated!`,
+                        logType
+                    );*/
+                }
             } else {
-                this.battleManager.addCombatLog(
-                    `💥 ${target.name} takes ${finalDamage} damage and is defeated!`,
-                    logType
-                );
+                /*if (damageApplication.shieldDamage > 0) {
+                    this.battleManager.addCombatLog(
+                        `🩸 ${target.name} takes ${finalDamage} damage (${damageApplication.shieldDamage} to shield, ${damageApplication.hpDamage} to HP)!`,
+                        logType
+                    );
+                } else {
+                    this.battleManager.addCombatLog(
+                        `🩸 ${target.name} takes ${finalDamage} damage! (${target.currentHp + damageApplication.hpDamage} → ${target.currentHp} HP)`,
+                        logType
+                    );
+                }*/
             }
-        } else {
-            if (damageApplication.shieldDamage > 0) {
-                this.battleManager.addCombatLog(
-                    `🩸 ${target.name} takes ${finalDamage} damage (${damageApplication.shieldDamage} to shield, ${damageApplication.hpDamage} to HP)!`,
-                    logType
-                );
-            } else {
-                this.battleManager.addCombatLog(
-                    `🩸 ${target.name} takes ${finalDamage} damage! (${target.currentHp + damageApplication.hpDamage} → ${target.currentHp} HP)`,
-                    logType
-                );
+            
+            if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
+                this.battleManager.battleScreen.battleLog.addHpBarMessage(target, target.currentHp, target.maxHp);
             }
         }
         
@@ -1179,7 +1510,7 @@ export class BattleCombatManager {
         
         return damageApplication;
     }
-
+    
     // Helper method to find creature info
     findCreatureInfo(creature) {
         // Search through all heroes to find this creature
@@ -1373,7 +1704,7 @@ export class BattleCombatManager {
         if (this.battleManager.spellSystem) {
             // Create a version of the hero that only shows enabled spells
             const heroForSpells = this.createHeroWithEnabledSpellsOnly(hero);
-            spellToCast = this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
+            spellToCast = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
             if (spellToCast) {
                 willAttack = false; // Hero spent turn casting spell
             }
@@ -1394,7 +1725,7 @@ export class BattleCombatManager {
             let target = null;
             if (isRanged) {
                 target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
-                this.battleManager.addCombatLog(`🹹 ${hero.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🏹 ${hero.name} uses ranged attack!`, 'info');
             } else {
                 target = this.authoritative_findTargetWithCreatures(position, attackerSide);
             }
@@ -1610,7 +1941,7 @@ export class BattleCombatManager {
     }
 
     guest_handleImmortalRevival(data) {
-        if (this.isAuthoritative) {
+        if (this.battleManager.isAuthoritative) {
             console.warn('Host should not receive immortal revival messages');
             return;
         }
@@ -1618,11 +1949,11 @@ export class BattleCombatManager {
         const { targetAbsoluteSide, targetPosition, targetName, newHp, remainingImmortalStacks } = data;
         
         // Determine local side for guest
-        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const targetLocalSide = (targetAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         
-        // Find the target hero
-        const heroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
+        // Find the target hero - FIX: Use battleManager reference
+        const heroes = targetLocalSide === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
         const target = heroes[targetPosition];
         
         if (!target) {
@@ -1634,16 +1965,16 @@ export class BattleCombatManager {
         target.currentHp = newHp;
         target.alive = true;
         
-        // Update immortal stacks
-        if (this.statusEffectsManager && remainingImmortalStacks >= 0) {
-            this.statusEffectsManager.setStatusEffectStacks(target, 'immortal', remainingImmortalStacks);
+        // Update immortal stacks - FIX: Use battleManager reference
+        if (this.battleManager.statusEffectsManager && remainingImmortalStacks >= 0) {
+            this.battleManager.statusEffectsManager.setStatusEffectStacks(target, 'immortal', remainingImmortalStacks);
         }
         
-        // Update visuals
-        this.updateHeroHealthBar(targetLocalSide, targetPosition, target.currentHp, target.maxHp);
+        // Update visuals - FIX: Use battleManager reference
+        this.battleManager.updateHeroHealthBar(targetLocalSide, targetPosition, target.currentHp, target.maxHp);
         
-        // Remove defeated state
-        const heroElement = this.getHeroElement(targetLocalSide, targetPosition);
+        // Remove defeated state - FIX: Use battleManager reference
+        const heroElement = this.battleManager.getHeroElement(targetLocalSide, targetPosition);
         if (heroElement) {
             const card = heroElement.querySelector('.battle-hero-card');
             if (card) {
@@ -1658,9 +1989,9 @@ export class BattleCombatManager {
             this.combatManager.createImmortalRevivalAnimation(target);
         }
         
-        // Add to combat log
+        // Add to combat log - FIX: Use battleManager reference
         const logType = targetLocalSide === 'player' ? 'success' : 'error';
-        this.addCombatLog(
+        this.battleManager.addCombatLog(
             `✨ ${targetName} is revived by immortal power with ${newHp} HP!`,
             logType
         );
@@ -1681,6 +2012,29 @@ export class BattleCombatManager {
         });
         
         return totalWealthBonus;
+    }
+
+    /**
+     * Check for CriticalStrike damage modification
+     * @param {Object} attacker - The attacking hero
+     * @param {Object} target - The target being attacked  
+     * @param {number} damage - The base damage
+     * @returns {Object} - { modifiedDamage: number, criticalStrikeTriggered: boolean, effectData: Object }
+     */
+    checkCriticalStrikeDamageModifier(attacker, target, damage) {
+        if (!this.battleManager.spellSystem || 
+            !this.battleManager.spellSystem.spellImplementations.has('CriticalStrike')) {
+            return { modifiedDamage: damage, criticalStrikeTriggered: false, effectData: null };
+        }
+
+        const criticalStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('CriticalStrike');
+        const result = criticalStrikeSpell.checkCriticalStrikeTrigger(attacker, target, damage);
+
+        return {
+            modifiedDamage: result.modifiedDamage,
+            criticalStrikeTriggered: result.shouldTrigger,
+            effectData: result.effectData
+        };
     }
 }
 

@@ -64,6 +64,8 @@ export class Hero {
 
         // Other stacks
         this.burningFingerStack = 0;
+        this.deathCounters = 0;
+
         
         // Extensible state for future features
         this.statusEffects = [];
@@ -752,6 +754,8 @@ export class Hero {
             necromancyStacks: this.necromancyStacks,
             maxNecromancyStacks: this.maxNecromancyStacks,
             burningFingerStack: this.burningFingerStack || 0,
+            deathCounters: this.deathCounters || 0,
+
             
             // Battle state
             statusEffects: this.statusEffects,
@@ -827,6 +831,8 @@ export class Hero {
         hero.necromancyStacks = savedState.necromancyStacks || 0;
         hero.maxNecromancyStacks = savedState.maxNecromancyStacks || 0;
         hero.burningFingerStack = savedState.burningFingerStack || 0;
+        hero.deathCounters = savedState.deathCounters || 0;
+
         
         // Restore battle state
         hero.statusEffects = savedState.statusEffects || [];

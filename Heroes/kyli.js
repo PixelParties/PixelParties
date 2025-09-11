@@ -1,88 +1,57 @@
 // ./Heroes/kyli.js - Kyli Hero Effect Manager: Nature Bond BiomancyToken Empowerment
-// VERSION WITH EXTENSIVE DEBUGGING
 
 export class KyliEffectManager {
     constructor() {
-        console.log('🐛 [KYLI DEBUG] KyliEffectManager constructor called');
         // No state tracking needed - returnToFormationScreenAfterBattle handles timing
     }
 
     // Process Kyli empowerment after battle (called from returnToFormationScreenAfterBattle)
     async processPostBattleEmpowerment(heroSelection) {
-        console.log('🐛 [KYLI DEBUG] processPostBattleEmpowerment called');
-        console.log('🐛 [KYLI DEBUG] heroSelection object:', heroSelection);
-        
         if (!heroSelection) {
-            console.error('🐛 [KYLI DEBUG] CRITICAL: heroSelection is null/undefined');
             return;
         }
         
         if (!heroSelection.formationManager) {
-            console.error('🐛 [KYLI DEBUG] CRITICAL: heroSelection.formationManager is missing');
-            console.log('🐛 [KYLI DEBUG] Available properties on heroSelection:', Object.keys(heroSelection));
             return;
         }
         
         if (!heroSelection.heroCreatureManager) {
-            console.error('🐛 [KYLI DEBUG] CRITICAL: heroSelection.heroCreatureManager is missing');
-            console.log('🐛 [KYLI DEBUG] Available properties on heroSelection:', Object.keys(heroSelection));
             return;
         }
 
-        console.log('🐛 [KYLI DEBUG] All required managers are available');
-
         try {
             // Count Kyli heroes in current formation
-            console.log('🐛 [KYLI DEBUG] Getting battle formation...');
             const formation = heroSelection.formationManager.getBattleFormation();
-            console.log('🐛 [KYLI DEBUG] Formation retrieved:', formation);
             
             const kyliCount = this.countKyliHeroes(formation);
-            console.log('🐛 [KYLI DEBUG] Kyli count in formation:', kyliCount);
             
             if (kyliCount === 0) {
-                console.log('🐛 [KYLI DEBUG] No Kyli heroes found, exiting empowerment');
                 return; // No Kyli heroes, no empowerment
             }
 
-            console.log('🐛 [KYLI DEBUG] Found', kyliCount, 'Kyli hero(s), proceeding with empowerment');
-
             // Find and empower all BiomancyToken creatures
             const empoweredCount = this.empowerBiomancyTokens(heroSelection, kyliCount);
-            console.log('🐛 [KYLI DEBUG] Empowerment complete, empowered count:', empoweredCount);
             
             if (empoweredCount > 0) {
-                const totalHpBonus = kyliCount * 20;
-                console.log(`🐛 [KYLI DEBUG] SUCCESS: Kyli empowered ${empoweredCount} BiomancyTokens with +${totalHpBonus} HP`);
                 this.showEmpowermentNotification(kyliCount, empoweredCount);
                 
                 // CRITICAL: Save the game state to persist the HP changes
-                console.log('🐛 [KYLI DEBUG] Saving game state to persist empowerment...');
                 try {
                     if (heroSelection.saveGameState) {
                         await heroSelection.saveGameState();
-                        console.log('🐛 [KYLI DEBUG] Game state saved successfully after empowerment');
-                    } else {
-                        console.error('🐛 [KYLI DEBUG] No saveGameState method available!');
                     }
                 } catch (error) {
-                    console.error('🐛 [KYLI DEBUG] Error saving game state after empowerment:', error);
+                    // Error saving game state after empowerment
                 }
-            } else {
-                console.log('🐛 [KYLI DEBUG] No BiomancyTokens were empowered (none found?)');
             }
         } catch (error) {
-            console.error('🐛 [KYLI DEBUG] EXCEPTION in processPostBattleEmpowerment:', error);
-            console.error('🐛 [KYLI DEBUG] Stack trace:', error.stack);
+            // Exception in processPostBattleEmpowerment
         }
     }
 
     // Count Kyli heroes in formation
     countKyliHeroes(formation) {
-        console.log('🐛 [KYLI DEBUG] countKyliHeroes called with formation:', formation);
-        
         if (!formation) {
-            console.error('🐛 [KYLI DEBUG] Formation is null/undefined');
             return 0;
         }
         
@@ -90,132 +59,67 @@ export class KyliEffectManager {
         const positions = ['left', 'center', 'right'];
         
         positions.forEach(position => {
-            console.log(`🐛 [KYLI DEBUG] Checking position ${position}...`);
             const hero = formation[position];
             
             if (!hero) {
-                console.log(`🐛 [KYLI DEBUG] No hero at position ${position}`);
                 return;
             }
             
-            console.log(`🐛 [KYLI DEBUG] Hero at ${position}:`, hero);
-            console.log(`🐛 [KYLI DEBUG] Hero name: "${hero.name}"`);
-            
             if (hero.name === 'Kyli') {
                 count++;
-                console.log(`🐛 [KYLI DEBUG] Found Kyli at position ${position}! Count now: ${count}`);
-            } else {
-                console.log(`🐛 [KYLI DEBUG] Hero at ${position} is ${hero.name}, not Kyli`);
             }
         });
         
-        console.log('🐛 [KYLI DEBUG] Final Kyli count:', count);
         return count;
     }
 
     // Empower all BiomancyToken creatures
     empowerBiomancyTokens(heroSelection, kyliCount) {
-        console.log('🐛 [KYLI DEBUG] empowerBiomancyTokens called with kyliCount:', kyliCount);
-        
         const hpBonusPerKyli = 20;
         const totalHpBonus = kyliCount * hpBonusPerKyli;
-        console.log('🐛 [KYLI DEBUG] Total HP bonus to apply:', totalHpBonus);
         
         let empoweredCount = 0;
 
         // Process each hero position
         const positions = ['left', 'center', 'right'];
         positions.forEach(position => {
-            console.log(`🐛 [KYLI DEBUG] Processing creatures at position ${position}...`);
-            
             try {
                 const creatures = heroSelection.heroCreatureManager.getHeroCreatures(position);
-                console.log(`🐛 [KYLI DEBUG] Creatures at ${position}:`, creatures);
-                console.log(`🐛 [KYLI DEBUG] Number of creatures at ${position}:`, creatures.length);
                 
                 if (creatures.length === 0) {
-                    console.log(`🐛 [KYLI DEBUG] No creatures at position ${position}`);
                     return;
                 }
                 
                 creatures.forEach((creature, index) => {
-                    console.log(`🐛 [KYLI DEBUG] Examining creature ${index} at ${position}:`, creature);
-                    console.log(`🐛 [KYLI DEBUG] Creature name: "${creature.name}"`);
-                    console.log(`🐛 [KYLI DEBUG] Creature current HP: ${creature.currentHp}`);
-                    console.log(`🐛 [KYLI DEBUG] Creature max HP: ${creature.hp}`);
-                    
                     if (creature.name === 'BiomancyToken') {
-                        console.log(`🐛 [KYLI DEBUG] Found BiomancyToken at ${position}-${index}!`);
-                        
-                        // Store original values for logging
-                        const originalMaxHp = creature.hp;
-                        const originalCurrentHp = creature.currentHp;
-                        
-                        console.log(`🐛 [KYLI DEBUG] BEFORE empowerment - MaxHP: ${originalMaxHp}, CurrentHP: ${originalCurrentHp}`);
-                        
                         // Apply HP bonus directly to the creature
                         creature.hp = creature.hp + totalHpBonus;
                         creature.currentHp = creature.currentHp + totalHpBonus;
                         
-                        console.log(`🐛 [KYLI DEBUG] AFTER empowerment - MaxHP: ${creature.hp}, CurrentHP: ${creature.currentHp}`);
-                        console.log(`🐛 [KYLI DEBUG] HP increase: ${creature.hp - originalMaxHp}`);
-                        
                         // Show buff animation
                         this.showTokenBuffAnimation(position, index, totalHpBonus);
                         empoweredCount++;
-                        
-                        console.log(`🐛 [KYLI DEBUG] Successfully empowered BiomancyToken at ${position}-${index}: +${totalHpBonus} HP`);
-                        console.log(`🐛 [KYLI DEBUG] Total empowered so far: ${empoweredCount}`);
-                    } else {
-                        console.log(`🐛 [KYLI DEBUG] Creature at ${position}-${index} is ${creature.name}, not BiomancyToken`);
                     }
                 });
             } catch (error) {
-                console.error(`🐛 [KYLI DEBUG] ERROR processing creatures at ${position}:`, error);
-                console.error(`🐛 [KYLI DEBUG] Stack trace:`, error.stack);
+                // Error processing creatures at position
             }
         });
         
-        console.log('🐛 [KYLI DEBUG] Final empowered count:', empoweredCount);
         return empoweredCount;
     }
 
     // Show buff animation for empowered token
     showTokenBuffAnimation(position, creatureIndex, hpBonus) {
-        console.log(`🐛 [KYLI DEBUG] showTokenBuffAnimation called for ${position}-${creatureIndex} with bonus ${hpBonus}`);
-        
         // Small delay to ensure UI is ready
         setTimeout(() => {
-            console.log(`🐛 [KYLI DEBUG] Executing buff animation for ${position}-${creatureIndex}`);
-            
             const selector = `.hero-creatures[data-hero-position="${position}"] .creature-icon[data-creature-index="${creatureIndex}"]`;
-            console.log(`🐛 [KYLI DEBUG] Looking for element with selector: ${selector}`);
             
             const creatureElement = document.querySelector(selector);
-            console.log(`🐛 [KYLI DEBUG] Found creature element:`, creatureElement);
             
             if (!creatureElement) {
-                console.warn(`🐛 [KYLI DEBUG] Could not find creature element for buff animation at ${position}-${creatureIndex}`);
-                
-                // Try alternative selectors for debugging
-                const altSelector1 = `.hero-creatures[data-hero-position="${position}"]`;
-                const container = document.querySelector(altSelector1);
-                console.log(`🐛 [KYLI DEBUG] Container element:`, container);
-                
-                if (container) {
-                    const allCreatures = container.querySelectorAll('.creature-icon');
-                    console.log(`🐛 [KYLI DEBUG] All creature icons in container:`, allCreatures);
-                    console.log(`🐛 [KYLI DEBUG] Number of creature icons:`, allCreatures.length);
-                    
-                    allCreatures.forEach((el, idx) => {
-                        console.log(`🐛 [KYLI DEBUG] Creature ${idx} data-creature-index:`, el.getAttribute('data-creature-index'));
-                    });
-                }
-                
                 return;
             }
-
-            console.log(`🐛 [KYLI DEBUG] Creating buff effect element...`);
 
             // Create buff effect
             const buffEffect = document.createElement('div');
@@ -247,23 +151,15 @@ export class KyliEffectManager {
                 gap: 4px;
             `;
 
-            console.log(`🐛 [KYLI DEBUG] Setting creature element position to relative...`);
             // Ensure the creature element can contain the buff effect
             creatureElement.style.position = 'relative';
             
-            console.log(`🐛 [KYLI DEBUG] Appending buff effect to creature element...`);
             creatureElement.appendChild(buffEffect);
-            
-            console.log(`🐛 [KYLI DEBUG] Buff animation element created and attached successfully`);
 
             // Remove after animation completes
             setTimeout(() => {
-                console.log(`🐛 [KYLI DEBUG] Removing buff effect after animation completion`);
                 if (buffEffect.parentNode) {
                     buffEffect.remove();
-                    console.log(`🐛 [KYLI DEBUG] Buff effect removed successfully`);
-                } else {
-                    console.log(`🐛 [KYLI DEBUG] Buff effect was already removed`);
                 }
             }, 2500);
         }, 100);
@@ -271,10 +167,7 @@ export class KyliEffectManager {
 
     // Show empowerment notification
     showEmpowermentNotification(kyliCount, tokenCount) {
-        console.log(`🐛 [KYLI DEBUG] showEmpowermentNotification called - kyliCount: ${kyliCount}, tokenCount: ${tokenCount}`);
-        
         const hpPerToken = kyliCount * 20;
-        console.log(`🐛 [KYLI DEBUG] HP per token: ${hpPerToken}`);
         
         const notification = document.createElement('div');
         notification.className = 'kyli-empowerment-notification';
@@ -313,39 +206,29 @@ export class KyliEffectManager {
             gap: 16px;
         `;
 
-        console.log(`🐛 [KYLI DEBUG] Appending notification to document body...`);
         document.body.appendChild(notification);
-        console.log(`🐛 [KYLI DEBUG] Notification displayed successfully`);
 
         // Remove after animation
         setTimeout(() => {
-            console.log(`🐛 [KYLI DEBUG] Removing notification after animation`);
             if (notification.parentNode) {
                 notification.remove();
-                console.log(`🐛 [KYLI DEBUG] Notification removed successfully`);
-            } else {
-                console.log(`🐛 [KYLI DEBUG] Notification was already removed`);
             }
         }, 3500);
     }
 
     // Reset for new turn - no state to reset since empowerment is permanent until creatures are replaced
     resetForNewTurn() {
-        console.log('🐛 [KYLI DEBUG] resetForNewTurn called');
         // No state tracking, no reset needed
     }
 
     // Reset to initial state - no state to reset
     reset() {
-        console.log('🐛 [KYLI DEBUG] reset called');
         // No persistent state to reset
-        console.log('🐛 [KYLI DEBUG] Kyli: Reset (no state to clear)');
     }
 }
 
 // Inject CSS styles for Kyli effects
 if (typeof document !== 'undefined' && !document.getElementById('kyliEffectStyles')) {
-    console.log('🐛 [KYLI DEBUG] Injecting CSS styles...');
     const style = document.createElement('style');
     style.id = 'kyliEffectStyles';
     style.textContent = `
@@ -449,9 +332,6 @@ if (typeof document !== 'undefined' && !document.getElementById('kyliEffectStyle
         }
     `;
     document.head.appendChild(style);
-    console.log('🐛 [KYLI DEBUG] CSS styles injected successfully');
-} else {
-    console.log('🐛 [KYLI DEBUG] CSS styles already exist, skipping injection');
 }
 
 // Export for use in other modules

@@ -1,6 +1,9 @@
 // navigation.js - Navigation Ability Implementation
 
 export const navigationAbility = {
+    // Track which heroes have used Navigation this turn (by hero name, not position)
+    heroNavigationUsed: new Set(),
+    
     // Current Navigation mode state
     navigationMode: {
         active: false,
@@ -9,37 +12,46 @@ export const navigationAbility = {
         overlay: null
     },
     
-    // Check if hero can use Navigation (delegate to heroAbilitiesManager)
-    canUseNavigation(heroPosition) {
-        if (!window.heroSelection?.heroAbilitiesManager) {
-            console.warn('HeroAbilitiesManager not available for Navigation check');
-            return false;
+    // Helper method to get hero name from position
+    getHeroNameFromPosition(position) {
+        if (!window.heroSelection?.formationManager) {
+            return null;
         }
         
-        // Use heroAbilitiesManager's tracking (similar to Leadership)
-        // This would need to be added to heroAbilitiesManager if it doesn't exist yet
-        return window.heroSelection.heroAbilitiesManager.canUseNavigation?.(heroPosition) ?? true;
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        const hero = formation[position];
+        return hero ? hero.name : null;
     },
     
-    // Mark Navigation as used for this hero (delegate to heroAbilitiesManager)
-    markNavigationUsed(heroPosition) {
-        if (!window.heroSelection?.heroAbilitiesManager) {
-            console.warn('HeroAbilitiesManager not available for Navigation tracking');
+    // Check if hero can use Navigation
+    canUseNavigation(heroPosition) {
+        const heroName = this.getHeroNameFromPosition(heroPosition);
+        if (!heroName) {
+            console.warn('Navigation: Could not determine hero name for position', heroPosition);
             return false;
         }
         
-        // Use heroAbilitiesManager's tracking (similar to Leadership)
-        // This would need to be added to heroAbilitiesManager if it doesn't exist yet
-        const success = window.heroSelection.heroAbilitiesManager.markNavigationUsed?.(heroPosition) ?? false;
-        
-        if (success) {
-            // Save the state immediately after marking as used
-            if (window.heroSelection?.saveGameState) {
-                window.heroSelection.saveGameState();
-            }
+        // Check if this specific hero has already used Navigation this turn
+        return !this.heroNavigationUsed.has(heroName);
+    },
+    
+    // Mark Navigation as used for this hero
+    markNavigationUsed(heroPosition) {
+        const heroName = this.getHeroNameFromPosition(heroPosition);
+        if (!heroName) {
+            console.warn('Navigation: Could not determine hero name for position', heroPosition);
+            return false;
         }
         
-        return success;
+        // Mark this specific hero as having used Navigation
+        this.heroNavigationUsed.add(heroName);
+        
+        // Save the state immediately after marking as used
+        if (window.heroSelection?.saveGameState) {
+            window.heroSelection.saveGameState();
+        }
+        
+        return true;
     },
     
     // Handle Navigation ability click
@@ -377,6 +389,62 @@ export const navigationAbility = {
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, str => str.toUpperCase())
             .trim();
+    },
+    
+    // Reset for new turn
+    resetTurnBasedTracking() {
+        this.heroNavigationUsed.clear();
+        
+        // Also exit navigation mode if still active (safety measure)
+        if (this.navigationMode.active) {
+            this.endNavigationMode();
+        }
+    },
+    
+    // Export state for saving
+    exportState() {
+        return {
+            heroNavigationUsed: Array.from(this.heroNavigationUsed), // Convert Set to Array for JSON
+            navigationMode: { ...this.navigationMode }
+        };
+    },
+    
+    // Import state for loading
+    importState(state) {
+        if (!state) return false;
+        
+        if (state.heroNavigationUsed) {
+            this.heroNavigationUsed = new Set(state.heroNavigationUsed); // Convert Array back to Set
+        }
+        
+        if (state.navigationMode) {
+            // Don't restore active navigation mode on reconnection for simplicity
+            this.navigationMode = {
+                active: false,
+                heroPosition: null,
+                navigationLevel: 0,
+                overlay: null
+            };
+        }
+        
+        return true;
+    },
+    
+    // Reset for new game
+    reset() {
+        this.heroNavigationUsed.clear();
+        
+        // Exit navigation mode if active
+        if (this.navigationMode.active) {
+            this.endNavigationMode();
+        }
+        
+        this.navigationMode = {
+            active: false,
+            heroPosition: null,
+            navigationLevel: 0,
+            overlay: null
+        };
     }
 };
 

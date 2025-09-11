@@ -241,10 +241,9 @@ export class KazenaEffect {
             const hero = formation[position];
             
             if (hero && hero.name === 'Kazena') {
-                if (hero.kazenaCounters) {
-                    const bonusCards = Math.floor(hero.kazenaCounters / 3);
-                    totalBonusCards += bonusCards;
-                }
+                const counters = hero.kazenaCounters || 0;
+                const bonusCards = Math.floor(counters / 3) + 1;
+                totalBonusCards += bonusCards;
             }
         });
 

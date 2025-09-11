@@ -580,6 +580,17 @@ export const leadershipAbility = {
             successDiv.style.animation = 'leadershipSuccessFade 0.3s ease-out forwards';
             setTimeout(() => successDiv.remove(), 300);
         }, 2500);
+    },
+
+    // Helper method to get hero name from position
+    getHeroNameFromPosition(position) {
+        if (!window.heroSelection?.formationManager) {
+            return null;
+        }
+        
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        const hero = formation[position];
+        return hero ? hero.name : null;
     }
 };
 

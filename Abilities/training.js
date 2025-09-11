@@ -22,12 +22,10 @@ export const trainingAbility = {
             
             if (initialTrainingCount === 0) return;
 
-            console.log(`Training: ${hero.name} at ${position} has ${initialTrainingCount} Training stacks`);
-
             // Roll for each initial Training stack
             for (let i = 0; i < initialTrainingCount; i++) {
                 const roll = Math.random();
-                if (roll <= 0.25) { // 25% chance
+                if (roll <= 0.15) { // 15% chance
                     const upgrade = this.upgradeRandomAbility(position);
                     if (upgrade) {
                         upgrades.push({
@@ -82,7 +80,6 @@ export const trainingAbility = {
         );
 
         if (success) {
-            console.log(`Training: Upgraded ${selectedAbility.name} for hero at ${heroPosition}`);
             return {
                 abilityName: selectedAbility.name,
                 zone: selectedAbility.zone,
@@ -121,8 +118,6 @@ export const trainingAbility = {
 
     // Show visual feedback for Training upgrades
     async showTrainingUpgrades(upgrades) {
-        console.log(`Training: Showing ${upgrades.length} upgrade(s)`);
-
         // Create sparkle animations for each upgrade
         upgrades.forEach(upgrade => {
             this.createSparkleAnimation(upgrade.position, upgrade.zone, upgrade.abilityName);
@@ -249,7 +244,6 @@ export const trainingAbility = {
 
         // Check if already initialized to prevent double-wrapping
         if (window.heroSelection.returnToFormationScreenAfterBattle._trainingWrapped) {
-            console.log('Training: System already initialized, skipping');
             return;
         }
 
@@ -269,8 +263,6 @@ export const trainingAbility = {
 
         // Mark as wrapped to prevent double-wrapping
         window.heroSelection.returnToFormationScreenAfterBattle._trainingWrapped = true;
-
-        console.log('Training: System initialized successfully');
     }
 };
 

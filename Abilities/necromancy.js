@@ -18,10 +18,6 @@ export class NecromancyManager {
                 playerHero.initializeNecromancyStacks();
                 const stacks = playerHero.getNecromancyStacks();
                 if (stacks > 0) {
-                    this.battleManager.addCombatLog(
-                        `🧙 ${playerHero.name} gains ${stacks} Necromancy stacks!`, 
-                        'success'
-                    );
                     necromancyInitialized = true;
                 }
             }
@@ -31,18 +27,10 @@ export class NecromancyManager {
                 opponentHero.initializeNecromancyStacks();
                 const stacks = opponentHero.getNecromancyStacks();
                 if (stacks > 0) {
-                    this.battleManager.addCombatLog(
-                        `🧙 Opponent's ${opponentHero.name} gains ${stacks} Necromancy stacks!`, 
-                        'error'
-                    );
                     necromancyInitialized = true;
                 }
             }
         });
-        
-        if (necromancyInitialized) {
-            this.battleManager.addCombatLog('💀 Necromancy empowers the fallen to rise again!', 'info');
-        }
     }
 
     // Get all heroes on a side that have necromancy stacks
@@ -326,28 +314,12 @@ export class NecromancyManager {
             // Add to end (back of formation)
             heroOwner.creatures.push(creature);
             finalCreatureIndex = heroOwner.creatures.length - 1;
-            
-            this.battleManager.addCombatLog(
-                `💀⬇️ ${creature.name} rises and moves to the back of the formation!`,
-                'info'
-            );
         }
-        
-            console.log("NECRO TEST!!!");
-        // Console log: Array after changes
-        console.log(`🔍 NECROMANCY REVIVAL - Array AFTER changes for ${heroOwner.name}:`, 
-            heroOwner.creatures.map((c, i) => `${i}: ${c.name} (${c.alive ? 'alive' : 'dead'})`));
-        console.log(`🎯 Final creature index: ${finalCreatureIndex}`);
-        
+                
         // Add combat log messages
         this.battleManager.addCombatLog(
             `💀✨ ${necromancyHero.name} uses Necromancy to revive ${creature.name}!`,
             side === 'player' ? 'success' : 'error'
-        );
-        
-        this.battleManager.addCombatLog(
-            `🧙 ${necromancyHero.name} has ${necromancyHero.getNecromancyStacks()} Necromancy stacks remaining`,
-            'info'
         );
         
         this.rerenderCreaturesVisually(side, position, heroOwner);
@@ -504,11 +476,6 @@ export class NecromancyManager {
                 `💀✨ ${revivingHero.name} uses Necromancy to revive ${revivedCreature.name}!`,
                 revivingHeroLocalSide === 'player' ? 'success' : 'error'
             );
-            
-            this.battleManager.addCombatLog(
-                `🧙 ${revivingHero.name} has ${remainingStacks} Necromancy stacks remaining`,
-                'info'
-            );
         }
         
         // Update the revived creature
@@ -567,8 +534,6 @@ export class NecromancyManager {
                     creature.maxHp, 
                     true // This is a revival
                 );
-                
-                this.battleManager.addCombatLog(`⚡ ${creature.name} rises from the dead!`, 'success');
             } else {
                 console.error(`Failed to find creature ${revivedCreature.name} for revival on guest side`);
             }

@@ -52,17 +52,8 @@ export class AliceHeroEffect {
         // NEW: Only trigger Alice's effect if she has living creatures (damage > 0)
         if (creatureCount === 0) {
             console.log(`🔴 Alice's laser effect cancelled - no living creatures on her team`);
-            this.battleManager.addCombatLog(
-                `🔴 Alice's targeting system remains dormant - no creatures to power it!`,
-                alice.side === 'player' ? 'info' : 'info'
-            );
             return;
         }
-
-        this.battleManager.addCombatLog(
-            `🔴 Alice's targeting system activates at the start of her turn!`,
-            alice.side === 'player' ? 'success' : 'error'
-        );
 
         // Find random enemy target
         const target = this.findRandomEnemyTarget(alice);
@@ -258,11 +249,6 @@ export class AliceHeroEffect {
         
         // Remove laser with fade effect
         await this.removeLaser(laser);
-
-        this.battleManager.addCombatLog(
-            `🔴 Alice's opening laser dissipates!`,
-            'info'
-        );
     }
 
     // Get the DOM element for a target
@@ -534,8 +520,6 @@ export class AliceHeroEffect {
         // Remove laser after duration
         await this.battleManager.delay(duration);
         await this.removeLaser(laser);
-        
-        this.battleManager.addCombatLog(`🔴 Alice's opening laser dissipates!`, 'info');
     }
 
     // ============================================

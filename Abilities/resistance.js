@@ -35,16 +35,6 @@ export class ResistanceManager {
                 
                 this.resistanceStacks[key] = resistanceLevel;
                 
-                console.log(`🛡️ ${hero.name} (${side} ${position}) initialized with ${resistanceLevel} resistance stacks`);
-                
-                // Add to battle log
-                if (resistanceLevel > 0) {
-                    this.battleManager.addCombatLog(
-                        `🛡️ ${hero.name} gains ${resistanceLevel} resistance stack${resistanceLevel > 1 ? 's' : ''}!`,
-                        side === 'player' ? 'success' : 'info'
-                    );
-                }
-                
                 // Store in hero's custom stats for persistence
                 hero.customStats.resistanceStacks = resistanceLevel;
             }
@@ -387,12 +377,12 @@ export function applyResistancePatches(BattleManager) {
     
     // Patch startBattle to initialize resistance stacks
     BattleManager.prototype.startBattle = async function() {
-        await originalStartBattle.apply(this);
-        
-        // Initialize resistance stacks for all heroes
+        // Initialize resistance stacks for all heroes BEFORE battle start effects
         if (this.resistanceManager && this.isAuthoritative) {
             this.resistanceManager.initializeResistanceStacks();
         }
+        
+        await originalStartBattle.apply(this);
     };
     
     // Patch exportBattleState to include resistance state

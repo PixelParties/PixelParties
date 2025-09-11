@@ -36,10 +36,10 @@ export const magicArtsRedraw = {
             return false;
         }
         
-        // Roll 20% chance for each MagicArts level
+        // Roll 10% chance for each MagicArts level
         for (let i = 0; i < magicArtsLevel; i++) {
             const roll = Math.random();
-            if (roll <= 0.2) {
+            if (roll <= 0.1) {
                 return true; // Success! Player gets a redraw
             }
         }

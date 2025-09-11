@@ -14,13 +14,6 @@ export class OccultismAbility {
             hpBonus: 0,
             attackBonus: 0
         };
-        
-        // Turn-based usage tracking (per hero position)
-        this.usageThisTurn = {
-            left: false,
-            center: false,
-            right: false
-        };
     }
 
     // Handle click on Occultism ability
@@ -515,6 +508,17 @@ export class OccultismAbility {
         }
 
         return true;
+    }
+
+    // Helper method to get hero name from position
+    getHeroNameFromPosition(position) {
+        if (!window.heroSelection?.formationManager) {
+            return null;
+        }
+        
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        const hero = formation[position];
+        return hero ? hero.name : null;
     }
 
     // Reset for new game

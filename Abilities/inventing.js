@@ -3,11 +3,22 @@
 
 export class InventingAbility {
     constructor() {
-        // Track each Inventing instance by heroPosition-zone key
-        // Format: 'left-1', 'center-2', 'right-3'
+        // Track each Inventing instance by heroName-zone key
+        // Format: 'Alice-1', 'Toras-2', 'Nicolas-3'
         this.inventingData = {};
         
         console.log('InventingAbility system initialized');
+    }
+
+    // Helper method to get hero name from position
+    getHeroNameFromPosition(position) {
+        if (!window.heroSelection?.formationManager) {
+            return null;
+        }
+        
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        const hero = formation[position];
+        return hero ? hero.name : null;
     }
 
     // Initialize the system (called once when game loads)
@@ -37,14 +48,15 @@ export class InventingAbility {
         
         // Process each Inventing instance
         inventingInstances.forEach(instance => {
-            const { heroPosition, zone, level } = instance;
-            const key = `${heroPosition}-${zone}`;
+            const { heroPosition, zone, level, heroName } = instance;
+            const key = `${heroName}-${zone}`;
             
             // Ensure data exists for this instance
             if (!this.inventingData[key]) {
                 this.inventingData[key] = {
                     counters: 0,
-                    generationsThisTurn: 0
+                    generationsThisTurn: 0,
+                    heroName: heroName // Store hero name for reference
                 };
             }
             
@@ -57,12 +69,12 @@ export class InventingAbility {
                 data.generationsThisTurn += 1;
                 totalCountersAdded += level;
                 
-                console.log(`🔧 InventingAbility: ${heroPosition} hero zone ${zone} (level ${level}) gains ${level} counters (${data.counters} total, ${data.generationsThisTurn}/${level} generations this turn)`);
+                console.log(`🔧 InventingAbility: ${heroName} zone ${zone} (level ${level}) gains ${level} counters (${data.counters} total, ${data.generationsThisTurn}/${level} generations this turn)`);
                 
                 // Show visual feedback
                 this.showCounterGainFeedback(heroPosition, zone, level, data.counters);
             } else {
-                console.log(`🔧 InventingAbility: ${heroPosition} hero zone ${zone} has reached generation limit (${data.generationsThisTurn}/${level})`);
+                console.log(`🔧 InventingAbility: ${heroName} zone ${zone} has reached generation limit (${data.generationsThisTurn}/${level})`);
             }
         });
 
@@ -83,6 +95,9 @@ export class InventingAbility {
         const abilitiesManager = heroSelection.heroAbilitiesManager;
         
         ['left', 'center', 'right'].forEach(heroPosition => {
+            const heroName = this.getHeroNameFromPosition(heroPosition);
+            if (!heroName) return;
+            
             const heroAbilities = abilitiesManager.getHeroAbilities(heroPosition);
             
             if (heroAbilities) {
@@ -93,6 +108,7 @@ export class InventingAbility {
                     if (zone && zone.length > 0 && zone[0].name === 'Inventing') {
                         instances.push({
                             heroPosition,
+                            heroName,
                             zone: zoneNumber,
                             level: zone.length // Stack count = level
                         });
@@ -117,14 +133,17 @@ export class InventingAbility {
                 data.counters -= 5;
                 totalCardsDrawn += 1;
                 
-                const [heroPosition, zone] = key.split('-');
-                console.log(`🔧 InventingAbility: ${heroPosition} hero zone ${zone} converts 5 counters to 1 card draw (${data.counters} counters remaining)`);
+                const [heroName, zone] = key.split('-');
+                console.log(`🔧 InventingAbility: ${heroName} zone ${zone} converts 5 counters to 1 card draw (${data.counters} counters remaining)`);
                 
                 // Draw the card
                 const success = heroSelection.handManager.addCardToHand(this.drawCardFromDeck(heroSelection));
                 if (success) {
-                    // Show visual feedback for card draw
-                    this.showCardDrawFeedback(heroPosition, parseInt(zone));
+                    // Show visual feedback for card draw - need to find hero position for visual feedback
+                    const heroPosition = this.findHeroPositionByName(heroName);
+                    if (heroPosition) {
+                        this.showCardDrawFeedback(heroPosition, parseInt(zone));
+                    }
                 }
             }
         });
@@ -145,6 +164,21 @@ export class InventingAbility {
                 heroSelection.autoSave();
             }
         }
+    }
+
+    // Helper method to find hero position by name (for visual feedback)
+    findHeroPositionByName(heroName) {
+        if (!window.heroSelection?.formationManager) {
+            return null;
+        }
+        
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        for (const [position, hero] of Object.entries(formation)) {
+            if (hero && hero.name === heroName) {
+                return position;
+            }
+        }
+        return null;
     }
 
     // Draw a random card from the deck
@@ -297,7 +331,7 @@ export class InventingAbility {
         
         const currentInstances = this.findAllInventingInstances(heroSelection);
         const currentKeys = new Set(currentInstances.map(instance => 
-            `${instance.heroPosition}-${instance.zone}`
+            `${instance.heroName}-${instance.zone}`
         ));
         
         let cleanedCount = 0;
@@ -332,32 +366,41 @@ export class InventingAbility {
         };
     }
 
-    // Get current counter count for a specific hero position and zone
-    getCountersForPosition(heroPosition, zone) {
-        const key = `${heroPosition}-${zone}`;
+    // Get current counter count for a specific hero and zone
+    getCountersForHeroAndZone(heroName, zone) {
+        const key = `${heroName}-${zone}`;
         return this.inventingData[key] ? this.inventingData[key].counters : 0;
     }
 
     // Update all Inventing counter displays in the UI
     updateInventingCounterDisplays() {
         Object.keys(this.inventingData).forEach(key => {
-            const [heroPosition, zone] = key.split('-');
+            const [heroName, zone] = key.split('-');
             const counterCount = this.inventingData[key].counters;
             
-            const counterDisplay = document.querySelector(`.inventing-counter-display[data-position="${heroPosition}"][data-zone="${zone}"]`);
-            if (counterDisplay) {
-                const counterValue = counterDisplay.querySelector('.inventing-counter-value');
-                if (counterValue) {
-                    counterValue.textContent = counterCount;
-                    
-                    // Add brief highlight effect when counter changes
-                    counterDisplay.classList.add('counter-updated');
-                    setTimeout(() => {
-                        counterDisplay.classList.remove('counter-updated');
-                    }, 500);
+            // Find the hero's current position for display updates
+            const heroPosition = this.findHeroPositionByName(heroName);
+            if (heroPosition) {
+                const counterDisplay = document.querySelector(`.inventing-counter-display[data-position="${heroPosition}"][data-zone="${zone}"]`);
+                if (counterDisplay) {
+                    const counterValue = counterDisplay.querySelector('.inventing-counter-value');
+                    if (counterValue) {
+                        counterValue.textContent = counterCount;
+                        
+                        // Add brief highlight effect when counter changes
+                        counterDisplay.classList.add('counter-updated');
+                        setTimeout(() => {
+                            counterDisplay.classList.remove('counter-updated');
+                        }, 500);
+                    }
                 }
             }
         });
+    }
+
+    getCountersForPosition(position, zone) {
+        const heroName = this.getHeroNameFromPosition(position);
+        return heroName ? this.getCountersForHeroAndZone(heroName, zone) : 0;
     }
 
     // Reset everything (for new games)

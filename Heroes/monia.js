@@ -297,11 +297,6 @@ export class MoniaHeroEffect {
         
         // Wait for all shield animations to complete
         await Promise.all(shieldPromises);
-        
-        this.battleManager.addCombatLog(
-            `🛡️ ${protectingMonia.name}'s protection fades`,
-            'info'
-        );
     }
 
     // Create protection shield visual effect

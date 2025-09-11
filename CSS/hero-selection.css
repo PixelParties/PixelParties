@@ -1,6 +1,8 @@
 /* ============================================
-   14. HERO SELECTION & TEAM BUILDING
+   HERO SELECTION & TEAM BUILDING
    ============================================ */
+
+/* Main Container */
 .hero-selection-screen {
     flex: 1;
     width: 100%;
@@ -31,6 +33,7 @@
     padding-bottom: 20px;
 }
 
+/* Left Column Layouts */
 .character-selection-column,
 .team-building-left {
     flex: 1;
@@ -51,6 +54,7 @@
     user-select: none;
 }
 
+/* Right Column Layouts */
 .card-preview-column,
 .team-building-right {
     width: 600px;
@@ -63,10 +67,9 @@
     justify-content: center;
     align-items: center;
     flex: 1;
-    min-width: 0;
-    position: relative !important;
     min-width: 300px;
     min-height: 400px;
+    position: relative;
 }
 
 .team-building-right {
@@ -78,6 +81,10 @@
 .hero-selection-screen[data-post-battle="true"] .team-building-right {
     transform: translateZ(0);
 }
+
+/* ============================================
+   HEADERS & TEXT
+   ============================================ */
 
 .selection-header,
 .team-header {
@@ -145,27 +152,30 @@
     letter-spacing: 0.5px;
 }
 
+/* ============================================
+   CHARACTER SELECTION - 50% LARGER
+   ============================================ */
+
 .character-selection-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 30px;
+    gap: 25px;
     margin-bottom: 40px;
-    max-width: 800px;
+    max-width: 1400px;
     margin-left: auto;
     margin-right: auto;
 }
 
-/* Character cards */
 .character-card {
     background: rgba(255, 255, 255, 0.95);
     border: 3px solid rgba(102, 126, 234, 0.2);
     border-radius: var(--radius-large);
-    padding: 20px;
+    padding: 5px;
     transition: var(--transition-medium);
     cursor: pointer;
     position: relative;
     overflow: hidden;
-    min-height: 280px;
+    min-height: 550px;
     display: flex;
     flex-direction: column;
 }
@@ -204,14 +214,15 @@
 
 .character-image-container {
     width: 100%;
-    height: 200px;
+    height: 380px;
     border-radius: 15px;
     overflow: hidden;
-    margin-bottom: 15px;
+    margin-bottom: 22px;
     background: linear-gradient(135deg, #f8f9fa, #e9ecef);
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
 .character-image {
@@ -228,7 +239,7 @@
 
 .character-name {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 1.3rem;
+    font-size: 1.6rem;
     font-weight: 700;
     color: #333;
     text-align: center;
@@ -236,9 +247,70 @@
     letter-spacing: 1px;
 }
 
+/* Character Tags Overlay */
+.character-card:not(.with-ability-zones) .card-tags-container {
+    position: absolute;
+    top: 250px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    margin: 0;
+    padding: 0 6px;
+    max-width: calc(100% - 24px);
+    pointer-events: none;
+}
+
+.character-card:not(.with-ability-zones) .card-tag {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 16px;
+    padding: 3px 8px;
+    min-width: auto;
+    max-width: none;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.character-card:not(.with-ability-zones):hover .card-tag {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.character-card.character-selectable .card-tags-container {
+    opacity: 0.9;
+    transition: opacity 0.3s ease;
+}
+
+.character-card.character-selectable:hover .card-tags-container {
+    opacity: 1;
+    z-index: 16;
+}
+
+.character-card.character-selected .card-tags-container {
+    opacity: 1;
+}
+
+.character-card.character-selected .card-tag {
+    background: rgba(40, 167, 69, 0.9);
+    border-color: rgba(255, 255, 255, 0.6);
+    animation: selectedCharacterTagGlow 2s ease-in-out infinite alternate;
+}
+
+/* ============================================
+   TEAM BUILDING LAYOUTS
+   ============================================ */
+
 /* Character cards with ability zones */
 .character-card.with-ability-zones {
-    min-height: 340px;
+    min-height: 420px;
+    max-height: 420px;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
@@ -278,8 +350,6 @@
 .character-card .ability-zone:hover {
     border-color: rgba(102, 126, 234, 0.3);
     background: rgba(248, 249, 250, 0.08);
-    box-shadow: none;
-    transform: none;
 }
 
 .character-card .ability-zone.filled {
@@ -315,9 +385,18 @@
     transition: var(--transition-fast);
 }
 
-.ability-zone:hover .ability-card-image {
+.ability-zone:hover .ability-card-image,
+.ability-card-image.clickable-ability:hover {
     transform: scale(1.05);
     filter: brightness(1.15);
+}
+
+.ability-card-image.clickable-ability:hover {
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+}
+
+.ability-card-image.clickable-ability:active {
+    transform: scale(0.95);
 }
 
 .ability-zone .ability-stack-count {
@@ -342,13 +421,9 @@
     letter-spacing: 0.5px;
 }
 
+/* Turn limit and ability received states */
 .character-card.turn-limit-reached {
     animation: shake 0.5s ease-in-out;
-    position: relative;
-}
-
-.character-card[data-ability-received="true"] {
-    position: relative;
 }
 
 .character-card[data-ability-received="true"]::before {
@@ -370,39 +445,14 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Ability zone states */
-.ability-zone.filled {
-    position: relative;
-    z-index: 10;
-}
-
-.ability-zone.filled .ability-card-image {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
 .ability-zone.ability-clicked {
     animation: abilityClickPulse 0.3s ease-out;
 }
 
-/* Clickable ability styles */
-.ability-card-image.clickable-ability {
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-}
+/* ============================================
+   TEAM SLOTS LAYOUT - DECOUPLED
+   ============================================ */
 
-.ability-card-image.clickable-ability:hover {
-    transform: scale(1.1);
-    filter: brightness(1.2);
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
-}
-
-.ability-card-image.clickable-ability:active {
-    transform: scale(0.95);
-}
-
-/* UPDATED: Team Building Slots - Decoupled Area, Discard Pile, and Heroes */
 .team-slots-container {
     display: flex;
     justify-content: center;
@@ -412,146 +462,13 @@
     min-height: 340px;
 }
 
-/* Independent Area Slot Positioning - UPDATED for half height */
-.area-slot {
-    position: absolute;
-    left: -20px;
-    top: 0%;
-    transform: translateY(0);
-    width: 200px;
-    min-height: 227px; /* Half the hero slot height */
-    border: 3px dashed rgba(76, 175, 80, 0.4);
-    border-radius: var(--radius-large);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(129, 199, 132, 0.05));
-    backdrop-filter: blur(10px);
-    transition: var(--transition-medium);
-    overflow: hidden;
-    z-index: 1;
-}
-
-.area-slot.filled {
-    border: 3px solid #4CAF50;
-    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(129, 199, 132, 0.1));
-    box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
-}
-
-.area-slot.empty:hover {
-    border-color: rgba(76, 175, 80, 0.6);
-    background: linear-gradient(135deg, rgba(76, 175, 80, 0.12), rgba(129, 199, 132, 0.08));
-    transform: translateY(0) scale(1.02);
-}
-
-/* Discard Pile Styles */
-.discard-pile-slot {
-    position: absolute;
-    left: -20px;
-    top: calc(19% + 170px + 10px); 
-    width: 200px;
-    min-height: 170px; /* Half the hero slot height */
-    border: 3px dashed rgba(220, 53, 69, 0.4);
-    border-radius: var(--radius-large);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.08), rgba(244, 67, 54, 0.05));
-    backdrop-filter: blur(10px);
-    transition: var(--transition-medium);
-    overflow: hidden;
-    z-index: 1;
-}
-
-.discard-pile-slot.empty {
-    border-style: dashed;
-}
-
-.discard-pile-slot.empty:hover {
-    border-color: rgba(220, 53, 69, 0.6);
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.12), rgba(244, 67, 54, 0.08));
-    transform: scale(1.02);
-}
-
-/* Discard pile placeholder content */
-.discard-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 20px;
-}
-
-.discard-icon {
-    font-size: 2.5rem;
-    margin-bottom: 8px;
-    filter: drop-shadow(0 4px 8px rgba(220, 53, 69, 0.3));
-    animation: discardIconFloat 3s ease-in-out infinite;
-}
-
-.discard-label {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #dc3545;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    letter-spacing: 1px;
-}
-
-/* Discard pile drag states */
-.discard-pile-slot.discard-drop-ready {
-    border-color: #dc3545 !important;
-    border-style: solid !important;
-    border-width: 4px !important;
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.25), rgba(244, 67, 54, 0.2)) !important;
-    box-shadow: 
-        0 0 30px rgba(220, 53, 69, 0.6),
-        inset 0 0 20px rgba(220, 53, 69, 0.3) !important;
-    transform: scale(1.03);
-    animation: discardDropPulse 1.5s ease-in-out infinite;
-}
-
-.discard-pile-slot.discard-drop-invalid {
-    border-color: #6c757d !important;
-    border-style: solid !important;
-    border-width: 4px !important;
-    background: linear-gradient(135deg, rgba(108, 117, 125, 0.15), rgba(134, 142, 150, 0.1)) !important;
-    box-shadow: 
-        0 0 20px rgba(108, 117, 125, 0.5),
-        inset 0 0 15px rgba(108, 117, 125, 0.2) !important;
-    animation: invalidDiscardDropPulse 1.5s ease-in-out infinite;
-}
-
-/* Drop tooltip for discard pile */
-.discard-pile-slot.discard-drop-ready::after {
-    content: "Discard for 2 Gold";
-    position: absolute;
-    top: -35px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(220, 53, 69, 0.95);
-    color: white;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    white-space: nowrap;
-    z-index: 1000;
-    pointer-events: none;
-    animation: fadeIn 0.2s ease-out;
-    letter-spacing: 0.5px;
-}
-
-/* NEW: Hero Slots Container - Only affects heroes */
+/* Hero Slots Container */
 .hero-slots-container {
     display: flex;
     justify-content: center;
     gap: 30px;
 }
 
-/* Hero Slots - Independent from Area and Discard Pile */
 .team-slot {
     width: 200px;
     min-height: 340px;
@@ -569,26 +486,6 @@
     border: 3px solid #28a745;
     background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.1));
     box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
-}
-
-.team-slot.drag-over {
-    border-color: #667eea !important;
-    border-style: solid !important;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2)) !important;
-    box-shadow: var(--shadow-glow) !important;
-    transform: none !important;
-    transition: none !important;
-    pointer-events: auto !important;
-}
-
-.team-slot:not(.drag-over):hover {
-    transform: scale(1.02);
-    transition: var(--transition-fast);
-}
-
-.team-slot.drag-over,
-.team-slot.drag-over * {
-    cursor: copy !important;
 }
 
 .team-slot:not(.filled).drag-over::after {
@@ -623,6 +520,33 @@
     letter-spacing: 0.5px;
 }
 
+.slot-placeholder {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    padding: 20px;
+    letter-spacing: 1px;
+}
+
+/* ============================================
+   DRAG STATES
+   ============================================ */
+
+.team-slot.drag-over {
+    border-color: #667eea !important;
+    border-style: solid !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2)) !important;
+    box-shadow: var(--shadow-glow) !important;
+    cursor: copy !important;
+}
+
+.team-slot:not(.drag-over):hover {
+    transform: scale(1.02);
+    transition: var(--transition-fast);
+}
+
 .team-slot.invalid-drop {
     border-color: #ff6b6b !important;
     background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(238, 90, 36, 0.1)) !important;
@@ -636,7 +560,7 @@
     box-shadow: 0 15px 35px rgba(40, 167, 69, 0.5) !important;
 }
 
-/* Ability drop zone styles */
+/* Ability drop states */
 .team-slot.filled.ability-drop-ready {
     border-color: #4caf50 !important;
     border-width: 4px !important;
@@ -648,14 +572,6 @@
     animation: abilityDropPulse 1.5s ease-in-out infinite;
 }
 
-.team-slot.empty.ability-drop-ready {
-    border-color: rgba(102, 126, 234, 0.3) !important;
-    border-width: 3px !important;
-    background: none !important;
-    box-shadow: none !important;
-    transform: none !important;
-}
-
 .team-slot.ability-drop-invalid {
     border-color: #dc3545 !important;
     border-width: 4px !important;
@@ -665,26 +581,8 @@
         inset 0 0 15px rgba(220, 53, 69, 0.2) !important;
 }
 
-.team-slot.empty.ability-drop-invalid {
-    border-color: rgba(220, 53, 69, 0.5) !important;
-    border-width: 3px !important;
-    border-style: dashed !important;
-    background: rgba(220, 53, 69, 0.05) !important;
-    box-shadow: 0 0 10px rgba(220, 53, 69, 0.3) !important;
-    transform: none !important;
-}
-
 .team-slot.filled.ability-drop-invalid {
     animation: invalidDropPulse 1.5s ease-in-out infinite;
-}
-
-.team-slot.turn-limit-reached {
-    animation: shake 0.5s ease-in-out;
-}
-
-.team-slot.turn-limit-reached .character-card {
-    border-color: #dc3545 !important;
-    box-shadow: 0 0 20px rgba(220, 53, 69, 0.5) !important;
 }
 
 .team-slot.spell-drop-ready {
@@ -723,46 +621,497 @@
     letter-spacing: 0.5px;
 }
 
-.slot-placeholder {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 1rem;
-    font-weight: 600;
+/* ============================================
+   AREA & DISCARD PILE SLOTS
+   ============================================ */
+
+.area-slot {
+    position: absolute;
+    left: -20px;
+    top: 0%;
+    transform: translateY(0);
+    width: 200px;
+    min-height: 227px;
+    border: 3px dashed rgba(76, 175, 80, 0.4);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(129, 199, 132, 0.05));
+    backdrop-filter: blur(10px);
+    transition: var(--transition-medium);
+    overflow: hidden;
+    z-index: 1;
+}
+
+.area-slot.filled {
+    border: 3px solid #4CAF50;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(129, 199, 132, 0.1));
+    box-shadow: 0 10px 30px rgba(76, 175, 80, 0.3);
+}
+
+.area-slot.empty:hover {
+    border-color: rgba(76, 175, 80, 0.6);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.12), rgba(129, 199, 132, 0.08));
+    transform: translateY(0) scale(1.02);
+}
+
+.area-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     padding: 20px;
+}
+
+.area-globe {
+    font-size: 2.8rem;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.3));
+    animation: globeFloat 3s ease-in-out infinite;
+}
+
+.area-label {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #4CAF50;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     letter-spacing: 1px;
 }
 
-.team-status {
-    text-align: center;
-    padding: 30px;
+.discard-pile-slot {
+    position: absolute;
+    left: -20px;
+    top: calc(19% + 170px + 10px); 
+    width: 200px;
+    min-height: 170px;
+    border: 3px dashed rgba(220, 53, 69, 0.4);
+    border-radius: var(--radius-large);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.08), rgba(244, 67, 54, 0.05));
+    backdrop-filter: blur(10px);
+    transition: var(--transition-medium);
+    overflow: hidden;
+    z-index: 1;
 }
 
-.ready-indicator {
-    padding: 20px 30px;
-    background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(32, 201, 151, 0.15));
-    border: 2px solid rgba(40, 167, 69, 0.3);
-    border-radius: 15px;
+.discard-pile-slot.empty:hover {
+    border-color: rgba(220, 53, 69, 0.6);
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.12), rgba(244, 67, 54, 0.08));
+    transform: scale(1.02);
+}
+
+.discard-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+}
+
+.discard-icon {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 4px 8px rgba(220, 53, 69, 0.3));
+    animation: discardIconFloat 3s ease-in-out infinite;
+}
+
+.discard-label {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #dc3545;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+}
+
+/* Area & Discard Drop States */
+.area-slot.area-drop-ready,
+.discard-pile-slot.discard-drop-ready {
+    border-style: solid !important;
+    border-width: 4px !important;
+    transform: scale(1.03);
+}
+
+.area-slot.area-drop-ready {
+    border-color: #4CAF50 !important;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(129, 199, 132, 0.2)) !important;
+    box-shadow: 
+        0 0 30px rgba(76, 175, 80, 0.6),
+        inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
+    animation: areaDropPulse 1.5s ease-in-out infinite;
+}
+
+.discard-pile-slot.discard-drop-ready {
+    border-color: #dc3545 !important;
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.25), rgba(244, 67, 54, 0.2)) !important;
+    box-shadow: 
+        0 0 30px rgba(220, 53, 69, 0.6),
+        inset 0 0 20px rgba(220, 53, 69, 0.3) !important;
+    animation: discardDropPulse 1.5s ease-in-out infinite;
+}
+
+.area-slot.area-drop-invalid,
+.discard-pile-slot.discard-drop-invalid {
+    border-color: #6c757d !important;
+    border-style: solid !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(108, 117, 125, 0.15), rgba(134, 142, 150, 0.1)) !important;
+    box-shadow: 
+        0 0 20px rgba(108, 117, 125, 0.5),
+        inset 0 0 15px rgba(108, 117, 125, 0.2) !important;
+    animation: invalidDropPulse 1.5s ease-in-out infinite;
+}
+
+/* Drop Tooltips */
+.area-slot.area-drop-ready::after {
+    content: "Drop Area Card Here";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(76, 175, 80, 0.95);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
+}
+
+.discard-pile-slot.discard-drop-ready::after {
+    content: "Discard for 2 Gold";
+    position: absolute;
+    top: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(220, 53, 69, 0.95);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
+}
+
+/* Area card styles */
+.area-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition-medium);
+}
+
+.area-card:hover {
+    transform: scale(1.02);
+}
+
+.area-card-image-container {
+    width: 120px;
+    height: 168px;
+    border-radius: var(--radius-medium);
+    overflow: hidden;
+    box-shadow: var(--shadow-medium);
+    position: relative;
+}
+
+.area-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition-medium);
+}
+
+.area-card:hover .area-card-image {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+.area-card.area-card-dragging {
+    opacity: 0.5 !important;
+    transform: scale(0.9) !important;
+    z-index: 1000 !important;
+}
+
+/* ============================================
+   HERO STATS & TOOLTIPS
+   ============================================ */
+
+.hero-stats-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.fonts-loaded .hero-stats-overlay,
+.no-font-loading .hero-stats-overlay {
+    opacity: 1;
+}
+
+.hero-stat {
+    position: absolute;
+    bottom: 2px;
+    min-width: 24px;
+    text-align: center;
+}
+
+.hero-stat[data-stat="hp"] {
+    left: 35px; 
+}
+
+.hero-stat[data-stat="attack"] {
+    right: 25px; 
+}
+
+.hero-stat .stat-value {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 15px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    line-height: 1;
+    display: block;
+    font-variant-numeric: tabular-nums;
+    font-display: swap;
+}
+
+.character-card:hover .hero-stat .stat-value {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
+}
+
+/* Tooltip sprite stats */
+.tooltip-image-container {
+    position: relative;
     display: inline-block;
 }
 
-.ready-indicator .status-text {
+.tooltip-sprite-stats {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.tooltip-sprite-stat {
+    position: absolute;
+    bottom: 48px; 
+    min-width: 32px;
+    text-align: center;
+}
+
+.tooltip-sprite-stat.hp-stat {
+    left: 105px;
+}
+
+.tooltip-sprite-stat.attack-stat {
+    right: 78px;
+}
+
+.tooltip-sprite-stat .stat-value {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #28a745;
+    font-size: 30px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
+    line-height: 1;
     display: block;
-    margin-bottom: 8px;
+}
+
+.large-card-tooltip:hover .tooltip-sprite-stat .stat-value,
+.large-card-tooltip.character-with-stats .tooltip-image-container,
+.large-card-tooltip.creature-with-stats .tooltip-image-container {
+    margin-bottom: 5px;
+}
+
+.reward-image-container .tooltip-sprite-stat.hp-stat {
+    left: 25px;
+}
+
+.reward-image-container .tooltip-sprite-stat.attack-stat {
+    right: 25px;
+}
+
+/* ============================================
+   HERO CREATURES MANAGEMENT
+   ============================================ */
+
+.character-card .hero-creatures {
+    max-height: 600px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    padding: 4px;
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+}
+
+.character-card .hero-creatures::-webkit-scrollbar {
+    width: 8px;
+}
+
+.character-card .hero-creatures::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.character-card .hero-creatures::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.character-card .hero-creatures::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #764ba2, #667eea);
+}
+
+.character-card .hero-creatures[data-scrollable="true"]::after {
+    content: "⌄";
+    position: absolute;
+    bottom: 4px;
+    right: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 16px;
+    font-weight: bold;
+    pointer-events: none;
+    animation: scrollHint 2s ease-in-out infinite;
+    z-index: 10;
+}
+
+.character-card .hero-creatures.scrolled-to-bottom::after {
+    display: none;
+}
+
+.character-card .hero-creatures .creature-icon {
+    flex-shrink: 0;
+}
+
+/* ============================================
+   GUARD CHANGE & SPECIAL STATES
+   ============================================ */
+
+.team-header-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    text-align: center !important;
+}
+
+.guard-change-indicator {
+    position: relative;
+    background: linear-gradient(135deg, 
+        rgba(76, 175, 80, 0.15) 0%, 
+        rgba(129, 199, 132, 0.15) 100%);
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 14px;
+    font-weight: bold;
+    color: #2E7D32;
+    box-shadow: 
+        0 2px 8px rgba(76, 175, 80, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    animation: guardChangeGlow 2s ease-in-out infinite alternate;
+    white-space: nowrap;
+    user-select: none;
     letter-spacing: 1px;
 }
 
-.ready-indicator p {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    margin: 0;
-    font-size: 1rem;
-    color: rgba(255, 255, 255, 0.8);
-    letter-spacing: 0.5px;
+.guard-change-indicator::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid #4CAF50;
 }
+
+/* ============================================
+   INVENTING COUNTER DISPLAY
+   ============================================ */
+
+.inventing-counter-display {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    padding: 2px 6px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow: 
+        0 2px 6px rgba(23, 162, 184, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    z-index: 15;
+    min-width: 28px;
+    justify-content: center;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+.inventing-counter-display.counter-updated {
+    transform: scale(1.2);
+    box-shadow: 
+        0 4px 12px rgba(23, 162, 184, 0.8),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    animation: counterUpdatePulse 0.5s ease-out;
+}
+
+.inventing-counter-icon {
+    font-size: 9px;
+    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.5));
+}
+
+.inventing-counter-value {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    min-width: 8px;
+    text-align: center;
+}
+
+/* ============================================
+   STATUS DISPLAYS
+   ============================================ */
 
 .loading-heroes {
     text-align: center;
@@ -818,50 +1167,37 @@
     margin: 0 auto;
 }
 
-/* Guard change indicator */
-.team-header-title {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    position: relative;
-    text-align: center !important;
+.team-status {
+    text-align: center;
+    padding: 30px;
 }
 
-.guard-change-indicator {
-    position: relative;
-    background: linear-gradient(135deg, 
-        rgba(76, 175, 80, 0.15) 0%, 
-        rgba(129, 199, 132, 0.15) 100%);
-    border: 2px solid #4CAF50;
-    border-radius: 8px;
-    padding: 8px 16px;
+.ready-indicator {
+    padding: 20px 30px;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(32, 201, 151, 0.15));
+    border: 2px solid rgba(40, 167, 69, 0.3);
+    border-radius: 15px;
+    display: inline-block;
+}
+
+.ready-indicator .status-text {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 14px;
-    font-weight: bold;
-    color: #2E7D32;
-    box-shadow: 
-        0 2px 8px rgba(76, 175, 80, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    animation: guardChangeGlow 2s ease-in-out infinite alternate;
-    white-space: nowrap;
-    user-select: none;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #28a745;
+    display: block;
+    margin-bottom: 8px;
     letter-spacing: 1px;
 }
 
-.guard-change-indicator::before {
-    content: '';
-    position: absolute;
-    left: -8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-top: 8px solid transparent;
-    border-bottom: 8px solid transparent;
-    border-right: 8px solid #4CAF50;
+.ready-indicator p {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    margin: 0;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.5px;
 }
 
-/* Ability hint */
 .ability-hint {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     color: #6c757d;
@@ -874,292 +1210,9 @@
     letter-spacing: 0.5px;
 }
 
-/* Hero stats with Pixel font - keep existing positioning, just update font */
-.hero-stat .stat-value {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 16px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
-    line-height: 1;
-    display: block;
-    font-variant-numeric: tabular-nums;
-}
-
-.fonts-loaded .hero-stats-overlay {
-    opacity: 1;
-}
-
-.no-font-loading .hero-stats-overlay {
-    opacity: 1;
-}
-
-.tooltip-image-container {
-    position: relative;
-    display: inline-block;
-}
-
-.tooltip-sprite-stats {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    pointer-events: none;
-    z-index: 10;
-}
-
-.tooltip-sprite-stat {
-    position: absolute;
-    bottom: 48px; 
-    min-width: 32px;
-    text-align: center;
-}
-
-.tooltip-sprite-stat.hp-stat {
-    left: 105px;
-}
-
-.tooltip-sprite-stat.attack-stat {
-    right: 78px;
-}
-
-.tooltip-sprite-stat .stat-value {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 30px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
-    line-height: 1;
-    display: block;
-}
-
-.large-card-tooltip:hover .tooltip-sprite-stat .stat-value {
-    transform: scale(1.1);
-    transition: transform 0.2s ease;
-}
-
-.large-card-tooltip.character-with-stats .tooltip-image-container {
-    margin-bottom: 5px;
-}
-
-.reward-image-container .tooltip-sprite-stat.hp-stat {
-    left: 25px;
-}
-
-.reward-image-container .tooltip-sprite-stat.attack-stat {
-    right: 25px;
-}
-
 /* ============================================
-   AREA ZONE STYLES - Independent from Heroes
+   FEEDBACK ANIMATIONS
    ============================================ */
-
-/* Area placeholder content - UPDATED for smaller height */
-.area-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 20px;
-}
-
-.area-globe {
-    font-size: 2.8rem; /* Reduced from 3.5rem to fit smaller height */
-    margin-bottom: 8px; /* Reduced from 10px */
-    filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.3));
-    animation: globeFloat 3s ease-in-out infinite;
-}
-
-.area-label {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 1rem; /* Slightly reduced from 1.1rem */
-    font-weight: 700;
-    color: #4CAF50;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    letter-spacing: 1px;
-}
-
-/* Globe floating animation */
-@keyframes globeFloat {
-    0%, 100% {
-        transform: translateY(0px) rotate(0deg);
-    }
-    33% {
-        transform: translateY(-4px) rotate(120deg); /* Reduced from -6px */
-    }
-    66% {
-        transform: translateY(2px) rotate(240deg); /* Reduced from 3px */
-    }
-}
-
-/* Area card styles */
-.area-card {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    transition: var(--transition-medium);
-}
-
-.area-card:hover {
-    transform: scale(1.02);
-}
-
-.area-card-image-container {
-    width: 120px; /* Reduced from 140px to fit smaller height */
-    height: 168px; /* Reduced proportionally (120 * 1.4) */
-    border-radius: var(--radius-medium);
-    overflow: hidden;
-    box-shadow: var(--shadow-medium);
-    position: relative;
-}
-
-.area-card-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: var(--transition-medium);
-}
-
-.area-card:hover .area-card-image {
-    transform: scale(1.05);
-    filter: brightness(1.1);
-}
-
-/* Area slot drag states */
-.area-slot.area-drop-ready {
-    border-color: #4CAF50 !important;
-    border-style: solid !important;
-    border-width: 4px !important;
-    background: linear-gradient(135deg, rgba(76, 175, 80, 0.25), rgba(129, 199, 132, 0.2)) !important;
-    box-shadow: 
-        0 0 30px rgba(76, 175, 80, 0.6),
-        inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
-    transform: translateY(0) scale(1.03);
-    animation: areaDropPulse 1.5s ease-in-out infinite;
-}
-
-.area-slot.area-drop-invalid {
-    border-color: #F44336 !important;
-    border-style: solid !important;
-    border-width: 4px !important;
-    background: linear-gradient(135deg, rgba(244, 67, 54, 0.15), rgba(229, 57, 53, 0.1)) !important;
-    box-shadow: 
-        0 0 20px rgba(244, 67, 54, 0.5),
-        inset 0 0 15px rgba(244, 67, 54, 0.2) !important;
-    animation: invalidAreaDropPulse 1.5s ease-in-out infinite;
-}
-
-/* Area card dragging state */
-.area-card.area-card-dragging {
-    opacity: 0.5 !important;
-    transform: scale(0.9) !important;
-    z-index: 1000 !important;
-}
-
-/* Drop tooltips for area slot */
-.area-slot.area-drop-ready::after {
-    content: "Drop Area Card Here";
-    position: absolute;
-    top: -35px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(76, 175, 80, 0.95);
-    color: white;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    white-space: nowrap;
-    z-index: 1000;
-    pointer-events: none;
-    animation: fadeIn 0.2s ease-out;
-    letter-spacing: 0.5px;
-}
-
-.area-slot.area-drop-invalid::after {
-    content: "Invalid Card Type";
-    position: absolute;
-    top: -35px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(244, 67, 54, 0.95);
-    color: white;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    white-space: nowrap;
-    z-index: 1000;
-    pointer-events: none;
-    animation: fadeIn 0.2s ease-out;
-    letter-spacing: 0.5px;
-}
-
-/* ============================================
-   ANIMATIONS
-   ============================================ */
-
-/* Discard pile animations */
-@keyframes discardIconFloat {
-    0%, 100% {
-        transform: translateY(0px) rotate(0deg);
-    }
-    33% {
-        transform: translateY(-4px) rotate(5deg);
-    }
-    66% {
-        transform: translateY(2px) rotate(-5deg);
-    }
-}
-
-@keyframes discardDropPulse {
-    0%, 100% {
-        box-shadow: 
-            0 0 30px rgba(220, 53, 69, 0.6),
-            inset 0 0 20px rgba(220, 53, 69, 0.3);
-    }
-    50% {
-        box-shadow: 
-            0 0 40px rgba(220, 53, 69, 0.8),
-            inset 0 0 30px rgba(220, 53, 69, 0.4);
-    }
-}
-
-@keyframes invalidDiscardDropPulse {
-    0%, 100% {
-        box-shadow: 
-            0 0 20px rgba(108, 117, 125, 0.5),
-            inset 0 0 15px rgba(108, 117, 125, 0.2);
-    }
-    50% {
-        box-shadow: 
-            0 0 30px rgba(108, 117, 125, 0.7),
-            inset 0 0 25px rgba(108, 117, 125, 0.3);
-    }
-}
-
-/* Discard success feedback animation */
-@keyframes discardSuccessFeedback {
-    0% {
-        transform: translate(-50%, -50%) scale(0.8);
-        opacity: 0;
-    }
-    20% {
-        transform: translate(-50%, -50%) scale(1.1);
-        opacity: 1;
-    }
-    100% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 0;
-    }
-}
 
 .discard-success-feedback {
     display: flex;
@@ -1177,29 +1230,76 @@
     font-size: 16px;
 }
 
-@keyframes areaDropPulse {
-    0%, 100% {
+.birthday-present-opponent-draw-feedback {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.birthday-present-opponent-draw-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.birthday-present-opponent-draw-icon {
+    font-size: 24px;
+    animation: bounce 1s ease-out infinite;
+}
+
+.birthday-present-opponent-draw-text {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes selectedCharacterTagGlow {
+    from {
         box-shadow: 
-            0 0 30px rgba(76, 175, 80, 0.6),
-            inset 0 0 20px rgba(76, 175, 80, 0.3);
+            0 2px 8px rgba(0, 0, 0, 0.6),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
-    50% {
+    to {
         box-shadow: 
-            0 0 40px rgba(76, 175, 80, 0.8),
-            inset 0 0 30px rgba(76, 175, 80, 0.4);
+            0 4px 16px rgba(40, 167, 69, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 }
 
-@keyframes invalidAreaDropPulse {
+@keyframes globeFloat {
     0%, 100% {
-        box-shadow: 
-            0 0 20px rgba(244, 67, 54, 0.5),
-            inset 0 0 15px rgba(244, 67, 54, 0.2);
+        transform: translateY(0px) rotate(0deg);
+    }
+    33% {
+        transform: translateY(-4px) rotate(120deg);
+    }
+    66% {
+        transform: translateY(2px) rotate(240deg);
+    }
+}
+
+@keyframes discardIconFloat {
+    0%, 100% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    33% {
+        transform: translateY(-4px) rotate(5deg);
+    }
+    66% {
+        transform: translateY(2px) rotate(-5deg);
+    }
+}
+
+@keyframes scrollHint {
+    0%, 100% {
+        opacity: 0.6;
+        transform: translateY(0px);
     }
     50% {
-        box-shadow: 
-            0 0 30px rgba(244, 67, 54, 0.7),
-            inset 0 0 25px rgba(244, 67, 54, 0.3);
+        opacity: 1;
+        transform: translateY(2px);
     }
 }
 
@@ -1213,6 +1313,32 @@
         box-shadow: 
             0 0 40px rgba(76, 175, 80, 0.8),
             inset 0 0 30px rgba(76, 175, 80, 0.4);
+    }
+}
+
+@keyframes areaDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 30px rgba(76, 175, 80, 0.6),
+            inset 0 0 20px rgba(76, 175, 80, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 40px rgba(76, 175, 80, 0.8),
+            inset 0 0 30px rgba(76, 175, 80, 0.4);
+    }
+}
+
+@keyframes discardDropPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 30px rgba(220, 53, 69, 0.6),
+            inset 0 0 20px rgba(220, 53, 69, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 40px rgba(220, 53, 69, 0.8),
+            inset 0 0 30px rgba(220, 53, 69, 0.4);
     }
 }
 
@@ -1263,326 +1389,6 @@
     }
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* ============================================
-   RESPONSIVE BREAKPOINTS - Updated for Decoupled Layout with Discard Pile
-   ============================================ */
-
-@media (max-width: 1200px) {
-    /* Hero slots only */
-    .team-slot {
-        width: 180px;
-        min-height: 320px;
-    }
-    
-    .hero-slots-container {
-        gap: 20px;
-    }
-    
-    /* Area slot - separate responsive rules */
-    .area-slot {
-        left: -240px; /* Adjust for smaller screens */
-        min-height: 160px; /* Half of hero slot height */
-        width: 180px;
-    }
-    
-    /* Discard pile - separate responsive rules */
-    .discard-pile-slot {
-        left: -240px;
-        top: calc(10% + 160px + 10px);
-        min-height: 160px;
-        width: 180px;
-    }
-    
-    .area-card-image-container {
-        width: 100px;
-        height: 140px;
-    }
-    
-    .area-globe {
-        font-size: 2.4rem;
-    }
-    
-    .area-label {
-        font-size: 0.9rem;
-    }
-    
-    .discard-icon {
-        font-size: 2rem;
-    }
-    
-    .discard-label {
-        font-size: 0.9rem;
-    }
-}
-
-@media (max-width: 900px) {
-    /* Stack layout for mobile */
-    .team-slots-container {
-        flex-direction: column;
-        align-items: center;
-        gap: 20px;
-        min-height: auto;
-    }
-    
-    .hero-slots-container {
-        flex-direction: column;
-        align-items: center;
-        gap: 20px;
-        max-width: 220px;
-        margin: 0 auto;
-    }
-    
-    /* Area slot returns to normal positioning on mobile */
-    .area-slot {
-        position: static;
-        transform: none;
-        margin-bottom: 20px;
-        min-height: 170px; /* Keep reduced height */
-        width: 200px;
-    }
-    
-    .area-slot.empty:hover {
-        transform: scale(1.02);
-    }
-    
-    .area-slot.area-drop-ready {
-        transform: scale(1.03);
-    }
-    
-    /* Discard pile returns to normal positioning on mobile */
-    .discard-pile-slot {
-        position: static;
-        transform: none;
-        margin-bottom: 20px;
-        min-height: 170px;
-        width: 200px;
-    }
-    
-    .discard-pile-slot.discard-drop-ready {
-        transform: scale(1.03);
-    }
-    
-    .area-card-image-container {
-        width: 140px;
-        height: 196px;
-    }
-}
-
-@media (max-width: 768px) {
-    .selection-header h2,
-    .team-header h2 {
-        font-size: 2.2rem;
-        letter-spacing: 0.5px;
-    }
-    
-    .character-name {
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
-    }
-    
-    .tooltip-sprite-stat {
-        bottom: 10px;
-    }
-    
-    .tooltip-sprite-stat.hp-stat {
-        left: 15px;
-    }
-    
-    .tooltip-sprite-stat.attack-stat {
-        right: 15px;
-    }
-    
-    .tooltip-sprite-stat .stat-value {
-        font-size: 20px;
-    }
-    
-    /* Area adjustments */
-    .area-globe {
-        font-size: 2.2rem;
-        margin-bottom: 6px;
-    }
-    
-    .area-label {
-        font-size: 0.8rem;
-        letter-spacing: 0.5px;
-    }
-    
-    .area-slot.area-drop-ready::after,
-    .area-slot.area-drop-invalid::after {
-        font-size: 10px;
-        padding: 4px 8px;
-        top: -30px;
-    }
-    
-    /* Discard pile adjustments */
-    .discard-icon {
-        font-size: 1.8rem;
-        margin-bottom: 6px;
-    }
-    
-    .discard-label {
-        font-size: 0.8rem;
-        letter-spacing: 0.5px;
-    }
-    
-    .discard-pile-slot.discard-drop-ready::after {
-        font-size: 10px;
-        padding: 4px 8px;
-        top: -30px;
-    }
-}
-
-@media (max-width: 480px) {
-    .selection-header h2,
-    .team-header h2 {
-        font-size: 1.8rem;
-        letter-spacing: 0px;
-    }
-    
-    .character-name {
-        font-size: 1rem;
-        letter-spacing: 0px;
-    }
-    
-    .selection-header p,
-    .team-header p {
-        font-size: 1rem;
-        letter-spacing: 0.3px;
-    }
-    
-    .drag-hint {
-        font-size: 0.8rem;
-        letter-spacing: 0.2px;
-    }
-    
-    /* Area adjustments for very small screens */
-    .area-globe {
-        font-size: 1.8rem;
-    }
-    
-    .area-label {
-        font-size: 0.7rem;
-        letter-spacing: 0.3px;
-    }
-    
-    /* Discard pile adjustments for very small screens */
-    .discard-icon {
-        font-size: 1.5rem;
-    }
-    
-    .discard-label {
-        font-size: 0.7rem;
-        letter-spacing: 0.3px;
-    }
-}
-
-/* Ensure team-slots-container provides positioning context for absolutely positioned children */
-.team-slots-container {
-    position: relative !important;
-}
-
-/* Strengthen area-slot positioning to prevent inheritance issues */
-.area-slot {
-    position: absolute !important;
-    /* Prevent flex styling if accidentally moved to hero container */
-    flex: none !important;
-    /* Ensure it maintains its intended dimensions */
-    width: 200px !important;
-    min-height: 227px !important;
-}
-
-/* Emergency styling if area-slot gets moved to wrong container */
-.hero-slots-container .area-slot {
-    /* If area slot somehow ends up in hero container, make it obvious */
-    position: absolute !important;
-    left: -250px !important; /* Move it outside the hero container */
-    top: 0 !important;
-    background: rgba(255, 0, 0, 0.3) !important; /* Red background to indicate error */
-    border: 3px solid red !important;
-    z-index: 1000 !important;
-}
-
-.hero-slots-container .area-slot::before {
-    content: "ERROR: Area in Hero Container!";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(255, 0, 0, 0.9);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    z-index: 1001;
-    pointer-events: none;
-}
-
-/* Inventing Counter Display */
-.inventing-counter-display {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    border-radius: 12px;
-    padding: 2px 6px;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 10px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-    box-shadow: 
-        0 2px 6px rgba(23, 162, 184, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
-    z-index: 15;
-    min-width: 28px;
-    justify-content: center;
-    pointer-events: none;
-    transition: all 0.3s ease;
-}
-
-.inventing-counter-display.counter-updated {
-    transform: scale(1.2);
-    box-shadow: 
-        0 4px 12px rgba(23, 162, 184, 0.8),
-        inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    animation: counterUpdatePulse 0.5s ease-out;
-}
-
-.inventing-counter-icon {
-    font-size: 9px;
-    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.5));
-}
-
-.inventing-counter-value {
-    font-size: 10px;
-    font-weight: 900;
-    letter-spacing: 0.5px;
-    min-width: 8px;
-    text-align: center;
-}
-
-/* Animation for counter updates */
 @keyframes counterUpdatePulse {
     0% {
         transform: scale(1);
@@ -1595,39 +1401,18 @@
     }
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .inventing-counter-display {
-        font-size: 8px;
-        padding: 1px 4px;
-        border-radius: 8px;
-        min-width: 22px;
-        gap: 2px;
+@keyframes discardSuccessFeedback {
+    0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
     }
-    
-    .inventing-counter-icon {
-        font-size: 7px;
+    20% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 1;
     }
-    
-    .inventing-counter-value {
-        font-size: 8px;
-    }
-}
-
-@media (max-width: 480px) {
-    .inventing-counter-display {
-        font-size: 7px;
-        padding: 1px 3px;
-        border-radius: 6px;
-        min-width: 18px;
-    }
-    
-    .inventing-counter-icon {
-        font-size: 6px;
-    }
-    
-    .inventing-counter-value {
-        font-size: 7px;
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
     }
 }
 
@@ -1650,166 +1435,149 @@
     }
 }
 
-.birthday-present-opponent-draw-feedback {
-    display: flex;
-    align-items: center;
-    white-space: nowrap;
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-.birthday-present-opponent-draw-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
 }
 
-.birthday-present-opponent-draw-icon {
-    font-size: 24px;
-    animation: bounce 1s ease-out infinite;
-}
-
-.birthday-present-opponent-draw-text {
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
-}
-
-/* Add after the existing character tooltip styles */
-.large-card-tooltip.creature-with-stats .tooltip-image-container {
-    margin-bottom: 5px;
-}
-
-/* Creature stats use the same positioning as character stats */
-.creature-with-stats .tooltip-sprite-stats {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    pointer-events: none;
-    z-index: 10;
-}
-
-.creature-with-stats .tooltip-sprite-stat {
-    position: absolute;
-    bottom: 48px; 
-    min-width: 32px;
-    text-align: center;
-}
-
-.creature-with-stats .tooltip-sprite-stat.hp-stat {
-    left: 105px; /* Same position as hero HP */
-}
-
-.creature-with-stats .tooltip-sprite-stat .stat-value {
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-size: 30px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.9);
-    line-height: 1;
-    display: block;
-}
-
-.large-card-tooltip.creature-with-stats:hover .tooltip-sprite-stat .stat-value {
-    transform: scale(1.1);
-    transition: transform 0.2s ease;
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* ============================================
-   HERO CREATURE SCROLLING - Height Cap & Scroll Fix
+   RESPONSIVE DESIGN
    ============================================ */
 
-/* Cap the overall character card height at 1000px */
-.character-card.with-ability-zones {
-    max-height: 420px;
-    overflow: hidden; /* Prevent card itself from creating scrollbars */
-}
-
-/* Make the creatures container scrollable when it has too many creatures */
-.character-card .hero-creatures {
-    max-height: 600px; /* Reserve ~400px for hero image + abilities + padding */
-    overflow-y: auto;
-    overflow-x: hidden;
-    position: relative;
-}
-
-/* Style the scrollbar to look better */
-.character-card .hero-creatures::-webkit-scrollbar {
-    width: 8px;
-}
-
-.character-card .hero-creatures::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-}
-
-.character-card .hero-creatures::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.character-card .hero-creatures::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #764ba2, #667eea);
-}
-
-/* Add visual indicator when content is scrollable */
-.character-card .hero-creatures[data-scrollable="true"]::after {
-    content: "⌄";
-    position: absolute;
-    bottom: 4px;
-    right: 12px;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 16px;
-    font-weight: bold;
-    pointer-events: none;
-    animation: scrollHint 2s ease-in-out infinite;
-    z-index: 10;
-}
-
-/* Hide scroll indicator when scrolled to bottom */
-.character-card .hero-creatures.scrolled-to-bottom::after {
-    display: none;
-}
-
-/* Animation for scroll hint */
-@keyframes scrollHint {
-    0%, 100% {
-        opacity: 0.6;
-        transform: translateY(0px);
-    }
-    50% {
-        opacity: 1;
-        transform: translateY(2px);
+@media (max-width: 1400px) {
+    .character-selection-grid {
+        max-width: 1000px;
+        gap: 35px;
     }
 }
-
-/* Ensure creatures maintain their layout within the scrollable area */
-.character-card .hero-creatures .creature-icon {
-    flex-shrink: 0; /* Prevent creatures from shrinking */
-}
-
-/* Add some padding to the creatures container for better scrolling UX */
-.character-card .hero-creatures {
-    padding: 4px;
-    box-sizing: border-box;
-}
-
-/* Smooth scrolling */
-.character-card .hero-creatures {
-    scroll-behavior: smooth;
-}
-
-/* ============================================
-   RESPONSIVE ADJUSTMENTS
-   ============================================ */
 
 @media (max-width: 1200px) {
-    .character-card .hero-creatures {
-        max-height: 500px;
+    .character-selection-grid {
+        max-width: 900px;
+        gap: 30px;
+    }
+    
+    .character-card {
+        min-height: 380px;
+        padding: 25px;
+    }
+    
+    .character-image-container {
+        height: 260px;
+        margin-bottom: 18px;
+    }
+    
+    .character-name {
+        font-size: 1.4rem;
+    }
+    
+    .team-slot {
+        width: 180px;
+        min-height: 320px;
+    }
+    
+    .hero-slots-container {
+        gap: 20px;
+    }
+    
+    .area-slot {
+        left: -240px;
+        min-height: 160px;
+        width: 180px;
+    }
+    
+    .discard-pile-slot {
+        left: -240px;
+        top: calc(10% + 160px + 10px);
+        min-height: 160px;
+        width: 180px;
+    }
+    
+    .area-card-image-container {
+        width: 100px;
+        height: 140px;
+    }
+    
+    .area-globe {
+        font-size: 2.4rem;
+    }
+    
+    .area-label,
+    .discard-label {
+        font-size: 0.9rem;
+    }
+    
+    .discard-icon {
+        font-size: 2rem;
     }
 }
 
 @media (max-width: 900px) {
-    .character-card.with-ability-zones {
-        max-height: 800px;
+    .character-selection-grid {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 600px;
+        gap: 25px;
+    }
+    
+    .character-card {
+        min-height: 350px;
+        padding: 20px;
+    }
+    
+    .character-image-container {
+        height: 220px;
+        margin-bottom: 15px;
+    }
+    
+    .character-name {
+        font-size: 1.3rem;
+    }
+    
+    .team-slots-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        min-height: auto;
+    }
+    
+    .hero-slots-container {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        max-width: 220px;
+        margin: 0 auto;
+    }
+    
+    .area-slot {
+        position: static;
+        transform: none;
+        margin-bottom: 20px;
+        min-height: 170px;
+        width: 200px;
+    }
+    
+    .discard-pile-slot {
+        position: static;
+        transform: none;
+        margin-bottom: 20px;
+        min-height: 170px;
+        width: 200px;
+    }
+    
+    .area-card-image-container {
+        width: 140px;
+        height: 196px;
     }
     
     .character-card .hero-creatures {
@@ -1818,6 +1586,94 @@
 }
 
 @media (max-width: 768px) {
+    .selection-header h2,
+    .team-header h2 {
+        font-size: 2.2rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .character-selection-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+        gap: 20px;
+    }
+    
+    .character-card {
+        min-height: 320px;
+        padding: 20px;
+    }
+    
+    .character-image-container {
+        height: 200px;
+        margin-bottom: 15px;
+    }
+    
+    .character-name {
+        font-size: 1.2rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .character-card:not(.with-ability-zones) .card-tag {
+        font-size: 14px;
+        padding: 2px 6px;
+    }
+    
+    .tooltip-sprite-stat {
+        bottom: 10px;
+    }
+    
+    .tooltip-sprite-stat.hp-stat {
+        left: 15px;
+    }
+    
+    .tooltip-sprite-stat.attack-stat {
+        right: 15px;
+    }
+    
+    .tooltip-sprite-stat .stat-value {
+        font-size: 20px;
+    }
+    
+    .area-globe {
+        font-size: 2.2rem;
+        margin-bottom: 6px;
+    }
+    
+    .area-label,
+    .discard-label {
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .discard-icon {
+        font-size: 1.8rem;
+        margin-bottom: 6px;
+    }
+    
+    .area-slot.area-drop-ready::after,
+    .area-slot.area-drop-invalid::after,
+    .discard-pile-slot.discard-drop-ready::after {
+        font-size: 10px;
+        padding: 4px 8px;
+        top: -30px;
+    }
+    
+    .inventing-counter-display {
+        font-size: 8px;
+        padding: 1px 4px;
+        border-radius: 8px;
+        min-width: 22px;
+        gap: 2px;
+    }
+    
+    .inventing-counter-icon {
+        font-size: 7px;
+    }
+    
+    .inventing-counter-value {
+        font-size: 8px;
+    }
+    
     .character-card.with-ability-zones {
         max-height: 600px;
     }
@@ -1825,4 +1681,164 @@
     .character-card .hero-creatures {
         max-height: 300px;
     }
+}
+
+@media (max-width: 480px) {
+    .selection-header h2,
+    .team-header h2 {
+        font-size: 1.8rem;
+        letter-spacing: 0px;
+    }
+    
+    .character-selection-grid {
+        max-width: 300px;
+        gap: 15px;
+    }
+    
+    .character-card {
+        min-height: 280px;
+        padding: 15px;
+    }
+    
+    .character-image-container {
+        height: 180px;
+        margin-bottom: 12px;
+    }
+    
+    .character-name {
+        font-size: 1.1rem;
+        letter-spacing: 0px;
+    }
+    
+    .character-card:not(.with-ability-zones) .card-tag {
+        font-size: 12px;
+        padding: 2px 5px;
+    }
+    
+    .selection-header p,
+    .team-header p {
+        font-size: 1rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .drag-hint {
+        font-size: 0.8rem;
+        letter-spacing: 0.2px;
+    }
+    
+    .area-globe {
+        font-size: 1.8rem;
+    }
+    
+    .area-label,
+    .discard-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .discard-icon {
+        font-size: 1.5rem;
+    }
+    
+    .inventing-counter-display {
+        font-size: 7px;
+        padding: 1px 3px;
+        border-radius: 6px;
+        min-width: 18px;
+    }
+    
+    .inventing-counter-icon {
+        font-size: 6px;
+    }
+    
+    .inventing-counter-value {
+        font-size: 7px;
+    }
+}
+
+/* Emergency styling if area-slot gets moved to wrong container */
+.hero-slots-container .area-slot {
+    position: absolute !important;
+    left: -250px !important;
+    top: 0 !important;
+    background: rgba(255, 0, 0, 0.3) !important;
+    border: 3px solid red !important;
+    z-index: 1000 !important;
+}
+
+.hero-slots-container .area-slot::before {
+    content: "ERROR: Area in Hero Container!";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+/* Ensure positioning context */
+.team-slots-container {
+    position: relative !important;
+}
+
+.area-slot {
+    position: absolute !important;
+    flex: none !important;
+    width: 200px !important;
+    min-height: 227px !important;
+}
+
+/* Hero Reward Tags Styling */
+.hero-reward-card .reward-hero-image-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    border-radius: 15px;
+    overflow: hidden;
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hero-reward-card .card-tags-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    margin: 0;
+    padding: 0 6px;
+    max-width: calc(100% - 24px);
+    pointer-events: none;
+}
+
+.hero-reward-card .card-tag {
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    font-size: 12px;
+    padding: 3px 8px;
+    min-width: auto;
+    max-width: none;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+.hero-reward-card:hover .card-tag {
+    background: rgba(0, 0, 0, 0.95);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }

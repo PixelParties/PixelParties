@@ -165,7 +165,11 @@ export class FireballSpell {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
+            }, { 
+                source: 'spell', 
+                attacker: caster,
+                aoe: true 
+            });
         }
         
         // Apply damage to all living creatures of the target hero with small delays
@@ -181,7 +185,11 @@ export class FireballSpell {
                                 damage: damage,
                                 position: target.position,
                                 side: target.side
-                            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
+                            }, { 
+                                source: 'spell', 
+                                attacker: caster,
+                                aoe: true
+                            });
                             resolve();
                         }, this.battleManager.getSpeedAdjustedDelay(30 + index * 20));
                     });

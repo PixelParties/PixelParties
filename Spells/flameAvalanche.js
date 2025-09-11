@@ -46,8 +46,11 @@ export class FlameAvalancheSpell {
         // Pass caster to resistance check for Ida effect
         const resistanceResults = this.checkResistanceForAllTargets(allTargets, caster);
         
-        // Log the spell effect with resistance info
-        this.logSpellEffect(caster, damage, allTargets, resistanceResults);
+        // Calculate which targets will die from the damage
+        const deathResults = this.calculateDeathResults(allTargets, damage, resistanceResults);
+        
+        // Log the spell effect with resistance and death info
+        this.logSpellEffect(caster, damage, allTargets, resistanceResults, deathResults);
         
         // Start visual effects and damage application
         const animationPromise = this.playFlameAvalancheAnimation(allTargets, caster, resistanceResults);
@@ -57,6 +60,34 @@ export class FlameAvalancheSpell {
         await Promise.all([animationPromise, damagePromise]);
         
         console.log(`🔥 ${this.displayName} completed!`);
+    }
+
+    // ============================================
+    // DEATH CALCULATION
+    // ============================================
+
+    // Calculate which targets will die from the damage (before applying it)
+    calculateDeathResults(targets, damage, resistanceResults) {
+        const deathMap = new Map();
+        
+        targets.forEach(target => {
+            const key = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(key);
+            let willDie = false;
+            
+            // Only calculate death if target is not resisted
+            if (!isResisted) {
+                if (target.type === 'hero') {
+                    willDie = (target.hero.currentHp - damage) <= 0;
+                } else if (target.type === 'creature') {
+                    willDie = (target.creature.currentHp - damage) <= 0;
+                }
+            }
+            
+            deathMap.set(key, willDie);
+        });
+        
+        return deathMap;
     }
 
     // ============================================
@@ -207,7 +238,11 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 newHp: Math.max(0, target.hero.currentHp - damage),
                 died: (target.hero.currentHp - damage) <= 0
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
+            }, { 
+                source: 'spell', 
+                attacker: caster,
+                aoe: true
+            });
             
         } else if (target.type === 'creature') {
             // Apply damage to creature
@@ -218,7 +253,11 @@ export class FlameAvalancheSpell {
                 damage: damage,
                 position: target.position,
                 side: target.side
-            }, { source: 'spell', attacker: caster }); // Pass caster as attacker
+            }, { 
+                source: 'spell', 
+                attacker: caster,
+                aoe: true
+            });
         }
     }
 
@@ -546,72 +585,65 @@ export class FlameAvalancheSpell {
     // BATTLE LOG
     // ============================================
 
-    // Log the spell effect to battle log
-    logSpellEffect(caster, damage, targets, resistanceResults) {
+    // Log the spell effect to battle log (UPDATED for consolidated logging)
+    logSpellEffect(caster, damage, targets, resistanceResults, deathResults) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
-        // Count actual hits vs resisted
-        let heroHits = 0, heroResists = 0;
-        let creatureHits = 0, creatureResists = 0;
+        // Count actual hits vs resisted vs deaths
+        let totalHits = 0;
+        let totalResists = 0;
+        let totalDeaths = 0;
         
         targets.forEach(target => {
             const key = this.getTargetKey(target);
             const resisted = resistanceResults.get(key);
+            const willDie = deathResults.get(key);
             
-            if (target.type === 'hero') {
-                if (resisted) heroResists++;
-                else heroHits++;
+            if (resisted) {
+                totalResists++;
             } else {
-                if (resisted) creatureResists++;
-                else creatureHits++;
+                totalHits++;
+                if (willDie) {
+                    totalDeaths++;
+                }
             }
         });
         
-        // Build description of what was hit
-        const parts = [];
-        if (heroHits > 0) {
-            parts.push(`${heroHits} hero${heroHits > 1 ? 'es' : ''}`);
-        }
-        if (creatureHits > 0) {
-            parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
-        }
-        
+        // Build consolidated message
         let message = `🔥 ${this.displayName} engulfs the battlefield`;
         
-        if (parts.length > 0) {
-            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+        if (totalHits > 0) {
+            message += `, hitting ${totalHits} target${totalHits > 1 ? 's' : ''} for ${damage} damage each!`;
+            
+            // Add death information if any targets died
+            if (totalDeaths > 0) {
+                message += ` ${totalDeaths} of them died.`;
+            }
         } else {
             // All targets resisted
             message += `, but all targets resisted!`;
         }
         
-        // Add resistance info if any
-        if (heroResists > 0 || creatureResists > 0) {
-            const resistParts = [];
-            if (heroResists > 0) {
-                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
-            }
-            if (creatureResists > 0) {
-                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
-            }
-            
-            // Only add this line if some targets were hit
-            if (parts.length > 0) {
-                this.battleManager.addCombatLog(
-                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
-                    'info'
-                );
-            }
-        }
-        
         // Main spell effect log
         this.battleManager.addCombatLog(message, logType);
         
-        // Convert resistance map to serializable format for guest
+        // Add separate resistance info if there were both hits and resists
+        if (totalHits > 0 && totalResists > 0) {
+            this.battleManager.addCombatLog(
+                `🛡️ ${totalResists} target${totalResists > 1 ? 's' : ''} resisted the spell!`,
+                'info'
+            );
+        }
+        
+        // Convert resistance and death maps to serializable format for guest
         const resistanceData = {};
+        const deathData = {};
         resistanceResults.forEach((resisted, key) => {
             resistanceData[key] = resisted;
+        });
+        deathResults.forEach((willDie, key) => {
+            deathData[key] = willDie;
         });
         
         // Send spell effect update to guest
@@ -623,11 +655,11 @@ export class FlameAvalancheSpell {
             casterPosition: caster.position,
             damage: damage,
             targetCount: targets.length,
-            heroHits: heroHits,
-            heroResists: heroResists,
-            creatureHits: creatureHits,
-            creatureResists: creatureResists,
+            totalHits: totalHits,
+            totalResists: totalResists,
+            totalDeaths: totalDeaths,
             resistanceData: resistanceData,
+            deathData: deathData,
             effectType: 'area_damage',
             timestamp: Date.now()
         });
@@ -637,28 +669,25 @@ export class FlameAvalancheSpell {
     // GUEST-SIDE HANDLING
     // ============================================
 
-    // Handle spell effect on guest side
+    // Handle spell effect on guest side (UPDATED for consolidated logging)
     handleGuestSpellEffect(data) {
-        const { displayName, casterName, damage, heroHits, heroResists, creatureHits, creatureResists, resistanceData } = data;
+        const { displayName, casterName, damage, totalHits, totalResists, totalDeaths } = data;
         
         // Determine log type based on caster side
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const casterLocalSide = (data.casterAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const logType = casterLocalSide === 'player' ? 'success' : 'error';
         
-        // Build description matching host
-        const parts = [];
-        if (heroHits > 0) {
-            parts.push(`${heroHits} hero${heroHits > 1 ? 'es' : ''}`);
-        }
-        if (creatureHits > 0) {
-            parts.push(`${creatureHits} creature${creatureHits > 1 ? 's' : ''}`);
-        }
-        
+        // Build consolidated message matching host
         let message = `🔥 ${displayName} engulfs the battlefield`;
         
-        if (parts.length > 0) {
-            message += `, hitting ${parts.join(' and ')} for ${damage} damage each!`;
+        if (totalHits > 0) {
+            message += `, hitting ${totalHits} target${totalHits > 1 ? 's' : ''} for ${damage} damage each!`;
+            
+            // Add death information if any targets died
+            if (totalDeaths > 0) {
+                message += ` ${totalDeaths} of them died.`;
+            }
         } else {
             message += `, but all targets resisted!`;
         }
@@ -666,22 +695,12 @@ export class FlameAvalancheSpell {
         // Add main log
         this.battleManager.addCombatLog(message, logType);
         
-        // Add resistance info if any
-        if (heroResists > 0 || creatureResists > 0) {
-            const resistParts = [];
-            if (heroResists > 0) {
-                resistParts.push(`${heroResists} hero${heroResists > 1 ? 'es' : ''}`);
-            }
-            if (creatureResists > 0) {
-                resistParts.push(`${creatureResists} creature${creatureResists > 1 ? 's' : ''}`);
-            }
-            
-            if (parts.length > 0) {
-                this.battleManager.addCombatLog(
-                    `🛡️ ${resistParts.join(' and ')} resisted the spell!`,
-                    'info'
-                );
-            }
+        // Add separate resistance info if there were both hits and resists
+        if (totalHits > 0 && totalResists > 0) {
+            this.battleManager.addCombatLog(
+                `🛡️ ${totalResists} target${totalResists > 1 ? 's' : ''} resisted the spell!`,
+                'info'
+            );
         }
         
         // Find the caster and targets for guest-side animation
@@ -700,8 +719,8 @@ export class FlameAvalancheSpell {
         
         // Convert resistance data to Map format for guest
         const guestResistanceMap = new Map();
-        if (resistanceData) {
-            Object.entries(resistanceData).forEach(([key, resisted]) => {
+        if (data.resistanceData) {
+            Object.entries(data.resistanceData).forEach(([key, resisted]) => {
                 guestResistanceMap.set(key, resisted);
             });
         }

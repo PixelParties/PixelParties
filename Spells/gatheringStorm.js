@@ -7,7 +7,7 @@ export class GatheringStormEffect {
         this.stormIntensity = 'normal'; // 'normal' or 'double'
         this.stormOverlay = null;
         this.animationIntervals = [];
-        // NEW: Track counters for each player's storm
+        // Track counters for each player's storm
         this.playerStormCounters = 1;
         this.opponentStormCounters = 1;
     }
@@ -21,7 +21,7 @@ export class GatheringStormEffect {
         const opponentHasStorm = battleManager.opponentAreaCard && 
                                 battleManager.opponentAreaCard.name === 'GatheringStorm';
 
-        // NEW: Get counter values from area cards
+        // Get counter values from area cards
         const playerCounters = playerHasStorm ? (battleManager.playerAreaCard.stormCounters || 1) : 1;
         const opponentCounters = opponentHasStorm ? (battleManager.opponentAreaCard.stormCounters || 1) : 1;
 
@@ -44,23 +44,14 @@ export class GatheringStormEffect {
 
         this.isActive = true;
         this.stormIntensity = stormCheck.intensity;
-        // NEW: Store counter values
+        // Store counter values
         this.playerStormCounters = stormCheck.playerCounters;
         this.opponentStormCounters = stormCheck.opponentCounters;
 
         // Create storm animation immediately
         this.createStormAnimation(battleManager);
 
-        // NEW: Sync storm state including counters to guest
-        battleManager.sendBattleUpdate('gathering_storm_damage', {
-            intensity: this.stormIntensity,
-            playerCounters: this.playerStormCounters,
-            opponentCounters: this.opponentStormCounters,
-            reason: 'battle_start',
-            timestamp: Date.now()
-        });
-
-        // NEW: Enhanced log messages showing counter values
+        // Enhanced log messages showing counter values
         let stormMessage = '';
         if (this.stormIntensity === 'double') {
             stormMessage = `The clash of two Gathering Storms creates a devastating maelstrom! (Player: ${this.playerStormCounters}x, Opponent: ${this.opponentStormCounters}x)`;
@@ -91,10 +82,23 @@ export class GatheringStormEffect {
 
             // Collect all targets
             const allTargets = this.getAllTargets(battleManager);
+            
+            if (allTargets.length === 0) {
+                continue;
+            }
+
+            // Check resistance for all targets
+            const resistanceResults = this.checkResistanceForAllTargets(allTargets, battleManager);
+            
+            // Calculate which targets will die
+            const deathResults = this.calculateDeathResults(allTargets, baseDamage, resistanceResults, instance, battleManager);
+            
+            // Log consolidated storm effect
+            this.logStormEffect(battleManager, allTargets, baseDamage, resistanceResults, deathResults, instance);
 
             // Apply damage to all targets
             for (const target of allTargets) {
-                await this.applyStormDamageToTarget(battleManager, target, baseDamage);
+                await this.applyStormDamageToTarget(battleManager, target, baseDamage, instance, resistanceResults);
             }
 
             // Delay between damage instances if double storm
@@ -102,6 +106,185 @@ export class GatheringStormEffect {
                 await battleManager.delay(800);
             }
         }
+    }
+
+    // Check resistance for all targets upfront
+    checkResistanceForAllTargets(targets, battleManager) {
+        const resistanceMap = new Map();
+        
+        targets.forEach(target => {
+            let resisted = false;
+            
+            if (battleManager.resistanceManager) {
+                if (target.type === 'hero') {
+                    resisted = battleManager.resistanceManager.shouldResistSpell(target.hero, 'GatheringStorm');
+                } else if (target.type === 'creature') {
+                    resisted = battleManager.resistanceManager.shouldResistAreaSpell(target, 'GatheringStorm');
+                }
+            }
+            
+            const key = this.getTargetKey(target);
+            resistanceMap.set(key, resisted);
+        });
+        
+        return resistanceMap;
+    }
+
+    // Calculate which targets will die from the damage (before applying it)
+    calculateDeathResults(targets, baseDamage, resistanceResults, stormInstance, battleManager) {
+        const deathMap = new Map();
+        
+        targets.forEach(target => {
+            const key = this.getTargetKey(target);
+            const isResisted = resistanceResults.get(key);
+            let willDie = false;
+            
+            // Only calculate death if target is not resisted
+            if (!isResisted) {
+                const actualDamage = this.calculateStormDamageForTarget(battleManager, target, baseDamage, stormInstance);
+                
+                if (target.type === 'hero') {
+                    willDie = (target.hero.currentHp - actualDamage) <= 0;
+                } else if (target.type === 'creature') {
+                    willDie = (target.creature.currentHp - actualDamage) <= 0;
+                }
+            }
+            
+            deathMap.set(key, willDie);
+        });
+        
+        return deathMap;
+    }
+
+    // Get unique key for a target
+    getTargetKey(target) {
+        if (target.type === 'hero') {
+            return `hero_${target.side}_${target.position}`;
+        } else {
+            return `creature_${target.side}_${target.position}_${target.creatureIndex}`;
+        }
+    }
+
+    // Log consolidated storm effect with enhanced HP tracking
+    logStormEffect(battleManager, targets, baseDamage, resistanceResults, deathResults, stormInstance) {
+        // Count actual hits vs resisted vs deaths
+        let totalHits = 0;
+        let totalResists = 0;
+        let totalDeaths = 0;
+        let totalDamage = 0;
+        
+        // Collect detailed target information
+        let hitTargetDetails = [];
+        let deadTargetNames = [];
+        
+        targets.forEach(target => {
+            const key = this.getTargetKey(target);
+            const resisted = resistanceResults.get(key);
+            const willDie = deathResults.get(key);
+            
+            if (resisted) {
+                totalResists++;
+            } else {
+                totalHits++;
+                const actualDamage = this.calculateStormDamageForTarget(battleManager, target, baseDamage, stormInstance);
+                totalDamage = actualDamage; // All targets take same damage
+                
+                // Get target name and HP info
+                let targetName, currentHp, maxHp, previousHp;
+                
+                if (target.type === 'hero') {
+                    targetName = target.hero.name;
+                    currentHp = target.hero.currentHp;
+                    maxHp = target.hero.maxHp;
+                    previousHp = currentHp; // Store current HP as previous before damage
+                } else if (target.type === 'creature') {
+                    targetName = target.creature.name;
+                    currentHp = target.creature.currentHp;
+                    maxHp = target.creature.maxHp;
+                    previousHp = currentHp; // Store current HP as previous before damage
+                }
+                
+                // Calculate HP after damage
+                const hpAfterDamage = Math.max(0, currentHp - actualDamage);
+                
+                // Store hit target details
+                hitTargetDetails.push({
+                    name: targetName,
+                    previousHp: previousHp,
+                    currentHp: hpAfterDamage,
+                    willDie: willDie
+                });
+                
+                // Track deaths
+                if (willDie) {
+                    totalDeaths++;
+                    deadTargetNames.push(targetName);
+                }
+            }
+        });
+        
+        // Build enhanced consolidated message
+        if (totalHits > 0) {
+            // Build target details string
+            const targetDetailsStrings = hitTargetDetails.map(target => 
+                `${target.name} ❤️ ${target.previousHp} → ${target.currentHp}`
+            );
+            
+            let message = `⚡ The Gathering Storm strikes ${totalHits} target${totalHits > 1 ? 's' : ''} for ${totalDamage} damage each: ${targetDetailsStrings.join(', ')}!`;
+            
+            // Add death information if any targets died
+            if (totalDeaths > 0) {
+                if (deadTargetNames.length === 1) {
+                    message += ` ${deadTargetNames[0]} perished in the Storm!`;
+                } else if (deadTargetNames.length === 2) {
+                    message += ` ${deadTargetNames[0]} and ${deadTargetNames[1]} perished in the Storm!`;
+                } else {
+                    // Handle 3+ deaths
+                    const lastTarget = deadTargetNames.pop();
+                    message += ` ${deadTargetNames.join(', ')} and ${lastTarget} perished in the Storm!`;
+                }
+            }
+            
+            battleManager.addCombatLog(message, 'warning');
+        }
+        
+        // Add separate resistance info if there were resists
+        /*if (totalResists > 0) {
+            battleManager.addCombatLog(
+                `🛡️ ${totalResists} target${totalResists > 1 ? 's' : ''} resisted the storm!`,
+                'info'
+            );
+        }*/
+
+        // Convert resistance and death maps to serializable format for guest
+        const resistanceData = {};
+        const deathData = {};
+        resistanceResults.forEach((resisted, key) => {
+            resistanceData[key] = resisted;
+        });
+        deathResults.forEach((willDie, key) => {
+            deathData[key] = willDie;
+        });
+
+        // Send storm effect update to guest with enhanced data
+        battleManager.sendBattleUpdate('gathering_storm_damage', {
+            intensity: this.stormIntensity,
+            playerCounters: this.playerStormCounters,
+            opponentCounters: this.opponentStormCounters,
+            reason: stormInstance === 0 ? 'battle_start' : 'round_end',
+            stormInstance: stormInstance,
+            targetCount: targets.length,
+            totalHits: totalHits,
+            totalResists: totalResists,
+            totalDeaths: totalDeaths,
+            totalDamage: totalDamage,
+            resistanceData: resistanceData,
+            deathData: deathData,
+            // Add enhanced data for guest synchronization
+            hitTargetDetails: hitTargetDetails,
+            deadTargetNames: deadTargetNames,
+            timestamp: Date.now()
+        });
     }
 
     // Get all valid targets on the battlefield
@@ -166,22 +349,21 @@ export class GatheringStormEffect {
         return targets;
     }
 
-    // NEW: Calculate damage based on which storm is affecting this target
-    calculateStormDamageForTarget(battleManager, target, baseDamage) {
+    // Calculate damage based on which storm is affecting this target
+    calculateStormDamageForTarget(battleManager, target, baseDamage, stormInstance = 0) {
         // Determine which storm is doing damage based on who has the storm area
         const playerHasStorm = battleManager.playerAreaCard?.name === 'GatheringStorm';
         const opponentHasStorm = battleManager.opponentAreaCard?.name === 'GatheringStorm';
 
         if (this.stormIntensity === 'double') {
-            // Both have storms - each storm damages based on its own counters
-            // For simplicity, we'll apply the higher counter value to all targets
-            const maxCounters = Math.max(this.playerStormCounters, this.opponentStormCounters);
-            return baseDamage * maxCounters;
+            // Both have storms - use specific counters for each instance
+            // Instance 0: Host's storm (playerCounters)
+            // Instance 1: Guest's storm (opponentCounters)
+            const countersToUse = stormInstance === 0 ? this.playerStormCounters : this.opponentStormCounters;
+            return baseDamage * countersToUse;
         } else if (playerHasStorm) {
-            // Only player has storm - multiply by player's counters
             return baseDamage * this.playerStormCounters;
         } else if (opponentHasStorm) {
-            // Only opponent has storm - multiply by opponent's counters
             return baseDamage * this.opponentStormCounters;
         }
         
@@ -189,9 +371,18 @@ export class GatheringStormEffect {
     }
 
     // Apply storm damage to a specific target
-    async applyStormDamageToTarget(battleManager, target, baseDamage) {
-        // NEW: Calculate actual damage using counters
-        const actualDamage = this.calculateStormDamageForTarget(battleManager, target, baseDamage);
+    async applyStormDamageToTarget(battleManager, target, baseDamage, stormInstance = 0, resistanceResults) {
+        const targetKey = this.getTargetKey(target);
+        const isResisted = resistanceResults.get(targetKey);
+        
+        // Skip damage if resisted
+        if (isResisted) {
+            this.createLightningStrike(target, true); // Show resisted visual
+            return;
+        }
+
+        // Calculate actual damage using counters
+        const actualDamage = this.calculateStormDamageForTarget(battleManager, target, baseDamage, stormInstance);
 
         if (target.type === 'hero') {
             // Apply damage to hero
@@ -205,7 +396,8 @@ export class GatheringStormEffect {
 
             await battleManager.authoritative_applyDamage(damageResult, {
                 source: 'gathering_storm',
-                preventRevival: false
+                preventRevival: false,
+                aoe: true
             });
 
         } else if (target.type === 'creature') {
@@ -221,12 +413,13 @@ export class GatheringStormEffect {
 
             await battleManager.authoritative_applyDamageToCreature(damageData, {
                 source: 'gathering_storm',
-                preventRevival: false
+                preventRevival: false,
+                aoe: true
             });
         }
 
         // Add visual lightning effect
-        this.createLightningStrike(target);
+        this.createLightningStrike(target, false);
     }
 
     // Handle guest storm start
@@ -235,26 +428,98 @@ export class GatheringStormEffect {
 
         this.isActive = true;
         this.stormIntensity = data.intensity;
-        // NEW: Restore counter values on guest
+        // Restore counter values on guest
         this.playerStormCounters = data.playerCounters || 1;
         this.opponentStormCounters = data.opponentCounters || 1;
         
         // Create animation for guest
         this.createStormAnimation();
 
-        // NEW: Enhanced log message with counter info
-        let stormMessage = '';
-        if (this.stormIntensity === 'double') {
-            stormMessage = `The clash of two Gathering Storms creates a devastating maelstrom! (Player: ${this.playerStormCounters}x, Opponent: ${this.opponentStormCounters}x)`;
-        } else {
-            const activeCounters = data.playerCounters > 1 ? data.playerCounters : data.opponentCounters;
-            stormMessage = `Dark storm clouds gather, unleashing nature's fury! (${activeCounters}x power)`;
+        // Enhanced log message with counter info - only for initial storm start
+        if (data.reason === 'battle_start') {
+            let stormMessage = '';
+            if (this.stormIntensity === 'double') {
+                stormMessage = `The clash of two Gathering Storms creates a devastating maelstrom! (Player: ${this.playerStormCounters}x, Opponent: ${this.opponentStormCounters}x)`;
+            } else {
+                const activeCounters = data.playerCounters > 1 ? data.playerCounters : data.opponentCounters;
+                stormMessage = `Dark storm clouds gather, unleashing nature's fury! (${activeCounters}x power)`;
+            }
+            
+            // Add to combat log if battle manager is available
+            if (window.battleManager) {
+                window.battleManager.addCombatLog(`⛈️ ${stormMessage}`, 'warning');
+            }
+        }
+
+        // Handle consolidated damage logging
+        if (data.totalHits !== undefined) {
+            this.handleGuestStormDamageLog(data);
+        }
+    }
+
+    // Handle guest-side consolidated damage logging with enhanced HP tracking
+    handleGuestStormDamageLog(data) {
+        if (!window.battleManager) return;
+
+        const { totalHits, totalResists, totalDeaths, totalDamage, stormInstance, hitTargetDetails, deadTargetNames } = data;
+        
+        // Add storm wave message for double storms
+        if (this.stormIntensity === 'double' && stormInstance !== undefined) {
+            const totalWaves = 2;
+            if (stormInstance < totalWaves - 1) {
+                window.battleManager.addCombatLog(
+                    `⚡ Storm wave ${stormInstance + 1} of ${totalWaves} strikes!`, 
+                    'warning'
+                );
+            }
+        }
+
+        // Build enhanced consolidated message matching host
+        if (totalHits > 0) {
+            let message;
+            
+            // Use enhanced data if available, otherwise fall back to simple format
+            if (hitTargetDetails && hitTargetDetails.length > 0) {
+                // Enhanced format with HP details
+                const targetDetailsStrings = hitTargetDetails.map(target => 
+                    `${target.name} ❤️ ${target.previousHp} → ${target.currentHp}`
+                );
+                
+                message = `⚡ The Gathering Storm strikes ${totalHits} target${totalHits > 1 ? 's' : ''} for ${totalDamage} damage each: ${targetDetailsStrings.join(', ')}!`;
+                
+                // Add death information if any targets died
+                if (totalDeaths > 0 && deadTargetNames && deadTargetNames.length > 0) {
+                    if (deadTargetNames.length === 1) {
+                        message += ` ${deadTargetNames[0]} perished in the Storm!`;
+                    } else if (deadTargetNames.length === 2) {
+                        message += ` ${deadTargetNames[0]} and ${deadTargetNames[1]} perished in the Storm!`;
+                    } else {
+                        // Handle 3+ deaths
+                        const lastTarget = deadTargetNames[deadTargetNames.length - 1];
+                        const otherTargets = deadTargetNames.slice(0, -1);
+                        message += ` ${otherTargets.join(', ')} and ${lastTarget} perished in the Storm!`;
+                    }
+                }
+            } else {
+                // Fall back to simple format for backwards compatibility
+                message = `⚡ The gathering storm strikes ${totalHits} target${totalHits > 1 ? 's' : ''} for ${totalDamage} damage each!`;
+                
+                // Add death information if any targets died
+                if (totalDeaths > 0) {
+                    message += ` ${totalDeaths} of them died.`;
+                }
+            }
+            
+            window.battleManager.addCombatLog(message, 'warning');
         }
         
-        // Add to combat log if battle manager is available
-        if (window.battleManager) {
-            window.battleManager.addCombatLog(`⛈️ ${stormMessage}`, 'warning');
-        }
+        // Add separate resistance info if there were resists
+        /*if (totalResists > 0) {
+            window.battleManager.addCombatLog(
+                `🛡️ ${totalResists} target${totalResists > 1 ? 's' : ''} resisted the storm!`,
+                'info'
+            );
+        }*/
     }
 
     // Apply end-of-round storm damage
@@ -262,16 +527,6 @@ export class GatheringStormEffect {
         if (!this.isActive || !battleManager || !battleManager.isAuthoritative) return;
 
         battleManager.addCombatLog('The gathering storm lashes out at the end of the round!', 'warning');
-
-        // Sync end-of-round storm damage to guest
-        battleManager.sendBattleUpdate('gathering_storm_damage', {
-            intensity: this.stormIntensity,
-            playerCounters: this.playerStormCounters,
-            opponentCounters: this.opponentStormCounters,
-            reason: 'round_end',
-            round: battleManager.currentTurn,
-            timestamp: Date.now()
-        });
 
         // Apply the same damage as battle start
         await this.applyStormDamage(battleManager);
@@ -281,13 +536,18 @@ export class GatheringStormEffect {
     handleGuestRoundStormDamage(data) {
         if (!data) return;
 
-        // NEW: Update counter values if provided
+        // Update counter values if provided
         if (data.playerCounters) this.playerStormCounters = data.playerCounters;
         if (data.opponentCounters) this.opponentStormCounters = data.opponentCounters;
 
         // Add combat log message for guest
         if (window.battleManager) {
             window.battleManager.addCombatLog('The gathering storm lashes out at the end of the round!', 'warning');
+        }
+
+        // Handle consolidated damage logging
+        if (data.totalHits !== undefined) {
+            this.handleGuestStormDamageLog(data);
         }
     }
 
@@ -640,7 +900,7 @@ export class GatheringStormEffect {
     }
 
     // Create targeted lightning strike on specific target
-    createLightningStrike(target) {
+    createLightningStrike(target, isResisted = false) {
         let targetElement = null;
 
         if (target.type === 'hero') {
@@ -661,15 +921,19 @@ export class GatheringStormEffect {
         const lightningPath = this.generateTargetedLightningPath(rect);
         const intensity = this.stormIntensity === 'double' ? 0.9 : 0.7;
         
+        // Different colors for resisted vs normal strikes
+        const strokeColor = isResisted ? 'rgba(100, 200, 255, ' + intensity + ')' : 'rgba(255, 255, 255, ' + intensity + ')';
+        const innerStrokeColor = isResisted ? 'rgba(150, 150, 255, ' + (intensity * 0.6) + ')' : 'rgba(200, 220, 255, ' + (intensity * 0.6) + ')';
+        
         lightning.innerHTML = `
             <svg width="100%" height="100%" style="position: absolute; top: 0; left: 0;" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <path d="${lightningPath}" 
-                      stroke="rgba(255, 255, 255, ${intensity})" 
+                      stroke="${strokeColor}" 
                       stroke-width="0.8" 
                       fill="none" 
                       filter="url(#targetedLightningGlow)"/>
                 <path d="${lightningPath}" 
-                      stroke="rgba(200, 220, 255, ${intensity * 0.6})" 
+                      stroke="${innerStrokeColor}" 
                       stroke-width="0.4" 
                       fill="none"/>
                 <defs>
@@ -859,7 +1123,7 @@ export class GatheringStormEffect {
     }
 }
 
-// NEW: Functions for managing storm counters externally
+// Functions for managing storm counters externally
 
 // Initialize a GatheringStorm area with counter = 1
 export function initializeGatheringStormArea(areaCard) {
@@ -889,14 +1153,12 @@ export function getGatheringStormCounters(areaCard) {
 // Initialize GatheringStorm counter system (similar to Training)
 export function initializeGatheringStormSystem() {
     if (!window.heroSelection) {
-        console.warn('GatheringStorm: Hero selection not available, deferring initialization');
         setTimeout(() => initializeGatheringStormSystem(), 1000);
         return;
     }
 
     // Check if already initialized to prevent double-wrapping
     if (window.heroSelection.returnToFormationScreenAfterBattle._gatheringStormWrapped) {
-        console.log('GatheringStorm: System already initialized, skipping');
         return;
     }
 
@@ -916,8 +1178,6 @@ export function initializeGatheringStormSystem() {
 
     // Mark as wrapped to prevent double-wrapping
     window.heroSelection.returnToFormationScreenAfterBattle._gatheringStormWrapped = true;
-
-    console.log('GatheringStorm: Counter system initialized successfully');
 }
 
 async function processGatheringStormCounterIncrement(heroSelection) {
@@ -930,7 +1190,6 @@ async function processGatheringStormCounterIncrement(heroSelection) {
         
         if (wasIncremented) {
             const newCount = currentArea.stormCounters || 1;
-            console.log(`Storm power increased to ${newCount}x!`);
             
             // Update area display
             if (heroSelection.areaHandler.updateAreaDisplay) {
@@ -940,9 +1199,8 @@ async function processGatheringStormCounterIncrement(heroSelection) {
             // Save the updated area state
             try {
                 await heroSelection.saveGameState();
-                console.log('Storm counter increment saved to Firebase');
             } catch (error) {
-                console.error('Failed to save storm counter increment:', error);
+                // Error saving - continue silently
             }
             
             return true;
@@ -969,7 +1227,7 @@ export function handleGuestGatheringStormDamage(data, battleManager) {
     battleManager.gatheringStormEffect.handleGuestStormStart(data);
 }
 
-// NEW: Handle guest storm damage (compatibility with existing handler name)
+// Handle guest storm damage (compatibility with existing handler name)
 export function handleGuestGatheringStormStart(data, battleManager) {
     return handleGuestGatheringStormDamage(data, battleManager);
 }

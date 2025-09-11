@@ -75,7 +75,10 @@ export const birthdayPresentArtifact = {
         } 
         
         // Increment the birthday present counter by 2 (for opponent draws)
-        heroSelection.birthdayPresentCounter = (heroSelection.birthdayPresentCounter || 0) + 2;
+        if (!heroSelection.playerCounters) {
+            heroSelection.playerCounters = { birthdayPresent: 0 };
+        }
+        heroSelection.playerCounters.birthdayPresent = (heroSelection.playerCounters.birthdayPresent || 0) + 2;
         
         // Show visual feedback
         this.showBirthdayPresentAnimation(cardIndex, cardsToDraw, 2);

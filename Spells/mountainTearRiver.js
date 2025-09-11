@@ -226,6 +226,9 @@ export class MountainTearRiverSpell {
     async playLavaFlowAnimation(targets, caster, resistanceResults) {
         console.log(`🌋 Playing Mountain Tear River animation with ${targets.length} targets...`);
         
+        // FIXED: Ensure CSS is available before any animations start
+        this.ensureMountainTearRiverCSS();
+        
         // Total animation duration: ~800ms (longer than FlameAvalanche for the lava flow effect)
         const totalDuration = 800;
         
@@ -325,8 +328,6 @@ export class MountainTearRiverSpell {
         if (lavaFlow && lavaFlow.parentNode) {
             lavaFlow.remove();
         }
-        
-        this.ensureMountainTearRiverCSS();
     }
 
     // Create individual lava bubbles that flow across the screen

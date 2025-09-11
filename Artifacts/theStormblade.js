@@ -418,6 +418,31 @@ export class TheStormbladeEffect {
         this.battleManager.updateCreatureVisuals(side, position1, hero2.creatures);
         this.battleManager.updateCreatureVisuals(side, position2, hero1.creatures);
         
+        // ===== RESTORE STATUS EFFECT VISUALS FOR SWAPPED CREATURES =====
+        if (this.battleManager.statusEffectsManager) {
+            // Restore status indicators for creatures that moved to position1
+            if (hero2.creatures && hero2.creatures.length > 0) {
+                hero2.creatures.forEach(creature => {
+                    if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                        creature.statusEffects.forEach(effect => {
+                            this.battleManager.statusEffectsManager.updateStatusVisualIndicator(creature, effect.name);
+                        });
+                    }
+                });
+            }
+            
+            // Restore status indicators for creatures that moved to position2
+            if (hero1.creatures && hero1.creatures.length > 0) {
+                hero1.creatures.forEach(creature => {
+                    if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                        creature.statusEffects.forEach(effect => {
+                            this.battleManager.statusEffectsManager.updateStatusVisualIndicator(creature, effect.name);
+                        });
+                    }
+                });
+            }
+        }
+        
         // Update necromancy displays if applicable
         if (this.battleManager.necromancyManager) {
             this.battleManager.necromancyManager.updateNecromancyStackDisplay(side, position1, hero2.necromancyStacks);
@@ -737,7 +762,7 @@ export class TheStormbladeEffect {
             console.log(`🌪️ Enhanced visual swap completed between ${position1} and ${position2}`);
             
         } catch (error) {
-            console.error('❌ Error in enhanced visual swap, falling back to innerHTML method:', error);
+            console.error('⌘ Error in enhanced visual swap, falling back to innerHTML method:', error);
             
             // Fallback to original method
             const content1 = slot1.innerHTML;
@@ -840,6 +865,31 @@ export class TheStormbladeEffect {
         // Update creature visuals
         this.battleManager.updateCreatureVisuals(localSide, position1, hero2.creatures);
         this.battleManager.updateCreatureVisuals(localSide, position2, hero1.creatures);
+        
+        // ===== RESTORE STATUS EFFECT VISUALS FOR SWAPPED CREATURES =====
+        if (this.battleManager.statusEffectsManager) {
+            // Restore status indicators for creatures that moved to position1
+            if (hero2.creatures && hero2.creatures.length > 0) {
+                hero2.creatures.forEach(creature => {
+                    if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                        creature.statusEffects.forEach(effect => {
+                            this.battleManager.statusEffectsManager.updateStatusVisualIndicator(creature, effect.name);
+                        });
+                    }
+                });
+            }
+            
+            // Restore status indicators for creatures that moved to position2
+            if (hero1.creatures && hero1.creatures.length > 0) {
+                hero1.creatures.forEach(creature => {
+                    if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
+                        creature.statusEffects.forEach(effect => {
+                            this.battleManager.statusEffectsManager.updateStatusVisualIndicator(creature, effect.name);
+                        });
+                    }
+                });
+            }
+        }
         
         // Update necromancy displays if applicable
         if (this.battleManager.necromancyManager) {

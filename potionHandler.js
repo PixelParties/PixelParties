@@ -482,11 +482,44 @@ export class PotionHandler {
 
             case 'TeleportationPowder':
                 return await this.handleTeleportationPowderEffects(effects, playerRole, battleManager);
+
+            case 'MagicLamp':
+                return await this.handleMagicLampEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
                 console.log(`No battle effect defined for potion: ${potionName}`);
                 return 0;
+        }
+    }
+
+    async handleMagicLampEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the MagicLamp module
+            const { MagicLampPotion } = await import('./Potions/magicLamp.js');
+            const magicLampPotion = new MagicLampPotion();
+            
+            // Delegate everything to the MagicLamp module
+            const effectsProcessed = await magicLampPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`🪔 MagicLamp delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating MagicLamp effects for ${playerRole}:`, error);
+            
+            // Fallback: log failure
+            const playerName = playerRole === 'host' ? 'Host' : 'Guest';
+            battleManager.addCombatLog(
+                `🪔 ${playerName}'s Magic Lamp failed to activate properly`, 
+                'warning'
+            );
+            
+            return effects.length;
         }
     }
 

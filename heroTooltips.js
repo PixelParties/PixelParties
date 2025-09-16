@@ -1,4 +1,4 @@
-// heroTooltips.js - Locked Tooltip Mode Enhancement
+// heroTooltips.js - Locked Tooltip Mode Enhancement + Beato Auto-Lock
 
 export class HeroTooltipManager {
     constructor() {
@@ -90,14 +90,55 @@ export class HeroTooltipManager {
         this.activeHeroPosition = heroPosition;
         this.tooltipHoverState = false;
         
+        // NEW: Check if hero is "Beato" and auto-lock spellbook
+        this.checkAndLockBeatoSpellbook(heroPosition);
+        
         if (this.lockedMode) {
             this.addLockedModeFeatures(tooltipElement);
+        }
+    }
+
+    // NEW METHOD: Check if hero is "Beato" and automatically lock their spellbook
+    checkAndLockBeatoSpellbook(heroPosition) {
+        try {
+            // Get hero data from formation
+            if (window.heroSelection && window.heroSelection.formationManager) {
+                const formation = window.heroSelection.formationManager.getBattleFormation();
+                const hero = formation?.[heroPosition];
+                
+                if (hero && hero.name === 'Beato') {
+                    // Check if spellbook is already locked
+                    const spellbookManager = window.heroSelection.heroSpellbookManager;
+                    if (spellbookManager && !spellbookManager.isSpellbookLocked(heroPosition)) {
+                        // Lock Beato's spellbook automatically
+                        const lockResult = spellbookManager.lockHeroSpellbook(heroPosition);
+                        
+                        if (lockResult) {
+                            console.log(`🔒 Auto-locked ${hero.name}'s spellbook (Beato special rule)`);
+                            
+                            // Save game state after auto-locking
+                            if (window.heroSelection.saveGameState) {
+                                window.heroSelection.saveGameState().catch(error => {
+                                    console.warn('Failed to save game state after Beato auto-lock:', error);
+                                });
+                            }
+                        } else {
+                            console.warn('Failed to auto-lock Beato\'s spellbook');
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error in checkAndLockBeatoSpellbook:', error);
         }
     }
 
     addLockedModeFeatures(tooltipElement) {
         // Add padlock indicator
         this.addPadlockIndicator(tooltipElement);
+    
+        // Enable pointer events for locked mode interaction
+        tooltipElement.style.pointerEvents = 'auto';
         
         // Add hover listeners to tooltip itself
         this.addTooltipHoverListeners(tooltipElement);
@@ -226,6 +267,8 @@ export class HeroTooltipManager {
                 // Remove locked mode features
                 this.removePadlockIndicator(this.activeTooltipElement);
                 this.removeTooltipHoverListeners(this.activeTooltipElement);
+                // Disable pointer events when not in locked mode
+                this.activeTooltipElement.style.pointerEvents = 'none';
             }
         }
     }

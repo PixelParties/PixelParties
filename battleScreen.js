@@ -1077,7 +1077,7 @@ export class BattleScreen {
         return success;
     }
 
-    // UPDATED: Create individual battle hero slot using pre-calculated hero stats
+    // Create individual battle hero slot using pre-calculated hero stats
     createBattleHeroSlot(hero, side, position) {
         if (!hero) {
             return `
@@ -1090,11 +1090,35 @@ export class BattleScreen {
             `;
         }
         
-        // Create card data for hover preview
+        // FIXED: Create card data for hover preview WITH HERO STATS
+        let heroStats = null;
+        try {
+            // Get the actual hero instance from battle manager to get current stats
+            if (this.battleManager) {
+                const heroInstance = side === 'player' 
+                    ? this.battleManager.playerHeroes[position]
+                    : this.battleManager.opponentHeroes[position];
+                
+                if (heroInstance) {
+                    // Create hero stats object with current battle stats
+                    heroStats = {
+                        currentHp: heroInstance.currentHp,
+                        maxHp: heroInstance.maxHp,
+                        attack: heroInstance.getCurrentAttack(),
+                        defense: heroInstance.defense || 0,
+                        speed: heroInstance.speed || 0
+                    };
+                }
+            }
+        } catch (error) {
+            console.warn('Could not get hero stats for tooltip:', error);
+        }
+
         const cardData = {
             imagePath: hero.image,
             displayName: hero.name,
-            cardType: 'character'
+            cardType: 'character',
+            heroStats: heroStats
         };
         const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
         
@@ -1169,7 +1193,7 @@ export class BattleScreen {
                         <img src="${hero.image}" 
                             alt="${hero.name}" 
                             class="battle-hero-image"
-                            onerror="this.src='./Cards/Characters/placeholder.png'">
+                            onerror="this.src='./Cards/All/placeholder.png'">
                     </div>
                     <div class="hero-info-bar">
                         <div class="battle-hero-name">${hero.name}</div>
@@ -1195,6 +1219,51 @@ export class BattleScreen {
                 ${creaturesHTML}
             </div>
         `;
+    }
+
+    // Show card preview in interface panel WITH STATS SUPPORT
+    showCardPreview(cardData) {
+        const previewArea = document.getElementById('battleCardPreview');
+        if (!previewArea) return;
+        
+        // Show stats for ANY hero tooltip (any character card)
+        const shouldShowStats = (cardData.cardType === 'character' || cardData.cardType === 'hero') && cardData.heroStats;
+        
+        
+        // Build preview with optional stats overlay
+        let previewHTML = `
+            <div class="preview-card-display">
+                <div class="battle-preview-image-container" style="position: relative; display: inline-block;">
+                    <img src="${cardData.imagePath}" 
+                         alt="${cardData.displayName}" 
+                         class="preview-card-image"
+                         onerror="this.src='./Cards/All/placeholder.png'">
+        `;
+        
+        // Add stats overlay if this is a character card with stats
+        if (shouldShowStats) {
+            const stats = cardData.heroStats;
+            previewHTML += `
+                    <div class="battle-preview-stats" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                        <div class="battle-preview-stat hp-stat" style="position: absolute; bottom: 15%; left: 25%; background: rgba(0,0,0,0.0); color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 14px;">
+                            <span class="stat-value">${stats.maxHp}</span>
+                        </div>
+                        <div class="battle-preview-stat attack-stat" style="position: absolute; bottom: 15%; right: 20%; background: rgba(0,0,0,0.0); color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 14px;">
+                            <span class="stat-value">${stats.attack}</span>
+                        </div>
+                    </div>
+            `;
+        } 
+        
+        previewHTML += `
+                </div>
+                <div class="preview-card-info">
+                    <p class="card-type">${cardData.cardType === 'character' ? '🦸 Hero' : '🃏 Ability'}</p>
+                </div>
+            </div>
+        `;
+        
+        previewArea.innerHTML = previewHTML;
     }
 
     // Create creatures HTML for battle display (same as formation screen)
@@ -1951,25 +2020,6 @@ export class BattleScreen {
             tooltip.style.animation = 'fadeOut 0.3s ease-out';
             setTimeout(() => tooltip.remove(), this.getSpeedAdjustedDelay(300));
         }
-    }
-
-    // Show card preview in interface panel
-    showCardPreview(cardData) {
-        const previewArea = document.getElementById('battleCardPreview');
-        if (!previewArea) return;
-        
-        previewArea.innerHTML = `
-            <div class="preview-card-display">
-                <img src="${cardData.imagePath}" 
-                     alt="${cardData.displayName}" 
-                     class="preview-card-image"
-                     onerror="this.src='./Cards/placeholder.png'">
-                <div class="preview-card-info">
-                    <h4>${cardData.displayName}</h4>
-                    <p class="card-type">${cardData.cardType === 'character' ? '🦸 Hero' : '🃏 Ability'}</p>
-                </div>
-            </div>
-        `;
     }
 
     // Hide card preview

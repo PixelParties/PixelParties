@@ -247,6 +247,13 @@ export class BattleSpellSystem {
             return null; // No spells can be cast right now
         }
 
+        // SPECIAL CASE: Beato always casts a spell if any are available
+        if (hero.name === 'Beato') {
+            // Randomly select one of the available spells using battleManager's deterministic randomness
+            const randomSpell = this.battleManager.getRandomChoice(availableSpells);
+            return randomSpell;
+        }
+
         // Sort spells by level (higher level first)
         const sortedSpells = this.sortSpellsByLevel(availableSpells);
         

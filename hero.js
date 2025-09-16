@@ -1,4 +1,4 @@
-// hero.js - Enhanced Hero Class with Pre-calculated Stats from heroSelection + Battle Bonus System + Shield System
+// hero.js - Enhanced Hero Class with ascendedStack tracking
 
 import { getCardInfo } from './cardDatabase.js';
 
@@ -7,13 +7,26 @@ export class Hero {
         // Basic hero information
         this.id = heroData.id;
         this.name = heroData.name;
-        this.image = heroData.image;
+        
+        if (heroData.image && heroData.image.includes('./Cards/Characters/')) {
+            this.image = heroData.image.replace('./Cards/Characters/', './Cards/All/');
+        } else if (heroData.filename) {
+            // Construct the correct path from filename
+            this.image = `./Cards/All/${heroData.filename}`;
+        } else {
+            // Fallback - construct from name
+            this.image = `./Cards/All/${heroData.name}.png`;
+        }
+        
         this.filename = heroData.filename;
         
         // Position and side information
         this.position = position;
         this.side = side;
         this.absoluteSide = absoluteSide;
+        
+        // ASCENSION TRACKING - Track evolution history
+        this.ascendedStack = heroData.ascendedStack || [];
         
         // Load base stats from card database
         const heroInfo = getCardInfo(this.name);
@@ -65,6 +78,7 @@ export class Hero {
         // Other stacks
         this.burningFingerStack = 0;
         this.deathCounters = 0;
+        this.spellShields = 0;
 
         
         // Extensible state for future features
@@ -84,10 +98,111 @@ export class Hero {
         } else {
             this.burningFingerStack = 0;
         }
+        
+        // Add SpellShield stack initialization
+        if (heroData.spellShields !== undefined) {
+            this.spellShields = heroData.spellShields;
+        } else {
+            this.spellShields = 0;
+        }
+        
+        // Add spellbook locked flag initialization
+        if (heroData.spellbookLocked !== undefined) {
+            this.spellbookLocked = heroData.spellbookLocked;
+        } else {
+            this.spellbookLocked = false;
+        }
     }
 
     // ============================================
-    // SHIELD SYSTEM METHODS
+    // ASCENSION STACK METHODS
+    // ============================================
+
+    /**
+     * Add a hero form to the ascended stack (called during ascension)
+     * @param {string} heroName - The name of the hero form being replaced
+     */
+    addToAscendedStack(heroName) {
+        if (!heroName || typeof heroName !== 'string') return;
+        
+        // Ensure ascendedStack exists
+        if (!Array.isArray(this.ascendedStack)) {
+            this.ascendedStack = [];
+        }
+        
+        // Add the hero form to the stack if it's not already there
+        if (!this.ascendedStack.includes(heroName)) {
+            this.ascendedStack.push(heroName);
+        }
+    }
+
+    /**
+     * Get the complete ascension history
+     * @returns {string[]} Array of hero names in ascension order
+     */
+    getAscendedStack() {
+        return [...(this.ascendedStack || [])];
+    }
+
+    /**
+     * Get the original base hero (first in the ascension chain)
+     * @returns {string|null} Original hero name or null if no ascensions
+     */
+    getOriginalHero() {
+        if (!this.ascendedStack || this.ascendedStack.length === 0) {
+            return null;
+        }
+        return this.ascendedStack[0];
+    }
+
+    /**
+     * Get the previous form (most recent in the ascension chain)
+     * @returns {string|null} Previous hero form or null if no ascensions
+     */
+    getPreviousForm() {
+        if (!this.ascendedStack || this.ascendedStack.length === 0) {
+            return null;
+        }
+        return this.ascendedStack[this.ascendedStack.length - 1];
+    }
+
+    /**
+     * Check if this hero has been ascended from another form
+     * @returns {boolean} True if hero has ascension history
+     */
+    hasAscensionHistory() {
+        return this.ascendedStack && this.ascendedStack.length > 0;
+    }
+
+    /**
+     * Get the total number of ascensions this hero has undergone
+     * @returns {number} Number of ascensions
+     */
+    getAscensionCount() {
+        return this.ascendedStack ? this.ascendedStack.length : 0;
+    }
+
+    /**
+     * Set the ascended stack directly (for restoration)
+     * @param {string[]} stack - Array of hero names
+     */
+    setAscendedStack(stack) {
+        if (Array.isArray(stack)) {
+            this.ascendedStack = [...stack];
+        } else {
+            this.ascendedStack = [];
+        }
+    }
+
+    /**
+     * Clear the ascended stack
+     */
+    clearAscendedStack() {
+        this.ascendedStack = [];
+    }
+
+    // ============================================
+    // SHIELD SYSTEM METHODS (unchanged)
     // ============================================
 
     /**
@@ -230,7 +345,7 @@ export class Hero {
     }
 
     // ============================================
-    // EXISTING METHODS (unchanged)
+    // EXISTING METHODS (unchanged from here down)
     // ============================================
 
     addPermanentStatBonuses(attackBonus, hpBonus) {
@@ -708,7 +823,7 @@ export class Hero {
         return this.statusEffects.some(effect => effect.name === effectName);
     }
     
-    // Export hero state for persistence - UPDATED WITH SHIELD SUPPORT
+    // Export hero state for persistence - UPDATED WITH ASCENDED STACK
     exportState() {
         return {
             // Basic info
@@ -721,6 +836,9 @@ export class Hero {
             position: this.position,
             side: this.side,
             absoluteSide: this.absoluteSide,
+            
+            // ASCENSION TRACKING - Include ascended stack in export
+            ascendedStack: [...(this.ascendedStack || [])],
             
             // Stats (pre-calculated from heroSelection)
             currentHp: this.currentHp,
@@ -747,6 +865,7 @@ export class Hero {
             
             // Spellbook, creatures, equipment
             spellbook: this.spellbook.map(spell => ({ ...spell })),
+            spellbookLocked: this.spellbookLocked || false,
             creatures: this.creatures.map(creature => ({ ...creature })),
             equipment: this.equipment.map(item => ({...item})),
             
@@ -755,6 +874,7 @@ export class Hero {
             maxNecromancyStacks: this.maxNecromancyStacks,
             burningFingerStack: this.burningFingerStack || 0,
             deathCounters: this.deathCounters || 0,
+            spellShields: this.spellShields || 0,
 
             
             // Battle state
@@ -778,7 +898,7 @@ export class Hero {
         return this.spellbook.some(spell => spell.name === spellName && spell.enabled !== false);
     }
     
-    // Import hero state from persistence - UPDATED WITH SHIELD SUPPORT
+    // Import hero state from persistence - UPDATED WITH ASCENDED STACK
     static fromSavedState(savedState) {
         const hero = new Hero(
             {
@@ -786,7 +906,9 @@ export class Hero {
                 name: savedState.name,
                 image: savedState.image,
                 filename: savedState.filename,
-                burningFingerStack: savedState.burningFingerStack
+                burningFingerStack: savedState.burningFingerStack,
+                spellShields: savedState.spellShields,
+                ascendedStack: savedState.ascendedStack  // RESTORE ASCENDED STACK
             },
             savedState.position,
             savedState.side,
@@ -808,6 +930,9 @@ export class Hero {
         // SHIELD SYSTEM - Restore shield data
         hero.currentShield = savedState.currentShield || 0;
         
+        // ASCENSION TRACKING - Restore ascended stack
+        hero.setAscendedStack(savedState.ascendedStack || []);
+        
         // Restore permanent stat bonuses
         hero.attackBonusses = savedState.attackBonusses || 0;
         hero.hpBonusses = savedState.hpBonusses || 0;
@@ -822,6 +947,7 @@ export class Hero {
         
         // Restore spellbook, creatures, equipment
         hero.spellbook = savedState.spellbook || [];
+        hero.spellbookLocked = savedState.spellbookLocked || false;
         hero.creatures = savedState.creatures || [];
         if (savedState.equipment) {
             hero.setEquipment(savedState.equipment);
@@ -832,6 +958,7 @@ export class Hero {
         hero.maxNecromancyStacks = savedState.maxNecromancyStacks || 0;
         hero.burningFingerStack = savedState.burningFingerStack || 0;
         hero.deathCounters = savedState.deathCounters || 0;
+        hero.spellShields = savedState.spellShields || 0;
 
         
         // Restore battle state

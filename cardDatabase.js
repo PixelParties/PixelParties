@@ -17,6 +17,20 @@ const CARD_DATABASE = {
         ability2: 'SummoningMagic',
         tags: ["Summoner", "Damage Dealer", "Card Draw"]
     },
+    'Beato': {
+        name: 'Beato',
+        image: './Cards/Characters/Beato.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 300,
+        atk: 30,
+        ability1: 'MagicArts',
+        ability2: 'MagicArts',
+        tags: ["High-Value", "Random", "Card Draw"]
+    },
     'Cecilia': {
         name: 'Cecilia',
         image: './Cards/Characters/Cecilia.png',
@@ -240,6 +254,20 @@ const CARD_DATABASE = {
         ability1: 'Leadership',
         ability2: 'Necromancy',
         tags: ["Summoner", "Creature Spam", "Disruption"]
+    },
+    'Waflav': {
+        name: 'Waflav',
+        image: './Cards/Characters/Waflav.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 80,
+        ability1: 'Cannibalism',
+        ability2: 'Toughness',
+        tags: ["Attacker", "Damage Dealer", "Disruption"]
     },
 
     // CHARACTER-SPECIFIC CARDS - Alice's Cards
@@ -1435,6 +1463,18 @@ const CARD_DATABASE = {
         spellSchool: 'DecayMagic',
         subtype: null
     },
+    'SkeletonKingSkullmael': {
+        name: 'SkeletonKingSkullmael',
+        image: './Cards/All/SkeletonKingSkullmael.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: true
+    },
 
 
     //KAZENA
@@ -1689,7 +1729,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: 'MagicArts',
-        subtype: 'Reaction',
+        subtype: 'Quick',
         global: true
     },
     'Teleportal': {
@@ -1714,6 +1754,165 @@ const CARD_DATABASE = {
         subtype: 'Area'
     },
 
+
+
+    // BEATO
+    'ButterflyCloud': {
+        name: 'ButterflyCloud',
+        image: './Cards/All/ButterflyCloud.png',
+        cardType: 'Spell',
+        level: 3,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
+    },
+    'DivineGiftOfMagic': {
+        name: 'DivineGiftOfMagic',
+        image: './Cards/All/DivineGiftOfMagic.png',
+        cardType: 'Spell',
+        level: 9,
+        cost: 0,
+        action: false,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
+    },
+    'AntiMagicShield': {
+        name: 'AntiMagicShield',
+        image: './Cards/All/AntiMagicShield.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: false,
+        spellSchool: 'MagicArts',
+        subtype: 'Quick',
+        global: true
+    },
+    'CreateIllusion': {
+        name: 'CreateIllusion',
+        image: './Cards/All/CreateIllusion.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
+    },
+    'AuroraBorealis': {
+        name: 'AuroraBorealis',
+        image: './Cards/All/AuroraBorealis.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
+    },
+    'MagicLamp': {
+        name: 'MagicLamp',
+        image: './Cards/All/MagicLamp.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+
+
+
+    // WAFLAV
+    'Cannibalism': {
+        name: 'Cannibalism',
+        image: './Cards/All/Cannibalism.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'ThunderstruckWaflav': {
+        name: 'ThunderstruckWaflav',
+        image: './Cards/Characters/ThunderstruckWaflav.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 400,
+        atk: 120,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Waflav'
+    },
+    'SwampborneWaflav': {
+        name: 'SwampborneWaflav',
+        image: './Cards/Characters/SwampborneWaflav.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 500,
+        atk: 180,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Waflav'
+    },
+    'FlamebathedWaflav': {
+        name: 'FlamebathedWaflav',
+        image: './Cards/Characters/FlamebathedWaflav.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 450,
+        atk: 140,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Waflav'
+    },
+    'StormkissedWaflav': {
+        name: 'StormkissedWaflav',
+        image: './Cards/Characters/StormkissedWaflav.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 400,
+        atk: 100,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Waflav'
+    },
+    'DeepDrownedWaflav': {
+        name: 'DeepDrownedWaflav',
+        image: './Cards/Characters/DeepDrownedWaflav.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 550,
+        atk: 180,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Waflav'
+    },
+    'CaptureNet': {
+        name: 'CaptureNet',
+        image: './Cards/All/CaptureNet.png',
+        cardType: 'Artifact',
+        cost: 3,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
 
 
 
@@ -1877,6 +2076,11 @@ export function getCardInfo(cardName) {
     // Only add archetype if it exists
     if (cardInfo.archetype !== undefined) {
         baseInfo.archetype = cardInfo.archetype;
+    }
+
+    // Only add baseHero if it exists
+    if (cardInfo.baseHero !== undefined) {
+        baseInfo.baseHero = cardInfo.baseHero;
     }
 
     // Add hero-specific properties if this is a hero card

@@ -1,3 +1,5 @@
+import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
+
 export class StatusEffectsManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
@@ -217,6 +219,11 @@ export class StatusEffectsManager {
         if (definition && definition.type === 'debuff' && this.checkAndConsumeJuice(target, effectName, stacks)) {
             // Juice consumed to negate the negative effect!
             return false;
+        }
+
+        // Check for SwampborneWaflav evolution counter award
+        if (this.battleManager.swampborneWaflavEffect) {
+            SwampborneWaflavHeroEffect.checkPoisonEvolutionCounter(target, effectName, stacks, this.battleManager);
         }
         
         // ☀️ TheSunSword: Check for frozen resistance

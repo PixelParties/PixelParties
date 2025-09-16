@@ -685,6 +685,18 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'skeleton_king_skullmael_summon':
+                if (bm.skeletonKingSkullmaelManager) {
+                    bm.skeletonKingSkullmaelManager.handleGuestSkeletonSummon(data);
+                }
+                break;
+
+            case 'skeleton_king_death_spawn':
+                if (bm.skeletonKingSkullmaelManager) {
+                    bm.skeletonKingSkullmaelManager.handleGuestDeathSkeletonSpawn(data);
+                }
+                break;
+
             case 'cavalry_movements':
                 this.guest_handleCavalryMovements(data);
                 break;
@@ -800,6 +812,61 @@ export class BattleNetworkManager {
             case 'nomu_shield_applied':
                 bm.guest_handleNomuShieldApplied(data);
                 break;
+
+            case 'waflav_evolution_counter_gained':
+                if (!bm.isAuthoritative) {
+                    // Import and handle Waflav evolution counter update
+                    import('./Heroes/waflav.js').then(({ WaflavEffectManager }) => {
+                        WaflavEffectManager.handleGuestEvolutionCounterGained(data, bm);
+                    }).catch(error => {
+                        console.warn('Could not load Waflav system for guest counter update:', error);
+                    });
+                }
+                break;
+                
+            case 'thunderstruck_waflav_evolution_counters_consumed':
+                this.guest_handleThunderstruckWaflavCounterConsumption(data);
+                break;
+
+            case 'flamebathed_waflav_battle_start_effect':
+                if (!bm.isAuthoritative) {
+                    import('./Heroes/flamebathedWaflav.js').then(({ FlamebathedWaflavHeroEffect }) => {
+                        FlamebathedWaflavHeroEffect.handleGuestBattleStartEffect(data, bm);
+                    }).catch(error => {
+                        console.warn('Could not load FlamebathedWaflav system for guest battle start effect:', error);
+                    });
+                }
+                break;
+
+            case 'flamebathed_waflav_battle_end_effect':
+                if (!bm.isAuthoritative) {
+                    import('./Heroes/flamebathedWaflav.js').then(({ FlamebathedWaflavHeroEffect }) => {
+                        FlamebathedWaflavHeroEffect.handleGuestBattleEndEffect(data, bm);
+                    }).catch(error => {
+                        console.warn('Could not load FlamebathedWaflav system for guest battle end effect:', error);
+                    });
+                }
+                break;
+
+            case 'swampborne_poison_retaliation':
+                SwampborneWaflavHeroEffect.handleGuestPoisonRetaliation(data, this.battleManager);
+                break;
+
+            case 'swampborne_evolution_counter_gained':
+                SwampborneWaflavHeroEffect.handleGuestEvolutionCounterGained(data, this.battleManager);
+                break;
+
+            case 'deep_drowned_waflav_battle_start_effect':
+                if (!bm.isAuthoritative) {
+                    import('./Heroes/deepDrownedWaflav.js').then(({ DeepDrownedWaflavHeroEffect }) => {
+                        DeepDrownedWaflavHeroEffect.handleGuestBattleStartEffect(data, bm);
+                    }).catch(error => {
+                        console.warn('Could not load DeepDrownedWaflav system for guest battle start effect:', error);
+                    });
+                }
+                break;
+
+            
             
             case 'field_standard_effects_complete':
                 import('./Artifacts/fieldStandard.js').then(({ handleGuestFieldStandardEffects }) => {
@@ -828,6 +895,17 @@ export class BattleNetworkManager {
             case 'sun_sword_frozen_resist':
                 bm.guest_handleSunSwordFrozenResist(data);
                 break;
+
+            case 'capture_net_capture':
+                if (!this.battleManager.captureNetArtifact) {
+                    const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
+                    this.battleManager.captureNetArtifact = new CaptureNetArtifact(this.battleManager);
+                }
+                await this.battleManager.captureNetArtifact.handleGuestCreatureCapture(data);
+                break;
+
+
+
                 
             case 'spell_cast':
                 bm.guest_handleSpellCast(data);
@@ -875,6 +953,10 @@ export class BattleNetworkManager {
                 
             case 'creature_healed':
                 this.guest_handleCreatureHealed(data);
+                break;
+
+            case 'cannibalism_healing':
+                bm.guest_handleCannibalismHealing(data);
                 break;
 
             case 'burning_finger_stack_added':
@@ -1162,7 +1244,6 @@ export class BattleNetworkManager {
 
             case 'request_creature_sync':
                 if (bm.isAuthoritative) {
-                    console.log('📨 Guest requested creature sync:', data.reason);
                     bm.sendCreatureStateSync();
                 }
                 break;
@@ -1330,13 +1411,6 @@ export class BattleNetworkManager {
             necromancyArrayManipulation, debugInfo 
         } = data;
         
-        // Debug logging
-        console.log('🐛 Guest receiving creature damage:', {
-            creatureName, damage, oldHp, newHp, died,
-            originalCreatureIndex, currentCreatureIndex, finalCreatureIndex,
-            heroPosition, heroAbsoluteSide
-        });
-        
         // If creature was stolen, skip normal damage handling
         if (stolenByDarkGear) {
             return;
@@ -1358,19 +1432,12 @@ export class BattleNetworkManager {
         let targetCreature = null;
         let targetCreatureIndex = -1;
 
-        console.log('🔍 Guest searching for creature:', {
-            searchingFor: creatureName,
-            availableCreatures: localHero.creatures.map((c, i) => ({ index: i, name: c.name, hp: c.currentHp, alive: c.alive })),
-            searchIndices: { original: originalCreatureIndex, current: currentCreatureIndex }
-        });
-
         // Strategy 1: Use currentCreatureIndex with name validation
         if (currentCreatureIndex >= 0 && currentCreatureIndex < localHero.creatures.length) {
             const candidateCreature = localHero.creatures[currentCreatureIndex];
             if (candidateCreature && candidateCreature.name === creatureName && candidateCreature.currentHp === oldHp) {
                 targetCreature = candidateCreature;
                 targetCreatureIndex = currentCreatureIndex;
-                console.log('✅ Found creature using currentCreatureIndex:', currentCreatureIndex);
             }
         }
 
@@ -1380,7 +1447,6 @@ export class BattleNetworkManager {
             if (candidateCreature && candidateCreature.name === creatureName && candidateCreature.currentHp === oldHp) {
                 targetCreature = candidateCreature;
                 targetCreatureIndex = originalCreatureIndex;
-                console.log('✅ Found creature using originalCreatureIndex:', originalCreatureIndex);
             }
         }
 
@@ -1391,7 +1457,6 @@ export class BattleNetworkManager {
                 if (creature.name === creatureName && creature.currentHp === oldHp && creature.alive) {
                     targetCreature = creature;
                     targetCreatureIndex = i;
-                    console.log('✅ Found creature using name+HP search at index:', i);
                     break;
                 }
             }
@@ -1404,7 +1469,6 @@ export class BattleNetworkManager {
                 if (creature.name === creatureName && creature.alive) {
                     targetCreature = creature;
                     targetCreatureIndex = i;
-                    console.log('⚠️ Found creature using name-only search at index:', i, '(HP mismatch - expected:', oldHp, 'actual:', creature.currentHp, ')');
                     break;
                 }
             }
@@ -1672,7 +1736,8 @@ export class BattleNetworkManager {
             bm.kazenaEffect.transferCountersToFormation(bm);
         }
 
-        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn } = data;
+        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn, permanentGuardians, permanentCaptures,
+                hostPlayerCounters, guestPlayerCounters } = data;
         
         // Update turn from the battle_end message BEFORE showing rewards
         if (newTurn && bm.battleScreen && bm.battleScreen.turnTracker) {
@@ -1708,7 +1773,7 @@ export class BattleNetworkManager {
             try {
                 window.potionHandler.clearPotionEffects();
             } catch (error) {
-                // Error clearing potion effects
+                console.error('Error clearing potion effects on guest:', error);
             }
         }
 
@@ -1725,12 +1790,98 @@ export class BattleNetworkManager {
             });
         }
         
+        // Handle permanent guardian skeletons transfer
+        if (permanentGuardians && permanentGuardians.length > 0) {
+            try {
+                const { SkeletonKingSkullmaelCreature } = await import('./Creatures/skeletonKingSkullmael.js');
+                SkeletonKingSkullmaelCreature.transferPermanentGuardiansToFormation(
+                    permanentGuardians, 
+                    window.heroSelection
+                );
+            } catch (error) {
+                console.error('Error transferring permanent guardian skeletons:', error);
+            }
+        }
+
+        // After permanent guardians handling
+        if (permanentCaptures && permanentCaptures.length > 0) {
+            try {
+                const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
+                CaptureNetArtifact.transferPermanentCapturesToFormation(
+                    permanentCaptures, 
+                    window.heroSelection
+                );
+            } catch (error) {
+                console.error('Error transferring permanent captures:', error);
+            }
+        }
+
+        // RESTORE GUEST'S OWN COUNTERS
+        if (window.heroSelection) {
+            // ADD DEBUGGING BEFORE RESTORATION
+            console.log('GUEST: About to restore counters');
+            console.log('GUEST: bm.isHost =', bm.isHost);
+            console.log('GUEST: window.heroSelection exists =', !!window.heroSelection);
+            
+            // Restore the guest's own player counters (not opponent counters)
+            const myCounters = bm.isHost ? hostPlayerCounters : guestPlayerCounters;
+            const opponentCounters = bm.isHost ? guestPlayerCounters : hostPlayerCounters;
+            
+            console.log('GUEST: Logic check - if isHost then use hostPlayerCounters, else use guestPlayerCounters');
+            console.log('GUEST: bm.isHost =', bm.isHost);
+            console.log('GUEST: hostPlayerCounters =', hostPlayerCounters);
+            console.log('GUEST: guestPlayerCounters =', guestPlayerCounters);
+            console.log('GUEST: myCounters (selected) =', myCounters);
+            console.log('GUEST: myCounters?.evolutionCounters =', myCounters?.evolutionCounters);
+            console.log('GUEST: opponentCounters?.evolutionCounters =', opponentCounters?.evolutionCounters);
+            
+            if (myCounters) {
+                console.log('GUEST: myCounters exists, restoring...');
+                console.log('GUEST: myCounters.evolutionCounters before restoration =', myCounters.evolutionCounters);
+                
+                window.heroSelection.playerCounters = {
+                    birthdayPresent: myCounters.birthdayPresent || 0,
+                    teleports: myCounters.teleports || 0,
+                    goldenBananas: myCounters.goldenBananas || 0,
+                    evolutionCounters: myCounters.evolutionCounters !== undefined ? myCounters.evolutionCounters : 1
+                };
+                
+                console.log('GUEST: Restored own counters.evolutionCounters =', window.heroSelection.playerCounters.evolutionCounters);
+                console.log('GUEST: Full restored playerCounters =', window.heroSelection.playerCounters);
+            } else {
+                console.log('GUEST: ERROR - myCounters was null/undefined!');
+                console.log('GUEST: This means the battle end data did not contain the expected counter data');
+            }
+            
+            if (opponentCounters) {
+                console.log('GUEST: opponentCounters exists, restoring...');
+                
+                window.heroSelection.opponentCounters = {
+                    birthdayPresent: opponentCounters.birthdayPresent || 0,
+                    teleports: opponentCounters.teleports || 0,
+                    goldenBananas: opponentCounters.goldenBananas || 0,
+                    evolutionCounters: opponentCounters.evolutionCounters !== undefined ? opponentCounters.evolutionCounters : 1
+                };
+                
+                console.log('GUEST: Restored opponent counters.evolutionCounters =', window.heroSelection.opponentCounters.evolutionCounters);
+                console.log('GUEST: Full restored opponentCounters =', window.heroSelection.opponentCounters);
+            } else {
+                console.log('GUEST: WARNING - opponentCounters was null/undefined!');
+            }
+        } else {
+            console.log('GUEST: CRITICAL ERROR - window.heroSelection was null/undefined!');
+        }
+        
         const myMessage = bm.getResultMessage(myResult);
         bm.addCombatLog(myMessage, myResult === 'victory' ? 'success' : myResult === 'defeat' ? 'error' : 'info');
         
         await bm.cleanupBattleState();
         
         await bm.showBattleResult(myMessage);
+        
+        // ADD DEBUGGING BEFORE SHOWING REWARDS
+        console.log('GUEST: About to show rewards, final counter check:');
+        console.log('GUEST: window.heroSelection?.playerCounters?.evolutionCounters =', window.heroSelection?.playerCounters?.evolutionCounters);
         
         // Show rewards with the correct turn number
         if (bm.battleScreen && bm.battleScreen.showCardRewardsAndReturn) {

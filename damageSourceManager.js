@@ -2,6 +2,7 @@
 // Handles damage source classification and applies source-based damage modifications
 
 import { getCardInfo } from './cardDatabase.js';
+import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
 
 export class DamageSourceManager {
     constructor(battleManager) {
@@ -136,16 +137,17 @@ export class DamageSourceManager {
         if (cloudedResult.modified) {
             modifications.push(cloudedResult.modification);
         }
-        
-        // Future damage modifications can be added here
-        // Example: Apply magical resistance for magical damage
-        // if (sourceAnalysis.isMagical) {
-        //     const magicResistResult = this.applyMagicalResistance(target, finalDamage, sourceAnalysis);
-        //     finalDamage = magicResistResult.damage;
-        //     if (magicResistResult.modified) {
-        //         modifications.push(magicResistResult.modification);
-        //     }
-        // }
+
+        // Apply SwampborneWaflav retaliation check
+        if (sourceAnalysis.isPhysical && context.attacker) {
+            SwampborneWaflavHeroEffect.checkSwampborneRetaliation(
+                target, 
+                context.attacker, 
+                finalDamage, 
+                context, 
+                this.battleManager
+            );
+        }
         
         return {
             finalDamage: finalDamage,

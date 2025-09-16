@@ -29,6 +29,10 @@ export class TagsManager {
             'Stealing': '#9b59b6',
             'Potions': '#e91e63',
             
+            // Value/Quality tags
+            'High-Value': '#ffd700',
+            'Random': '#9c27b0',
+            
             // Status/Control tags
             'Status Effects': '#8e44ad',
             'Incapacitation': '#9b59b6',
@@ -117,6 +121,7 @@ export class TagsManager {
         // Since this is for character selection, we can define character tags directly
         const characterTagsMap = {
             'Alice': ['Summoner', 'Damage Dealer', 'Card Draw'],
+            'Beato': ['High-Value', 'Random', 'Card Draw'],
             'Cecilia': ['Attacker', 'Gold Generation', 'Damage Dealer'],
             'Darge': ['Attacker', 'Sniper', 'Damage Dealer'],
             'Gon': ['Support', 'Disruption', 'Status Effects'],
@@ -132,7 +137,8 @@ export class TagsManager {
             'Sid': ['Support', 'Disruption', 'Card Draw'],
             'Tharx': ['Defense', 'Summoner', 'Support'],
             'Toras': ['Attacker', 'Burst Damage', 'Damage Dealer', 'Strong Early'],
-            'Vacarn': ['Summoner', 'Creature Spam', 'Disruption']
+            'Vacarn': ['Summoner', 'Creature Spam', 'Disruption'],
+            'Waflav': ['Attacker', 'Damage Dealer', 'Late Game Scaling']
         };
         
         return characterTagsMap[cardName] || [];
@@ -206,6 +212,10 @@ export class TagsManager {
             'Gold Gain': '🪙',
             'Stealing': '🔓',
             'Potions': '🧪',
+            
+            // Value/Quality tags
+            'High-Value': '💎',
+            'Random': '🎲',
             
             // Status/Control tags
             'Status Effects': '✨',

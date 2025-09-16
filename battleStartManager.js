@@ -184,6 +184,18 @@ export class BattleStartManager {
             console.error('Error applying hero start effects:', error);
         }
 
+
+        // Waflav effects
+        const { ThunderstruckWaflavHeroEffect } = await import('./Heroes/thunderstruckWaflav.js');
+        await ThunderstruckWaflavHeroEffect.applyThunderstruckWaflavEffectsAtBattleStart(bm);
+        
+        const { FlamebathedWaflavHeroEffect } = await import('./Heroes/flamebathedWaflav.js');
+        await FlamebathedWaflavHeroEffect.applyFlamebathedWaflavEffectsAtBattleStart(bm);
+
+        const { DeepDrownedWaflavHeroEffect } = await import('./Heroes/deepDrownedWaflav.js');
+        await DeepDrownedWaflavHeroEffect.applyDeepDrownedWaflavEffectsAtBattleStart(bm);
+
+
         // Apply Future Tech Drone HP bonuses
         try {
             const { FutureTechDroneCreature } = await import('./Creatures/futureTechDrone.js');

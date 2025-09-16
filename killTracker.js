@@ -1,4 +1,4 @@
-// killTracker.js - Generic Kill Tracking System for Battle (UPDATED for Necromancy)
+// killTracker.js - Generic Kill Tracking System for Battle (UPDATED for Necromancy + Waflav + Duplicate Prevention)
 
 export class KillTracker {
     constructor() {
@@ -11,7 +11,9 @@ export class KillTracker {
         // Reference to battle manager (set during init)
         this.battleManager = null;
         
-        console.log('KillTracker initialized');
+        // Duplicate kill prevention
+        this.recentKills = new Set();
+        this.recentKillTimeout = 200; // 0.2 seconds to prevent duplicates
     }
     
     // Initialize with battle manager reference
@@ -19,14 +21,70 @@ export class KillTracker {
         this.battleManager = battleManager;
     }
     
+    // Generate a unique key for a kill event
+    generateKillKey(attacker, target, targetType) {
+        const timestamp = Date.now();
+        return `${attacker.side}-${attacker.position}-${target.name}-${targetType}-${timestamp}`;
+    }
+    
+    // Generate a base key for duplicate detection (without timestamp)
+    generateBaseKillKey(attacker, target, targetType) {
+        return `${attacker.side}-${attacker.position}-${target.name}-${targetType}`;
+    }
+    
+    // Check if this kill was already recorded recently
+    isDuplicateKill(attacker, target, targetType) {
+        const baseKey = this.generateBaseKillKey(attacker, target, targetType);
+        const now = Date.now();
+        
+        // Check if we've seen this exact kill combination recently
+        for (const recentKey of this.recentKills) {
+            if (recentKey.includes(baseKey)) {
+                const keyParts = recentKey.split('-');
+                const keyTimestamp = parseInt(keyParts[keyParts.length - 1]);
+                if (now - keyTimestamp < this.recentKillTimeout) {
+                    return true; // Duplicate detected
+                }
+            }
+        }
+        return false;
+    }
+    
+    // Clean up old kill entries to prevent memory leaks
+    cleanupOldKills() {
+        const now = Date.now();
+        const keysToRemove = [];
+        
+        for (const key of this.recentKills) {
+            const keyParts = key.split('-');
+            const keyTimestamp = parseInt(keyParts[keyParts.length - 1]);
+            if (now - keyTimestamp > this.recentKillTimeout) {
+                keysToRemove.push(key);
+            }
+        }
+        
+        keysToRemove.forEach(key => this.recentKills.delete(key));
+    }
+    
     // Record a kill made by an attacker against a target
     // NOTE: This is called whenever a target's HP drops to 0, regardless of whether
     // they are subsequently revived by Necromancy or other effects
     recordKill(attacker, target, targetType = 'unknown') {
         if (!attacker || !attacker.side || !attacker.position) {
-            console.warn('Invalid attacker for kill tracking');
             return;
         }
+        
+        // Check for duplicate kills
+        if (this.isDuplicateKill(attacker, target, targetType)) {
+            return null;
+        }
+        
+        // Generate unique key for this kill and add to recent kills
+        const killKey = this.generateKillKey(attacker, target, targetType);
+        this.recentKills.add(killKey);
+        
+        // Clean up old entries
+        this.cleanupOldKills();
         
         // Create kill record
         const killRecord = {
@@ -43,8 +101,10 @@ export class KillTracker {
         // Add to kill list for this attacker
         this.kills[attacker.side][attacker.position].push(killRecord);
         
-        // Log the kill
-        console.log(`⚔️ ${attacker.name} killed ${killRecord.targetName} (${targetType})`);
+        // ============================================
+        // NEW: Check for Waflav evolution counter reward
+        // ============================================
+        this.checkWaflavKillReward(attacker);
         
         // Sync with opponent if authoritative
         if (this.battleManager?.isAuthoritative) {
@@ -52,6 +112,25 @@ export class KillTracker {
         }
         
         return killRecord;
+    }
+    
+    // NEW: Check if the attacker is a Waflav hero and award evolution counter
+    checkWaflavKillReward(attacker) {
+        if (!this.battleManager || !this.battleManager.isAuthoritative) {
+            // Only the host should award Waflav kill rewards to prevent double-awarding
+            return;
+        }
+
+        try {
+            // Import Waflav handler dynamically to avoid circular dependencies
+            import('./Heroes/waflav.js').then(({ WaflavEffectManager }) => {
+                WaflavEffectManager.handleWaflavKill(attacker, this.battleManager);
+            }).catch(error => {
+                // Silently handle import errors - Waflav system is optional
+            });
+        } catch (error) {
+            // Silently handle any errors - kill tracking should not break
+        }
     }
     
     // NEW: Mark a kill as having been revived (for future tracking/display purposes)
@@ -63,7 +142,6 @@ export class KillTracker {
             const kill = kills[i];
             if (kill.targetName === targetName && kill.targetType === targetType && !kill.wasRevived) {
                 kill.wasRevived = true;
-                console.log(`💀✨ Marked kill of ${targetName} as revived`);
                 return true;
             }
         }
@@ -119,14 +197,30 @@ export class KillTracker {
     // NOTE: Wanted Poster counts ALL kills, including revived creatures
     handleWantedPosterKill(attacker, killRecord) {
         const killCount = this.getKillCount(attacker.side, attacker.position);
+        const posterCount = this.getWantedPosterCount(attacker);
         
-        // Wanted Poster caps at 5 kills
         if (killCount <= 5) {
+            const currentBonus = Math.min(killCount, 5) * 2 * posterCount;
+            const maxBonus = 10 * posterCount;
+            
             this.battleManager?.addCombatLog(
-                `📜 ${attacker.name} scored a bounty kill! (${Math.min(killCount, 5)}/5)`,
+                `📜 ${attacker.name} scored a bounty kill! (${Math.min(killCount, 5)}/5 kills, +${currentBonus}/${maxBonus} gold)`,
                 attacker.side === 'player' ? 'success' : 'info'
             );
+        } else {
+            // Already at max kills
+            this.battleManager?.addCombatLog(
+                `📜 ${attacker.name} scored another kill, but bounty is already maxed (5/5 kills)`,
+                attacker.side === 'player' ? 'info' : 'info'
+            );
         }
+    }
+
+    getWantedPosterCount(hero) {
+        const equipment = hero.equipment || hero.getEquipment?.() || [];
+        return equipment.filter(item => 
+            item && (item.name === 'WantedPoster' || item.cardName === 'WantedPoster')
+        ).length;
     }
     
     // Sync kill to opponent
@@ -170,6 +264,7 @@ export class KillTracker {
         return {
             kills: this.kills,
             timestamp: Date.now()
+            // Note: We don't export recentKills as it's just for duplicate prevention
         };
     }
     
@@ -177,7 +272,8 @@ export class KillTracker {
     importState(state) {
         if (state && state.kills) {
             this.kills = state.kills;
-            console.log('KillTracker state restored');
+            // Reset recent kills set on state import
+            this.recentKills.clear();
             return true;
         }
         return false;
@@ -189,7 +285,8 @@ export class KillTracker {
             player: { left: [], center: [], right: [] },
             opponent: { left: [], center: [], right: [] }
         };
-        console.log('KillTracker reset');
+        // Clear duplicate prevention tracking
+        this.recentKills.clear();
     }
     
     // Get statistics (UPDATED with revival tracking)
@@ -244,40 +341,7 @@ export class KillTracker {
         // 2 gold per kill per poster
         return effectiveKills * 2 * posterCount;
     }
-
-    handleWantedPosterKill(attacker, killRecord) {
-        const killCount = this.getKillCount(attacker.side, attacker.position);
-        const posterCount = this.getWantedPosterCount(attacker);
-        
-        if (killCount <= 5) {
-            const currentBonus = Math.min(killCount, 5) * 2 * posterCount;
-            const maxBonus = 10 * posterCount;
-            
-            this.battleManager?.addCombatLog(
-                `📜 ${attacker.name} scored a bounty kill! (${Math.min(killCount, 5)}/5 kills, +${currentBonus}/${maxBonus} gold)`,
-                attacker.side === 'player' ? 'success' : 'info'
-            );
-        } else {
-            // Already at max kills
-            this.battleManager?.addCombatLog(
-                `📜 ${attacker.name} scored another kill, but bounty is already maxed (5/5 kills)`,
-                attacker.side === 'player' ? 'info' : 'info'
-            );
-        }
-    }
-
-    getWantedPosterCount(hero) {
-        const equipment = hero.equipment || hero.getEquipment?.() || [];
-        return equipment.filter(item => 
-            item && (item.name === 'WantedPoster' || item.cardName === 'WantedPoster')
-        ).length;
-    }
 }
 
 // Create singleton instance
 export const killTracker = new KillTracker();
-
-// Attach to window for debugging
-if (typeof window !== 'undefined') {
-    window.killTracker = killTracker;
-}

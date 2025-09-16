@@ -19,6 +19,7 @@ import { BattleCombatManager } from './battleCombatManager.js';
 import DamageSourceManager from './damageSourceManager.js';
 
 import { applyResistancePatches } from './Abilities/resistance.js';
+import { CannibalismAbility } from './Abilities/cannibalism.js';
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
@@ -32,6 +33,7 @@ import GrinningCatCreature from './Creatures/grinningCat.js';
 import { MoniaHeroEffect } from './Heroes/monia.js';
 import { kazenaEffect } from './Heroes/kazena.js';
 import { NomuHeroEffect } from './Heroes/nomu.js';
+import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
 
 
 export class BattleManager {
@@ -336,8 +338,8 @@ export class BattleManager {
         this.roomManager = roomManager;
         this.isAuthoritative = isHost;
 
-        this.playerCounters = playerCounters || { birthdayPresent: 0 };
-        this.opponentCounters = opponentCounters || { birthdayPresent: 0 };
+        this.playerCounters = playerCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 };
+        this.opponentCounters = opponentCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 };
 
         this.checkpointSystem = getCheckpointSystem();
         this.checkpointSystem.init(this, roomManager, isHost);
@@ -416,6 +418,9 @@ export class BattleManager {
         
         this.combatManager = new BattleCombatManager(this);
         
+        // Initialize Cannibalism manager
+        this.cannibalismManager = new CannibalismAbility(this);
+
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
@@ -425,6 +430,8 @@ export class BattleManager {
         this.kazenaEffect = kazenaEffect;
         this.kazenaEffect.init(this);
         window.kazenaEffect = kazenaEffect;
+
+        this.swampborneWaflavEffect = SwampborneWaflavHeroEffect.init(this);
     }
 
     setBattleSpeed(speed) {
@@ -452,6 +459,12 @@ export class BattleManager {
                 speedName: speedNames[speed],
                 timestamp: Date.now()
             });
+        }
+    }
+
+    guest_handleCannibalismHealing(data) {
+        if (this.cannibalismManager) {
+            this.cannibalismManager.handleGuestCannibalismHealing(data);
         }
     }
     
@@ -1242,6 +1255,17 @@ export class BattleManager {
                     'info'
                 );
             }
+        }
+
+        // SKELETON KING SKULLMAEL DEATH SKELETON SPAWN
+        if (creature.name === 'SkeletonKingSkullmael' && this.skeletonKingSkullmaelManager) {
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the permanent skeleton spawn effect
+            await this.skeletonKingSkullmaelManager.executeDeathSkeletonSpawn(creature, heroOwner, position, side);
         }
     }
 
@@ -2470,6 +2494,28 @@ export class BattleManager {
             }
         }
 
+        // Collect permanent guardian skeletons before cleanup
+        let permanentGuardians = [];
+        if (this.isAuthoritative) {
+            try {
+                const { SkeletonKingSkullmaelCreature } = await import('./Creatures/skeletonKingSkullmael.js');
+                permanentGuardians = SkeletonKingSkullmaelCreature.collectPermanentGuardiansFromBattle(this);
+            } catch (error) {
+                console.error('Error collecting permanent guardian skeletons:', error);
+            }
+        }
+
+        // Collect permanent captures before cleanup
+        let permanentCaptures = [];
+        if (this.isAuthoritative) {
+            try {
+                const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
+                permanentCaptures = CaptureNetArtifact.collectPermanentCapturesFromBattle(this);
+            } catch (error) {
+                console.error('Error collecting permanent captures:', error);
+            }
+        }
+
         this.battleActive = false;
         
         if (this.isAuthoritative) {
@@ -2487,10 +2533,30 @@ export class BattleManager {
             // Set game phase to Reward BEFORE clearing battle states
             await this.setGamePhaseToReward();
 
-            // Transfer counters back to heroSelection
-            if (window.heroSelection) {               
-                // The opponent's counters become the player's reward source
-                window.heroSelection.opponentCounters = this.opponentCounters || { birthdayPresent: 0 };
+            // Apply FlamebathedWaflav battle end effects
+            try {
+                const { FlamebathedWaflavHeroEffect } = await import('./Heroes/flamebathedWaflav.js');
+                await FlamebathedWaflavHeroEffect.applyFlamebathedWaflavEffectsAtBattleEnd(this);
+            } catch (error) {
+                console.error('Error applying FlamebathedWaflav battle end effects:', error);
+            }
+
+            // Transfer counters back to heroSelection for host
+            if (window.heroSelection) {
+                // Restore host's own player counters
+                window.heroSelection.playerCounters = this.playerCounters || { 
+                    birthdayPresent: 0, 
+                    teleports: 0, 
+                    goldenBananas: 0, 
+                    evolutionCounters: 1 
+                };
+                // The opponent's counters become the host's opponent counter data
+                window.heroSelection.opponentCounters = this.opponentCounters || { 
+                    birthdayPresent: 0, 
+                    teleports: 0, 
+                    goldenBananas: 0, 
+                    evolutionCounters: 1 
+                };
             }
 
             // Mark battle as ended with timestamp for reconnection detection
@@ -2548,6 +2614,7 @@ export class BattleManager {
                 try {
                     window.potionHandler.clearPotionEffects();
                 } catch (error) {
+                    console.error('Error clearing potion effects:', error);
                 }
             }
 
@@ -2556,6 +2623,11 @@ export class BattleManager {
                 const { syncDoomCountersAfterBattle } = await import('./Spells/doomClock.js');
                 syncDoomCountersAfterBattle(this);
             }
+
+            console.log('🏠 HOST: Battle ending, collecting counter data');
+            console.log('🏠 HOST: this.playerCounters.evolutionCounters =', this.playerCounters?.evolutionCounters);
+            console.log('🏠 HOST: this.opponentCounters.evolutionCounters =', this.opponentCounters?.evolutionCounters);
+
             
             const battleEndData = {
                 hostResult,
@@ -2564,8 +2636,29 @@ export class BattleManager {
                 guestLives: this.lifeManager ? this.lifeManager.getOpponentLives() : 10,
                 hostGold: this.goldManager ? this.goldManager.getPlayerGold() : 0,
                 guestGold: this.goldManager ? this.goldManager.getOpponentGold() : 0,
-                newTurn: newTurn 
+                newTurn: newTurn,
+                permanentGuardians: permanentGuardians,
+                permanentCaptures: permanentCaptures,
+                // ADD COUNTER DATA FOR BOTH HOST AND GUEST
+                hostPlayerCounters: this.playerCounters || { 
+                    birthdayPresent: 0, 
+                    teleports: 0, 
+                    goldenBananas: 0, 
+                    evolutionCounters: 1 
+                },
+                guestPlayerCounters: this.opponentCounters || { 
+                    birthdayPresent: 0, 
+                    teleports: 0, 
+                    goldenBananas: 0, 
+                    evolutionCounters: 1 
+                }
             };
+
+            console.log('🏠 HOST: Sending battleEndData.hostPlayerCounters.evolutionCounters =', battleEndData.hostPlayerCounters?.evolutionCounters);
+            console.log('🏠 HOST: Sending battleEndData.guestPlayerCounters.evolutionCounters =', battleEndData.guestPlayerCounters?.evolutionCounters);
+            console.log('🏠 HOST: isHost =', this.isHost);
+            console.log('🏠 HOST: Full battleEndData.hostPlayerCounters =', battleEndData.hostPlayerCounters);
+            console.log('🏠 HOST: Full battleEndData.guestPlayerCounters =', battleEndData.guestPlayerCounters);
             
             // Save final battle state before cleanup
             await this.saveFinalBattleState();
@@ -2573,7 +2666,7 @@ export class BattleManager {
             this.sendBattleUpdate('battle_end', battleEndData);
             
             const hostMessage = this.getResultMessage(hostResult);
-            this.addCombatLog(`🏁 ${hostMessage}`, hostResult === 'victory' ? 'success' : hostResult === 'defeat' ? 'error' : 'info');
+            this.addCombatLog(`🏆 ${hostMessage}`, hostResult === 'victory' ? 'success' : hostResult === 'defeat' ? 'error' : 'info');
             await this.showBattleResult(hostMessage);
 
             if (window.heroSelection && window.heroSelection.deckManager) {
@@ -2600,6 +2693,32 @@ export class BattleManager {
 
             if (this.onBattleEnd) {
                 this.onBattleEnd(hostResult);
+            }
+
+            // Transfer permanent guardians to formation for host
+            if (permanentGuardians.length > 0) {
+                try {
+                    const { SkeletonKingSkullmaelCreature } = await import('./Creatures/skeletonKingSkullmael.js');
+                    SkeletonKingSkullmaelCreature.transferPermanentGuardiansToFormation(
+                        permanentGuardians, 
+                        window.heroSelection
+                    );
+                } catch (error) {
+                    console.error('Error transferring permanent guardian skeletons to host formation:', error);
+                }
+            }
+
+            // Transfer permanent captures to formation for host
+            if (permanentCaptures.length > 0) {
+                try {
+                    const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
+                    CaptureNetArtifact.transferPermanentCapturesToFormation(
+                        permanentCaptures, 
+                        window.heroSelection
+                    );
+                } catch (error) {
+                    console.error('Error transferring permanent captures to host formation:', error);
+                }
             }
         }
     }
@@ -2844,15 +2963,23 @@ export class BattleManager {
         // ===== CLEANUP DIPLOMACY AFTER BATTLE =====
         try {
             const { DiplomacyManager } = await import('./Abilities/diplomacy.js');
-            const recruitedCreatures = DiplomacyManager.cleanupDiplomacyAfterBattle(this);
+            DiplomacyManager.cleanupDiplomacyAfterBattle(this);
         } catch (error) {
         }
 
         // ===== CLEANUP GREATSWORD SKELETONS AFTER BATTLE =====
         try {
             const { SkullmaelsGreatswordArtifact } = await import('./Artifacts/skullmaelsGreatsword.js');
-            const skeletonsRemoved = SkullmaelsGreatswordArtifact.cleanupGreatswordSkeletonsAfterBattle(this);
+            SkullmaelsGreatswordArtifact.cleanupGreatswordSkeletonsAfterBattle(this);
         } catch (error) {
+        }
+
+        // ===== CLEANUP CAPTURED CREATURES AFTER BATTLE =====
+        try {
+            const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
+            CaptureNetArtifact.cleanupCapturedCreaturesAfterBattle(this);
+        } catch (error) {
+            console.error('Error cleaning up captured creatures after battle:', error);
         }
         
         if (this.arrowSystem) {
@@ -2926,8 +3053,6 @@ export class BattleManager {
             this.graveWormManager = null;
         }
 
-
-
         // Area cleanups
         
         if (this.gatheringStormEffect) {
@@ -2935,8 +3060,19 @@ export class BattleManager {
             this.gatheringStormEffect = null;
         }
 
+        
 
+        // Ability cleanups
+        if (this.cannibalismManager) {
+            this.cannibalismManager.cleanup();
+            this.cannibalismManager = null;
+        }
 
+        // Hero cleanups
+        if (this.swampborneWaflavEffect) {
+            this.swampborneWaflavEffect.cleanup();
+            this.swampborneWaflavEffect = null;
+        }
 
         // ===== RESTORE OVERHEAT EQUIPMENT AFTER BATTLE =====
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Overheat')) {
@@ -2947,7 +3083,7 @@ export class BattleManager {
         // ===== CLEANUP MONSTER IN A BOTTLE AFTER BATTLE =====
         try {
             const { MonsterInABottlePotion } = await import('./Potions/monsterInABottle.js');
-            const monstersRemoved = MonsterInABottlePotion.cleanupMonsterBottleAfterBattle(this);
+            MonsterInABottlePotion.cleanupMonsterBottleAfterBattle(this);
             
         } catch (error) {
         }
@@ -3625,6 +3761,10 @@ export class BattleManager {
         if (this.burningSkeletonManager) {
             this.burningSkeletonManager.cleanup();
             this.burningSkeletonManager = null;
+        }
+        if (this.skeletonKingSkullmaelManager) {
+            this.skeletonKingSkullmaelManager.cleanup();
+            this.skeletonKingSkullmaelManager = null;
         }
         if (this.skeletonReaperManager) {
             this.skeletonReaperManager.cleanup();

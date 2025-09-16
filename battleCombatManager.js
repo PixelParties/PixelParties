@@ -252,7 +252,7 @@ export class BattleCombatManager {
         const willDie = creature.currentHp <= 0;
         
         // Record kill IMMEDIATELY when creature HP drops to 0
-        if (willDie && wasAlive && attacker && this.battleManager.isAuthoritative) { 
+        if (willDie && wasAlive && attacker && this.battleManager.isAuthoritative) {
             recordKillWithVisualFeedback(this.battleManager, attacker, creature, 'creature'); 
             
             // UPDATED: Add creature death message with proper flags
@@ -279,7 +279,7 @@ export class BattleCombatManager {
         }
         
         if (!context.aoe) {
-            // UPDATED: Add creature damage message with proper flags
+            // Add creature damage message with proper flags
             this.battleManager.addCombatLog( 
                 `🩸 ${creature.name} takes ${finalDamage} damage! (${oldHp} → ${creature.currentHp} HP)`,
                 side === 'player' ? 'error' : 'success',
@@ -297,7 +297,8 @@ export class BattleCombatManager {
         
         let finalCreatureIndex = currentCreatureIndex;
         let revivedByNecromancy = false;
-        let stolenByDarkGear = false;  // Track if stolen
+        let stolenByDarkGear = false;
+        let capturedByCaptureNet = false;  // NEW: Track CaptureNet capturing
         let necromancyArrayManipulation = null;
         
         // If creature died, handle death sequence
@@ -307,7 +308,7 @@ export class BattleCombatManager {
             
             // 1. Trigger death effects
             this.battleManager.triggerCreatureDeathEffects(creature, hero, attacker, context); 
-            this.battleManager.checkForSkeletonMageReactions(creature, hero.side, 'creature'); 
+            this.battleManager.checkForSkeletonMageReactions(creature, side, 'creature'); 
             
             // 2. Check for Furious Anger
             setTimeout(async () => {
@@ -346,8 +347,28 @@ export class BattleCombatManager {
                 }
             }
             
-            // 4. If not revived, attempt Dark Gear stealing
-            if (!revivedByNecromancy) {
+            // 4. If not revived, attempt CaptureNet capturing (NEW)
+            if (!revivedByNecromancy && attacker && attacker.type !== 'creature') {
+                // Only heroes can use CaptureNet (not creatures attacking)
+                try {
+                    const { attemptCaptureNetCapture } = await import('./Artifacts/captureNet.js');
+                    capturedByCaptureNet = await attemptCaptureNetCapture(
+                        creature, hero, currentCreatureIndex, side, attacker, attacker.side, this.battleManager
+                    );
+                    
+                    if (capturedByCaptureNet) {
+                        // CaptureNet handles all cleanup and removal
+                        // IMPORTANT: Don't update any visuals here - CaptureNet does it all
+                        finalCreatureIndex = -1; // Creature is captured and moved
+                    }
+                } catch (error) {
+                    console.error('Error attempting CaptureNet capture:', error);
+                    capturedByCaptureNet = false;
+                }
+            }
+            
+            // 5. If not revived or captured, attempt Dark Gear stealing
+            if (!revivedByNecromancy && !capturedByCaptureNet) {
                 const { attemptDarkGearStealing } = await import('./Artifacts/darkGear.js');
                 stolenByDarkGear = await attemptDarkGearStealing(
                     creature, hero, currentCreatureIndex, side, this.battleManager 
@@ -360,8 +381,8 @@ export class BattleCombatManager {
                 }
             }
             
-            // 5. Only apply death visuals if creature wasn't stolen or revived
-            if (!revivedByNecromancy && !stolenByDarkGear) {
+            // 6. Only apply death visuals if creature wasn't stolen, captured, or revived
+            if (!revivedByNecromancy && !stolenByDarkGear && !capturedByCaptureNet) {
                 this.battleManager.handleCreatureDeathWithoutRevival(hero, creature, currentCreatureIndex, side, position); 
             }
         } else if (!willDie) {
@@ -369,8 +390,8 @@ export class BattleCombatManager {
             this.battleManager.updateCreatureHealthBar(side, position, currentCreatureIndex, creature.currentHp, creature.maxHp); 
         }
         
-        // Only create damage number and send update if creature wasn't stolen
-        if (!stolenByDarkGear) {
+        // Only create damage number and send update if creature wasn't stolen or captured
+        if (!stolenByDarkGear && !capturedByCaptureNet) {
             const damageSource = context?.source || 'attack';
             this.battleManager.animationManager.createDamageNumberOnCreature(side, position, finalCreatureIndex, finalDamage, creature.maxHp, damageSource); 
             
@@ -389,7 +410,8 @@ export class BattleCombatManager {
                 maxHp: creature.maxHp,
                 died: willDie,
                 revivedByNecromancy: revivedByNecromancy,
-                stolenByDarkGear: stolenByDarkGear,  
+                stolenByDarkGear: stolenByDarkGear,
+                capturedByCaptureNet: capturedByCaptureNet,  // NEW: Include capture status
                 necromancyArrayManipulation: necromancyArrayManipulation,
                 debugInfo: {
                     heroCreatureCount: hero.creatures.length,
@@ -405,7 +427,7 @@ export class BattleCombatManager {
         });
 
         // Sync Creature with guest
-        if (this.battleManager.isAuthoritative && !stolenByDarkGear) {
+        if (this.battleManager.isAuthoritative && !stolenByDarkGear && !capturedByCaptureNet) {
             setTimeout(() => {
                 this.battleManager.sendCreatureStateSync();
             }, 200); // Small delay to allow damage numbers to start animating
@@ -434,7 +456,7 @@ export class BattleCombatManager {
             // For display purposes, show what contributed to the bonus
             if (hero.hasAbility('Fighting')) {
                 const fightingStacks = hero.getAbilityStackCount('Fighting');
-                modifiers.specialEffects.push(`Fighting (+${fightingStacks * 10} ATK)`);
+                modifiers.specialEffects.push(`Fighting (+${fightingStacks * 20} ATK)`);
             }
             
             // Special case for Toras: show equipment bonus if applicable
@@ -1187,6 +1209,9 @@ export class BattleCombatManager {
         if (attack.target.type === 'creature') {
             const wasAlive = attack.target.creature.alive;
             
+            // Store damage for cannibalism calculation
+            const damageForCannibalism = attack.damage;
+            
             // Apply damage to creature - this now handles kill tracking and necromancy revival internally
             await this.authoritative_applyDamageToCreature({
                 hero: attack.target.hero,
@@ -1218,6 +1243,16 @@ export class BattleCombatManager {
                     attack.damage
                 );
             }
+
+            // CANNIBALISM: Apply cannibalism healing for creature attacks
+            if (this.battleManager.cannibalismManager) {
+                await this.battleManager.cannibalismManager.checkAndApplyCannibalism(
+                    attack.hero, 
+                    attack.target.creature, 
+                    damageForCannibalism, 
+                    'basic'
+                );
+            }
             
         } else {
             // Hero-to-hero attack - NOW WITH SHIELD SUPPORT
@@ -1237,6 +1272,9 @@ export class BattleCombatManager {
                 if (this.checkAndApplyFrostRune(attacker, defender)) {
                 }
             }
+            
+            // Store damage for cannibalism calculation before applying
+            const damageForCannibalism = attack.damage;
             
             // Use authoritative_applyDamage to ensure all status effects are processed
             const damageResult = await this.authoritative_applyDamage({
@@ -1284,6 +1322,20 @@ export class BattleCombatManager {
                     attacker,
                     defender,
                     attack.damage
+                );
+            }
+
+            // CANNIBALISM: Apply cannibalism healing for hero attacks
+            // Use the actual damage that was calculated to be dealt (before shields/reductions)
+            if (this.battleManager.cannibalismManager && damageResult) {
+                // For heroes, we need to calculate actual damage dealt considering shields
+                const actualDamageDealt = (damageResult.shieldDamage || 0) + (damageResult.hpDamage || 0);
+                
+                await this.battleManager.cannibalismManager.checkAndApplyCannibalism(
+                    attacker, 
+                    defender, 
+                    actualDamageDealt, 
+                    'basic'
                 );
             }
 
@@ -1938,6 +1990,11 @@ export class BattleCombatManager {
         if (revivalLight && revivalLight.parentNode) {
             revivalLight.remove();
         }
+    }
+
+    guest_handleThunderstruckWaflavCounterConsumption(data) {
+        const { ThunderstruckWaflavHeroEffect } = require('./Heroes/thunderstruckWaflav.js');
+        ThunderstruckWaflavHeroEffect.handleGuestCounterConsumption(data, this.battleManager);
     }
 
     guest_handleImmortalRevival(data) {

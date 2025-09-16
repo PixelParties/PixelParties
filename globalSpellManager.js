@@ -148,8 +148,84 @@ export class GlobalSpellManager {
         if (cardName === 'Teleportal') {
             return await this.handleTeleportalClick(cardIndex, cardName, heroSelection);
         }
+        if (cardName === 'DivineGiftOfMagic') {
+            return await this.handleDivineGiftOfMagicClick(cardIndex, cardName, heroSelection);
+        }
+        if (cardName === 'AntiMagicShield') {
+            return await this.handleAntiMagicShieldClick(cardIndex, cardName, heroSelection);
+        }
+        if (cardName === 'CreateIllusion') {
+            return await this.handleCreateIllusionClick(cardIndex, cardName, heroSelection);
+        }
+        if (cardName === 'AuroraBorealis') {
+            return await this.handleAuroraBorealisClick(cardIndex, cardName, heroSelection);
+        }
         
         return false;
+    }
+
+    async handleAuroraBorealisClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('auroraBorealis');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('AuroraBorealis spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load AuroraBorealis spell:', error);
+            return false;
+        }
+    }
+
+    async handleCreateIllusionClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('createIllusion');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('CreateIllusion spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load CreateIllusion spell:', error);
+            return false;
+        }
+    }
+
+    async handleAntiMagicShieldClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('antiMagicShield');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('Anti-Magic Shield spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load Anti-Magic Shield spell:', error);
+            return false;
+        }
+    }
+
+    async handleDivineGiftOfMagicClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('divineGiftOfMagic');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('DivineGiftOfMagic spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load DivineGiftOfMagic spell:', error);
+            return false;
+        }
     }
 
     async handleTeleportalClick(cardIndex, cardName, heroSelection) {
@@ -233,7 +309,7 @@ export class GlobalSpellManager {
         return this.isGlobalSpell(dragState.draggedCardName, heroSelection);
     }
 
-    handleGlobalSpellDropOnHero(targetSlot, heroSelection) {
+    async handleGlobalSpellDropOnHero(targetSlot, heroSelection) {
         const dragState = heroSelection.handManager.getHandDragState();
         const spellName = dragState.draggedCardName;
         
@@ -242,6 +318,10 @@ export class GlobalSpellManager {
         // Handle Teleport spell specifically
         if (spellName === 'Teleport') {
             return this.handleTeleportDropOnHero(targetSlot, heroSelection, dragState);
+        }
+        // Handle ButterflyCloud spell specifically
+        if (spellName === 'ButterflyCloud') {
+            return this.handleButterflyCloudDropOnHero(targetSlot, heroSelection, dragState);
         }
         
         // Other global spells show the generic message
@@ -300,6 +380,28 @@ export class GlobalSpellManager {
             }
         } catch (error) {
             console.error('Failed to load Teleport spell:', error);
+            return false;
+        }
+    }
+
+    async handleButterflyCloudDropOnHero(targetSlot, heroSelection, dragState) {
+        try {
+            const spell = await this.loadSpell('butterflyCloud');
+            if (spell && spell.handleDrop) {
+                const result = await spell.handleDrop(
+                    targetSlot, 
+                    dragState.draggedCardIndex, 
+                    dragState.draggedCardName, 
+                    heroSelection, 
+                    this
+                );
+                return result;
+            } else {
+                console.error('ButterflyCloud spell missing handleDrop method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load ButterflyCloud spell:', error);
             return false;
         }
     }

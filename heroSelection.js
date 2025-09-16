@@ -22,6 +22,7 @@ import heroTooltipManager from './heroTooltips.js';
 import AreaHandler from './areaHandler.js'
 import { graveyardManager } from './graveyard.js';
 import { tagsManager } from './tags.js';
+import { ascendedManager } from './ascendeds.js';
 
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
@@ -34,6 +35,9 @@ import { VacarnEffectManager } from './Heroes/vacarn.js';
 import { SemiEffectManager } from './Heroes/semi.js';
 import { HeinzEffectManager } from './Heroes/heinz.js';
 import { KyliEffectManager } from './Heroes/kyli.js';
+import { BeatoEffectManager } from './Heroes/beato.js';
+import { WaflavEffectManager } from './Heroes/waflav.js';
+import { StormkissedWaflavEffectManager } from './Heroes/stormkissedWaflav.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
@@ -67,6 +71,7 @@ export class HeroSelection {
         this.heroTooltipManager = heroTooltipManager;
         this.graveyardManager = graveyardManager;
         this.tagsManager = tagsManager;
+        this.ascendedManager = ascendedManager;
 
         this.magicSapphiresUsed = 0;
         this.magicRubiesUsed = 0;
@@ -75,12 +80,14 @@ export class HeroSelection {
         this.playerCounters = {
             birthdayPresent: 0,
             teleports: 0,
-            goldenBananas: 0 
+            goldenBananas: 0,
+            evolutionCounters: 1
         };
         this.opponentCounters = {
             birthdayPresent: 0,
             teleports: 0,
-            goldenBananas: 0 
+            goldenBananas: 0,
+            evolutionCounters: 1
         };
 
 
@@ -121,6 +128,9 @@ export class HeroSelection {
         this.semiEffectManager = new SemiEffectManager();
         this.heinzEffectManager = new HeinzEffectManager();
         this.kyliEffectManager = new KyliEffectManager();
+        this.beatoEffectManager = new BeatoEffectManager();
+        this.waflavEffectManager = new WaflavEffectManager();
+        this.stormkissedWaflavEffectManager = new StormkissedWaflavEffectManager();
 
         
         this.graveWormCreature = new GraveWormCreature(this);
@@ -211,6 +221,7 @@ export class HeroSelection {
         // Character card mappings
         this.characterCards = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
+            'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['Fighting', 'AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['DecayMagic', 'BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
@@ -226,7 +237,8 @@ export class HeroSelection {
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
             'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
-            'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic']
+            'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
+            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet']
         };
 
         
@@ -318,7 +330,6 @@ export class HeroSelection {
         import('./Spells/spatialCrevice.js').then(({ initializeSpatialCreviceSystem }) => {
             initializeSpatialCreviceSystem();
         }).catch(error => {
-            console.error('Failed to load SpatialCrevice system:', error);
         });
     }
 
@@ -373,7 +384,7 @@ export class HeroSelection {
         
         // Calculate final stats with all bonuses
         const hpBonus = toughnessStacks * 200;
-        const fightingAttackBonus = fightingStacks * 10;
+        const fightingAttackBonus = fightingStacks * 20;
         const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + energyCoreAttackBonus + permanentAttackBonus;
         const totalHpBonus = hpBonus + permanentHpBonus;
         
@@ -643,6 +654,11 @@ export class HeroSelection {
             if (this.kyliEffectManager) {
                 this.kyliEffectManager.resetForNewTurn();
             }
+            
+            // Reset Beato effect usage for new turn
+            if (this.beatoEffectManager) {
+                this.beatoEffectManager.resetForNewTurn();
+            }
 
             // Reset CrystalWell for new turn
             crystalWellManager.resetForNewTurn();
@@ -690,7 +706,7 @@ export class HeroSelection {
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
-                'Kyli.png', 'Nomu.png'
+                'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -727,7 +743,7 @@ export class HeroSelection {
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
-                'Kyli.png', 'Nomu.png'
+                'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -1492,14 +1508,13 @@ export class HeroSelection {
         }
 
         if (playerCountersData) {
-            this.playerCounters = { ...playerCountersData };
+            this.playerCounters = { 
+                ...{ birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 }, // defaults
+                ...playerCountersData // override with saved data
+            };
         } else {
             // Initialize default counters if no saved data
-            this.playerCounters = {
-                birthdayPresent: 0,
-                teleports: 0,
-                goldenBananas: 0 
-            };
+            this.playerCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 };
         }
         
         // Initialize life manager with turn tracker after restoration
@@ -2177,10 +2192,20 @@ export class HeroSelection {
                 window.birthdayPresentArtifact.processBirthdayPresentEffectsAfterBattle(this);
             }
 
-            // ===== PROCESS KYLI NATURE BOND EMPOWERMENT =====
+            // ===== PROCESS START OF TURN HERO EMPOWERMENTS =====
             if (this.kyliEffectManager) {
                 await this.kyliEffectManager.processPostBattleEmpowerment(this);
             }
+            if (this.beatoEffectManager) {
+                await this.beatoEffectManager.processPostBattleEmpowerment(this);
+            }
+            if (this.stormkissedWaflavEffectManager) {
+                await this.stormkissedWaflavEffectManager.processPostBattleEmpowerment(this);
+            }
+
+            
+            // ===== SAVE COUNTER STATE IMMEDIATELY AFTER BATTLE =====
+            const saveResult = await this.saveGameState(); // Ensure counters are saved to Firebase immediately
             
             // STEP 2: IMMEDIATE UI UPDATES (no waiting for Firebase)
             this.clearAllTooltips();
@@ -2764,7 +2789,7 @@ export class HeroSelection {
                 playerGraveyard,
                 opponentGraveyard,
                 this.playerCounters,
-                opponentCounters      
+                this.opponentCounters
             );
             return true;
             
@@ -3113,6 +3138,19 @@ export class HeroSelection {
             const success = await this.handleEquipArtifactDrop(targetSlot);
             return success;
         }
+
+        // Check if it's an ascended hero card
+        if (window.ascendedManager && this.handManager && this.handManager.isHandDragging()) {
+            const dragState = this.handManager.getHandDragState();
+            const cardName = dragState.draggedCardName;
+            const cardIndex = dragState.draggedCardIndex;
+            
+            if (window.ascendedManager.isAscendedHero(cardName)) {
+                // Handle ascended hero drop through ascendedManager
+                const success = await window.ascendedManager.performAscension(targetSlot, cardName, cardIndex);
+                return success;
+            }
+        }
         
         // Otherwise, handle hero swapping as normal
         const swapInfo = await this.formationManager.handleDrop(targetSlot);
@@ -3154,7 +3192,7 @@ export class HeroSelection {
     async handleSpellDrop(targetSlot) {
         // Check if this is a global spell being dropped on a hero slot
         if (this.globalSpellManager.isDraggingGlobalSpell(this)) {
-            return this.globalSpellManager.handleGlobalSpellDropOnHero(targetSlot, this);
+            return await this.globalSpellManager.handleGlobalSpellDropOnHero(targetSlot, this);
         }
 
         const dragState = this.handManager.getHandDragState();
@@ -3308,7 +3346,6 @@ export class HeroSelection {
             
             return dialogShown;
         } catch (error) {
-            console.error('Failed to load DarkDeal module:', error);
             this.showSpellDropResult(targetSlot, 'DarkDeal module not available', false);
             return false;
         }

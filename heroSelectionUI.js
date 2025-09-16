@@ -194,6 +194,9 @@ export class HeroSelectionUI {
         // Don't show tooltip if no spells AND no equipment
         if ((!spellbook || spellbook.length === 0) && (!equipment || equipment.length === 0)) return;
         
+        // Check if spellbook is locked
+        const isSpellbookLocked = window.heroSelection?.heroSpellbookManager?.isSpellbookLocked(position) || false;
+        
         // Remove any existing tooltip
         this.hideHeroSpellbookTooltip();
         
@@ -202,13 +205,19 @@ export class HeroSelectionUI {
         tooltip.className = 'formation-spellbook-tooltip enhanced-hero-tooltip';
         tooltip.id = 'formationSpellbookTooltip';
         
+        // Update the title to show lock status
+        let tooltipTitle = `📋 ${hero.name}'s Arsenal`;
+        if (isSpellbookLocked) {
+            tooltipTitle += ' 🔒';
+        }
+        
         let tooltipHTML = `
             <div class="spellbook-tooltip-container">
-                <h4 class="spellbook-tooltip-title">📋 ${hero.name}'s Arsenal</h4>
+                <h4 class="spellbook-tooltip-title">${tooltipTitle}</h4>
                 <div class="tooltip-section arsenal-section">
                     <div class="section-header">
                         <span class="section-icon">📜</span>
-                        <span class="section-title">Complete Arsenal (${(spellbook?.length || 0) + (equipment?.length || 0)} items)</span>
+                        <span class="section-title">Complete Arsenal (${(spellbook?.length || 0) + (equipment?.length || 0)} items)${isSpellbookLocked ? ' - Locked' : ''}</span>
                     </div>
                     <div class="spellbook-list">
         `;
@@ -282,12 +291,14 @@ export class HeroSelectionUI {
                 const spellName = this.formatCardName(spell.name);
                 const isEnabled = spell.enabled !== false; // Default to true for backward compatibility
                 
-                // Add click handler and disabled styling
+                // Add disabled class and click handler based on lock status
                 const disabledClass = !isEnabled ? 'spell-disabled' : '';
-                const clickHandler = `onclick="window.toggleHeroSpell('${position}', ${spellIndexInOriginal})"`;
+                const lockedClass = isSpellbookLocked ? 'spell-locked' : '';
+                const clickHandler = isSpellbookLocked ? '' : `onclick="window.toggleHeroSpell('${position}', ${spellIndexInOriginal})"`;
+                const titleText = isSpellbookLocked ? 'Spellbook is locked' : `Click to ${isEnabled ? 'disable' : 'enable'} this spell`;
                 
                 tooltipHTML += `
-                    <div class="spell-entry ${disabledClass}" ${clickHandler} data-spell-index="${spellIndexInOriginal}" title="Click to ${isEnabled ? 'disable' : 'enable'} this spell">
+                    <div class="spell-entry ${disabledClass} ${lockedClass}" ${clickHandler} data-spell-index="${spellIndexInOriginal}" title="${titleText}">
                         <span class="spell-name">${spellName}</span>
                         <span class="spell-level">Lv${spellLevel}</span>
                     </div>
@@ -339,22 +350,23 @@ export class HeroSelectionUI {
         // Enhanced summary with enabled/disabled count
         let summaryText = `Total Items: ${totalItems}`;
         if (spellbook && spellbook.length > 0) {
-            if (disabledSpells > 0) {
+            if (disabledSpells > 0 && !isSpellbookLocked) {
                 summaryText += ` • Spells: ${enabledSpells} enabled, ${disabledSpells} disabled`;
             } else {
                 summaryText += ` • All ${enabledSpells} spells enabled`;
             }
         }
         
+        // Update hint text based on lock status
+        const hintText = isSpellbookLocked ? '🔒 Spellbook is locked - spells cannot be toggled' : '💡 Click spells to enable/disable them';
+        
         tooltipHTML += `
                 <div class="arsenal-summary">${summaryText}</div>
-                <div class="spell-toggle-hint">💡 Click spells to enable/disable them</div>
+                <div class="spell-toggle-hint">${hintText}</div>
             </div>
         `;
         
         tooltip.innerHTML = tooltipHTML;
-        
-        // REMOVED: tooltip hover event listeners - tooltip no longer keeps itself visible
         
         // KEEP: Add wheel event listener to the tooltip for direct scrolling
         tooltip.addEventListener('wheel', (event) => {
@@ -374,6 +386,9 @@ export class HeroSelectionUI {
         
         // Position tooltip to the left of the hero card
         this.positionSpellbookTooltip(tooltip, heroElement);
+
+        // Make tooltip not interfere with mouse events by default
+        tooltip.style.pointerEvents = 'none';
         
         // Add wheel event listener to the hero element for scroll forwarding
         this.addHeroScrollSupport(heroElement, position);
@@ -980,6 +995,8 @@ export class HeroSelectionUI {
                 heroClickEvents = `onclick="window.handleNicolasClick(event, '${slotPosition}', '${character.name}')"`;
             } else if (character.name === 'Vacarn') {
                 heroClickEvents = `onclick="window.handleVacarnClick(event, '${slotPosition}', '${character.name}')"`;
+            } else if (character.name.includes('Waflav')) {  // NEW - Waflav click handling
+                heroClickEvents = `onclick="window.handleWaflavClick(event, '${slotPosition}', '${character.name}')"`;
             }
         }
         
@@ -993,6 +1010,10 @@ export class HeroSelectionUI {
         // Add hero stats HTML if in team building mode (includeAbilityZones = true)
         const heroStatsHTML = includeAbilityZones && slotPosition ? 
             this.createHeroStatsHTML(slotPosition) : '';
+
+        // Add evolution counter HTML if this is a Waflav hero in team building mode
+        const evolutionCounterHTML = includeAbilityZones && slotPosition && character.name.includes('Waflav') ? 
+            this.createEvolutionCounterHTML() : '';
 
         // Add tags HTML if in selection mode (NOT in team building)
         const tagsHTML = !includeAbilityZones && window.tagsManager ? 
@@ -1009,7 +1030,7 @@ export class HeroSelectionUI {
                 data-character-name="${character.name}"
                 ${isSelectable && !isDraggable ? `onclick="window.selectCharacterCard(${character.id})"` : ''}
                 ${hoverEvents}>
-                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass}">
+                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass} ${character.name.includes('Waflav') && isDraggable ? 'waflav-clickable' : ''}">
                     <img src="${character.image}" 
                         alt="${character.name}" 
                         class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''}"
@@ -1019,10 +1040,30 @@ export class HeroSelectionUI {
                         ${heroClickEvents}
                         onerror="this.src='./Cards/Characters/placeholder.png'">
                     ${heroStatsHTML}
+                    ${evolutionCounterHTML}
                     ${tagsHTML}
                 </div>
                 ${showCharacterName ? `<div class="character-name">${character.name}</div>` : ''}
                 ${abilityZonesHTML}
+            </div>
+        `;
+    }
+
+    createEvolutionCounterHTML() {
+        if (!window.heroSelection || !window.heroSelection.playerCounters) {
+            return '';
+        }
+        
+        const evolutionCounters = window.heroSelection.playerCounters.evolutionCounters;
+        
+        // Only hide if evolutionCounters is undefined/null, but show 0
+        if (evolutionCounters === undefined || evolutionCounters === null) {
+            return '';
+        }
+        
+        return `
+            <div class="evolution-counter-display">
+                ${evolutionCounters}
             </div>
         `;
     }
@@ -1926,6 +1967,91 @@ function onTeamSlotDragOver(event, position) {
             
             return;
         }
+
+        // Check if it's an ascended hero card
+        if (window.ascendedManager && window.ascendedManager.isAscendedHero(cardName)) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const slot = event.currentTarget;
+            
+            // Clean up tooltip from other slots if we're over a different slot
+            if (currentTooltipSlot && currentTooltipSlot !== slot) {
+                cleanupAllAbilityTooltips();
+                if (currentTooltipSlot && currentTooltipSlot.classList) {
+                    currentTooltipSlot.classList.remove('ascension-drop-ready', 'ascension-drop-invalid');
+                }
+            }
+            
+            // Check if tooltip already exists for this slot
+            let existingTooltip = slot.querySelector('.ascension-drop-tooltip');
+            
+            if (!existingTooltip) {
+                // Get ascension validation info
+                const tooltipInfo = window.ascendedManager.getAscensionDropTooltipInfo(position, cardName);
+                
+                // Set visual state
+                if (tooltipInfo.canDrop) {
+                    slot.classList.add('ascension-drop-ready');
+                    slot.classList.remove('ascension-drop-invalid');
+                } else {
+                    slot.classList.add('ascension-drop-invalid');
+                    slot.classList.remove('ascension-drop-ready');
+                }
+                
+                // Create tooltip
+                const tooltip = document.createElement('div');
+                tooltip.className = `ascension-drop-tooltip ${tooltipInfo.type}`;
+                
+                // Add long-text class if needed
+                if (tooltipInfo.message.length > 30) {
+                    tooltip.className += ' long-text';
+                }
+                
+                tooltip.textContent = tooltipInfo.message;
+                
+                // Style the tooltip
+                tooltip.style.cssText = `
+                    position: absolute;
+                    top: -40px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    white-space: nowrap;
+                    z-index: 1000;
+                    pointer-events: none;
+                    animation: fadeIn 0.3s ease-out;
+                    border: 2px solid rgba(255, 255, 255, 0.3);
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                `;
+                
+                slot.appendChild(tooltip);
+                
+                // Track current tooltip and slot
+                currentTooltip = tooltip;
+                currentTooltipSlot = slot;
+            } else {
+                // Tooltip already exists, just update the classes
+                const tooltipInfo = window.ascendedManager.getAscensionDropTooltipInfo(position, cardName);
+                
+                if (tooltipInfo.canDrop) {
+                    slot.classList.add('ascension-drop-ready');
+                    slot.classList.remove('ascension-drop-invalid');
+                } else {
+                    slot.classList.add('ascension-drop-invalid');
+                    slot.classList.remove('ascension-drop-ready');
+                }
+                
+                // Update tracking
+                currentTooltip = existingTooltip;
+                currentTooltipSlot = slot;
+            }
+            
+            return;
+        }
     }
     
     // Otherwise handle hero drag
@@ -1978,11 +2104,15 @@ function onTeamSlotDragLeave(event) {
         slot.classList.remove('spell-drop-ready', 'spell-drop-invalid');
         slot.classList.remove('equip-drop-ready', 'equip-drop-invalid');
         slot.classList.remove('global-spell-hover');
-        slot.classList.remove('teleport-drop-ready', 'teleport-drop-invalid'); // Add this line
+        slot.classList.remove('ascension-drop-ready', 'ascension-drop-invalid');
+
+        slot.classList.remove('teleport-drop-ready', 'teleport-drop-invalid');
+
         
         // Remove tooltip if this is the current tooltip slot
         if (currentTooltipSlot === slot) {
-            const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip, .teleport-drop-tooltip');
+            const tooltip = slot.querySelector('.ability-drop-tooltip, .spell-drop-tooltip, .equip-drop-tooltip, .teleport-drop-tooltip, .ascension-drop-tooltip');
+
             if (tooltip) {
                 tooltip.remove();
             }
@@ -2013,7 +2143,7 @@ async function onTeamSlotDrop(event, targetSlot) {
     
         // Check for global spell (including Teleport)
         if (window.globalSpellManager && window.globalSpellManager.isGlobalSpell(cardName, window.heroSelection)) {
-            const success = window.globalSpellManager.handleGlobalSpellDropOnHero(targetSlot, window.heroSelection);
+            const success = await window.globalSpellManager.handleGlobalSpellDropOnHero(targetSlot, window.heroSelection);
             return success;
         }
         
@@ -2498,6 +2628,17 @@ function handleVacarnClick(event, heroPosition, heroName) {
     window.heroSelection.vacarnEffectManager.startBuryMode(heroPosition, window.heroSelection);
 }
 
+function handleWaflavClick(event, heroPosition, heroName) {
+    event.stopPropagation();
+    
+    if (!heroName.includes('Waflav') || !window.heroSelection?.waflavEffectManager) {
+        return;
+    }
+    
+    // Use the main Waflav handler that determines evolution vs descension
+    window.heroSelection.waflavEffectManager.handleWaflavHeroClick(window.heroSelection, heroPosition);
+}
+
 // Attach to window
 if (typeof window !== 'undefined') {
     window.onTeamSlotDragOver = onTeamSlotDragOver;
@@ -2508,6 +2649,7 @@ if (typeof window !== 'undefined') {
     window.onAbilityClick = onAbilityClick;
     window.handleNicolasClick = handleNicolasClick;
     window.handleVacarnClick = handleVacarnClick;
+    window.handleWaflavClick = handleWaflavClick;  // NEW - Add this line
     
     // Creature drag and drop functions
     window.onCreatureDragStart = onCreatureDragStart;
@@ -3349,6 +3491,93 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
             color: white;
             border-color: rgba(255, 255, 255, 0.4);
             box-shadow: 0 0 15px rgba(106, 27, 154, 0.4);
+        }
+
+        /* Locked spellbook styles */
+        .spell-entry.spell-locked {
+            cursor: not-allowed !important;
+            opacity: 0.8;
+        }
+
+        .spell-entry.spell-locked:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+            transform: none !important;
+        }
+
+        .spellbook-tooltip-title {
+            transition: color 0.3s ease;
+        }
+
+        .spell-toggle-hint {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            text-align: center;
+            font-style: italic;
+            margin-top: 4px;
+        }
+
+        /* Ensure tooltips don't interfere with hero hover detection */
+        .formation-spellbook-tooltip {
+            pointer-events: none; /* Default: don't block mouse events */
+        }
+
+        .formation-spellbook-tooltip.locked-mode {
+            pointer-events: auto; /* In locked mode: allow interaction */
+        }
+
+
+        /* Waflav-specific styles */
+        .character-image-container.waflav-clickable {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .character-image-container.waflav-clickable:hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+            box-shadow: 0 0 15px rgba(142, 36, 170, 0.4);
+        }
+
+        .evolution-counter-display {
+            position: absolute;
+            bottom: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            z-index: 15;
+            font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+            animation: evolutionCounterFloat 3s ease-in-out infinite;
+        }
+
+        .evolution-counter-display:hover {
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 4px 12px rgba(142, 36, 170, 0.6);
+        }
+
+        @keyframes evolutionCounterFloat {
+            0%, 100% { 
+                box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4);
+            }
+            50% { 
+                box-shadow: 0 4px 10px rgba(142, 36, 170, 0.6);
+            }
+        }
+
+        /* Ensure evolution counters appear above hero stats */
+        .hero-stats-overlay {
+            z-index: 10;
         }
     `;
     document.head.appendChild(style);

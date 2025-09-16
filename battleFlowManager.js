@@ -95,6 +95,9 @@ export class BattleFlowManager {
             const SkeletonMageCreature = (await import('./Creatures/skeletonMage.js')).default;
             bm.skeletonMageManager = new SkeletonMageCreature(bm);
 
+            const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
+            bm.skeletonKingSkullmaelManager = new SkeletonKingSkullmaelCreature(bm);
+
             const FrontSoldierCreature = (await import('./Creatures/frontSoldier.js')).default;
             bm.frontSoldierManager = new FrontSoldierCreature(bm);
 
@@ -141,6 +144,7 @@ export class BattleFlowManager {
             if (!bm.skeletonNecromancerManager) bm.skeletonNecromancerManager = null;
             if (!bm.skeletonDeathKnightManager) bm.skeletonDeathKnightManager = null;
             if (!bm.skeletonReaperManager) bm.skeletonReaperManager = null;
+            if (!bm.skeletonKingSkullmaelManager) bm.skeletonKingSkullmaelManager = null;
             if (!bm.royalCorgiManager) bm.royalCorgiManager = null;
             if (!bm.crumTheClassPetManager) bm.crumTheClassPetManager = null;
             if (!bm.coldHeartedYukiOnnaManager) bm.coldHeartedYukiOnnaManager = null;
@@ -346,7 +350,7 @@ export class BattleFlowManager {
         } catch (error) {
             // Error handled silently
         } finally {
-            // ADDED: Always clear the running flag when loop exits
+            // Always clear the running flag when loop exits
             if (bm.networkManager) {
                 bm.networkManager.battleLoopRunning = false;
             }
@@ -642,6 +646,7 @@ export class BattleFlowManager {
                 const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
                 const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
                 const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
+                const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
 
                 
                 const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
@@ -805,6 +810,13 @@ export class BattleFlowManager {
                     } else {
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                     }
+                } else if (SkeletonKingSkullmaelCreature.isSkeletonKingSkullmael(playerActor.name)) {
+                    if (bm.skeletonKingSkullmaelManager) {
+                        actions.push(bm.skeletonKingSkullmaelManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                    }
                 }
                 else {
                     actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
@@ -838,6 +850,7 @@ export class BattleFlowManager {
                 const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
                 const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
                 const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
+                const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
 
                 
                 const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
@@ -972,10 +985,16 @@ export class BattleFlowManager {
                     } else {
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
                     }
-                }
-                else if (GraveWormCreature.isGraveWorm(opponentActor.name)) {
+                } else if (GraveWormCreature.isGraveWorm(opponentActor.name)) {
                     if (bm.graveWormManager) {
                         actions.push(bm.graveWormManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                    }
+                } else if (SkeletonKingSkullmaelCreature.isSkeletonKingSkullmael(opponentActor.name)) {
+                    if (bm.skeletonKingSkullmaelManager) {
+                        actions.push(bm.skeletonKingSkullmaelManager.executeSpecialAttack(opponentActor, position));
                         hasSpecialAttacks = true;
                     } else {
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));

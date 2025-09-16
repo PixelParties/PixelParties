@@ -724,6 +724,9 @@ export class HandManager {
             // Check if this is a potion card
             const isPotionCard = window.potionHandler?.isPotionCard(cardName, window.heroSelection) || false;
 
+            // Check if this is an ascended hero card
+            const isAscendedHero = window.ascendedManager?.isAscendedHero(cardName) || false;
+
             
 
             // Check if this is an artifact and if it's unaffordable
@@ -744,6 +747,8 @@ export class HandManager {
                     const playerGold = window.heroSelection?.goldManager?.getPlayerGold() || 0;
                     isUnaffordable = playerGold < cardInfo.cost;
                 }
+            } else if (isAscendedHero) {
+                dataCardType = 'ascended-hero';
             }
 
             // Check if this is an equip artifact
@@ -772,6 +777,8 @@ export class HandManager {
             if (isSpellCard) cardClasses += ' spell-card';
             if (!canPlay) cardClasses += ' no-actions-available';
             if (isAnyExclusiveActive) cardClasses += ' exclusive-hand-disabled';
+            if (isAscendedHero) cardClasses += ' ascended-hero-card';
+
 
             // Add clickable class for special cards (only if they can be played)
             let clickableClass = '';

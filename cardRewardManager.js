@@ -35,6 +35,7 @@ export class CardRewardManager {
         // Define all available heroes and their card sets
         this.allHeroes = [
             { name: 'Alice', image: './Cards/Characters/Alice.png' },
+            { name: 'Beato', image: './Cards/Characters/Beato.png' },
             { name: 'Cecilia', image: './Cards/Characters/Cecilia.png' },
             { name: 'Darge', image: './Cards/Characters/Darge.png' },
             { name: 'Gon', image: './Cards/Characters/Gon.png' },
@@ -50,11 +51,13 @@ export class CardRewardManager {
             { name: 'Sid', image: './Cards/Characters/Sid.png' },
             { name: 'Tharx', image: './Cards/Characters/Tharx.png' },
             { name: 'Toras', image: './Cards/Characters/Toras.png' },
-            { name: 'Vacarn', image: './Cards/Characters/Vacarn.png' }
+            { name: 'Vacarn', image: './Cards/Characters/Vacarn.png' },
+            { name: 'Waflav', image: './Cards/Characters/Waflav.png' }
         ];
         
         this.heroCardSets = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
+            'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'Fighting', 'RainbowsArrow', 'RainOfArrows'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
@@ -70,7 +73,8 @@ export class CardRewardManager {
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
             'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
-            'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic']
+            'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
+            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet']
         };
 
         // Redraw system
@@ -1587,8 +1591,38 @@ export class CardRewardManager {
             .filter(hero => hero !== null)
             .map(hero => hero.name);
         
-        // Filter out already used heroes
-        const availableHeroes = this.allHeroes.filter(hero => !usedHeroNames.includes(hero.name));
+        // Get base hero names from any Ascended heroes currently in formation
+        const currentBaseHeroNames = Object.values(currentFormation)
+            .filter(hero => hero !== null)
+            .map(hero => {
+                const heroInfo = this.heroSelection.getCardInfo(hero.name);
+                if (heroInfo && heroInfo.subtype === 'Ascended' && heroInfo.baseHero) {
+                    return heroInfo.baseHero;
+                }
+                return null;
+            })
+            .filter(baseHero => baseHero !== null);
+        
+        // Filter out already used heroes and their base forms
+        const availableHeroes = this.allHeroes.filter(hero => {
+            // Skip if hero is already in formation
+            if (usedHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Skip if hero's base form is already in play as an Ascended version
+            if (currentBaseHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Check if hero has "Ascended" subtype and exclude it
+            const heroInfo = this.heroSelection.getCardInfo(hero.name);
+            if (heroInfo && heroInfo.subtype === 'Ascended') {
+                return false;
+            }
+            
+            return true;
+        });
         
         if (availableHeroes.length === 0) {
             return [];

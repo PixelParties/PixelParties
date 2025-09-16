@@ -103,10 +103,57 @@ export class HeroSpellbookManager {
         return true;
     }
 
-    // NEW: Toggle enabled state of a specific spell by index
+    // Check if a hero's spellbook is locked
+    isSpellbookLocked(heroPosition) {
+        if (!this.formationManager) return false;
+        
+        const formation = this.formationManager.getBattleFormation();
+        const hero = formation?.[heroPosition];
+        return hero?.spellbookLocked || false;
+    }
+
+    // Lock spellbook and reactivate all spells
+    lockHeroSpellbook(heroPosition) {
+        if (!this.formationManager) return false;
+        
+        const formation = this.formationManager.getBattleFormation();
+        const hero = formation?.[heroPosition];
+        if (!hero) return false;
+        
+        // Set the lock flag
+        hero.spellbookLocked = true;
+        
+        // Reactivate all disabled spells
+        const spellbook = this.heroSpellbooks[heroPosition];
+        let reactivatedCount = 0;
+        
+        spellbook.forEach(spell => {
+            if (spell.enabled === false) {
+                spell.enabled = true;
+                reactivatedCount++;
+            }
+        });
+        
+        console.log(`🔒 Locked spellbook for ${hero.name} and reactivated ${reactivatedCount} spells`);
+        
+        // Notify state change
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
+        
+        return true;
+    }
+
+    // Modified toggleSpellEnabled method
     toggleSpellEnabled(heroPosition, spellIndex) {
         if (!this.heroSpellbooks.hasOwnProperty(heroPosition)) {
             console.error(`Invalid hero position: ${heroPosition}`);
+            return false;
+        }
+
+        // Check if spellbook is locked
+        if (this.isSpellbookLocked(heroPosition)) {
+            console.log(`🔒 Cannot toggle spell - spellbook is locked for ${heroPosition}`);
             return false;
         }
 
@@ -129,7 +176,7 @@ export class HeroSpellbookManager {
         return spellbook[spellIndex].enabled;
     }
 
-    // NEW: Check if a specific spell is enabled
+    // Check if a specific spell is enabled
     isSpellEnabled(heroPosition, spellIndex) {
         if (!this.heroSpellbooks.hasOwnProperty(heroPosition)) {
             return false;

@@ -44,6 +44,27 @@ export class FormationManager {
         return { ...this.opponentBattleFormation };
     }
 
+    // Update hero at specific position (for ascension transformations)
+    updateHeroAtPosition(position, newHeroData) {
+        if (!['left', 'center', 'right'].includes(position)) {
+            console.error('Invalid position for hero update:', position);
+            return false;
+        }
+        
+        // Ensure we don't lose any existing hero data by merging
+        if (this.battleFormation[position]) {
+            this.battleFormation[position] = { 
+                ...this.battleFormation[position], // Preserve existing data
+                ...newHeroData // Apply new hero data (name, image, stats, etc.)
+            };
+        } else {
+            // If slot was empty, just set the new hero data
+            this.battleFormation[position] = { ...newHeroData };
+        }
+        
+        return true;
+    }
+
     // Align opponent's formation since players face each other across the battlefield
     alignOpponentFormation(opponentFormation) {
         if (!opponentFormation) return { left: null, center: null, right: null };

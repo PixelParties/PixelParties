@@ -27,18 +27,108 @@ export class ResistanceManager {
 
     // Initialize resistance for one side's heroes
     initializeResistanceForSide(side, heroes) {
+        console.log(`🛡️ RESISTANCE DEBUG: Initializing resistance for ${side} side`);
+        
         ['left', 'center', 'right'].forEach(position => {
             const hero = heroes[position];
-            if (hero && hero.hasAbility('Resistance')) {
-                const resistanceLevel = hero.getAbilityStackCount('Resistance');
+            
+            console.log(`🛡️ RESISTANCE DEBUG: Checking ${side} ${position}:`);
+            console.log(`  - Hero exists: ${!!hero}`);
+            
+            if (!hero) {
+                console.log(`  - No hero at ${side} ${position}, skipping`);
+                return;
+            }
+            
+            console.log(`  - Hero name: ${hero.name}`);
+            console.log(`  - Hero has Resistance ability: ${hero.hasAbility ? hero.hasAbility('Resistance') : 'hasAbility method missing'}`);
+            console.log(`  - Hero spellShields value: ${hero.spellShields} (type: ${typeof hero.spellShields})`);
+            console.log(`  - Hero spellShields > 0: ${hero.spellShields && hero.spellShields > 0}`);
+            
+            const hasResistanceAbility = hero.hasAbility && hero.hasAbility('Resistance');
+            const hasSpellShields = hero.spellShields && hero.spellShields > 0;
+            
+            if (hasResistanceAbility || hasSpellShields) {
                 const key = this.getHeroKey(side, position);
+                let baseResistanceLevel = 0;
+                let spellShieldBonus = 0;
                 
-                this.resistanceStacks[key] = resistanceLevel;
+                // Get base resistance if hero has the ability
+                if (hasResistanceAbility) {
+                    baseResistanceLevel = hero.getAbilityStackCount('Resistance');
+                    console.log(`  - Base Resistance level: ${baseResistanceLevel}`);
+                }
+                
+                // Get spell shield bonus
+                if (hasSpellShields) {
+                    spellShieldBonus = hero.spellShields;
+                    console.log(`  - Spell Shield bonus: ${spellShieldBonus}`);
+                    
+                    // Reset spell shields after applying them
+                    console.log(`  - Resetting hero.spellShields from ${hero.spellShields} to 0`);
+                    hero.spellShields = 0;
+                    
+                    // Add combat log message if available
+                    if (this.battleManager && this.battleManager.addCombatLog) {
+                        this.battleManager.addCombatLog(
+                            `🛡️ ${hero.name} gains +${spellShieldBonus} resistance from Anti-Magic Shield!`,
+                            side === 'player' ? 'success' : 'info'
+                        );
+                    }
+                }
+                
+                const totalResistance = baseResistanceLevel + spellShieldBonus;
+                console.log(`  - Total resistance: ${totalResistance} (${baseResistanceLevel} base + ${spellShieldBonus} shield)`);
+                
+                this.resistanceStacks[key] = totalResistance;
                 
                 // Store in hero's custom stats for persistence
-                hero.customStats.resistanceStacks = resistanceLevel;
+                hero.customStats.resistanceStacks = totalResistance;
+                
+                console.log(`  - Set resistanceStacks[${key}] = ${totalResistance}`);
+                console.log(`  - Set hero.customStats.resistanceStacks = ${totalResistance}`);
+            } else {
+                console.log(`  - Hero has no resistance ability and no spell shields, skipping`);
             }
         });
+        
+        console.log(`🛡️ RESISTANCE DEBUG: Final resistance stacks for ${side}:`, this.resistanceStacks);
+        
+        // Save the updated hero data back to heroSelection after resetting spell shields
+        this.saveSpellShieldChangesToHeroSelection(side, heroes);
+    }
+
+    saveSpellShieldChangesToHeroSelection(side, heroes) {
+        try {
+            // Only save for the player's side (we don't manage opponent's persistent data)
+            if (side === 'player' && typeof window !== 'undefined' && window.heroSelection) {
+                const heroSelection = window.heroSelection;
+                
+                if (heroSelection.formationManager) {
+                    const formation = heroSelection.formationManager.getBattleFormation();
+                    
+                    ['left', 'center', 'right'].forEach(position => {
+                        const hero = heroes[position];
+                        if (hero && formation[position]) {
+                            // Update the formation data with the reset spell shields
+                            formation[position].spellShields = hero.spellShields || 0;
+                        }
+                    });
+                    
+                    // Update the formation
+                    heroSelection.formationManager.battleFormation = formation;
+                    
+                    // Save the game state to persist the changes
+                    if (heroSelection.saveGameState) {
+                        heroSelection.saveGameState();
+                    }
+                    
+                    console.log(`💾 Saved spell shield changes for ${side} side`);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error saving spell shield changes:', error);
+        }
     }
 
     // ============================================

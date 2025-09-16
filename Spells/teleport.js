@@ -148,10 +148,38 @@ export const teleportSpell = {
             .filter(hero => hero !== null)
             .map(hero => hero.name);
         
-        // Get all available heroes excluding current ones
-        return heroSelection.allCharacters.filter(hero => 
-            !currentHeroNames.includes(hero.name)
-        );
+        // Get base hero names from any Ascended heroes currently in formation
+        const currentBaseHeroNames = Object.values(formation)
+            .filter(hero => hero !== null)
+            .map(hero => {
+                const heroInfo = heroSelection.getCardInfo(hero.name);
+                if (heroInfo && heroInfo.subtype === 'Ascended' && heroInfo.baseHero) {
+                    return heroInfo.baseHero;
+                }
+                return null;
+            })
+            .filter(baseHero => baseHero !== null);
+
+        // Get all available heroes excluding current ones and Ascended heroes
+        return heroSelection.allCharacters.filter(hero => {
+            // Skip if hero is already in formation
+            if (currentHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Skip if hero's base form is already in play as an Ascended version
+            if (currentBaseHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Check if hero has "Ascended" subtype
+            const heroInfo = heroSelection.getCardInfo(hero.name);
+            if (heroInfo && heroInfo.subtype === 'Ascended') {
+                return false;
+            }
+            
+            return true;
+        });
     },
     
     // Calculate the highest MagicArts level among all current heroes

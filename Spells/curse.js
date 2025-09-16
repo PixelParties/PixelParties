@@ -5,8 +5,6 @@ export class CurseSpell {
         this.battleManager = battleManager;
         this.spellName = 'Curse';
         this.displayName = 'Curse';
-        
-        console.log('🌑 Curse spell module initialized');
     }
 
     // ============================================
@@ -15,8 +13,6 @@ export class CurseSpell {
 
     // Execute Curse spell effect
     async executeSpell(caster, spell) {
-        console.log(`🌑 ${caster.name} casting ${this.displayName}!`);
-        
         // Calculate status effect stacks based on DecayMagic level
         const stacks = this.calculateCurseStacks(caster);
         
@@ -24,7 +20,6 @@ export class CurseSpell {
         const target = this.findRandomEnemyHero(caster);
         
         if (!target) {
-            console.log(`🌑 ${this.displayName}: No valid target found!`);
             return;
         }
 
@@ -33,7 +28,7 @@ export class CurseSpell {
             this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (isResisted) {
-            console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);
+            // Resistance manager will handle the log message
         } else {
             // Log the spell effect only if not resisted
             this.logSpellEffect(caster, stacks, target);
@@ -41,8 +36,6 @@ export class CurseSpell {
         
         // Play curse animation (effects will only be applied if not resisted)
         await this.playCurseAnimation(caster, target, stacks, isResisted);
-        
-        console.log(`🌑 ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -51,14 +44,12 @@ export class CurseSpell {
 
     // Calculate curse stacks: 2 + floor(0.5 * DecayMagic level)
     calculateCurseStacks(caster) {
-        // Get DecayMagic level (defaults to 0 if hero doesn't have the ability)
+        // Get DecayMagic level (defaults to 1 if hero doesn't have the ability or has level 0)
         const decayMagicLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
+            : 1;
         
         const stacks = 2 + Math.floor(0.5 * decayMagicLevel);
-        
-        console.log(`🌑 ${caster.name} DecayMagic level ${decayMagicLevel}: ${stacks} curse stacks`);
         
         return stacks;
     }
@@ -88,15 +79,12 @@ export class CurseSpell {
         });
         
         if (aliveEnemyHeroes.length === 0) {
-            console.log(`🌑 ${this.displayName} found no alive enemy heroes!`);
             return null;
         }
         
         // Pick a random enemy hero
         const randomIndex = this.battleManager.getRandomInt(0, aliveEnemyHeroes.length - 1);
         const target = aliveEnemyHeroes[randomIndex];
-        
-        console.log(`🎯 ${this.displayName} targeting hero: ${target.hero.name} (${target.position} slot)`);
         
         return target;
     }
@@ -124,14 +112,11 @@ export class CurseSpell {
             );
             
             if (weakenedSuccess && silencedSuccess) {
-                console.log(`🌑 Successfully applied ${stacks} weakened and ${stacks} silenced stacks to ${actualTarget.name}`);
                 return true;
             } else {
-                console.error(`🌑 Failed to apply curse effects to ${actualTarget.name}`);
                 return false;
             }
         } else {
-            console.error('🌑 Status effects manager not available!');
             return false;
         }
     }
@@ -142,13 +127,10 @@ export class CurseSpell {
 
     // Play the curse animation with dark clouds and skulls
     async playCurseAnimation(caster, target, stacks, isResisted = false) {
-        console.log(`🌑 Playing Curse animation from ${caster.name} to ${target.hero.name}... (resisted: ${isResisted})`);
-        
         // Get target element
         const targetElement = this.battleManager.getHeroElement(target.side, target.position);
         
         if (!targetElement) {
-            console.error('Could not find target element for curse animation');
             // Still apply the curse effect even if animation fails (unless resisted)
             if (!isResisted) {
                 this.applyCurseToTarget(target, stacks);
@@ -481,8 +463,6 @@ export class CurseSpell {
         
         // Play visual effects on guest side (no status effect application)
         this.playCurseAnimationGuestSide(mockCaster, mockTarget, curseStacks, isResisted);
-        
-        console.log(`🌑 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''} (${curseStacks} stacks)`);
     }
 
     // Guest-side animation (visual only, no status effect application)
@@ -491,7 +471,6 @@ export class CurseSpell {
         const targetElement = this.battleManager.getHeroElement(target.side, target.position);
         
         if (!targetElement) {
-            console.error('Could not find target element for guest curse animation');
             return;
         }
         
@@ -552,8 +531,6 @@ export class CurseSpell {
         // Remove CSS if needed
         const css = document.getElementById('curseSpellCSS');
         if (css) css.remove();
-        
-        console.log('🌑 Curse spell cleaned up');
     }
 }
 

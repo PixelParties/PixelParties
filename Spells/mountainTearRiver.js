@@ -115,11 +115,14 @@ export class MountainTearRiverSpell {
             ? caster.getAbilityStackCount('DestructionMagic') 
             : 0;
         
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, destructionLevel);
+        
         // Add 1 stack for every 3 levels of DestructionMagic
-        const bonusStacks = Math.floor(destructionLevel / 3);
+        const bonusStacks = Math.floor(effectiveLevel / 3);
         const totalStacks = baseBurnStacks + bonusStacks;
         
-        console.log(`🌋 ${caster.name} DestructionMagic level ${destructionLevel}: ${totalStacks} burn stacks (${baseBurnStacks} base + ${bonusStacks} bonus)`);
+        console.log(`🌋 ${caster.name} DestructionMagic level ${destructionLevel} (effective: ${effectiveLevel}): ${totalStacks} burn stacks (${baseBurnStacks} base + ${bonusStacks} bonus)`);
         
         return totalStacks;
     }
@@ -790,7 +793,7 @@ export class MountainTearRiverSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'A flowing river of molten lava that engulfs all enemies, applying burn stacks. Burn causes damage over time.',
-            burnFormula: '1 + floor(DestructionMagic level / 3) burn stacks',
+            burnFormula: '1 + floor(max(1, DestructionMagic level) / 3) burn stacks',
             targetType: 'all_enemies',
             spellSchool: 'DestructionMagic',
             specialEffects: ['Applies Burn status effect instead of direct damage']

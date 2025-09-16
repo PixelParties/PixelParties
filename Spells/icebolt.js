@@ -5,8 +5,6 @@ export class IceboltSpell {
         this.battleManager = battleManager;
         this.spellName = 'Icebolt';
         this.displayName = 'Icebolt';
-        
-        console.log('🧊 Icebolt spell module initialized');
     }
 
     // ============================================
@@ -15,8 +13,6 @@ export class IceboltSpell {
 
     // Execute Icebolt spell effect
     async executeSpell(caster, spell) {
-        console.log(`🧊 ${caster.name} casting ${this.displayName}!`);
-        
         // Calculate frozen stacks based on DecayMagic level
         const frozenStacks = this.calculateFrozenStacks(caster);
         
@@ -24,7 +20,6 @@ export class IceboltSpell {
         const target = this.findTarget(caster);
         
         if (!target) {
-            console.log(`🧊 ${this.displayName}: No valid target found!`);
             return;
         }
 
@@ -33,7 +28,7 @@ export class IceboltSpell {
             this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (isResisted) {
-            console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);
+            // Resistance manager will handle the log message
         } else {
             // Log the spell effect only if not resisted
             this.logSpellEffect(caster, frozenStacks, target);
@@ -41,8 +36,6 @@ export class IceboltSpell {
         
         // Play icebolt animation (frozen will only be applied if not resisted, but ice animation always shows)
         await this.playIceboltAnimation(caster, target, frozenStacks, isResisted);
-        
-        console.log(`🧊 ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -51,10 +44,10 @@ export class IceboltSpell {
 
     // Calculate frozen stacks: 1 + floor(DecayMagic level / 2) + 1 if caster is Gon
     calculateFrozenStacks(caster) {
-        // Get DecayMagic level (defaults to 0 if hero doesn't have the ability)
+        // Get DecayMagic level (defaults to 1 if hero doesn't have the ability or has level 0)
         const decayMagicLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
+            : 1;
         
         const additionalStacks = Math.floor(decayMagicLevel / 2);
         let frozenStacks = 1 + additionalStacks;
@@ -62,13 +55,6 @@ export class IceboltSpell {
         // Special bonus for Gon
         const gonBonus = caster.name === 'Gon' ? 1 : 0;
         frozenStacks += gonBonus;
-        
-        let logDetails = `1 base + ${additionalStacks} from DecayMagic`;
-        if (gonBonus > 0) {
-            logDetails += ` + ${gonBonus} from Gon's mastery`;
-        }
-        
-        console.log(`🧊 ${caster.name} DecayMagic level ${decayMagicLevel}: ${frozenStacks} frozen stacks (${logDetails})`);
         
         return frozenStacks;
     }
@@ -83,16 +69,6 @@ export class IceboltSpell {
             caster.position, 
             caster.side
         );
-        
-        if (target) {
-            if (target.type === 'creature') {
-                console.log(`🎯 ${this.displayName} targeting creature: ${target.creature.name} (${target.position} slot)`);
-            } else {
-                console.log(`🎯 ${this.displayName} targeting hero: ${target.hero.name} (${target.position} slot)`);
-            }
-        } else {
-            console.log(`🎯 ${this.displayName} found no valid targets!`);
-        }
         
         return target;
     }
@@ -122,14 +98,11 @@ export class IceboltSpell {
             );
             
             if (success) {
-                console.log(`🧊 Successfully applied ${frozenStacks} frozen stacks to ${actualTarget.name}`);
                 return true;
             } else {
-                console.error(`🧊 Failed to apply frozen to ${actualTarget.name}`);
                 return false;
             }
         } else {
-            console.error('🧊 Status effects manager not available!');
             return false;
         }
     }
@@ -140,8 +113,6 @@ export class IceboltSpell {
 
     // Play the icebolt projectile and ice formation animation
     async playIceboltAnimation(caster, target, frozenStacks, isResisted = false) {
-        console.log(`🧊 Playing Icebolt animation from ${caster.name} to target... (resisted: ${isResisted})`);
-        
         // Get caster and target elements
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         let targetElement;
@@ -157,7 +128,6 @@ export class IceboltSpell {
         }
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for icebolt animation');
             // Still apply the frozen effect even if animation fails (unless resisted)
             if (!isResisted) {
                 this.applyFrozenToTarget(target, frozenStacks);
@@ -548,8 +518,6 @@ export class IceboltSpell {
         
         // Play visual effects on guest side (no frozen application)
         this.playIceboltAnimationGuestSide(mockCaster, mockTarget, frozenStacks, isResisted);
-        
-        console.log(`🧊 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''}${hasGonBonus ? ' (Gon bonus)' : ''} (${frozenStacks} frozen stacks)`);
     }
 
     // Guest-side animation (visual only, no frozen application)
@@ -568,7 +536,6 @@ export class IceboltSpell {
         }
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for guest icebolt animation');
             return;
         }
         
@@ -634,8 +601,6 @@ export class IceboltSpell {
         // Remove CSS if needed
         const css = document.getElementById('iceboltCSS');
         if (css) css.remove();
-        
-        console.log('🧊 Icebolt spell cleaned up');
     }
 }
 

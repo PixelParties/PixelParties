@@ -99,14 +99,17 @@ export class HasteSpell {
 
     // Calculate number of targets based on SupportMagic level
     calculateTargetCount(caster) {
-        // Get SupportMagic level (defaults to 1 if hero doesn't have the ability)
+        // Get SupportMagic level (defaults to 0 if hero doesn't have the ability)
         const supportMagicLevel = caster.hasAbility('SupportMagic') 
             ? caster.getAbilityStackCount('SupportMagic') 
-            : 1;
+            : 0;
         
-        console.log(`⚡ ${caster.name} SupportMagic level ${supportMagicLevel}: targeting up to ${supportMagicLevel} allies`);
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, supportMagicLevel);
         
-        return supportMagicLevel;
+        console.log(`⚡ ${caster.name} SupportMagic level ${supportMagicLevel} (effective: ${effectiveLevel}): targeting up to ${effectiveLevel} allies`);
+        
+        return effectiveLevel;
     }
 
     // Find random ally targets (heroes and creatures)
@@ -700,7 +703,7 @@ export class HasteSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Grants additional actions to random ally targets based on SupportMagic level. Each copy usable once per battle.',
-            effectFormula: 'Up to X targets (X = SupportMagic level)',
+            effectFormula: 'Up to max(1, SupportMagic level) targets',
             targetType: 'random_allies',
             spellSchool: 'SupportMagic',
             usageLimit: 'Once per copy per battle'

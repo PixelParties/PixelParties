@@ -51,7 +51,7 @@ export class OverflowingChalicePotion {
             
             if (effectCount > 1) {
                 battleManager.addCombatLog(
-                    `🏆 Mystical Chalice ${chaliceIndex + 1} of ${effectCount} empowers ${randomHero.name}!`, 
+                    `🏆 Overflowing Chalice ${chaliceIndex + 1} of ${effectCount} empowers ${randomHero.name}!`, 
                     'info'
                 );
             }

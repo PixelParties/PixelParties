@@ -146,9 +146,12 @@ export class FlameAvalancheSpell {
             ? caster.getAbilityStackCount('DestructionMagic') 
             : 0;
         
-        const totalDamage = baseDamage + (perLevelDamage * destructionLevel);
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, destructionLevel);
         
-        console.log(`🔥 ${caster.name} DestructionMagic level ${destructionLevel}: ${totalDamage} damage`);
+        const totalDamage = baseDamage + (perLevelDamage * effectiveLevel);
+        
+        console.log(`🔥 ${caster.name} DestructionMagic level ${destructionLevel} (effective: ${effectiveLevel}): ${totalDamage} damage`);
         
         return totalDamage;
     }
@@ -788,7 +791,7 @@ export class FlameAvalancheSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'A powerful barrage of flames that hits all enemies on the battlefield. When cast by Ida, applies additional flame damage to non-resisted targets.',
-            damageFormula: '60 + 30 × DestructionMagic level',
+            damageFormula: '40 + 20 × max(1, DestructionMagic level)',
             targetType: 'all_enemies',
             spellSchool: 'DestructionMagic',
             specialEffects: ['Ida: +50 flame damage to non-resisted targets']

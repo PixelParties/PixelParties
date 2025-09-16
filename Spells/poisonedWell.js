@@ -109,10 +109,13 @@ export class PoisonedWellSpell {
             ? caster.getAbilityStackCount('DecayMagic') 
             : 0;
         
-        // Minimum 1 stack even without DecayMagic
-        const poisonStacks = Math.max(1, decayMagicLevel);
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, decayMagicLevel);
         
-        console.log(`☔ ${caster.name} DecayMagic level ${decayMagicLevel}: ${poisonStacks} poison stacks to all enemies`);
+        // Poison stacks equals effective level
+        const poisonStacks = effectiveLevel;
+        
+        console.log(`☔ ${caster.name} DecayMagic level ${decayMagicLevel} (effective: ${effectiveLevel}): ${poisonStacks} poison stacks to all enemies`);
         
         return poisonStacks;
     }
@@ -741,7 +744,7 @@ export class PoisonedWellSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Creates a poisonous rain that falls across the entire enemy side, applying poison to all enemy targets. When cast by Ida, applies additional flame damage to non-resisted targets.',
-            effectFormula: 'DecayMagic level poison stacks (minimum 1) to all enemies',
+            effectFormula: 'max(1, DecayMagic level) poison stacks to all enemies',
             targetType: 'all_enemies',
             spellSchool: 'DecayMagic',
             specialEffects: ['Ida: +50 flame damage to non-resisted targets']

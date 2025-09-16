@@ -5,8 +5,6 @@ export class FireshieldSpell {
         this.battleManager = battleManager;
         this.spellName = 'Fireshield';
         this.displayName = 'Fireshield';
-        
-        console.log('🛡️ Fireshield spell module initialized');
     }
 
     // ============================================
@@ -15,8 +13,6 @@ export class FireshieldSpell {
 
     // Execute Fireshield spell effect
     async executeSpell(caster, spell) {
-        console.log(`🛡️ ${caster.name} casting ${this.displayName}!`);
-        
         // Apply fireshield buff to caster
         this.applyFireshieldBuff(caster);
         
@@ -25,8 +21,6 @@ export class FireshieldSpell {
         
         // Play fireshield visual effect
         await this.playFireshieldAnimation(caster);
-        
-        console.log(`🛡️ ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -46,11 +40,9 @@ export class FireshieldSpell {
         
         // Calculate recoil damage for display
         const destructionLevel = caster.hasAbility('DestructionMagic') 
-            ? caster.getAbilityStackCount('DestructionMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DestructionMagic'))
+            : 1;
         const recoilDamage = 20 * destructionLevel * currentStacks;
-        
-        console.log(`🛡️ ${caster.name} now has ${currentStacks} Fireshield stacks (${recoilDamage} recoil damage)`);
         
         // Store the turn when this fireshield was cast (for timing mechanics)
         const fireshieldEffect = caster.statusEffects.find(effect => effect.name === 'fireshield');
@@ -119,12 +111,10 @@ export class FireshieldSpell {
     calculateRecoilDamage(defender) {
         const fireshieldStacks = this.getFireshieldStacks(defender);
         const destructionLevel = defender.hasAbility('DestructionMagic') 
-            ? defender.getAbilityStackCount('DestructionMagic') 
-            : 0;
+            ? Math.max(1, defender.getAbilityStackCount('DestructionMagic'))
+            : 1;
         
         const recoilDamage = 20 * destructionLevel * fireshieldStacks;
-        
-        console.log(`🛡️ Fireshield recoil: ${fireshieldStacks} stacks × ${destructionLevel} DestructionMagic × 20 = ${recoilDamage} damage`);
         
         return recoilDamage;
     }
@@ -160,13 +150,10 @@ export class FireshieldSpell {
 
     // Play the fireshield casting animation and create persistent fire ring
     async playFireshieldAnimation(caster) {
-        console.log(`🛡️ Playing Fireshield animation for ${caster.name}...`);
-        
         // Get caster element
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         
         if (!casterElement) {
-            console.error('Could not find caster element for fireshield animation');
             return;
         }
         
@@ -286,8 +273,6 @@ export class FireshieldSpell {
         }
         
         heroElement.appendChild(fireRing);
-        
-        console.log(`🛡️ Created persistent fire ring for ${hero.name} with ${stacks} stacks`);
     }
 
     // Create recoil visual effect when attacker takes damage
@@ -324,8 +309,6 @@ export class FireshieldSpell {
 
     // Restore all fireshield visual effects (called on reconnection)
     restoreFireshieldVisuals() {
-        console.log('🛡️ Restoring Fireshield visual effects...');
-        
         // Restore for all heroes on both sides
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
@@ -337,7 +320,6 @@ export class FireshieldSpell {
                     const heroElement = this.battleManager.getHeroElement(side, position);
                     if (heroElement) {
                         this.createPersistentFireRing(heroElement, hero);
-                        console.log(`🛡️ Restored fire ring for ${hero.name} (${this.getFireshieldStacks(hero)} stacks)`);
                     }
                 }
             });
@@ -346,8 +328,6 @@ export class FireshieldSpell {
 
     // Remove fireshield effects when a hero dies
     removeFireshieldOnDeath(hero, side, position) {
-        console.log(`🛡️ Removing fireshield effects for deceased ${hero.name}`);
-        
         // Clear fireshield status effects
         hero.statusEffects = hero.statusEffects.filter(effect => effect.name !== 'fireshield');
         
@@ -357,7 +337,6 @@ export class FireshieldSpell {
             const existingRing = heroElement.querySelector('.fireshield-ring');
             if (existingRing) {
                 existingRing.remove();
-                console.log(`🛡️ Removed fire ring for deceased ${hero.name}`);
             }
         }
     }
@@ -484,8 +463,8 @@ export class FireshieldSpell {
         
         const currentStacks = this.getFireshieldStacks(caster);
         const destructionLevel = caster.hasAbility('DestructionMagic') 
-            ? caster.getAbilityStackCount('DestructionMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DestructionMagic'))
+            : 1;
         const recoilDamage = 20 * destructionLevel * currentStacks;
         
         // Main spell effect log
@@ -552,8 +531,6 @@ export class FireshieldSpell {
                 this.createPersistentFireRing(heroElement, hero);
             }
         }
-        
-        console.log(`🛡️ GUEST: ${heroName} received fireshield buff (${newStacks} stacks)`);
     }
 
     // Handle spell effect on guest side
@@ -591,8 +568,6 @@ export class FireshieldSpell {
                 }
             }
         }
-        
-        console.log(`🛡️ GUEST: ${casterName} used ${displayName}`);
     }
 
     // ============================================
@@ -623,8 +598,6 @@ export class FireshieldSpell {
         // Remove CSS if needed
         const css = document.getElementById('fireshieldCSS');
         if (css) css.remove();
-        
-        console.log('🛡️ Fireshield spell cleaned up');
     }
 }
 

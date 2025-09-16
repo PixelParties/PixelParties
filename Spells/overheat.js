@@ -9,8 +9,6 @@ export class OverheatSpell {
         // Track equipment removed by Overheat (for restoration at battle end)
         // Structure: { heroAbsoluteSide: { heroPosition: [removedEquipmentData] } }
         this.removedEquipmentTracking = {};
-        
-        console.log('🔥 Overheat spell module initialized');
     }
 
     // ============================================
@@ -19,13 +17,10 @@ export class OverheatSpell {
 
     // Execute Overheat spell effect
     async executeSpell(caster, spell) {
-        console.log(`🔥 ${caster.name} attempting to cast ${this.displayName}!`);
-        
         // Find target hero with equipment
         const target = this.findTargetWithEquipment(caster);
         
         if (!target) {
-            console.log(`🔥 ${this.displayName}: No valid targets with equipment found! Spell skipped.`);
             this.battleManager.addCombatLog(
                 `🔥 ${caster.name}'s ${this.displayName} fizzles - no equipped enemies!`,
                 caster.side === 'player' ? 'info' : 'info'
@@ -38,7 +33,6 @@ export class OverheatSpell {
             this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (isResisted) {
-            console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);
             // Resistance manager will handle the log message
         } else {
             // Calculate how many equips to remove
@@ -58,8 +52,6 @@ export class OverheatSpell {
                 this.sendOverheatUpdate(caster, target, removedEquips, isResisted);
             }
         }
-        
-        console.log(`🔥 ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -106,7 +98,6 @@ export class OverheatSpell {
         // Randomly select from weighted array
         const selectedTarget = this.battleManager.getRandomChoice(weightedTargets);
         
-        console.log(`🎯 ${this.displayName} targeting ${selectedTarget.hero.name} with ${selectedTarget.equipmentCount} equipment(s)`);
         return selectedTarget;
     }
 
@@ -117,12 +108,10 @@ export class OverheatSpell {
     // Calculate how many equips to remove: X+1 (X = DecayMagic level)
     calculateEquipsToRemove(caster) {
         const decayLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
+            : 1;
         
         const equipsToRemove = decayLevel + 1;
-        
-        console.log(`🔥 ${caster.name} DecayMagic level ${decayLevel}: removing up to ${equipsToRemove} equipment(s)`);
         
         return equipsToRemove;
     }
@@ -135,8 +124,6 @@ export class OverheatSpell {
         // Get current equipment
         const currentEquipment = [...hero.equipment];
         const actualToRemove = Math.min(maxToRemove, currentEquipment.length);
-        
-        console.log(`🔥 Removing ${actualToRemove} equipment(s) from ${hero.name}`);
         
         // Randomly select equipment to remove
         const shuffledEquipment = this.battleManager.shuffleArray([...currentEquipment]);
@@ -152,8 +139,6 @@ export class OverheatSpell {
                     ...removed,
                     originalIndex: currentEquipment.indexOf(equipToRemove)
                 });
-                
-                console.log(`🔥 Removed ${equipName} from ${hero.name}`);
                 
                 // Create visual effect for each removed equipment
                 this.createEquipmentRemovalEffect(target, equipName, i);
@@ -196,8 +181,6 @@ export class OverheatSpell {
                 removedBySpell: this.spellName
             });
         });
-        
-        console.log(`📋 Tracking ${removedEquips.length} removed equipment(s) for restoration`);
     }
 
     // ============================================
@@ -206,13 +189,10 @@ export class OverheatSpell {
 
     // Play the overheat animation
     async playOverheatAnimation(caster, target, isResisted = false) {
-        console.log(`🔥 Playing Overheat animation on ${target.hero.name}... (resisted: ${isResisted})`);
-        
         // Get target element
         const targetElement = this.battleManager.getHeroElement(target.side, target.position);
         
         if (!targetElement) {
-            console.error('Could not find target element for overheat animation');
             return;
         }
         
@@ -619,8 +599,6 @@ export class OverheatSpell {
                 }
             }
         }
-        
-        console.log(`🔥 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''}`);
     }
 
     // ============================================
@@ -638,7 +616,6 @@ export class OverheatSpell {
     importState(state) {
         if (state && state.removedEquipmentTracking) {
             this.removedEquipmentTracking = JSON.parse(JSON.stringify(state.removedEquipmentTracking));
-            console.log('📋 Restored Overheat equipment tracking from saved state');
         }
     }
 
@@ -648,8 +625,6 @@ export class OverheatSpell {
 
     // Restore all equipment removed by Overheat
     restoreAllRemovedEquipment() {
-        console.log('🔧 Restoring equipment removed by Overheat...');
-        
         let totalRestored = 0;
         
         for (const key in this.removedEquipmentTracking) {
@@ -667,7 +642,6 @@ export class OverheatSpell {
                     removedItems.forEach(item => {
                         // Restore the equipment
                         hero.addEquipment(item);
-                        console.log(`🔧 Restored ${item.name || item.cardName} to ${hero.name}`);
                         totalRestored++;
                     });
                 }
@@ -675,7 +649,6 @@ export class OverheatSpell {
         }
         
         if (totalRestored > 0) {
-            console.log(`✅ Restored ${totalRestored} equipment piece(s) removed by Overheat`);
             this.battleManager.addCombatLog(
                 `🔧 All equipment overheated during battle has been restored!`,
                 'info'
@@ -744,8 +717,6 @@ export class OverheatSpell {
         
         // Clear tracking
         this.removedEquipmentTracking = {};
-        
-        console.log('🔥 Overheat spell cleaned up');
     }
 }
 

@@ -43,7 +43,10 @@ export class DarkDealSpell {
             ? caster.getAbilityStackCount('DecayMagic') 
             : 0;
         
-        const maxSteals = Math.max(1, decayMagicLevel); // At least 1, up to DecayMagic level
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, decayMagicLevel);
+        
+        const maxSteals = effectiveLevel; // Equal to effective DecayMagic level
         
         // Find living enemy creatures
         const enemyCreatures = this.findLivingEnemyCreatures(caster);
@@ -270,7 +273,7 @@ export class DarkDealSpell {
                 <span class="chain">⛓️</span>
             </div>
             <div class="shadow-hands">
-                <span class="hand">💤</span>
+                <span class="hand">👤</span>
                 <span class="hand">🖖</span>
             </div>
             <div class="corruption-aura">💀</div>
@@ -876,7 +879,7 @@ export class DarkDealSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Makes a deal with dark powers to steal up to X enemy creatures, where X is your DecayMagic level',
-            effectFormula: 'Steal up to (DecayMagic level) enemy creatures',
+            effectFormula: 'Steal up to max(1, DecayMagic level) enemy creatures',
             targetType: 'enemy_creatures',
             spellSchool: 'DecayMagic',
             canOnlyCastWhen: 'Enemies have living creatures'

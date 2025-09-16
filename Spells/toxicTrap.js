@@ -5,8 +5,6 @@ export class ToxicTrapSpell {
         this.battleManager = battleManager;
         this.spellName = 'ToxicTrap';
         this.displayName = 'Toxic Trap';
-        
-        console.log('🍄 ToxicTrap spell module initialized');
     }
 
     // ============================================
@@ -15,8 +13,6 @@ export class ToxicTrapSpell {
 
     // Execute ToxicTrap spell effect
     async executeSpell(caster, spell) {
-        console.log(`🍄 ${caster.name} casting ${this.displayName}!`);
-        
         // Apply toxicTrap buff to caster
         this.applyToxicTrapBuff(caster);
         
@@ -25,8 +21,6 @@ export class ToxicTrapSpell {
         
         // Play toxicTrap visual effect
         await this.playToxicTrapAnimation(caster);
-        
-        console.log(`🍄 ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -46,11 +40,9 @@ export class ToxicTrapSpell {
         
         // Calculate poison damage for display
         const decayLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
             : 0;
         const poisonStacks = currentStacks * (1 + Math.floor(decayLevel / 2));
-        
-        console.log(`🍄 ${caster.name} now has ${currentStacks} ToxicTrap stacks (${poisonStacks} poison stacks to attackers)`);
         
         // Store the turn when this toxicTrap was cast
         const toxicTrapEffect = caster.statusEffects.find(effect => effect.name === 'toxicTrap');
@@ -119,12 +111,10 @@ export class ToxicTrapSpell {
     calculatePoisonStacks(defender) {
         const toxicTrapStacks = this.getToxicTrapStacks(defender);
         const decayLevel = defender.hasAbility('DecayMagic') 
-            ? defender.getAbilityStackCount('DecayMagic') 
+            ? Math.max(1, defender.getAbilityStackCount('DecayMagic'))
             : 0;
         
         const poisonStacks = toxicTrapStacks * (1 + Math.floor(decayLevel / 2));
-        
-        console.log(`🍄 ToxicTrap trigger: ${toxicTrapStacks} stacks × (1 + floor(${decayLevel}/2)) = ${poisonStacks} poison stacks`);
         
         return poisonStacks;
     }
@@ -139,7 +129,6 @@ export class ToxicTrapSpell {
         if (this.battleManager.statusEffectsManager) {
             this.battleManager.statusEffectsManager.applyStatusEffect(attacker, 'poisoned', poisonStacks);
         } else {
-            console.error('StatusEffectsManager not available for toxic trap effect');
             return false;
         }
         
@@ -164,13 +153,10 @@ export class ToxicTrapSpell {
 
     // Play the toxicTrap casting animation and create persistent mushrooms
     async playToxicTrapAnimation(caster) {
-        console.log(`🍄 Playing ToxicTrap animation for ${caster.name}...`);
-        
         // Get caster element
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         
         if (!casterElement) {
-            console.error('Could not find caster element for toxicTrap animation');
             return;
         }
         
@@ -264,8 +250,6 @@ export class ToxicTrapSpell {
             
             heroElement.appendChild(mushroom);
         }
-        
-        console.log(`🍄 Created ${stacks} persistent mushrooms for ${hero.name}`);
     }
 
     // Create toxic trap trigger effect when an attack is blocked
@@ -334,8 +318,6 @@ export class ToxicTrapSpell {
 
     // Restore all toxicTrap visual effects (called on reconnection)
     restoreToxicTrapVisuals() {
-        console.log('🍄 Restoring ToxicTrap visual effects...');
-        
         // Restore for all heroes on both sides
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
@@ -347,7 +329,6 @@ export class ToxicTrapSpell {
                     const heroElement = this.battleManager.getHeroElement(side, position);
                     if (heroElement) {
                         this.createPersistentMushrooms(heroElement, hero);
-                        console.log(`🍄 Restored mushrooms for ${hero.name} (${this.getToxicTrapStacks(hero)} stacks)`);
                     }
                 }
             });
@@ -356,8 +337,6 @@ export class ToxicTrapSpell {
 
     // Remove toxicTrap effects when a hero dies
     removeToxicTrapOnDeath(hero, side, position) {
-        console.log(`🍄 Removing toxicTrap effects for deceased ${hero.name}`);
-        
         // Clear toxicTrap status effects
         hero.statusEffects = hero.statusEffects.filter(effect => effect.name !== 'toxicTrap');
         
@@ -366,7 +345,6 @@ export class ToxicTrapSpell {
         if (heroElement) {
             const existingMushrooms = heroElement.querySelectorAll('.toxic-trap-mushroom');
             existingMushrooms.forEach(mushroom => mushroom.remove());
-            console.log(`🍄 Removed mushrooms for deceased ${hero.name}`);
         }
     }
 
@@ -482,7 +460,7 @@ export class ToxicTrapSpell {
         
         const currentStacks = this.getToxicTrapStacks(caster);
         const decayLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
             : 0;
         const poisonStacks = currentStacks * (1 + Math.floor(decayLevel / 2));
         
@@ -550,8 +528,6 @@ export class ToxicTrapSpell {
                 this.createPersistentMushrooms(heroElement, hero);
             }
         }
-        
-        console.log(`🍄 GUEST: ${heroName} received toxicTrap buff (${newStacks} stacks)`);
     }
 
     // Handle spell effect on guest side
@@ -589,8 +565,6 @@ export class ToxicTrapSpell {
                 }
             }
         }
-        
-        console.log(`🍄 GUEST: ${casterName} used ${displayName}`);
     }
 
     // ============================================
@@ -621,8 +595,6 @@ export class ToxicTrapSpell {
         // Remove CSS if needed
         const css = document.getElementById('toxicTrapCSS');
         if (css) css.remove();
-        
-        console.log('🍄 ToxicTrap spell cleaned up');
     }
 }
 

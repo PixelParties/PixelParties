@@ -107,7 +107,7 @@ export class IceAgeSpell {
     }
 
     // ============================================
-    // FROZEN STACK CALCULATION (UNCHANGED)
+    // FROZEN STACK CALCULATION (FIXED)
     // ============================================
 
     // Calculate frozen stacks: 1 + floor(DecayMagic level / 2) + 1 if caster is Gon
@@ -117,7 +117,10 @@ export class IceAgeSpell {
             ? caster.getAbilityStackCount('DecayMagic') 
             : 0;
         
-        const additionalStacks = Math.floor(decayMagicLevel / 2);
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, decayMagicLevel);
+        
+        const additionalStacks = Math.floor(effectiveLevel / 2);
         let frozenStacks = 1 + additionalStacks;
         
         // Special bonus for Gon
@@ -129,7 +132,7 @@ export class IceAgeSpell {
             logDetails += ` + ${gonBonus} from Gon's mastery`;
         }
         
-        console.log(`❄️🌨️ ${caster.name} DecayMagic level ${decayMagicLevel}: ${frozenStacks} frozen stacks (${logDetails})`);
+        console.log(`❄️🌨️ ${caster.name} DecayMagic level ${decayMagicLevel} (effective: ${effectiveLevel}): ${frozenStacks} frozen stacks (${logDetails})`);
         
         return frozenStacks;
     }
@@ -312,8 +315,7 @@ export class IceAgeSpell {
                 rgba(240, 248, 255, 0.2) 25%,
                 rgba(255, 255, 255, 0.3) 50%,
                 rgba(240, 248, 255, 0.2) 75%,
-                rgba(255, 255, 255, 0.1) 100%
-            );
+                rgba(255, 255, 255, 0.1) 100%);
             border-radius: 15px;
             box-shadow: inset 0 0 50px rgba(255, 255, 255, 0.3);
         `;
@@ -637,7 +639,7 @@ export class IceAgeSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Unleashes a devastating snowstorm upon the battlefield, pausing time while hundreds of snowflakes and ice particles engulf all enemies. Applies frozen stacks to all enemy heroes and creatures.',
-            effectFormula: '1 frozen stack + floor(DecayMagic level / 2) additional stacks + 1 if caster is Gon (applied to ALL enemies)',
+            effectFormula: '1 frozen stack + floor(max(1, DecayMagic level) / 2) additional stacks + 1 if caster is Gon (applied to ALL enemies)',
             targetType: 'all_enemies',
             spellSchool: 'DecayMagic',
             pausesBattle: true,

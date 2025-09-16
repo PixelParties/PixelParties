@@ -5,8 +5,6 @@ export class FrostRuneSpell {
         this.battleManager = battleManager;
         this.spellName = 'FrostRune';
         this.displayName = 'Frost Rune';
-        
-        console.log('❄️ FrostRune spell module initialized');
     }
 
     // ============================================
@@ -15,8 +13,6 @@ export class FrostRuneSpell {
 
     // Execute FrostRune spell effect
     async executeSpell(caster, spell) {
-        console.log(`❄️ ${caster.name} casting ${this.displayName}!`);
-        
         // Apply frostRune buff to caster
         this.applyFrostRuneBuff(caster);
         
@@ -25,8 +21,6 @@ export class FrostRuneSpell {
         
         // Play frostRune visual effect
         await this.playFrostRuneAnimation(caster);
-        
-        console.log(`❄️ ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -48,8 +42,6 @@ export class FrostRuneSpell {
         const baseStacks = currentStacks;
         const gonBonus = caster.name === 'Gon' ? 1 : 0;
         const totalFrozenStacks = baseStacks + gonBonus;
-        
-        console.log(`❄️ ${caster.name} now has ${currentStacks} FrostRune stacks (${totalFrozenStacks} frozen stacks to attackers)`);
         
         // Store the turn when this frostRune was cast
         const frostRuneEffect = caster.statusEffects.find(effect => effect.name === 'frostRune');
@@ -127,8 +119,6 @@ export class FrostRuneSpell {
             frozenStacks += 1;
         }
         
-        console.log(`❄️ FrostRune trigger: ${frostRuneStacks} stacks${defender.name === 'Gon' ? ' + 1 (Gon bonus)' : ''} = ${frozenStacks} frozen stacks`);
-        
         return frozenStacks;
     }
 
@@ -142,7 +132,6 @@ export class FrostRuneSpell {
         if (this.battleManager.statusEffectsManager) {
             this.battleManager.statusEffectsManager.applyStatusEffect(attacker, 'frozen', frozenStacks);
         } else {
-            console.error('StatusEffectsManager not available for frost rune effect');
             return false;
         }
         
@@ -168,13 +157,10 @@ export class FrostRuneSpell {
 
     // Play the frostRune casting animation and create persistent snowflakes
     async playFrostRuneAnimation(caster) {
-        console.log(`❄️ Playing FrostRune animation for ${caster.name}...`);
-        
         // Get caster element
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         
         if (!casterElement) {
-            console.error('Could not find caster element for frostRune animation');
             return;
         }
         
@@ -268,8 +254,6 @@ export class FrostRuneSpell {
             
             heroElement.appendChild(snowflake);
         }
-        
-        console.log(`❄️ Created ${stacks} persistent snowflakes for ${hero.name}`);
     }
 
     // Create frost rune trigger effect when an attack is blocked
@@ -338,8 +322,6 @@ export class FrostRuneSpell {
 
     // Restore all frostRune visual effects (called on reconnection)
     restoreFrostRuneVisuals() {
-        console.log('❄️ Restoring FrostRune visual effects...');
-        
         // Restore for all heroes on both sides
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
@@ -351,7 +333,6 @@ export class FrostRuneSpell {
                     const heroElement = this.battleManager.getHeroElement(side, position);
                     if (heroElement) {
                         this.createPersistentSnowflakes(heroElement, hero);
-                        console.log(`❄️ Restored snowflakes for ${hero.name} (${this.getFrostRuneStacks(hero)} stacks)`);
                     }
                 }
             });
@@ -360,8 +341,6 @@ export class FrostRuneSpell {
 
     // Remove frostRune effects when a hero dies
     removeFrostRuneOnDeath(hero, side, position) {
-        console.log(`❄️ Removing frostRune effects for deceased ${hero.name}`);
-        
         // Clear frostRune status effects
         hero.statusEffects = hero.statusEffects.filter(effect => effect.name !== 'frostRune');
         
@@ -370,7 +349,6 @@ export class FrostRuneSpell {
         if (heroElement) {
             const existingSnowflakes = heroElement.querySelectorAll('.frost-rune-snowflake');
             existingSnowflakes.forEach(snowflake => snowflake.remove());
-            console.log(`❄️ Removed snowflakes for deceased ${hero.name}`);
         }
     }
 
@@ -554,8 +532,6 @@ export class FrostRuneSpell {
                 this.createPersistentSnowflakes(heroElement, hero);
             }
         }
-        
-        console.log(`❄️ GUEST: ${heroName} received frostRune buff (${newStacks} stacks)`);
     }
 
     // Handle spell effect on guest side
@@ -594,8 +570,6 @@ export class FrostRuneSpell {
                 }
             }
         }
-        
-        console.log(`❄️ GUEST: ${casterName} used ${displayName}`);
     }
 
     // ============================================
@@ -626,8 +600,6 @@ export class FrostRuneSpell {
         // Remove CSS if needed
         const css = document.getElementById('frostRuneCSS');
         if (css) css.remove();
-        
-        console.log('❄️ FrostRune spell cleaned up');
     }
 }
 

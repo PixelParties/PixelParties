@@ -80,10 +80,13 @@ export class ToxicFumesSpell {
             ? caster.getAbilityStackCount('DecayMagic') 
             : 0;
         
-        // Minimum 1 stack even without DecayMagic
-        const poisonStacks = Math.max(1, decayMagicLevel);
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, decayMagicLevel);
         
-        console.log(`💨 ${caster.name} DecayMagic level ${decayMagicLevel}: ${poisonStacks} poison stacks to all enemy creatures`);
+        // Poison stacks equals effective level
+        const poisonStacks = effectiveLevel;
+        
+        console.log(`💨 ${caster.name} DecayMagic level ${decayMagicLevel} (effective: ${effectiveLevel}): ${poisonStacks} poison stacks to all enemy creatures`);
         
         return poisonStacks;
     }
@@ -537,7 +540,7 @@ export class ToxicFumesSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Spreads toxic fumes that poison all enemy creatures. Can only be cast when opponents control living creatures.',
-            effectFormula: 'DecayMagic level poison stacks (minimum 1) to all enemy creatures',
+            effectFormula: 'max(1, DecayMagic level) poison stacks to all enemy creatures',
             targetType: 'all_enemy_creatures_only',
             spellSchool: 'DecayMagic',
             castingRequirement: 'Opponent must control 1+ living creatures'

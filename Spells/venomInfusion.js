@@ -5,8 +5,6 @@ export class VenomInfusionSpell {
         this.battleManager = battleManager;
         this.spellName = 'VenomInfusion';
         this.displayName = 'Venom Infusion';
-        
-        console.log('🐍 Venom Infusion spell module initialized');
     }
 
     // ============================================
@@ -15,8 +13,6 @@ export class VenomInfusionSpell {
 
     // Execute Venom Infusion spell effect
     async executeSpell(caster, spell) {
-        console.log(`🐍 ${caster.name} casting ${this.displayName}!`);
-        
         // Calculate poison stacks based on DecayMagic level
         const poisonStacks = this.calculatePoisonStacks(caster);
         
@@ -24,7 +20,6 @@ export class VenomInfusionSpell {
         const target = this.findTarget(caster);
         
         if (!target) {
-            console.log(`🐍 ${this.displayName}: No valid target found!`);
             return;
         }
 
@@ -33,7 +28,7 @@ export class VenomInfusionSpell {
             this.battleManager.resistanceManager.shouldResistSpell(target.hero, this.spellName, caster);
         
         if (isResisted) {
-            console.log(`🛡️ ${target.hero.name} resisted ${this.displayName}!`);
+            // Resistance manager will handle the log message
         } else {
             // Log the spell effect only if not resisted
             this.logSpellEffect(caster, poisonStacks, target);
@@ -41,24 +36,20 @@ export class VenomInfusionSpell {
         
         // Play venom infusion animation (poison will only be applied if not resisted)
         await this.playVenomInfusionAnimation(caster, target, poisonStacks, isResisted);
-        
-        console.log(`🐍 ${this.displayName} completed!`);
     }
 
     // ============================================
     // POISON STACK CALCULATION
     // ============================================
 
-    // Calculate poison stacks: X+1 (X = DecayMagic level)
+    // Calculate poison stacks: X+1 (X = DecayMagic level, minimum 1)
     calculatePoisonStacks(caster) {
-        // Get DecayMagic level (defaults to 0 if hero doesn't have the ability)
+        // Get DecayMagic level (defaults to 1 if hero doesn't have the ability or has level 0)
         const decayMagicLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
+            : 1;
         
         const poisonStacks = decayMagicLevel + 1;
-        
-        console.log(`🐍 ${caster.name} DecayMagic level ${decayMagicLevel}: ${poisonStacks} poison stacks`);
         
         return poisonStacks;
     }
@@ -73,16 +64,6 @@ export class VenomInfusionSpell {
             caster.position, 
             caster.side
         );
-        
-        if (target) {
-            if (target.type === 'creature') {
-                console.log(`🎯 ${this.displayName} targeting creature: ${target.creature.name} (${target.position} slot)`);
-            } else {
-                console.log(`🎯 ${this.displayName} targeting hero: ${target.hero.name} (${target.position} slot)`);
-            }
-        } else {
-            console.log(`🎯 ${this.displayName} found no valid targets!`);
-        }
         
         return target;
     }
@@ -112,14 +93,11 @@ export class VenomInfusionSpell {
             );
             
             if (success) {
-                console.log(`🐍 Successfully applied ${poisonStacks} poison stacks to ${actualTarget.name}`);
                 return true;
             } else {
-                console.error(`🐍 Failed to apply poison to ${actualTarget.name}`);
                 return false;
             }
         } else {
-            console.error('🐍 Status effects manager not available!');
             return false;
         }
     }
@@ -130,8 +108,6 @@ export class VenomInfusionSpell {
 
     // Play the venom infusion projectile and poison application animation
     async playVenomInfusionAnimation(caster, target, poisonStacks, isResisted = false) {
-        console.log(`🐍 Playing Venom Infusion animation from ${caster.name} to target... (resisted: ${isResisted})`);
-        
         // Get caster and target elements
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         let targetElement;
@@ -147,7 +123,6 @@ export class VenomInfusionSpell {
         }
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for venom infusion animation');
             // Still apply the poison effect even if animation fails (unless resisted)
             if (!isResisted) {
                 this.applyPoisonToTarget(target, poisonStacks);
@@ -529,8 +504,6 @@ export class VenomInfusionSpell {
         
         // Play visual effects on guest side (no poison application)
         this.playVenomInfusionAnimationGuestSide(mockCaster, mockTarget, poisonStacks, isResisted);
-        
-        console.log(`🐍 GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''} (${poisonStacks} poison stacks)`);
     }
 
     // Guest-side animation (visual only, no poison application)
@@ -549,7 +522,6 @@ export class VenomInfusionSpell {
         }
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for guest venom infusion animation');
             return;
         }
         
@@ -615,8 +587,6 @@ export class VenomInfusionSpell {
         // Remove CSS if needed
         const css = document.getElementById('venomInfusionCSS');
         if (css) css.remove();
-        
-        console.log('🐍 Venom Infusion spell cleaned up');
     }
 }
 

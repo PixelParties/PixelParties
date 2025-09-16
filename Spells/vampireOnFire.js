@@ -38,8 +38,11 @@ export class VampireOnFireSpell {
             ? caster.getAbilityStackCount('DestructionMagic') 
             : 0;
         
-        const healBlockStacks = destructionLevel + 1; // X + 1
-        const damage = 10 + (10 * destructionLevel); // 10 + 10*X
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, destructionLevel);
+        
+        const healBlockStacks = effectiveLevel + 1; // X + 1
+        const damage = 10 + (10 * effectiveLevel); // 10 + 10*X
         
         // Find all enemy targets
         const allTargets = this.findAllEnemyTargets(caster);
@@ -702,8 +705,8 @@ export class VampireOnFireSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Sickly green flames engulf all enemies, applying heal-block first then damage. Heal-block prevents revival.',
-            damageFormula: '10 + 10*DestructionMagic level damage',
-            healBlockFormula: 'DestructionMagic level + 1 heal-block stacks',
+            damageFormula: '10 + 10 × max(1, DestructionMagic level) damage',
+            healBlockFormula: 'max(1, DestructionMagic level) + 1 heal-block stacks',
             targetType: 'all_enemies',
             spellSchool: 'DestructionMagic',
             specialEffects: ['Applies heal-block before damage to prevent revival']

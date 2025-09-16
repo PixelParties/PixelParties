@@ -5,8 +5,6 @@ export class IcyGraveSpell {
         this.battleManager = battleManager;
         this.spellName = 'IcyGrave';
         this.displayName = 'Icy Grave';
-        
-        console.log('⚰️❄️ IcyGrave spell module initialized');
     }
 
     // ============================================
@@ -15,17 +13,12 @@ export class IcyGraveSpell {
 
     // Execute IcyGrave spell effect
     async executeSpell(caster, spell) {
-        console.log(`⚰️ ${caster.name} casting ${this.displayName}!`);
-        
         // Find random enemy hero target
         const target = this.findRandomEnemyHero(caster);
         
         if (!target) {
-            console.log(`⚰️ ${this.displayName}: No valid enemy heroes found!`);
             return;
         }
-
-        console.log(`⚰️ ${this.displayName} targeting ${target.hero.name} (${target.position} slot)`);
 
         // Play the grand ice structure animation first
         await this.playIcyGraveAnimation(caster, target);
@@ -40,8 +33,6 @@ export class IcyGraveSpell {
             this.applyFrozenToTarget(target, frozenStacks);
             this.logSpellEffect(caster, frozenStacks, target);
         }
-        
-        console.log(`⚰️ ${this.displayName} completed!`);
     }
 
     // ============================================
@@ -71,14 +62,11 @@ export class IcyGraveSpell {
         });
         
         if (aliveEnemyHeroes.length === 0) {
-            console.log(`⚰️ No alive enemy heroes found for ${this.displayName}`);
             return null;
         }
         
         // Randomly select one using battleManager's deterministic randomness
         const randomTarget = this.battleManager.getRandomChoice(aliveEnemyHeroes);
-        
-        console.log(`🎯 ${this.displayName} randomly selected: ${randomTarget.hero.name} from ${aliveEnemyHeroes.length} possible targets`);
         
         return randomTarget;
     }
@@ -89,10 +77,10 @@ export class IcyGraveSpell {
 
     // Calculate frozen stacks: 2 + floor(DecayMagic level / 2) + 1 if caster is Gon
     calculateFrozenStacks(caster) {
-        // Get DecayMagic level (defaults to 0 if hero doesn't have the ability)
+        // Get DecayMagic level (defaults to 1 if hero doesn't have the ability or has level 0)
         const decayMagicLevel = caster.hasAbility('DecayMagic') 
-            ? caster.getAbilityStackCount('DecayMagic') 
-            : 0;
+            ? Math.max(1, caster.getAbilityStackCount('DecayMagic'))
+            : 1;
         
         const additionalStacks = Math.floor(decayMagicLevel / 2);
         let frozenStacks = 2 + additionalStacks; // Base 2 stacks instead of 1
@@ -100,13 +88,6 @@ export class IcyGraveSpell {
         // Special bonus for Gon
         const gonBonus = caster.name === 'Gon' ? 1 : 0;
         frozenStacks += gonBonus;
-        
-        let logDetails = `2 base + ${additionalStacks} from DecayMagic`;
-        if (gonBonus > 0) {
-            logDetails += ` + ${gonBonus} from Gon's mastery`;
-        }
-        
-        console.log(`⚰️ ${caster.name} DecayMagic level ${decayMagicLevel}: ${frozenStacks} frozen stacks (${logDetails})`);
         
         return frozenStacks;
     }
@@ -128,14 +109,11 @@ export class IcyGraveSpell {
             );
             
             if (success) {
-                console.log(`⚰️ Successfully applied ${frozenStacks} frozen stacks to ${targetHero.name}`);
                 return true;
             } else {
-                console.error(`⚰️ Failed to apply frozen to ${targetHero.name}`);
                 return false;
             }
         } else {
-            console.error('⚰️ Status effects manager not available!');
             return false;
         }
     }
@@ -146,14 +124,11 @@ export class IcyGraveSpell {
 
     // Play the grand ice structure enveloping animation
     async playIcyGraveAnimation(caster, target) {
-        console.log(`⚰️ Playing IcyGrave animation from ${caster.name} to ${target.hero.name}...`);
-        
         // Get caster and target elements
         const casterElement = this.battleManager.getHeroElement(caster.side, caster.position);
         const targetElement = this.battleManager.getHeroElement(target.side, target.position);
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for IcyGrave animation');
             return;
         }
         
@@ -568,8 +543,6 @@ export class IcyGraveSpell {
         
         // Play visual effects on guest side (no frozen application)
         this.playIcyGraveAnimationGuestSide(mockCaster, mockTarget, frozenStacks, isResisted);
-        
-        console.log(`⚰️ GUEST: ${casterName} used ${displayName} on ${targetName}${isResisted ? ' (RESISTED)' : ''}${hasGonBonus ? ' (Gon bonus)' : ''} (${frozenStacks} frozen stacks)`);
     }
 
     // Guest-side animation (visual only, no frozen application or resistance consumption)
@@ -582,7 +555,6 @@ export class IcyGraveSpell {
         const targetElement = this.battleManager.getHeroElement(target.side, target.position);
         
         if (!casterElement || !targetElement) {
-            console.error('Could not find caster or target elements for guest IcyGrave animation');
             return;
         }
         
@@ -715,8 +687,6 @@ export class IcyGraveSpell {
         // Remove CSS if needed
         const css = document.getElementById('icyGraveCSS');
         if (css) css.remove();
-        
-        console.log('⚰️ IcyGrave spell cleaned up');
     }
 }
 

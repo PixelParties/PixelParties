@@ -74,9 +74,12 @@ export class FireballSpell {
             ? caster.getAbilityStackCount('DestructionMagic') 
             : 0;
         
-        const totalDamage = baseDamage + (perLevelDamage * destructionLevel);
+        // FIXED: Ensure minimum level of 1 for calculations
+        const effectiveLevel = Math.max(1, destructionLevel);
         
-        console.log(`🔥 ${caster.name} DestructionMagic level ${destructionLevel}: ${totalDamage} damage`);
+        const totalDamage = baseDamage + (perLevelDamage * effectiveLevel);
+        
+        console.log(`🔥 ${caster.name} DestructionMagic level ${destructionLevel} (effective: ${effectiveLevel}): ${totalDamage} damage`);
         
         return totalDamage;
     }
@@ -736,7 +739,7 @@ export class FireballSpell {
             name: this.spellName,
             displayName: this.displayName,
             description: 'Launches a fireball that explodes on impact, damaging the target hero and all their creatures',
-            damageFormula: '30 + 40 × DestructionMagic level',
+            damageFormula: '30 + 40 × max(1, DestructionMagic level)',
             targetType: 'single_hero_and_creatures',
             spellSchool: 'DestructionMagic'
         };

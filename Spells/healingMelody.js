@@ -5,8 +5,6 @@ export class HealingMelodySpell {
         this.battleManager = battleManager;
         this.spellName = 'HealingMelody';
         this.displayName = 'Healing Melody';
-        
-        console.log('🎵 Healing Melody spell module initialized');
     }
 
     // ============================================
@@ -17,12 +15,6 @@ export class HealingMelodySpell {
     canCast(caster) {
         const eligibleTargets = this.findEligibleTargets(caster);
         const canCast = eligibleTargets.heroes.length >= 1 || eligibleTargets.creatures.length >= 2;
-        
-        if (!canCast) {
-            console.log(`🎵 ${caster.name} cannot cast ${this.displayName} - insufficient eligible targets`);
-        } else {
-            console.log(`🎵 ${caster.name} can cast ${this.displayName} - ${eligibleTargets.heroes.length} hero(s), ${eligibleTargets.creatures.length} creature(s) eligible`);
-        }
         
         return canCast;
     }
@@ -50,7 +42,6 @@ export class HealingMelodySpell {
                 const heroHpPercent = (hero.currentHp / hero.maxHp) * 100;
                 if (heroHpPercent <= 50 && heroHealBlockStacks === 0) {
                     eligibleTargets.heroes.push({ hero, position });
-                    console.log(`🎵 Eligible hero: ${hero.name} at ${position} (${hero.currentHp}/${hero.maxHp} HP, ${heroHealBlockStacks} heal-block)`);
                 }
                 
                 // Check creatures
@@ -69,7 +60,6 @@ export class HealingMelodySpell {
                                     creatureIndex, 
                                     position 
                                 });
-                                console.log(`🎵 Eligible creature: ${creature.name} at ${position} (${creature.currentHp}/${creature.maxHp} HP, ${creatureHealBlockStacks} heal-block)`);
                             }
                         }
                     });
@@ -86,13 +76,10 @@ export class HealingMelodySpell {
 
     // Execute Healing Melody spell effect
     async executeSpell(caster, spell) {
-        console.log(`🎵 ${caster.name} casting ${this.displayName}!`);
-        
         // Find all allies to heal (any with 0 heal-block, regardless of HP)
         const allTargets = this.findAllHealableTargets(caster);
         
         if (allTargets.heroes.length === 0 && allTargets.creatures.length === 0) {
-            console.log(`🎵 ${this.displayName}: No targets can be healed (all have heal-block)!`);
             return;
         }
         
@@ -101,8 +88,6 @@ export class HealingMelodySpell {
         
         // Play healing melody animation
         await this.playHealingMelodyAnimation(caster, allTargets);
-        
-        console.log(`🎵 ${this.displayName} completed!`);
     }
 
     // Find all targets that can be healed (0 heal-block, regardless of HP)
@@ -167,8 +152,6 @@ export class HealingMelodySpell {
         const healResult = hero.heal(healAmount);
         const actualHeal = healResult.newHp - oldHp;
         
-        console.log(`🎵 ${hero.name} healed for ${actualHeal} HP (${oldHp} → ${healResult.newHp})`);
-        
         // Update hero health bar
         this.battleManager.updateHeroHealthBar(hero.side, position, hero.currentHp, hero.maxHp);
         
@@ -184,8 +167,6 @@ export class HealingMelodySpell {
         creature.currentHp = Math.min(creature.maxHp, creature.currentHp + healAmount);
         const actualHeal = creature.currentHp - oldHp;
         
-        console.log(`🎵 ${creature.name} healed for ${actualHeal} HP (${oldHp} → ${creature.currentHp})`);
-        
         // Update creature health bar
         this.battleManager.updateCreatureHealthBar(hero.side, position, creatureIndex, creature.currentHp, creature.maxHp);
         
@@ -198,8 +179,6 @@ export class HealingMelodySpell {
 
     // Play the healing melody animation with music notes
     async playHealingMelodyAnimation(caster, targets) {
-        console.log(`🎵 Playing Healing Melody animation...`);
-        
         // ✅ SEND NETWORK MESSAGE FIRST - before any animations or delays
         // This ensures guest starts animation at the same time as host
         this.sendAnimationStartToGuest(caster, targets);
@@ -211,8 +190,6 @@ export class HealingMelodySpell {
         const musicNotesTime = this.battleManager.getSpeedAdjustedDelay(2500);
         const healingTime = this.battleManager.getSpeedAdjustedDelay(800);
         const musicNotesDelay = this.battleManager.getSpeedAdjustedDelay(1500);
-        
-        console.log(`🎵 Animation timings: music=${musicNotesTime}ms, healing=${healingTime}ms, delay=${musicNotesDelay}ms`);
         
         // Wait for music notes to fly across before applying healing
         await this.battleManager.delay(musicNotesDelay);
@@ -254,7 +231,6 @@ export class HealingMelodySpell {
         const remainingMusicTime = musicNotesTime - musicNotesDelay;
         const totalWaitTime = Math.max(remainingMusicTime, healingTime);
         
-        console.log(`🎵 Waiting ${totalWaitTime}ms for animations to complete...`);
         await this.battleManager.delay(totalWaitTime);
         
         // Small buffer to ensure everything is done
@@ -262,8 +238,6 @@ export class HealingMelodySpell {
         
         // Cleanup
         this.cleanupHealingMelodyEffects();
-        
-        console.log(`🎵 HealingMelody animation sequence completed!`);
     }
 
     sendAnimationStartToGuest(caster, targets) {
@@ -290,11 +264,8 @@ export class HealingMelodySpell {
                          document.body;
         
         if (!battlefield) {
-            console.error('🎵 ERROR: No battlefield container found for music notes!');
             return;
         }
-        
-        console.log(`🎵 Using container:`, battlefield.className);
         
         // Ensure CSS exists first
         this.ensureHealingMelodyCSS();
@@ -552,7 +523,6 @@ export class HealingMelodySpell {
         `;
         
         document.head.appendChild(style);
-        console.log('🎵 HealingMelody CSS added to document');
     }
 
     // ============================================
@@ -578,8 +548,6 @@ export class HealingMelodySpell {
 
     // Handle spell effect on guest side
     async handleGuestSpellEffect(data) {
-        console.log(`🎵 GUEST: Handling HealingMelody spell effect`, data);
-        
         const { displayName, casterName, healingResults } = data; 
         
         // Determine log type based on caster side
@@ -596,24 +564,17 @@ export class HealingMelodySpell {
         // This ensures proper network synchronization of HP bar updates
         
         // Wait for animation to complete before continuing
-        console.log(`🎵 GUEST: Starting animation for ${casterLocalSide} side and waiting...`);
         await this.playGuestSideAnimation(casterLocalSide);
-        
-        console.log(`🎵 GUEST: ${casterName} used ${displayName} (healed ${totalTargets} targets) - Complete!`);
     }
 
     // Guest-side animation (visual only)
     async playGuestSideAnimation(casterLocalSide) {
-        console.log(`🎵 GUEST: Playing animation for ${casterLocalSide} side`);
-        
         // Create music notes animation IMMEDIATELY
         this.createMusicNotesAnimation(casterLocalSide);
         
         // Wait for music notes to fly before showing healing effects (speed-adjusted)
         const musicNotesDelay = this.battleManager.getSpeedAdjustedDelay(1500);
         await this.battleManager.delay(musicNotesDelay);
-        
-        console.log(`🎵 GUEST: Creating healing effects after ${musicNotesDelay}ms`);
         
         // Create healing effects on all valid targets
         ['left', 'center', 'right'].forEach(position => {
@@ -625,7 +586,6 @@ export class HealingMelodySpell {
                 const heroElement = this.battleManager.getHeroElement(casterLocalSide, position);
                 if (heroElement) {
                     this.createHealingEffect(heroElement);
-                    console.log(`🎵 GUEST: Added healing effect to ${hero.name}`);
                 }
                 
                 // Create healing effects on creatures
@@ -637,7 +597,6 @@ export class HealingMelodySpell {
                             );
                             if (creatureElement) {
                                 this.createHealingEffect(creatureElement);
-                                console.log(`🎵 GUEST: Added healing effect to ${creature.name}`);
                             }
                         }
                     });
@@ -651,7 +610,6 @@ export class HealingMelodySpell {
         const remainingMusicTime = musicNotesTime - musicNotesDelay;
         const totalWaitTime = Math.max(remainingMusicTime, healingTime);
         
-        console.log(`🎵 GUEST: Waiting ${totalWaitTime}ms for remaining animations...`);
         await this.battleManager.delay(totalWaitTime);
         
         // Small buffer
@@ -659,8 +617,6 @@ export class HealingMelodySpell {
         
         // Cleanup
         this.cleanupHealingMelodyEffects();
-        
-        console.log(`🎵 GUEST: Animation sequence completed!`);
     }
 
     // ============================================
@@ -669,7 +625,6 @@ export class HealingMelodySpell {
 
     // Test method - call this to test music notes animation
     testMusicNotesAnimation() {
-        console.log('🎵 TESTING: Starting music notes animation test');
         this.createMusicNotesAnimation('player');
         
         // Also test a simple note creation
@@ -722,8 +677,6 @@ export class HealingMelodySpell {
         // Remove CSS if needed
         const css = document.getElementById('healingMelodyCSS');
         if (css) css.remove();
-        
-        console.log('🎵 Healing Melody spell cleaned up');
     }
 }
 

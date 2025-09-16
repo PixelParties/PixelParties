@@ -51,6 +51,19 @@
     animation: tooltipFadeInSmooth 0.1s ease-out;
 }
 
+/* Card Preview Sizing - 20% larger while keeping centered */
+.large-card-tooltip,
+.battle-card-tooltip,
+.preview-card-display {
+    transform: scale(1.2) !important;
+    transform-origin: center center !important;
+}
+
+.preview-card-display {
+    transform: scale(1.2) !important;
+    transform-origin: center center !important;
+}
+
 .large-card-image {
     width: 100%;
     max-width: 300px;

@@ -1908,7 +1908,7 @@ const CARD_DATABASE = {
         name: 'CaptureNet',
         image: './Cards/All/CaptureNet.png',
         cardType: 'Artifact',
-        cost: 3,
+        cost: 30,
         action: false,
         spellSchool: null,
         subtype: "Equip"

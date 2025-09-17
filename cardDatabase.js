@@ -1196,7 +1196,7 @@ const CARD_DATABASE = {
         name: 'TheStormblade',
         image: './Cards/All/TheStormblade.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 10,
         action: false,
         spellSchool: null,
         subtype: 'Equip'

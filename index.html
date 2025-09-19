@@ -45,6 +45,237 @@
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
         }
+
+        /* How to Play Screen Styles - PC Optimized */
+        .how-to-play-screen {
+            position: relative;
+            max-width: 1050px;
+            width: 90vw;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            color: #ffffff;
+            line-height: 1.6;
+            max-height: 72vh;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        .how-to-play-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #00ffff;
+            padding-bottom: 15px;
+        }
+
+        .how-to-play-title {
+            font-size: 2.5rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .how-to-play-subtitle {
+            font-size: 1.2rem;
+            color: #88ccff;
+            margin-bottom: 0;
+        }
+
+        .how-to-play-content {
+            display: grid;
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .guide-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 8px;
+            border-left: 4px solid #00ffff;
+        }
+
+        .guide-section h3 {
+            color: #00ffff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        .guide-section p {
+            margin-bottom: 12px;
+            color: #e0e0e0;
+            font-size: 1rem;
+        }
+
+        .guide-section ul {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+
+        .guide-section li {
+            margin-bottom: 10px;
+            color: #cccccc;
+            font-size: 0.95rem;
+        }
+
+        .highlight-box {
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #00ffff;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+
+        .highlight-box strong {
+            color: #00ffff;
+        }
+
+        .anchored-back-button {
+            position: absolute;
+            top: 40px;
+            right: 40px;
+            padding: 12px 24px;
+            background: linear-gradient(145deg, #ff6b6b, #ff5252);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+            white-space: nowrap;
+        }
+
+        .anchored-back-button:hover {
+            background: linear-gradient(145deg, #ff5252, #ff1744);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+
+        .anchored-back-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Ensure proper scrolling */
+        .how-to-play-screen::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .how-to-play-screen::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .how-to-play-screen::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        .how-to-play-screen::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 255, 0.7);
+        }
+
+        /* Guide Section Images - Float for text wrapping */
+        .guide-section-image {
+            float: right;
+            width: 120px;
+            height: auto;
+            max-height: 150px;
+            margin: 0 0 15px 20px;
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            box-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.3),
+                0 0 10px rgba(0, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            object-fit: contain;
+            image-rendering: pixelated; /* Preserve pixel art quality */
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        .guide-section-image:hover {
+            transform: scale(1.05);
+            border-color: #88ccff;
+            box-shadow: 
+                0 6px 12px rgba(0, 0, 0, 0.4),
+                0 0 15px rgba(0, 255, 255, 0.4);
+        }
+
+        /* Clearfix for sections with images */
+        .guide-section::after {
+            content: "";
+            display: table;
+            clear: both;
+        }
+
+        /* Special styling for icon images (smaller and round) */
+        .guide-section:has(.guide-section-image[src*="Icon"]) .guide-section-image {
+            width: 80px;
+            max-height: 80px;
+            border-radius: 50%;
+            padding: 12px;
+        }
+
+        /* Alternative selector for older browsers that don't support :has() */
+        .guide-section[data-icon="true"] .guide-section-image {
+            width: 80px;
+            max-height: 80px;
+            border-radius: 50%;
+            padding: 12px;
+        }
+
+        /* Responsive adjustments for images */
+        @media (max-width: 768px) {
+            .guide-section-image {
+                float: none;
+                display: block;
+                margin: 0 auto 15px auto;
+                width: 100px;
+                max-height: 120px;
+            }
+            
+            .guide-section:has(.guide-section-image[src*="Icon"]) .guide-section-image,
+            .guide-section[data-icon="true"] .guide-section-image {
+                width: 70px;
+                max-height: 70px;
+            }
+        }
+
+        /* Ensure proper spacing with text content */
+        .guide-section h3 {
+            color: #00ffff;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        .guide-section p {
+            margin-bottom: 12px;
+            color: #e0e0e0;
+            font-size: 1rem;
+            text-align: justify;
+        }
+
+        /* Loading state for images */
+        .guide-section-image[src=""] {
+            display: none;
+        }
+
+        /* Error state handling */
+        .guide-section-image:not([src]),
+        .guide-section-image[src=""] {
+            display: none;
+        }
     </style>
     
     <link rel="stylesheet" href="main.css">
@@ -52,7 +283,7 @@
 <body class="fonts-loading">
     <div class="container">
         <h1>Project Pixel Parties</h1>
-        <div class="game-subtitle">🃏 Pixel Art Auto Battler 🎯</div>
+        <div class="game-subtitle">🃏 Pixel Parties Auto Battler 🎯</div>
         
         <div id="menu" class="menu-buttons">
             <div class="input-section">
@@ -70,6 +301,7 @@
             <button id="confirmCreateBtn" class="btn btn-primary hidden">🎮 Create Game</button>
             <button id="cancelCreateBtn" class="btn btn-secondary hidden">❌ Cancel</button>
             <button id="joinBtn" class="btn btn-secondary">⚔️ Browse Battles</button>
+            <button id="howToPlayBtn" class="btn btn-info">📖 How to Play</button>
             <button id="leaveBtn" class="btn btn-danger hidden">🚪 Leave Party</button>
         </div>
 
@@ -85,6 +317,11 @@
             <div class="browser-footer">
                 <button id="refreshRoomsBtn" class="btn btn-secondary">🔄 Refresh</button>
             </div>
+        </div>
+
+        <!-- How to Play Screen - Content dynamically loaded -->
+        <div id="howToPlayScreen" class="how-to-play-screen hidden">
+            <!-- Content will be populated by howToPlayScreen.js module -->
         </div>
 
         <div id="status" class="status hidden"></div>
@@ -233,6 +470,19 @@
             };
             
         })();
+    </script>
+
+    <!-- How to Play Module -->
+    <script type="module">
+        import { showHowToPlayScreen } from './howToPlayScreen.js';
+        
+        // Set up How to Play button event listener
+        document.addEventListener('DOMContentLoaded', () => {
+            const howToPlayBtn = document.getElementById('howToPlayBtn');
+            if (howToPlayBtn) {
+                howToPlayBtn.addEventListener('click', showHowToPlayScreen);
+            }
+        });
     </script>
 
     <!-- Application Modules -->

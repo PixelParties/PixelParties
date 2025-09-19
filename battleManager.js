@@ -20,6 +20,7 @@ import DamageSourceManager from './damageSourceManager.js';
 
 import { applyResistancePatches } from './Abilities/resistance.js';
 import { CannibalismAbility } from './Abilities/cannibalism.js';
+import { applyFriendshipPatches } from './Abilities/friendship.js';
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
@@ -1267,6 +1268,17 @@ export class BattleManager {
             // Execute the permanent skeleton spawn effect
             await this.skeletonKingSkullmaelManager.executeDeathSkeletonSpawn(creature, heroOwner, position, side);
         }
+
+        // EXPLODING SKULL DEATH EXPLOSION
+        if (creature.name === 'ExplodingSkull' && this.explodingSkullManager) {
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death explosion
+            await this.explodingSkullManager.executeDeathExplosion(creature, heroOwner, position, side);
+        }
     }
 
     handleCreatureDeathWithoutRevival(hero, creature, creatureIndex, side, position) {
@@ -1790,6 +1802,16 @@ export class BattleManager {
                 });
             } else {
                 this.grinningCatManager.handleGuestCounterUpdate(data);
+            }
+        }
+        else if (creatureName === 'ExplodingSkull') {
+            if (!bm.explodingSkullManager) {
+                import('./Creatures/explodingSkull.js').then(({ default: ExplodingSkullCreature }) => {
+                    bm.explodingSkullManager = new ExplodingSkullCreature(bm);
+                    bm.explodingSkullManager.handleGuestCounterUpdate(data);
+                });
+            } else {
+                bm.explodingSkullManager.handleGuestCounterUpdate(data);
             }
         }
     }
@@ -3020,6 +3042,10 @@ export class BattleManager {
             this.skeletonMageManager.cleanup();
             this.skeletonMageManager = null;
         }
+        if (this.explodingSkullManager) {
+            this.explodingSkullManager.cleanup();
+            this.explodingSkullManager = null;
+        }
         if (this.cavalryManager) {
             this.cavalryManager.cleanup();
             this.cavalryManager = null;
@@ -3052,12 +3078,25 @@ export class BattleManager {
             this.graveWormManager.cleanup();
             this.graveWormManager = null;
         }
+        if (this.blueIceDragonManager) {
+            this.blueIceDragonManager.cleanup();
+            this.blueIceDragonManager = null;
+        }
+        if (this.demonsGateManager) {
+            this.demonsGateManager.cleanup();
+            this.demonsGateManager = null;
+        }
+
 
         // Area cleanups
         
         if (this.gatheringStormEffect) {
             this.gatheringStormEffect.cleanup();
             this.gatheringStormEffect = null;
+        }
+        if (this.tearingMountainEffect) {
+            this.tearingMountainEffect.cleanup();
+            this.tearingMountainEffect = null;
         }
 
         
@@ -3742,6 +3781,10 @@ export class BattleManager {
             this.gatheringStormEffect.cleanup();
             this.gatheringStormEffect = null;
         }
+        if (this.tearingMountainEffect) {
+            this.tearingMountainEffect.cleanup();
+            this.tearingMountainEffect = null;
+        }
 
         
 
@@ -3811,6 +3854,14 @@ export class BattleManager {
             this.graveWormManager.cleanup();
             this.graveWormManager = null;
         }
+        if (this.blueIceDragonManager) {
+            this.blueIceDragonManager.cleanup();
+            this.blueIceDragonManager = null;
+        }
+        if (this.demonsGateManager) {
+            this.demonsGateManager.cleanup();
+            this.demonsGateManager = null;
+        }
 
 
 
@@ -3875,3 +3926,4 @@ export class BattleManager {
 export default BattleManager;
 
 applyResistancePatches(BattleManager);
+applyFriendshipPatches(BattleManager);

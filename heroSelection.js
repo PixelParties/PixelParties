@@ -50,6 +50,7 @@ import { GraveWormCreature } from './Creatures/graveWorm.js';
 import { NimbleMonkeeCreature } from './Creatures/nimbleMonkee.js';
 import { ResilientMonkeeCreature } from './Creatures/resilientMonkee.js';
 import { CriminalMonkeeCreature } from './Creatures/criminalMonkee.js';
+import DemonsGateCreature from './Creatures/demonsGate.js';
 
 
 
@@ -137,6 +138,7 @@ export class HeroSelection {
         this.nimbleMonkeeCreature = new NimbleMonkeeCreature(this);
         this.resilientMonkeeCreature = new ResilientMonkeeCreature(this);
         this.criminalMonkeeCreature = new CriminalMonkeeCreature(this);
+        this.demonsGateCreature = new DemonsGateCreature(null);
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
@@ -630,6 +632,11 @@ export class HeroSelection {
             // Reset Occultism usage for new turn
             if (this.occultismAbility) {
                 this.occultismAbility.resetTurnBasedTracking();
+            }
+
+            // Reset Navigation usage for new turn
+            if (window.navigationAbility) {
+                window.navigationAbility.resetTurnBasedTracking();
             }
             
             // Reset Nicolas effect usage for new turn
@@ -2152,7 +2159,7 @@ export class HeroSelection {
     }
 
     // Return to formation screen with more aggressive cleanup
-    async returnToFormationScreenAfterBattle() {       
+    async returnToFormationScreenAfterBattle() {      
         // Transition to cleanup state
         this.stateMachine.transitionTo(this.stateMachine.states.CLEANING_UP, {
             reason: 'returning_from_battle'
@@ -2201,6 +2208,11 @@ export class HeroSelection {
             }
             if (this.stormkissedWaflavEffectManager) {
                 await this.stormkissedWaflavEffectManager.processPostBattleEmpowerment(this);
+            }
+
+            // ===== PROCESS DEMON'S GATE DESTRUCTION MAGIC ENHANCEMENT =====
+            if (this.demonsGateCreature) {
+                this.demonsGateCreature.processPostBattleDestructionMagicEnhancement(this);
             }
 
             

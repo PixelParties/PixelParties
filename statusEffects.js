@@ -724,43 +724,81 @@ export class StatusEffectsManager {
         const burnStacks = this.getStatusEffectStacks(target, 'burned');
         if (burnStacks === 0) return;
 
-        const damage = 60 * burnStacks; // CHANGED: from 30 to 60 damage per stack
+        const baseDamage = 60 * burnStacks;
+        
+        // NEW: Apply Medea poison multiplier
+        const medeaResult = this.applyMedeaPoisonMultiplier(baseDamage, target);
+        const finalDamage = medeaResult.damage;
         
         // Apply damage
         if (target.type === 'hero' || !target.type) {
             // Hero damage with burn source
             await this.battleManager.authoritative_applyDamage({
                 target: target,
-                damage: damage,
-                newHp: Math.max(0, target.currentHp - damage),
-                died: (target.currentHp - damage) <= 0
+                damage: finalDamage,
+                newHp: Math.max(0, target.currentHp - finalDamage),
+                died: (target.currentHp - finalDamage) <= 0
             }, { source: 'burn' }); // Pass burn source
         } else {
             // Creature damage with burn source
-            this.applyCreatureDamage(target, damage, 'burn');
+            this.applyCreatureDamage(target, finalDamage, 'burn');
         }
 
         // Create enhanced burn damage visual
-        this.createStatusDamageVisuals(target, damage, 'burn');
+        this.createStatusDamageVisuals(target, finalDamage, 'burn');
 
         // Create additional burn visual effect
         this.createStatusVisualEffect(target, 'burned', 'damage');
 
-        // Log the damage
-        this.battleManager.addCombatLog(
-            `🔥 ${target.name} takes ${damage} burn damage!`,
-            target.side === 'player' ? 'error' : 'success'
-        );
-
-        // NEW: Remove one stack of burned after damage is applied (minimum 0)
-        this.removeStatusEffect(target, 'burned', 1);
-        
-        // Log if burn is completely removed
-        if (!this.hasStatusEffect(target, 'burned')) {
+        // Enhanced logging with Medea interaction
+        if (medeaResult.medeaCount > 0) {
             this.battleManager.addCombatLog(
-                `🔥 ${target.name}'s burn has been extinguished!`,
-                target.side === 'player' ? 'success' : 'error'
+                `🔥 ${target.name} takes ${finalDamage} burn damage (${baseDamage} × ${medeaResult.multiplier} from ${medeaResult.medeaCount} enemy Medea)!`,
+                target.side === 'player' ? 'error' : 'success'
             );
+            
+            // Additional Medea-specific visual effect
+            this.createMedeaPoisonEffect(target, medeaResult.medeaCount);
+        } else {
+            this.battleManager.addCombatLog(
+                `🔥 ${target.name} takes ${finalDamage} burn damage!`,
+                target.side === 'player' ? 'error' : 'success'
+            );
+        }
+
+        // ============================================
+        // NEW: Check if Tearing Mountain prevents burn consumption
+        // ============================================
+        let shouldRemoveBurnStack = true;
+        try {
+            const { shouldPreventBurnConsumption } = await import('../Spells/tearingMountain.js');
+            if (shouldPreventBurnConsumption(this.battleManager)) {
+                shouldRemoveBurnStack = false;
+                // Add a subtle log to indicate burn persistence (only occasionally to avoid spam)
+                if (Math.random() < 0.1) { // 10% chance to show message
+                    this.battleManager.addCombatLog(
+                        `🏔️ Tearing Mountain's presence prevents ${target.name}'s burn from fading!`,
+                        'info'
+                    );
+                }
+            }
+        } catch (error) {
+            // TearingMountain not available, proceed normally
+            console.log('TearingMountain check failed, burn will be consumed normally:', error);
+        }
+
+        // Only remove burn stack if Tearing Mountain doesn't prevent it
+        if (shouldRemoveBurnStack) {
+            // Remove one stack of burned after damage is applied (minimum 0)
+            this.removeStatusEffect(target, 'burned', 1);
+            
+            // Log if burn is completely removed
+            if (!this.hasStatusEffect(target, 'burned')) {
+                this.battleManager.addCombatLog(
+                    `🔥 ${target.name}'s burn has been extinguished!`,
+                    target.side === 'player' ? 'success' : 'error'
+                );
+            }
         }
 
         await this.battleManager.delay(300);

@@ -1475,6 +1475,54 @@ const CARD_DATABASE = {
         hp: 50,
         physicalAttack: true
     },
+    'BlueIceDragon': {
+        name: 'BlueIceDragon',
+        image: './Cards/All/BlueIceDragon.png',
+        cardType: 'Spell',
+        level: 5,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 250,
+        physicalAttack: false
+    },
+    'ExplodingSkull': {
+        name: 'ExplodingSkull',
+        image: './Cards/All/ExplodingSkull.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 1,
+        physicalAttack: false
+    },
+    'DemonsGate': {
+        name: 'DemonsGate',
+        image: './Cards/All/DemonsGate.png',
+        cardType: 'Spell',
+        level: 6,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 250,
+        physicalAttack: false
+    },
+    '3HeadedGiant': {
+        name: '3HeadedGiant',
+        image: './Cards/All/3HeadedGiant.png',
+        cardType: 'Spell',
+        level: 4,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 150,
+        physicalAttack: true
+    },
 
 
     //KAZENA
@@ -1916,6 +1964,30 @@ const CARD_DATABASE = {
 
 
 
+    // LUNA
+    'Friendship': {
+        name: 'Friendship',
+        image: './Cards/All/Friendship.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'TearingMountain': {
+        name: 'TearingMountain',
+        image: './Cards/All/TearingMountain.png',
+        cardType: 'Spell',
+        level: 2,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
+        subtype: 'Area',
+        aoe: true
+    },
+
+
+
 
     
 
@@ -1945,7 +2017,7 @@ const CARD_DATABASE = {
         name: 'CheekyMonkee',
         image: './Cards/All/CheekyMonkee.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1958,7 +2030,7 @@ const CARD_DATABASE = {
         name: 'ResilientMonkee',
         image: './Cards/All/ResilientMonkee.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1971,7 +2043,7 @@ const CARD_DATABASE = {
         name: 'NimbleMonkee',
         image: './Cards/All/NimbleMonkee.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -1984,7 +2056,7 @@ const CARD_DATABASE = {
         name: 'CriminalMonkee',
         image: './Cards/All/CriminalMonkee.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',

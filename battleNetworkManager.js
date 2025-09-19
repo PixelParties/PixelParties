@@ -613,6 +613,12 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'three_headed_giant_special_attack':
+                if (bm.threeHeadedGiantManager) {
+                    bm.threeHeadedGiantManager.handleGuestSpecialAttack(data);
+                }
+                break;
+
             case 'skeleton_archer_projectile_attack':
                 if (bm.skeletonArcherManager) {
                     bm.skeletonArcherManager.handleGuestProjectileAttack(data);
@@ -694,6 +700,23 @@ export class BattleNetworkManager {
             case 'skeleton_king_death_spawn':
                 if (bm.skeletonKingSkullmaelManager) {
                     bm.skeletonKingSkullmaelManager.handleGuestDeathSkeletonSpawn(data);
+                }
+                break;
+
+            case 'exploding_skull_death_explosion':
+                if (bm.explodingSkullManager) {
+                    await bm.explodingSkullManager.handleGuestDeathExplosion(data);
+                }
+                break;
+
+            case 'exploding_skull_counter_gain':
+                if (bm.explodingSkullManager) {
+                    bm.explodingSkullManager.handleGuestCounterGainAnimation(data);
+                } else {
+                    import('./Creatures/explodingSkull.js').then(({ default: ExplodingSkullCreature }) => {
+                        bm.explodingSkullManager = new ExplodingSkullCreature(bm);
+                        bm.explodingSkullManager.handleGuestCounterGainAnimation(data);
+                    });
                 }
                 break;
 
@@ -790,6 +813,20 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'blue_ice_dragon_frost_breath':
+                if (bm.blueIceDragonManager) {
+                    bm.blueIceDragonManager.handleGuestFrostBreathAttack(data);
+                }
+                break;
+
+            case 'demons_gate_spell_cast':
+                if (bm.demonsGateManager) {
+                    bm.demonsGateManager.handleGuestSpellCast(data);
+                }
+                break;
+
+
+
             case 'biomancy_token_vine_attack':
                 if (bm.biomancyTokenManager) {
                     bm.biomancyTokenManager.handleGuestVineAttack(data);
@@ -804,6 +841,8 @@ export class BattleNetworkManager {
                     }
                 }
                 break;
+
+                
 
             case 'monia_protection_effect':
                 bm.guest_handleMoniaProtectionEffect(data);
@@ -1169,6 +1208,10 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'friendship_effects_applied':
+                bm.guest_handleFriendshipEffects(data);
+                break;
+
             case 'fireshield_frozen_immunity':
                 if (this.statusEffectsManager) {
                     this.statusEffectsManager.handleGuestFireshieldFrozenImmunity(data);
@@ -1177,6 +1220,22 @@ export class BattleNetworkManager {
 
             case 'gathering_storm_damage':
                 bm.guest_handleGatheringStormDamage(data);
+                break;
+
+            case 'tearing_mountain_active':
+                import('./Spells/tearingMountain.js').then(({ handleGuestTearingMountainActive }) => {
+                    handleGuestTearingMountainActive(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling guest tearing mountain active:', error);
+                });
+                break;
+
+            case 'tearing_mountain_self_target':
+                import('./Spells/tearingMountain.js').then(({ handleGuestTearingMountainSelfTarget }) => {
+                    handleGuestTearingMountainSelfTarget(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling guest tearing mountain self target:', error);
+                });
                 break;
 
             case 'doom_clock_start':

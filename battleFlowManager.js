@@ -127,8 +127,18 @@ export class BattleFlowManager {
 
             const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
             bm.cheekyMonkeeManager = new CheekyMonkeeCreature(bm);
+            
+            const BlueIceDragonCreature = (await import('./Creatures/blueIceDragon.js')).default;
+            bm.blueIceDragonManager = new BlueIceDragonCreature(bm);
 
+            const ExplodingSkullCreature = (await import('./Creatures/explodingSkull.js')).default;
+            bm.explodingSkullManager = new ExplodingSkullCreature(bm);
 
+            const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
+            bm.demonsGateManager = new DemonsGateCreature(bm);
+
+            const ThreeHeadedGiantCreatureClass = (await import('./Creatures/3HeadedGiant.js')).default;
+            bm.threeHeadedGiantManager = new ThreeHeadedGiantCreatureClass(bm);
 
 
             
@@ -150,6 +160,9 @@ export class BattleFlowManager {
             if (!bm.coldHeartedYukiOnnaManager) bm.coldHeartedYukiOnnaManager = null;
             if (!bm.futureTechMechManager) bm.futureTechMechManager = null;
             if (!bm.graveWormManager) bm.graveWormManager = null;
+            if (!bm.blueIceDragonManager) bm.blueIceDragonManager = null;
+            if (!bm.explodingSkullManager) bm.explodingSkullManager = null;
+            if (!bm.demonsGateManager) bm.demonsGateManager = null;
 
             
             if (!bm.biomancyTokenManager) bm.biomancyTokenManager = null;
@@ -647,6 +660,11 @@ export class BattleFlowManager {
                 const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
                 const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
                 const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
+                const BlueIceDragonCreature = (await import('./Creatures/blueIceDragon.js')).default;
+                const ExplodingSkullCreature = (await import('./Creatures/explodingSkull.js')).default;
+                const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
+                const ThreeHeadedGiantCreature = (await import('./Creatures/3HeadedGiant.js')).default;
+
 
                 
                 const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
@@ -817,8 +835,34 @@ export class BattleFlowManager {
                     } else {
                         actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                     }
-                }
-                else {
+                }else if (BlueIceDragonCreature.isBlueIceDragon(playerActor.name)) {
+                    if (bm.blueIceDragonManager) {
+                        actions.push(bm.blueIceDragonManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                    }
+                } else if (ExplodingSkullCreature.isExplodingSkull(playerActor.name)) {
+                    if (!bm.explodingSkullManager) {
+                        bm.explodingSkullManager = new ExplodingSkullCreature(bm);
+                    }
+                    actions.push(bm.explodingSkullManager.executeSpecialAttack(playerActor, position));
+                    hasSpecialAttacks = true;
+                } else if (DemonsGateCreature.isDemonsGate(playerActor.name)) {
+                    if (bm.demonsGateManager) {
+                        actions.push(bm.demonsGateManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                    }
+                } else if (ThreeHeadedGiantCreature.isThreeHeadedGiant(playerActor.name)) {
+                    if (bm.threeHeadedGiantManager) {
+                        actions.push(bm.threeHeadedGiantManager.executeSpecialAttack(playerActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
+                    }
+                } else {
                     actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
                    // bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
                 }
@@ -851,6 +895,11 @@ export class BattleFlowManager {
                 const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
                 const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
                 const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
+                const BlueIceDragonCreature = (await import('./Creatures/blueIceDragon.js')).default;
+                const ExplodingSkullCreature = (await import('./Creatures/explodingSkull.js')).default;
+                const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
+                const ThreeHeadedGiantCreature = (await import('./Creatures/3HeadedGiant.js')).default;
+
 
                 
                 const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
@@ -999,7 +1048,34 @@ export class BattleFlowManager {
                     } else {
                         actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
                     }
-                } else {
+                } else if (BlueIceDragonCreature.isBlueIceDragon(opponentActor.name)) {
+                    if (bm.blueIceDragonManager) {
+                        actions.push(bm.blueIceDragonManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                    }
+                } else if (ExplodingSkullCreature.isExplodingSkull(opponentActor.name)) {
+                    if (!bm.explodingSkullManager) {
+                        bm.explodingSkullManager = new ExplodingSkullCreature(bm);
+                    }
+                    actions.push(bm.explodingSkullManager.executeSpecialAttack(opponentActor, position));
+                    hasSpecialAttacks = true;
+                } else if (DemonsGateCreature.isDemonsGate(opponentActor.name)) {
+                    if (bm.demonsGateManager) {
+                        actions.push(bm.demonsGateManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                    }
+                } else if (ThreeHeadedGiantCreature.isThreeHeadedGiant(opponentActor.name)) {
+                    if (bm.threeHeadedGiantManager) {
+                        actions.push(bm.threeHeadedGiantManager.executeSpecialAttack(opponentActor, position));
+                        hasSpecialAttacks = true;
+                    } else {
+                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
+                    }
+                }else {
                     actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
                 }
             } catch (error) {

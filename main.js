@@ -78,11 +78,15 @@ class ProjectPixelParties {
         elements.confirmCreateBtn.addEventListener('click', () => this.startGame());
         elements.cancelCreateBtn.addEventListener('click', () => this.cancelRoomCreation());
         elements.joinBtn.addEventListener('click', () => this.showRoomBrowser());
+        elements.howToPlayBtn.addEventListener('click', () => this.showHowToPlay());
         elements.leaveBtn.addEventListener('click', () => this.leaveRoom());
         
         // Room browser
         elements.backToMenuBtn.addEventListener('click', () => this.hideRoomBrowser());
         elements.refreshRoomsBtn.addEventListener('click', () => this.refreshRoomsList());
+        
+        // How to Play screen
+        elements.backFromHowToPlayBtn.addEventListener('click', () => this.hideHowToPlay());
         
         // Password modal
         elements.modalJoinBtn.addEventListener('click', () => this.handlePasswordSubmit());
@@ -147,6 +151,16 @@ class ProjectPixelParties {
     cancelRoomCreation() {
         this.uiManager.hidePasswordSection();
         this.uiManager.showMainMenuButtons();
+    }
+
+    // Show How to Play screen
+    showHowToPlay() {
+        this.uiManager.showHowToPlay();
+    }
+
+    // Hide How to Play screen
+    hideHowToPlay() {
+        this.uiManager.hideHowToPlay();
     }
 
     // Start game (create room) - This is always a NEW game

@@ -4,6 +4,7 @@
 
 import { applyArrowStartOfBattleEffects } from './arrowSystem.js';
 import { NomuHeroEffect } from './Heroes/nomu.js';
+import { FriendshipManager } from './Abilities/friendship.js';
 
 export class BattleStartManager {
     constructor(battleManager) {
@@ -28,6 +29,9 @@ export class BattleStartManager {
             // Phase 1.5: Area effects (Gathering Storm, etc.)
             await this.applyAreaEffects();
 
+            // Phase 1.75: Friendship effects (before potions)
+            await this.applyFriendshipEffects();
+
             // Phase 2: Potion effects from both players
             await this.applyPotionEffects();
 
@@ -47,6 +51,19 @@ export class BattleStartManager {
             await this.applyPermanentArtifactEffects();
         } catch (error) {
             console.error('Error applying battle start effects:', error);
+        }
+    }
+
+    // Phase 1.75: Apply Friendship effects (before potions)
+    async applyFriendshipEffects() {
+        const bm = this.battleManager;
+        
+        try {
+            if (bm.friendshipManager) {
+                await bm.friendshipManager.applyFriendshipEffectsAtBattleStart();
+            }
+        } catch (error) {
+            console.error('Error applying Friendship effects:', error);
         }
     }
 
@@ -80,6 +97,17 @@ export class BattleStartManager {
             // Apply Gathering Storm effects
             const { applyGatheringStormBattleEffects } = await import('./Spells/gatheringStorm.js');
             await applyGatheringStormBattleEffects(bm);
+
+            // ============================================
+            // NEW: Apply Tearing Mountain effects
+            // ============================================
+            try {
+                const { applyTearingMountainBattleEffects } = await import('./Spells/tearingMountain.js');
+                await applyTearingMountainBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying Tearing Mountain effects:', error);
+            }
+
         } catch (error) {
             console.error('Error applying area effects:', error);
         }

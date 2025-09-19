@@ -12,6 +12,7 @@ export class UIManager {
             confirmCreateBtn: document.getElementById('confirmCreateBtn'),
             cancelCreateBtn: document.getElementById('cancelCreateBtn'),
             joinBtn: document.getElementById('joinBtn'),
+            howToPlayBtn: document.getElementById('howToPlayBtn'),
             leaveBtn: document.getElementById('leaveBtn'),
             usernameInput: document.getElementById('usernameInput'),
             passwordInput: document.getElementById('passwordInput'),
@@ -27,6 +28,10 @@ export class UIManager {
             backToMenuBtn: document.getElementById('backToMenuBtn'),
             refreshRoomsBtn: document.getElementById('refreshRoomsBtn'),
             roomsList: document.getElementById('roomsList'),
+            
+            // How to Play elements
+            howToPlayScreen: document.getElementById('howToPlayScreen'),
+            backFromHowToPlayBtn: document.getElementById('backFromHowToPlayBtn'),
             
             // Password modal elements
             passwordModal: document.getElementById('passwordModal'),
@@ -83,6 +88,7 @@ export class UIManager {
         this.elements.passwordSection.classList.remove('hidden');
         this.elements.startBtn.classList.add('hidden');
         this.elements.joinBtn.classList.add('hidden');
+        this.elements.howToPlayBtn.classList.add('hidden');
         this.elements.confirmCreateBtn.classList.remove('hidden');
         this.elements.cancelCreateBtn.classList.remove('hidden');
         this.elements.passwordInput.focus();
@@ -99,6 +105,7 @@ export class UIManager {
     showMainMenuButtons() {
         this.elements.startBtn.classList.remove('hidden');
         this.elements.joinBtn.classList.remove('hidden');
+        this.elements.howToPlayBtn.classList.remove('hidden');
         this.elements.confirmCreateBtn.classList.add('hidden');
         this.elements.cancelCreateBtn.classList.add('hidden');
         this.elements.leaveBtn.classList.add('hidden');
@@ -107,11 +114,13 @@ export class UIManager {
         this.elements.passwordInput.disabled = false;
         this.elements.startBtn.disabled = false;
         this.elements.joinBtn.disabled = false;
+        this.elements.howToPlayBtn.disabled = false;
     }
 
     showLeaveButton() {
         this.elements.startBtn.classList.add('hidden');
         this.elements.joinBtn.classList.add('hidden');
+        this.elements.howToPlayBtn.classList.add('hidden');
         this.elements.confirmCreateBtn.classList.add('hidden');
         this.elements.cancelCreateBtn.classList.add('hidden');
         this.elements.leaveBtn.classList.remove('hidden');
@@ -130,10 +139,28 @@ export class UIManager {
         this.elements.playersList.classList.add('hidden');
         this.hideConnectionDetails();
         this.elements.roomBrowser.classList.remove('hidden');
+        this.elements.howToPlayScreen.classList.add('hidden');
     }
 
     hideRoomBrowser() {
         this.elements.roomBrowser.classList.add('hidden');
+        this.elements.menu.classList.remove('hidden');
+    }
+
+    // How to Play screen management
+    showHowToPlay() {
+        this.elements.menu.classList.add('hidden');
+        this.elements.roomBrowser.classList.add('hidden');
+        this.hidePasswordSection();
+        this.hideStatus();
+        this.hideRoomInfo();
+        this.elements.playersList.classList.add('hidden');
+        this.hideConnectionDetails();
+        this.elements.howToPlayScreen.classList.remove('hidden');
+    }
+
+    hideHowToPlay() {
+        this.elements.howToPlayScreen.classList.add('hidden');
         this.elements.menu.classList.remove('hidden');
     }
 
@@ -174,6 +201,7 @@ export class UIManager {
         
         // Hide other UI elements
         this.elements.roomBrowser.classList.add('hidden');
+        this.elements.howToPlayScreen.classList.add('hidden');
         this.elements.passwordModal.classList.add('hidden');
         
         // Show the full-screen game screen
@@ -425,6 +453,7 @@ export class UIManager {
         this.elements.playersList.classList.add('hidden');
         this.hideConnectionDetails();
         this.hideRoomBrowser();
+        this.hideHowToPlay();
         this.hidePasswordSection();
         this.hidePasswordModal();
         this.hideGameScreen();

@@ -59,6 +59,20 @@ const CARD_DATABASE = {
         ability2: 'Fighting',
         tags: ["Attacker", "Sniper", "Damage Dealer"]
     },
+    'Ghuanjun': {
+        name: 'Ghuanjun',
+        image: './Cards/Characters/Ghuanjun.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 80,
+        ability1: 'Fighting',
+        ability2: 'Necromancy',
+        tags: ["Attacker", "Defensive", "Setup"]
+    },
     'Gon': {
         name: 'Gon',
         image: './Cards/Characters/Gon.png',
@@ -128,6 +142,20 @@ const CARD_DATABASE = {
         ability1: 'Biomancy',
         ability2: 'Occultism',
         tags: ["Summoner", "Setup", "Attacker"]
+    },
+    'Luna': {
+        name: 'Luna',
+        image: './Cards/Characters/Luna.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 300,
+        atk: 30,
+        ability1: 'DestructionMagic',
+        ability2: 'Friendship',
+        tags: ["Status Effects", "Area Damage", "Self-Damage"]
     },
     'Medea': {
         name: 'Medea',
@@ -1984,6 +2012,109 @@ const CARD_DATABASE = {
         spellSchool: 'DestructionMagic',
         subtype: 'Area',
         aoe: true
+    },
+    'LunaKiai': {
+        name: 'LunaKiai',
+        image: './Cards/All/LunaKiai.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 100,
+        physicalAttack: false
+    },
+    'PriestOfLuna': {
+        name: 'PriestOfLuna',
+        image: './Cards/All/PriestOfLuna.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 20,
+        physicalAttack: false
+    },
+    'HeartOfTheMountain': {
+        name: 'HeartOfTheMountain',
+        image: './Cards/All/HeartOfTheMountain.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: "Permanent"
+    },
+    'DichotomyOfLunaAndTempeste': {
+        name: 'DichotomyOfLunaAndTempeste',
+        image: './Cards/All/DichotomyOfLunaAndTempeste.png',
+        cardType: 'Artifact',
+        cost: 6,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
+
+
+    // GHUANJUN
+    'GraveyardOfLimitedPower': {
+        name: 'GraveyardOfLimitedPower',
+        image: './Cards/All/GraveyardOfLimitedPower.png',
+        cardType: 'Spell',
+        level: 3,
+        cost: 0,
+        action: true,
+        spellSchool: 'DecayMagic',
+        subtype: 'Area'
+    },
+    'BlowOfTheVenomSnake': {
+        name: 'BlowOfTheVenomSnake',
+        image: './Cards/All/BlowOfTheVenomSnake.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
+    },
+    'StrongOxHeadbutt': {
+        name: 'StrongOxHeadbutt',
+        image: './Cards/All/StrongOxHeadbutt.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
+    },
+    'FerociousTigerKick': {
+        name: 'FerociousTigerKick',
+        image: './Cards/All/FerociousTigerKick.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
+    },
+    'SkullNecklace': {
+        name: 'SkullNecklace',
+        image: './Cards/All/SkullNecklace.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
+    'PunchInTheBox': {
+        name: 'PunchInTheBox',
+        image: './Cards/All/PunchInTheBox.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
     },
 
 

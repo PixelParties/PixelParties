@@ -95,6 +95,11 @@ export class HeroEquipmentManager {
             window.ancientTechInfiniteEnergyCoreEffect) {
             window.ancientTechInfiniteEnergyCoreEffect.onEquipmentChange();
         }
+        // Trigger Skull Necklace effect update if this is a Skull Necklace
+        if (artifactCardName === 'SkullNecklace' && 
+            window.skullNecklaceEffect) {
+            window.skullNecklaceEffect.onEquipmentChange();
+        }
         
         // Trigger callback
         if (this.onEquipmentChangeCallback) {

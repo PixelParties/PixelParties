@@ -391,9 +391,35 @@ export class AreaHandler {
         
         const formation = this.heroSelection.formationManager.getBattleFormation();
         const spellSchool = cardInfo.spellSchool;
-        const requiredLevel = cardInfo.level || 0;
+        let requiredLevel = cardInfo.level || 0;
         
-        // Check each hero position
+        // Special case: GraveyardOfLimitedPower level reduction by total Necromancy abilities
+        if (areaCardName === 'GraveyardOfLimitedPower') {
+            let totalNecromancyLevel = 0;
+            
+            // Count Necromancy abilities across ALL heroes
+            for (const position of ['left', 'center', 'right']) {
+                const hero = formation[position];
+                if (!hero) continue;
+                
+                const heroAbilities = this.heroSelection.heroAbilitiesManager.getHeroAbilities(position);
+                
+                ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                    if (heroAbilities && heroAbilities[zone]) {
+                        heroAbilities[zone].forEach(ability => {
+                            if (ability && ability.name === 'Necromancy') {
+                                totalNecromancyLevel++;
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Reduce the required level by total Necromancy count (minimum 0)
+            requiredLevel = Math.max(0, requiredLevel - totalNecromancyLevel);
+        }
+        
+        // Check each hero position (rest of the method remains the same)
         for (const position of ['left', 'center', 'right']) {
             const hero = formation[position];
             if (!hero) continue;

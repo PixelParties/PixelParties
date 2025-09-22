@@ -140,12 +140,25 @@ export class BattleFlowManager {
             const ThreeHeadedGiantCreatureClass = (await import('./Creatures/3HeadedGiant.js')).default;
             bm.threeHeadedGiantManager = new ThreeHeadedGiantCreatureClass(bm);
 
+            const LunaKiaiCreature = (await import('./Creatures/lunaKiai.js')).default;
+            bm.lunaKiaiManager = new LunaKiaiCreature(bm);
 
-            
+            const PriestOfLunaCreature = (await import('./Creatures/priestOfLuna.js')).default; 
+            bm.priestOfLunaManager = new PriestOfLunaCreature(bm);
 
             // Initialize Biomancy Token manager
             const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
             bm.biomancyTokenManager = new BiomancyTokenCreature(bm);
+
+            // HEROES
+            const LunaHeroManager = (await import('./Heroes/luna.js')).default;
+            bm.lunaManager = new LunaHeroManager(bm);
+            
+            const AliceHeroManager = (await import('./Heroes/alice.js')).default;
+            bm.aliceManager = new AliceHeroManager(bm);
+            
+            const GhuanjunHeroManager = (await import('./Heroes/ghuanjun.js')).default;
+            bm.ghuanjunManager = new GhuanjunHeroManager(bm);
 
         } catch (error) {
             // Initialize fallback null managers to prevent undefined errors
@@ -163,9 +176,10 @@ export class BattleFlowManager {
             if (!bm.blueIceDragonManager) bm.blueIceDragonManager = null;
             if (!bm.explodingSkullManager) bm.explodingSkullManager = null;
             if (!bm.demonsGateManager) bm.demonsGateManager = null;
-
-            
+            if (!bm.priestOfLunaManager) bm.priestOfLunaManager = null;
             if (!bm.biomancyTokenManager) bm.biomancyTokenManager = null;
+            if (!bm.lunaManager) bm.lunaManager = null;
+            if (!bm.aliceManager) bm.aliceManager = null;
         }
 
         try {
@@ -243,6 +257,229 @@ export class BattleFlowManager {
         // Stats logging removed - functionality preserved for any dependencies
     }
 
+    // ============================================
+    // CENTRALIZED CREATURE ACTIVATION
+    // ============================================
+
+    /**
+     * Centralized creature special attack activation used by both main battle flow and out-of-turn effects
+     * @param {Object} actor - Actor object with type, name, data, index, hero
+     * @param {string} position - Position ('left', 'center', 'right')
+     * @returns {Promise} Promise that resolves when activation is complete
+     */
+    async activateCreatureSpecialAttack(actor, position) {
+        const bm = this.battleManager;
+        
+        try {
+            // Import creature classes dynamically to avoid circular dependencies
+            const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
+            const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
+            const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
+            const SkeletonDeathKnightCreature = (await import('./Creatures/skeletonDeathKnight.js')).default;
+            const BurningSkeletonCreature = (await import('./Creatures/burningSkeleton.js')).default;
+            const SkeletonReaperCreature = (await import('./Creatures/skeletonReaper.js')).default;
+            const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
+            const SkeletonMageCreature = (await import('./Creatures/skeletonMage.js')).default;
+            const BoulderCreature = (await import('./Creatures/boulder.js')).default;
+            const FrontSoldierCreature = (await import('./Creatures/frontSoldier.js')).default; 
+            const ArcherCreature = (await import('./Creatures/archer.js')).default; 
+            const MoonlightButterflyCreature = (await import('./Creatures/moonlightButterfly.js')).default;
+            const RoyalCorgiCreature = (await import('./Creatures/royalCorgi.js')).default;
+            const GrinningCatCreature = (await import('./Creatures/grinningCat.js')).default;
+            const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
+            const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
+            const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
+            const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
+            const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
+            const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
+            const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
+            const BlueIceDragonCreature = (await import('./Creatures/blueIceDragon.js')).default;
+            const ExplodingSkullCreature = (await import('./Creatures/explodingSkull.js')).default;
+            const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
+            const ThreeHeadedGiantCreature = (await import('./Creatures/3HeadedGiant.js')).default;
+            const LunaKiaiCreature = (await import('./Creatures/lunaKiai.js')).default;
+            const PriestOfLunaCreature = (await import('./Creatures/priestOfLuna.js')).default; 
+            const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
+
+            const creatureName = actor.name;
+            const heroSide = actor.hero.side;
+            
+            // Determine creature type and call appropriate special attack
+            if (JigglesCreature.isJiggles(creatureName)) {
+                if (bm.jigglesManager) {
+                    return await bm.jigglesManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonArcherCreature.isSkeletonArcher(creatureName)) {
+                if (bm.skeletonArcherManager) {
+                    return await bm.skeletonArcherManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(creatureName)) {
+                if (bm.skeletonNecromancerManager) {
+                    return await bm.skeletonNecromancerManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(creatureName)) {
+                if (bm.skeletonDeathKnightManager) {
+                    return await bm.skeletonDeathKnightManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (BurningSkeletonCreature.isBurningSkeleton(creatureName)) {
+                if (bm.burningSkeletonManager) {
+                    return await bm.burningSkeletonManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonReaperCreature.isSkeletonReaper(creatureName)) {
+                if (bm.skeletonReaperManager) {
+                    return await bm.skeletonReaperManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonBardCreature.isSkeletonBard(creatureName)) {
+                if (bm.skeletonBardManager) {
+                    return await bm.skeletonBardManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonMageCreature.isSkeletonMage(creatureName)) {
+                if (bm.skeletonMageManager) {
+                    return await bm.skeletonMageManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (BoulderCreature.isBoulder(creatureName)) {
+                if (!bm.boulderManager) {
+                    bm.boulderManager = new BoulderCreature(bm);
+                }
+                return await bm.boulderManager.executeSpecialAttack(actor, position);
+            } else if (ArcherCreature.isArcher(creatureName)) {
+                if (bm.archerManager) {
+                    return await bm.archerManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (FrontSoldierCreature.isFrontSoldier(creatureName)) {
+                if (bm.frontSoldierManager) {
+                    return await bm.frontSoldierManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (RoyalCorgiCreature.isRoyalCorgi(creatureName)) {
+                if (bm.royalCorgiManager) {
+                    return await bm.royalCorgiManager.executeRoyalCorgiAction(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (MoonlightButterflyCreature.isMoonlightButterfly(creatureName)) {
+                if (!bm.moonlightButterflyManager) {
+                    bm.moonlightButterflyManager = new MoonlightButterflyCreature(bm);
+                }
+                return await bm.moonlightButterflyManager.executeMoonlightButterflyAction(actor, position);
+            } else if (CrumTheClassPetCreature.isCrumTheClassPet(creatureName)) {
+                if (!bm.crumTheClassPetManager) {
+                    bm.crumTheClassPetManager = new CrumTheClassPetCreature(bm);
+                }
+                return await bm.crumTheClassPetManager.executeCrumTheClassPetAction(actor, position);
+            } else if (ColdHeartedYukiOnnaCreature.isColdHeartedYukiOnna(creatureName)) {
+                if (bm.coldHeartedYukiOnnaManager) {
+                    return await bm.coldHeartedYukiOnnaManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (GrinningCatCreature.isGrinningCat(creatureName)) {
+                if (bm.grinningCatManager) {
+                    return await bm.grinningCatManager.executeGrinningCatAction(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (FutureTechMechCreature.isFutureTechMech(creatureName)) {
+                if (bm.futureTechMechManager) {
+                    return await bm.futureTechMechManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (BiomancyTokenCreature.isBiomancyToken(creatureName)) {
+                if (bm.biomancyTokenManager) {
+                    return await bm.biomancyTokenManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (TheRootOfAllEvilCreature.isTheRootOfAllEvil(creatureName)) {
+                if (!bm.theRootOfAllEvilManager) {
+                    bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
+                }
+                return await bm.theRootOfAllEvilManager.executeSpecialAttack(actor, position);
+            } else if (GraveWormCreature.isGraveWorm(creatureName)) {
+                if (bm.graveWormManager) {
+                    return await bm.graveWormManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (CheekyMonkeeCreature.isCheekyMonkee(creatureName)) {
+                if (bm.cheekyMonkeeManager) {
+                    return await bm.cheekyMonkeeManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (SkeletonKingSkullmaelCreature.isSkeletonKingSkullmael(creatureName)) {
+                if (bm.skeletonKingSkullmaelManager) {
+                    return await bm.skeletonKingSkullmaelManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (BlueIceDragonCreature.isBlueIceDragon(creatureName)) {
+                if (bm.blueIceDragonManager) {
+                    return await bm.blueIceDragonManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (ExplodingSkullCreature.isExplodingSkull(creatureName)) {
+                if (!bm.explodingSkullManager) {
+                    bm.explodingSkullManager = new ExplodingSkullCreature(bm);
+                }
+                return await bm.explodingSkullManager.executeSpecialAttack(actor, position);
+            } else if (DemonsGateCreature.isDemonsGate(creatureName)) {
+                if (bm.demonsGateManager) {
+                    return await bm.demonsGateManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (ThreeHeadedGiantCreature.isThreeHeadedGiant(creatureName)) {
+                if (bm.threeHeadedGiantManager) {
+                    return await bm.threeHeadedGiantManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (LunaKiaiCreature.isLunaKiai(creatureName)) {
+                if (bm.lunaKiaiManager) {
+                    return await bm.lunaKiaiManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else if (PriestOfLunaCreature.isPriestOfLuna(creatureName)) { 
+                if (bm.priestOfLunaManager) {
+                    return await bm.priestOfLunaManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                }
+            } else {
+                // Default action for creatures without special attacks
+                return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+            }
+            
+        } catch (error) {
+            console.error('Error in centralized creature activation:', error);
+            // Fallback to simple shake animation
+            return await bm.animationManager.shakeCreature(actor.hero.side, position, actor.index);
+        }
+    }
+
     // Battle loop with connection awareness and persistence
     async authoritative_battleLoop() {
         const bm = this.battleManager;
@@ -279,6 +516,11 @@ export class BattleFlowManager {
 
                 bm.currentTurn++;
                 bm.addCombatLog(`⚔️ Turn ${bm.currentTurn} begins`, 'info');
+                
+                // Reset Ghuanjun's Fighting spell tracking for new round
+                if (bm.ghuanjunManager && bm.currentTurn > 1) {
+                    bm.ghuanjunManager.resetForNewRound();
+                }
                 
                 bm.sendBattleUpdate('turn_start', { turn: bm.currentTurn });
                             
@@ -541,7 +783,7 @@ export class BattleFlowManager {
         return actors;
     }
 
-    // Execute actor actions (with Ice Age support)
+    // Execute actor actions (with Ice Age support) - NOW USES CENTRALIZED ACTIVATION
     async executeActorActions(playerActor, opponentActor, position) {
         const bm = this.battleManager;
         
@@ -595,498 +837,59 @@ export class BattleFlowManager {
             
             opponentActor = null; // Skip this actor's turn
         }
-
-        // ============================================
-        // ALICE'S LASER EFFECT: Trigger at START of turn (before actions)
-        // ============================================
-
-        // Check if Alice is about to take an action and trigger her laser first
-        if (originalPlayerActor && originalPlayerActor.type === 'hero' && 
-            originalPlayerActor.data && originalPlayerActor.data.name === 'Alice' && 
-            originalPlayerActor.data.alive) {
-            
-            // Import and trigger Alice's laser effect BEFORE her actual action
-            try {
-                const { AliceHeroEffect } = await import('./Heroes/alice.js');
-                await AliceHeroEffect.checkAliceActionEffect(originalPlayerActor.data, bm);
-            } catch (error) {
-                // Error handled silently
-            }
-        }
-
-        if (originalOpponentActor && originalOpponentActor.type === 'hero' && 
-            originalOpponentActor.data && originalOpponentActor.data.name === 'Alice' && 
-            originalOpponentActor.data.alive) {
-            
-            // Import and trigger Alice's laser effect BEFORE her actual action
-            try {
-                const { AliceHeroEffect } = await import('./Heroes/alice.js');
-                await AliceHeroEffect.checkAliceActionEffect(originalOpponentActor.data, bm);
-            } catch (error) {
-                // Error handled silently
-            }
-        }
         
         // ============================================
-        // EXISTING ACTOR ACTION LOGIC
+        // CREATURE ACTIONS - NOW USES CENTRALIZED LOGIC
         // ============================================
         
         const actions = [];
         let hasSpecialAttacks = false;
         let hasHeroActions = false;
         
-        // Collect all creature actions (including all special creature attacks)
+        // Use centralized creature activation for player creatures
         if (playerActor && playerActor.type === 'creature') {
-            try {
-                // Import creature classes with error handling
-                const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
-                const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
-                const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
-                const SkeletonDeathKnightCreature = (await import('./Creatures/skeletonDeathKnight.js')).default;
-                const BurningSkeletonCreature = (await import('./Creatures/burningSkeleton.js')).default;
-                const SkeletonReaperCreature = (await import('./Creatures/skeletonReaper.js')).default;
-                const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
-                const SkeletonMageCreature = (await import('./Creatures/skeletonMage.js')).default;
-                const BoulderCreature = (await import('./Creatures/boulder.js')).default;
-                const FrontSoldierCreature = (await import('./Creatures/frontSoldier.js')).default; 
-                const ArcherCreature = (await import('./Creatures/archer.js')).default; 
-                const MoonlightButterflyCreature = (await import('./Creatures/moonlightButterfly.js')).default;
-                const RoyalCorgiCreature = (await import('./Creatures/royalCorgi.js')).default;
-                const GrinningCatCreature = (await import('./Creatures/grinningCat.js')).default;
-                const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
-                const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
-                const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
-                const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
-                const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
-                const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
-                const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
-                const BlueIceDragonCreature = (await import('./Creatures/blueIceDragon.js')).default;
-                const ExplodingSkullCreature = (await import('./Creatures/explodingSkull.js')).default;
-                const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
-                const ThreeHeadedGiantCreature = (await import('./Creatures/3HeadedGiant.js')).default;
-
-
-                
-                const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
-
-                if (JigglesCreature.isJiggles(playerActor.name)) {
-                    if (bm.jigglesManager) {
-                        actions.push(bm.jigglesManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (SkeletonArcherCreature.isSkeletonArcher(playerActor.name)) {
-                    if (bm.skeletonArcherManager) {
-                        actions.push(bm.skeletonArcherManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`💀 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(playerActor.name)) {
-                    if (bm.skeletonNecromancerManager) {
-                        actions.push(bm.skeletonNecromancerManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🧙 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(playerActor.name)) {
-                    if (bm.skeletonDeathKnightManager) {
-                        actions.push(bm.skeletonDeathKnightManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`⚔️ ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (BurningSkeletonCreature.isBurningSkeleton(playerActor.name)) {
-                    if (bm.burningSkeletonManager) {
-                        actions.push(bm.burningSkeletonManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🔥 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (SkeletonReaperCreature.isSkeletonReaper(playerActor.name)) {
-                    if (bm.skeletonReaperManager) {
-                        actions.push(bm.skeletonReaperManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`💀 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (SkeletonBardCreature.isSkeletonBard(playerActor.name)) {
-                    if (bm.skeletonBardManager) {
-                        actions.push(bm.skeletonBardManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🎵 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (SkeletonMageCreature.isSkeletonMage(playerActor.name)) {
-                    if (bm.skeletonMageManager) {
-                        actions.push(bm.skeletonMageManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (BoulderCreature.isBoulder(playerActor.name)) {
-                    if (!bm.boulderManager) {
-                        bm.boulderManager = new BoulderCreature(bm);
-                    }
-                    actions.push(bm.boulderManager.executeSpecialAttack(playerActor, position));
-                    hasSpecialAttacks = true;
-                } else if (ArcherCreature.isArcher(playerActor.name)) {
-                    if (bm.archerManager) {
-                        actions.push(bm.archerManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🏹 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (FrontSoldierCreature.isFrontSoldier(playerActor.name)) {
-                    if (bm.frontSoldierManager) {
-                        actions.push(bm.frontSoldierManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🛡️ ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (RoyalCorgiCreature.isRoyalCorgi(playerActor.name)) {
-                    if (bm.royalCorgiManager) {
-                        actions.push(bm.royalCorgiManager.executeRoyalCorgiAction(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🐕 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (MoonlightButterflyCreature.isMoonlightButterfly(playerActor.name)) {
-                    if (!bm.moonlightButterflyManager) {
-                        bm.moonlightButterflyManager = new MoonlightButterflyCreature(bm);
-                    }
-                    actions.push(bm.moonlightButterflyManager.executeMoonlightButterflyAction(playerActor, position));
-                    hasSpecialAttacks = true;
-                } else if (CrumTheClassPetCreature.isCrumTheClassPet(playerActor.name)) {
-                    if (!bm.crumTheClassPetManager) {
-                        bm.crumTheClassPetManager = new CrumTheClassPetCreature(bm);
-                    }
-                    actions.push(bm.crumTheClassPetManager.executeCrumTheClassPetAction(playerActor, position));
-                    hasSpecialAttacks = true;
-                } else if (ColdHeartedYukiOnnaCreature.isColdHeartedYukiOnna(playerActor.name)) {
-                    if (bm.coldHeartedYukiOnnaManager) {
-                        actions.push(bm.coldHeartedYukiOnnaManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`❄️ ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (GrinningCatCreature.isGrinningCat(playerActor.name)) {
-                    if (bm.grinningCatManager) {
-                        actions.push(bm.grinningCatManager.executeGrinningCatAction(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`😸 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (FutureTechMechCreature.isFutureTechMech(playerActor.name)) {
-                    if (bm.futureTechMechManager) {
-                        actions.push(bm.futureTechMechManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                       // bm.addCombatLog(`🤖 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (BiomancyTokenCreature.isBiomancyToken(playerActor.name)) {
-                    if (bm.biomancyTokenManager) {
-                        actions.push(bm.biomancyTokenManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                        //bm.addCombatLog(`🌿 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (TheRootOfAllEvilCreature.isTheRootOfAllEvil(playerActor.name)) {
-                    if (!bm.theRootOfAllEvilManager) {
-                        bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
-                    }
-                    actions.push(bm.theRootOfAllEvilManager.executeSpecialAttack(playerActor, position));
-                    hasSpecialAttacks = true;
-                } else if (GraveWormCreature.isGraveWorm(playerActor.name)) {
-                    if (bm.graveWormManager) {
-                        actions.push(bm.graveWormManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                       // bm.addCombatLog(`🪱 ${playerActor.name} activates!`, 'success');
-                    }
-                } else if (CheekyMonkeeCreature.isCheekyMonkee(playerActor.name)) {
-                    if (bm.cheekyMonkeeManager) {
-                        actions.push(bm.cheekyMonkeeManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                    }
-                } else if (SkeletonKingSkullmaelCreature.isSkeletonKingSkullmael(playerActor.name)) {
-                    if (bm.skeletonKingSkullmaelManager) {
-                        actions.push(bm.skeletonKingSkullmaelManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                    }
-                }else if (BlueIceDragonCreature.isBlueIceDragon(playerActor.name)) {
-                    if (bm.blueIceDragonManager) {
-                        actions.push(bm.blueIceDragonManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                    }
-                } else if (ExplodingSkullCreature.isExplodingSkull(playerActor.name)) {
-                    if (!bm.explodingSkullManager) {
-                        bm.explodingSkullManager = new ExplodingSkullCreature(bm);
-                    }
-                    actions.push(bm.explodingSkullManager.executeSpecialAttack(playerActor, position));
-                    hasSpecialAttacks = true;
-                } else if (DemonsGateCreature.isDemonsGate(playerActor.name)) {
-                    if (bm.demonsGateManager) {
-                        actions.push(bm.demonsGateManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                    }
-                } else if (ThreeHeadedGiantCreature.isThreeHeadedGiant(playerActor.name)) {
-                    if (bm.threeHeadedGiantManager) {
-                        actions.push(bm.threeHeadedGiantManager.executeSpecialAttack(playerActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                    }
-                } else {
-                    actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-                   // bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
-                }
-            } catch (error) {
-                actions.push(bm.animationManager.shakeCreature('player', position, playerActor.index));
-               // bm.addCombatLog(`✨ ${playerActor.name} activates!`, 'success');
-            }
+            actions.push(this.activateCreatureSpecialAttack(playerActor, position));
+            hasSpecialAttacks = true;
         }
 
+        // Use centralized creature activation for opponent creatures
         if (opponentActor && opponentActor.type === 'creature') {
-            try {
-                // Import creature classes with error handling
-                const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
-                const SkeletonArcherCreature = (await import('./Creatures/skeletonArcher.js')).default;
-                const SkeletonNecromancerCreature = (await import('./Creatures/skeletonNecromancer.js')).default;
-                const SkeletonDeathKnightCreature = (await import('./Creatures/skeletonDeathKnight.js')).default;
-                const BurningSkeletonCreature = (await import('./Creatures/burningSkeleton.js')).default;
-                const SkeletonReaperCreature = (await import('./Creatures/skeletonReaper.js')).default;
-                const SkeletonBardCreature = (await import('./Creatures/skeletonBard.js')).default;
-                const SkeletonMageCreature = (await import('./Creatures/skeletonMage.js')).default;
-                const FrontSoldierCreature = (await import('./Creatures/frontSoldier.js')).default;
-                const ArcherCreature = (await import('./Creatures/archer.js')).default;
-                const MoonlightButterflyCreature = (await import('./Creatures/moonlightButterfly.js')).default;
-                const RoyalCorgiCreature = (await import('./Creatures/royalCorgi.js')).default;
-                const GrinningCatCreature = (await import('./Creatures/grinningCat.js')).default;
-                const CrumTheClassPetCreature = (await import('./Creatures/crumTheClassPet.js')).default;
-                const ColdHeartedYukiOnnaCreature = (await import('./Creatures/cold-HeartedYuki-Onna.js')).default;
-                const FutureTechMechCreature = (await import('./Creatures/futureTechMech.js')).default;
-                const TheRootOfAllEvilCreature = (await import('./Creatures/theRootOfAllEvil.js')).default;
-                const GraveWormCreature = (await import('./Creatures/graveWorm.js')).default;
-                const CheekyMonkeeCreature = (await import('./Creatures/cheekyMonkee.js')).default;
-                const SkeletonKingSkullmaelCreature = (await import('./Creatures/skeletonKingSkullmael.js')).default;
-                const BlueIceDragonCreature = (await import('./Creatures/blueIceDragon.js')).default;
-                const ExplodingSkullCreature = (await import('./Creatures/explodingSkull.js')).default;
-                const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
-                const ThreeHeadedGiantCreature = (await import('./Creatures/3HeadedGiant.js')).default;
-
-
-                
-                const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
-
-                if (JigglesCreature.isJiggles(opponentActor.name)) {
-                    if (bm.jigglesManager) {
-                        actions.push(bm.jigglesManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonArcherCreature.isSkeletonArcher(opponentActor.name)) {
-                    if (bm.skeletonArcherManager) {
-                        actions.push(bm.skeletonArcherManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(opponentActor.name)) {
-                    if (bm.skeletonNecromancerManager) {
-                        actions.push(bm.skeletonNecromancerManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(opponentActor.name)) {
-                    if (bm.skeletonDeathKnightManager) {
-                        actions.push(bm.skeletonDeathKnightManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (BurningSkeletonCreature.isBurningSkeleton(opponentActor.name)) {
-                    if (bm.burningSkeletonManager) {
-                        actions.push(bm.burningSkeletonManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonReaperCreature.isSkeletonReaper(opponentActor.name)) {
-                    if (bm.skeletonReaperManager) {
-                        actions.push(bm.skeletonReaperManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonBardCreature.isSkeletonBard(opponentActor.name)) {
-                    if (bm.skeletonBardManager) {
-                        actions.push(bm.skeletonBardManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonMageCreature.isSkeletonMage(opponentActor.name)) {
-                    if (bm.skeletonMageManager) {
-                        actions.push(bm.skeletonMageManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (FrontSoldierCreature.isFrontSoldier(opponentActor.name)) {
-                    if (bm.frontSoldierManager) {
-                        actions.push(bm.frontSoldierManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (ArcherCreature.isArcher(opponentActor.name)) {
-                    if (bm.archerManager) {
-                        actions.push(bm.archerManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (MoonlightButterflyCreature.isMoonlightButterfly(opponentActor.name)) {
-                    if (!bm.moonlightButterflyManager) {
-                        bm.moonlightButterflyManager = new MoonlightButterflyCreature(bm);
-                    }
-                    actions.push(bm.moonlightButterflyManager.executeMoonlightButterflyAction(opponentActor, position));
-                    hasSpecialAttacks = true;
-                } else if (RoyalCorgiCreature.isRoyalCorgi(opponentActor.name)) {
-                    if (bm.royalCorgiManager) {
-                        actions.push(bm.royalCorgiManager.executeRoyalCorgiAction(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (CrumTheClassPetCreature.isCrumTheClassPet(opponentActor.name)) {
-                    if (!bm.crumTheClassPetManager) {
-                        bm.crumTheClassPetManager = new CrumTheClassPetCreature(bm);
-                    }
-                    actions.push(bm.crumTheClassPetManager.executeCrumTheClassPetAction(opponentActor, position));
-                    hasSpecialAttacks = true;
-                } else if (ColdHeartedYukiOnnaCreature.isColdHeartedYukiOnna(opponentActor.name)) {
-                    if (bm.coldHeartedYukiOnnaManager) {
-                        actions.push(bm.coldHeartedYukiOnnaManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (GrinningCatCreature.isGrinningCat(opponentActor.name)) {
-                    if (bm.grinningCatManager) {
-                        actions.push(bm.grinningCatManager.executeGrinningCatAction(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (FutureTechMechCreature.isFutureTechMech(opponentActor.name)) {
-                    if (bm.futureTechMechManager) {
-                        actions.push(bm.futureTechMechManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (BiomancyTokenCreature.isBiomancyToken(opponentActor.name)) {
-                    if (bm.biomancyTokenManager) {
-                        actions.push(bm.biomancyTokenManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (TheRootOfAllEvilCreature.isTheRootOfAllEvil(opponentActor.name)) {
-                    if (!bm.theRootOfAllEvilManager) {
-                        bm.theRootOfAllEvilManager = new TheRootOfAllEvilCreature(bm);
-                    }
-                    actions.push(bm.theRootOfAllEvilManager.executeSpecialAttack(opponentActor, position));
-                    hasSpecialAttacks = true;
-                } else if (CheekyMonkeeCreature.isCheekyMonkee(opponentActor.name)) {
-                    if (bm.cheekyMonkeeManager) {
-                        actions.push(bm.cheekyMonkeeManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (GraveWormCreature.isGraveWorm(opponentActor.name)) {
-                    if (bm.graveWormManager) {
-                        actions.push(bm.graveWormManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (SkeletonKingSkullmaelCreature.isSkeletonKingSkullmael(opponentActor.name)) {
-                    if (bm.skeletonKingSkullmaelManager) {
-                        actions.push(bm.skeletonKingSkullmaelManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (BlueIceDragonCreature.isBlueIceDragon(opponentActor.name)) {
-                    if (bm.blueIceDragonManager) {
-                        actions.push(bm.blueIceDragonManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (ExplodingSkullCreature.isExplodingSkull(opponentActor.name)) {
-                    if (!bm.explodingSkullManager) {
-                        bm.explodingSkullManager = new ExplodingSkullCreature(bm);
-                    }
-                    actions.push(bm.explodingSkullManager.executeSpecialAttack(opponentActor, position));
-                    hasSpecialAttacks = true;
-                } else if (DemonsGateCreature.isDemonsGate(opponentActor.name)) {
-                    if (bm.demonsGateManager) {
-                        actions.push(bm.demonsGateManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                } else if (ThreeHeadedGiantCreature.isThreeHeadedGiant(opponentActor.name)) {
-                    if (bm.threeHeadedGiantManager) {
-                        actions.push(bm.threeHeadedGiantManager.executeSpecialAttack(opponentActor, position));
-                        hasSpecialAttacks = true;
-                    } else {
-                        actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                    }
-                }else {
-                    actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-                }
-            } catch (error) {
-                actions.push(bm.animationManager.shakeCreature('opponent', position, opponentActor.index));
-            }
+            actions.push(this.activateCreatureSpecialAttack(opponentActor, position));
+            hasSpecialAttacks = true;
         }
         
         // Check if we have hero actions to execute
         if ((playerActor && playerActor.type === 'hero') || 
             (opponentActor && opponentActor.type === 'hero')) {
             hasHeroActions = true;
+
+            // ============================================
+            // HERO SPECIAL EFFECTS: Trigger at START of turn (before actions)
+            // ============================================
+
+            // Process Alice special actions BEFORE normal hero combat  
+            if (originalPlayerActor && originalPlayerActor.type === 'hero' && 
+                originalPlayerActor.data && originalPlayerActor.data.name === 'Alice' && 
+                originalPlayerActor.data.alive && bm.aliceManager) {
+                await bm.aliceManager.executeHeroAction(originalPlayerActor, position);
+            }
+
+            if (originalOpponentActor && originalOpponentActor.type === 'hero' && 
+                originalOpponentActor.data && originalOpponentActor.data.name === 'Alice' && 
+                originalOpponentActor.data.alive && bm.aliceManager) {
+                await bm.aliceManager.executeHeroAction(originalOpponentActor, position);
+            }
+            
+            // Process Luna special actions BEFORE normal hero combat
+            if (playerActor && playerActor.type === 'hero' && 
+                playerActor.data.name === 'Luna' && bm.lunaManager) {
+                await bm.lunaManager.executeHeroAction(playerActor, position);
+            }
+            
+            if (opponentActor && opponentActor.type === 'hero' && 
+                opponentActor.data.name === 'Luna' && bm.lunaManager) {
+                await bm.lunaManager.executeHeroAction(opponentActor, position);
+            }
         }
         
         // If we have both special attacks and hero actions, start them simultaneously

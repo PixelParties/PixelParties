@@ -52,9 +52,18 @@ export class FriendshipManager {
             return; // No friendship on this side
         }
 
-        // Calculate bonuses (50 HP and 10 Attack per stack)
-        const hpBonus = totalFriendshipStacks * 50;
-        const attackBonus = totalFriendshipStacks * 10;
+        // Get the appropriate player's lunaBuffs counter
+        const counters = side === 'player' ? bm.playerCounters : bm.opponentCounters;
+        const lunaBuffs = counters ? (counters.lunaBuffs || 0) : 0;
+        
+        // Calculate Luna buff multiplier (2% per lunaBuffs counter)
+        const lunaMultiplier = 1 + (lunaBuffs * 0.02);
+        
+        // Calculate base bonuses and apply Luna multiplier
+        const baseHpBonus = totalFriendshipStacks * 50;
+        const baseAttackBonus = totalFriendshipStacks * 10;
+        const hpBonus = Math.floor(baseHpBonus * lunaMultiplier);
+        const attackBonus = Math.floor(baseAttackBonus * lunaMultiplier);
 
         // Second pass: apply bonuses to all OTHER heroes (not the ones with Friendship)
         const beneficiaries = [];
@@ -85,12 +94,17 @@ export class FriendshipManager {
             // Update visual displays
             this.updateHeroDisplays(side, beneficiaries);
             
-            // Log the effect
+            // Log the effect with Luna buff info if applicable
             const friendNames = friendshipHeroes.map(f => f.hero.name).join(', ');
             const beneficiaryNames = beneficiaries.map(b => b.hero.name).join(', ');
             
+            let logMessage = `🌈 ${friendNames}'s Friendship grants ${beneficiaryNames} +${hpBonus} HP and +${attackBonus} Attack!`;
+            if (lunaBuffs > 0) {
+                logMessage += ` (Enhanced by ${lunaBuffs} Luna buffs: ×${lunaMultiplier.toFixed(2)})`;
+            }
+            
             bm.addCombatLog(
-                `🌈 ${friendNames}'s Friendship grants ${beneficiaryNames} +${hpBonus} HP and +${attackBonus} Attack!`,
+                logMessage,
                 side === 'player' ? 'success' : 'info'
             );
 
@@ -112,6 +126,8 @@ export class FriendshipManager {
                     totalFriendshipStacks: totalFriendshipStacks,
                     hpBonus: hpBonus,
                     attackBonus: attackBonus,
+                    lunaBuffs: lunaBuffs,
+                    lunaMultiplier: lunaMultiplier,
                     timestamp: Date.now()
                 });
             }

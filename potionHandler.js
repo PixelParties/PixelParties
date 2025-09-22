@@ -1,5 +1,5 @@
 // potionHandler.js - Enhanced Potion Management System with Persistent Battle Effects and Multi-Player Support
-// UPDATED: Added ElixirOfStrength support
+// UPDATED: Added ElixirOfStrength support and P2P visual synchronization
 
 export class PotionHandler {
     constructor() {
@@ -43,6 +43,7 @@ export class PotionHandler {
             'OverflowingChalice',
             'PlanetInABottle',
             'TeleportationPowder',
+            'PunchInTheBox'
         ];
         
         return knownPotions.includes(cardName);
@@ -97,6 +98,12 @@ export class PotionHandler {
 
                 // Show special usage notification for ElixirOfQuickness
                 this.showPotionUsage(cardName);
+                
+                // Send visual sync to guest
+                this.sendPotionVisualSync('potion_usage', {
+                    potionName: cardName,
+                    visualType: 'usage'
+                }, heroSelection);
 
                 // Update UI displays
                 if (heroSelection.updateHandDisplay) {
@@ -137,6 +144,12 @@ export class PotionHandler {
 
                         // Show special usage notification for PlanetInABottle
                         this.showPotionUsage(cardName);
+                        
+                        // Send visual sync to guest
+                        this.sendPotionVisualSync('potion_usage', {
+                            potionName: cardName,
+                            visualType: 'usage'
+                        }, heroSelection);
 
                         // Update UI displays
                         if (heroSelection.updateHandDisplay) {
@@ -223,6 +236,12 @@ export class PotionHandler {
 
             // Show usage notification
             this.showPotionUsage(cardName);
+            
+            // Send visual sync to guest
+            this.sendPotionVisualSync('potion_usage', {
+                potionName: cardName,
+                visualType: 'usage'
+            }, heroSelection);
 
             // Update UI displays
             if (heroSelection.updateHandDisplay) {
@@ -259,6 +278,12 @@ export class PotionHandler {
         
         // Show confirmation of effect being added
         this.showPotionEffectAdded(potionName);
+        
+        // Send visual sync to guest - get battleManager from current battle context
+        this.sendPotionVisualSync('potion_effect_added', {
+            potionName: potionName,
+            visualType: 'effect_added'
+        });
     }
 
     // Generate unique ID for potion effects
@@ -284,6 +309,12 @@ export class PotionHandler {
         if (effectCount > 0) {
             console.log(`Cleared ${effectCount} active potion effects after battle`);
             this.showPotionEffectsCleared(effectCount);
+            
+            // Send visual sync to guest
+            this.sendPotionVisualSync('potion_effects_cleared', {
+                effectCount: effectCount,
+                visualType: 'effects_cleared'
+            });
         }
     }
 
@@ -316,6 +347,12 @@ export class PotionHandler {
 
         // Show summary of applied effects
         this.showPotionEffectsApplied(effectGroups);
+        
+        // Send visual sync to guest
+        this.sendPotionVisualSync('potion_effects_applied', {
+            effectGroups: effectGroups,
+            visualType: 'effects_applied'
+        });
     }
 
     // ===== NEW: MULTI-PLAYER BATTLE EFFECT SYSTEM =====
@@ -395,6 +432,39 @@ export class PotionHandler {
         if (totalEffectsApplied > 0) {
             battleManager.addCombatLog(`🧪 ${totalEffectsApplied} potion effects activated for battle!`, 'info');
             console.log(`✅ Applied ${totalEffectsApplied} total potion effects from both players`);
+            
+            // Show visual effects for applied potions
+            const allEffectGroups = {};
+            
+            // Combine host effects
+            if (hostPotionState?.activePotionEffects) {
+                hostPotionState.activePotionEffects.forEach(effect => {
+                    if (!allEffectGroups[effect.name]) {
+                        allEffectGroups[effect.name] = [];
+                    }
+                    allEffectGroups[effect.name].push(effect);
+                });
+            }
+            
+            // Combine guest effects
+            if (guestPotionState?.activePotionEffects) {
+                guestPotionState.activePotionEffects.forEach(effect => {
+                    if (!allEffectGroups[effect.name]) {
+                        allEffectGroups[effect.name] = [];
+                    }
+                    allEffectGroups[effect.name].push(effect);
+                });
+            }
+            
+            // Show combined effects applied notification
+            this.showPotionEffectsApplied(allEffectGroups);
+            
+            // Send visual sync to guest
+            this.sendPotionVisualSync('potion_effects_applied', {
+                effectGroups: allEffectGroups,
+                visualType: 'effects_applied',
+                totalEffects: totalEffectsApplied
+            });
         } else {
             console.log('No active potion effects to apply from either player');
         }
@@ -433,6 +503,79 @@ export class PotionHandler {
         }
         
         return effectsApplied;
+    }
+
+    // ===== P2P VISUAL SYNCHRONIZATION =====
+
+    // Send visual sync message to guest
+    sendPotionVisualSync(messageType, data, heroSelection = null) {
+        // Try to get battleManager from various contexts
+        let battleManager = null;
+        
+        if (heroSelection && heroSelection.battleManager) {
+            battleManager = heroSelection.battleManager;
+        } else if (window.battleManager) {
+            battleManager = window.battleManager;
+        } else if (typeof window !== 'undefined' && window.heroSelection && window.heroSelection.battleManager) {
+            battleManager = window.heroSelection.battleManager;
+        }
+        
+        if (battleManager && battleManager.sendBattleUpdate && battleManager.isAuthoritative) {
+            const syncData = {
+                ...data,
+                timestamp: Date.now(),
+                playerSide: battleManager.isHost ? 'host' : 'guest'
+            };
+            
+            battleManager.sendBattleUpdate(messageType, syncData);
+            console.log(`Sent potion visual sync: ${messageType}`, syncData);
+        }
+    }
+
+    // ===== GUEST VISUAL HANDLERS =====
+
+    // Handle potion usage visual on guest side
+    guest_handlePotionUsageVisual(data) {
+        const { potionName, playerSide, visualType } = data;
+        
+        console.log(`Guest received potion visual sync: ${visualType} for ${potionName} from ${playerSide}`);
+        
+        if (visualType === 'usage') {
+            this.showPotionUsage(potionName);
+        }
+    }
+
+    // Handle potion effect added visual on guest side
+    guest_handlePotionEffectAddedVisual(data) {
+        const { potionName, playerSide, visualType } = data;
+        
+        console.log(`Guest received potion effect added visual: ${potionName} from ${playerSide}`);
+        
+        if (visualType === 'effect_added') {
+            this.showPotionEffectAdded(potionName);
+        }
+    }
+
+    // Handle potion effects applied visual on guest side
+    guest_handlePotionEffectsAppliedVisual(data) {
+        const { effectGroups, playerSide, visualType, totalEffects } = data;
+        
+        console.log(`Guest received potion effects applied visual from ${playerSide}: ${totalEffects || 'multiple'} effects`);
+        
+        if (visualType === 'effects_applied' && effectGroups) {
+            this.showPotionEffectsApplied(effectGroups);
+        }
+    }
+
+    // Handle potion effects cleared visual on guest side
+    guest_handlePotionEffectsClearedVisual(data) {
+        const { effectCount, playerSide, visualType } = data;
+        
+        console.log(`Guest received potion effects cleared visual from ${playerSide}: ${effectCount} effects`);
+        
+        if (visualType === 'effects_cleared' && effectCount > 0) {
+            this.showPotionEffectsCleared(effectCount);
+        }
     }
 
     // Delegate potion effects to their specific modules
@@ -486,10 +629,43 @@ export class PotionHandler {
             case 'MagicLamp':
                 return await this.handleMagicLampEffects(effects, playerRole, battleManager);
                 
+            case 'PunchInTheBox':
+                return await this.handlePunchInTheBoxEffects(effects, playerRole, battleManager);
+                
             // Add other potion types here as they get battle effects
             default:
                 console.log(`No battle effect defined for potion: ${potionName}`);
                 return 0;
+        }
+    }
+
+    async handlePunchInTheBoxEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the PunchInTheBox module
+            const { PunchInTheBoxPotion } = await import('./Potions/punchInTheBox.js');
+            const punchInTheBoxPotion = new PunchInTheBoxPotion();
+            
+            // Delegate everything to the PunchInTheBox module
+            const effectsProcessed = await punchInTheBoxPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`👊 PunchInTheBox delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating PunchInTheBox effects for ${playerRole}:`, error);
+            
+            // Fallback: log failure
+            const playerName = playerRole === 'host' ? 'Host' : 'Guest';
+            battleManager.addCombatLog(
+                `👊 ${playerName}'s Punch in the Box failed to activate properly`, 
+                'warning'
+            );
+            
+            return effects.length;
         }
     }
 

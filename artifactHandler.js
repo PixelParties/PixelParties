@@ -390,7 +390,8 @@ export class ArtifactHandler {
             'AncientTechInfiniteEnergyCore',
             'BloodSoakedCoin', 
             'StaffOfTheTeleporter',
-            'GoldenBananas' 
+            'GoldenBananas',
+            'SkullNecklace'
         ];
         
         // Convert card names to proper module names using the existing method

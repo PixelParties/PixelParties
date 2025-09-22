@@ -99,13 +99,23 @@ export class BattleStartManager {
             await applyGatheringStormBattleEffects(bm);
 
             // ============================================
-            // NEW: Apply Tearing Mountain effects
+            // Apply Tearing Mountain effects
             // ============================================
             try {
                 const { applyTearingMountainBattleEffects } = await import('./Spells/tearingMountain.js');
                 await applyTearingMountainBattleEffects(bm);
             } catch (error) {
                 console.error('Error applying Tearing Mountain effects:', error);
+            }
+
+            // ============================================
+            // Apply Graveyard of Limited Power effects
+            // ============================================
+            try {
+                const { applyGraveyardOfLimitedPowerBattleEffects } = await import('./Spells/graveyardOfLimitedPower.js');
+                await applyGraveyardOfLimitedPowerBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying Graveyard of Limited Power effects:', error);
             }
 
         } catch (error) {
@@ -375,6 +385,14 @@ export class BattleStartManager {
                 await applySnowCannonBattleEffects(bm);
             } catch (error) {
                 console.error('Error applying Snow Cannon effects:', error);
+            }
+
+            // Heart of the Mountain effects
+            try {
+                const { applyHeartOfMountainBattleEffects } = await import('./Artifacts/heartOfTheMountain.js');
+                await applyHeartOfMountainBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying Heart of the Mountain effects:', error);
             }
 
             // Cloud Pillow effects

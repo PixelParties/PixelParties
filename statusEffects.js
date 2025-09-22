@@ -207,14 +207,14 @@ export class StatusEffectsManager {
             return false;
         }
 
-        //  Don't apply status effects to dead targets
+        // Don't apply status effects to dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
             console.log(`⚰️ Ignoring status effect application to dead target: ${target.name}`);
             return false;
         }
 
-        // 🧃 JUICE CHECK: Check if we can negate this status effect with Juice
+        // Check if we can negate this status effect with Juice
         const definition = this.statusEffectDefinitions[effectName];
         if (definition && definition.type === 'debuff' && this.checkAndConsumeJuice(target, effectName, stacks)) {
             // Juice consumed to negate the negative effect!
@@ -226,7 +226,7 @@ export class StatusEffectsManager {
             SwampborneWaflavHeroEffect.checkPoisonEvolutionCounter(target, effectName, stacks, this.battleManager);
         }
         
-        // ☀️ TheSunSword: Check for frozen resistance
+        // Check for frozen resistance and immunity checks...
         if (effectName === 'frozen' && this.battleManager && this.battleManager.attackEffectsManager) {
             const sunSwordEffect = this.battleManager.attackEffectsManager.sunSwordEffect;
             
@@ -251,7 +251,7 @@ export class StatusEffectsManager {
             }
         }
 
-        // 🛡️ Fireshield: Check for frozen immunity
+        // Fireshield frozen immunity check
         if (effectName === 'frozen') {
             // Check if target has any fireshield stacks
             const fireshieldEffect = target.statusEffects ? target.statusEffects.find(effect => effect.name === 'fireshield') : null;
@@ -282,8 +282,9 @@ export class StatusEffectsManager {
         // Handle special interactions BEFORE applying the effect
         this.handleStatusInteractions(target, effectName);
 
-        // Get or create the status effect
+        // Get existing status effect
         let statusEffect = this.getStatusEffect(target, effectName);
+        const wasExisting = !!statusEffect;
         
         if (statusEffect) {
             // Add to existing stacks
@@ -298,12 +299,20 @@ export class StatusEffectsManager {
         // Log the application
         this.logStatusEffectApplication(target, effectName, stacks, statusEffect.stacks);
 
-        // Create visual effect
-        this.createStatusVisualEffect(target, effectName, 'applied');
+        // FIX: Handle visual effects differently for new vs existing effects
+        if (wasExisting) {
+            // For existing effects, just update the indicator
+            this.updateStatusVisualIndicator(target, effectName);
+            // Still create the application flash effect
+            this.createApplicationEffect(this.getTargetElement(target), target, effectName);
+        } else {
+            // For new effects, create full visual effect
+            this.createStatusVisualEffect(target, effectName, 'applied');
+        }
 
         // Sync with guest if host
         if (this.battleManager.isAuthoritative) {
-            this.syncStatusEffectToGuest(target, effectName, statusEffect.stacks, 'applied');
+            this.syncStatusEffectToGuest(target, effectName, statusEffect.stacks, wasExisting ? 'updated' : 'applied');
         }
 
         return true;
@@ -490,14 +499,26 @@ export class StatusEffectsManager {
         const targetElement = this.getTargetElement(target);
         if (!targetElement) return;
 
-        // Remove existing indicator and create updated one
+        // FIX: Force DOM update by using requestAnimationFrame to ensure removal completes
         const existingIndicator = targetElement.querySelector(`.status-indicator-${effectName}`);
         if (existingIndicator) {
             existingIndicator.remove();
+            
+            // Use requestAnimationFrame to ensure DOM has updated before creating new indicator
+            requestAnimationFrame(() => {
+                // Double-check that the indicator was actually removed
+                const stillExists = targetElement.querySelector(`.status-indicator-${effectName}`);
+                if (stillExists) {
+                    stillExists.remove();
+                }
+                
+                // Now create the new indicator
+                this.createPersistentStatusIndicator(targetElement, target, effectName);
+            });
+        } else {
+            // No existing indicator, create new one immediately
+            this.createPersistentStatusIndicator(targetElement, target, effectName);
         }
-
-        // Create new indicator with updated stack count
-        this.createPersistentStatusIndicator(targetElement, target, effectName);
     }
 
     // Refresh all status effect visuals (for guest sync)
@@ -724,9 +745,17 @@ export class StatusEffectsManager {
         const burnStacks = this.getStatusEffectStacks(target, 'burned');
         if (burnStacks === 0) return;
 
+        // LunaKiai immunity check
+        if (target.type === 'creature' && target.name === 'LunaKiai') {
+            return; // Skip damage but keep the status effect
+        }
+        if (target.type === 'creature' && target.name === 'PriestOfLuna') {
+            return; // Skip damage but keep the status effect
+        }
+
         const baseDamage = 60 * burnStacks;
         
-        // NEW: Apply Medea poison multiplier
+        // Apply Medea poison multiplier
         const medeaResult = this.applyMedeaPoisonMultiplier(baseDamage, target);
         const finalDamage = medeaResult.damage;
         
@@ -767,7 +796,7 @@ export class StatusEffectsManager {
         }
 
         // ============================================
-        // NEW: Check if Tearing Mountain prevents burn consumption
+        // Check if Tearing Mountain prevents burn consumption
         // ============================================
         let shouldRemoveBurnStack = true;
         try {
@@ -777,7 +806,7 @@ export class StatusEffectsManager {
                 // Add a subtle log to indicate burn persistence (only occasionally to avoid spam)
                 if (Math.random() < 0.1) { // 10% chance to show message
                     this.battleManager.addCombatLog(
-                        `🏔️ Tearing Mountain's presence prevents ${target.name}'s burn from fading!`,
+                        `🗻 Tearing Mountain's presence prevents ${target.name}'s burn from fading!`,
                         'info'
                     );
                 }
@@ -1020,11 +1049,9 @@ export class StatusEffectsManager {
             return;
         }
 
-        // Remove existing indicator if any
-        const existingIndicator = targetElement.querySelector(`.status-indicator-${effectName}`);
-        if (existingIndicator) {
-            existingIndicator.remove();
-        }
+        // FIX: More aggressive cleanup of existing indicators for this effect
+        const existingIndicators = targetElement.querySelectorAll(`.status-indicator-${effectName}`);
+        existingIndicators.forEach(indicator => indicator.remove());
 
         const stacks = this.getStatusEffectStacks(target, effectName);
         if (stacks === 0) return;
@@ -1041,7 +1068,7 @@ export class StatusEffectsManager {
             dazed: { icon: '😵‍💫', color: '#c896ff' },
             taunting: { icon: '📢', color: '#ff6b6b' },
             healblock: { icon: '🚫', color: '#dc3545' },
-            weakened: { icon: '↓', color: '#dc3545' }
+            weakened: { icon: '↘', color: '#dc3545' }
         };
 
         const indicator = indicators[effectName];
@@ -1050,9 +1077,9 @@ export class StatusEffectsManager {
         const statusIndicator = document.createElement('div');
         statusIndicator.className = `status-indicator status-indicator-${effectName}`;
         
-        // Position indicators in a row above the target
-        const existingIndicators = targetElement.querySelectorAll('.status-indicator');
-        const xOffset = existingIndicators.length * 25;
+        // FIX: Position indicators based on CURRENT state, not including the indicator we just removed
+        const currentIndicators = targetElement.querySelectorAll('.status-indicator');
+        const xOffset = currentIndicators.length * 25;
         
         statusIndicator.style.cssText = `
             position: absolute;
@@ -1578,7 +1605,7 @@ export class StatusEffectsManager {
         const target = this.findTargetFromSyncInfo(targetInfo);
         if (!target) return;
 
-        // ✅ FIX: Don't apply status effects to dead targets
+        // Don't apply status effects to dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
             console.log(`⚰️ Ignoring status effect update for dead target: ${target.name}`);
@@ -1589,6 +1616,10 @@ export class StatusEffectsManager {
             // Set the exact stacks (don't add, as this is a sync)
             this.setStatusEffectStacks(target, effectName, stacks);
             this.createStatusVisualEffect(target, effectName, 'applied');
+        } else if (action === 'updated') {
+            // Handle stack updates (e.g., burn reduced from 2 to 1)
+            this.setStatusEffectStacks(target, effectName, stacks);
+            this.updateStatusVisualIndicator(target, effectName);
         } else if (action === 'removed') {
             this.removeStatusEffectFromTarget(target, effectName);
             this.removeStatusVisualEffect(target, effectName);

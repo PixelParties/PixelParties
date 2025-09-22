@@ -1462,23 +1462,6 @@ export class BattleManager {
         }
     }
 
-    guest_handleAliceLaserEffect(data) {
-        if (this.isAuthoritative) {
-            return;
-        }
-
-        // Initialize Alice effect if needed
-        if (!this.aliceEffect) {
-            import('./Heroes/alice.js').then(({ AliceHeroEffect }) => {
-                this.aliceEffect = new AliceHeroEffect(this);
-                this.aliceEffect.handleGuestLaserEffect(data);
-            }).catch(error => {
-            });
-        } else {
-            this.aliceEffect.handleGuestLaserEffect(data);
-        }
-    }
-
     guest_handleSpellCast(data) {
         if (this.spellSystem) {
             this.spellSystem.handleGuestSpellCast(data);
@@ -3086,6 +3069,21 @@ export class BattleManager {
             this.demonsGateManager.cleanup();
             this.demonsGateManager = null;
         }
+        if (this.lunaKiaiManager) {
+            this.lunaKiaiManager.cleanup();
+            this.lunaKiaiManager = null;
+        }
+        if (this.priestOfLunaManager) {
+            this.priestOfLunaManager.cleanup();
+            this.priestOfLunaManager = null;
+        }
+
+
+
+        if (this.lunaManager) {
+            this.lunaManager.cleanup();
+            this.lunaManager = null;
+        }
 
 
         // Area cleanups
@@ -3382,7 +3380,9 @@ export class BattleManager {
             
             // Export BattleLog state if available
             battleLogState: this.battleScreen && this.battleScreen.getBattleLogState ? 
-                            this.battleScreen.getBattleLogState() : null
+                            this.battleScreen.getBattleLogState() : null,
+            
+            ghuanjunState: this.ghuanjunManager ? this.ghuanjunManager.exportState() : null
         };
 
         return baseState;
@@ -3461,6 +3461,10 @@ export class BattleManager {
 
             if (stateData.spellSystemState && this.spellSystem) {
                 this.spellSystem.importState(stateData.spellSystemState);
+            }
+            
+            if (stateData.ghuanjunState && this.ghuanjunManager) {
+                this.ghuanjunManager.importState(stateData.ghuanjunState);
             }
             
             this.updateAllHeroVisuals();
@@ -3751,14 +3755,19 @@ export class BattleManager {
 
         
         // Cleanup Hero managers
-        if (this.aliceEffect) {
-            this.aliceEffect.cleanup();
-            this.aliceEffect = null;
+        if (this.aliceManager) {
+            this.aliceManager.cleanup();
+            this.aliceManager = null;
         }
         
         if (this.moniaEffect) {
             this.moniaEffect.cleanup();
             this.moniaEffect = null;
+        }
+
+        if (this.ghuanjunManager) {
+            this.ghuanjunManager.cleanup();
+            this.ghuanjunManager = null;
         }
 
 
@@ -3861,6 +3870,21 @@ export class BattleManager {
         if (this.demonsGateManager) {
             this.demonsGateManager.cleanup();
             this.demonsGateManager = null;
+        }
+        if (this.lunaKiaiManager) {
+            this.lunaKiaiManager.cleanup();
+            this.lunaKiaiManager = null;
+        }
+        if (this.priestOfLunaManager) {
+            this.priestOfLunaManager.cleanup();
+            this.priestOfLunaManager = null;
+        }
+
+
+
+        if (this.lunaManager) {
+            this.lunaManager.cleanup();
+            this.lunaManager = null;
         }
 
 

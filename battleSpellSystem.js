@@ -33,6 +33,9 @@ import HasteSpell from './Spells/haste.js';
 import HandOfDeathSpell from './Spells/handOfDeath.js';
 import CriticalStrikeSpell from './Spells/criticalStrike.js';
 import DarkDealSpell from './Spells/darkDeal.js';
+import BlowOfTheVenomSnakeSpell from './Spells/blowOfTheVenomSnake.js';
+import StrongOxHeadbuttSpell from './Spells/strongOxHeadbutt.js';
+import FerociousTigerKickSpell from './Spells/ferociousTigerKick.js';
 
 
 
@@ -182,6 +185,18 @@ export class BattleSpellSystem {
         // Register DarkDeal
         const darkDeal = new DarkDealSpell(this.battleManager);
         this.spellImplementations.set('DarkDeal', darkDeal);
+
+        // Register BlowOfTheVenomSnake (Fighting spell)
+        const blowOfTheVenomSnake = new BlowOfTheVenomSnakeSpell(this.battleManager);
+        this.spellImplementations.set('BlowOfTheVenomSnake', blowOfTheVenomSnake);
+
+        // Register StrongOxHeadbutt (Fighting spell)
+        const strongOxHeadbutt = new StrongOxHeadbuttSpell(this.battleManager);
+        this.spellImplementations.set('StrongOxHeadbutt', strongOxHeadbutt);
+
+        // Register FerociousTigerKick (Fighting spell)
+        const ferociousTigerKick = new FerociousTigerKickSpell(this.battleManager);
+        this.spellImplementations.set('FerociousTigerKick', ferociousTigerKick);
     }
 
     // ============================================
@@ -591,6 +606,9 @@ export class BattleSpellSystem {
             return;
         }
         
+        // Track triggered spells for Ghuanjun bonus attacks
+        const triggeredSpells = [];
+        
         // Check each Fighting spell for triggers and execute immediately
         for (const spell of fightingSpells) {
             let triggerChance;
@@ -614,6 +632,9 @@ export class BattleSpellSystem {
             const shouldTrigger = triggerChance >= 1.0 || this.battleManager.getRandom() <= triggerChance;
             
             if (shouldTrigger) {
+                // Add to triggered spells list for Ghuanjun
+                triggeredSpells.push(spell);
+                
                 // Find the spell implementation and execute its effect
                 if (spellImpl && spellImpl.executeEffect) {
                     try {
@@ -637,6 +658,11 @@ export class BattleSpellSystem {
                     isFightingSpell: true
                 });
             }
+        }
+
+        // Check for Ghuanjun bonus attacks after all Fighting spells are processed
+        if (triggeredSpells.length > 0 && this.battleManager.ghuanjunManager) {
+            await this.battleManager.ghuanjunManager.checkGhuanjunFightingSpellBonus(attacker, target, damage, triggeredSpells);
         }
     }
 

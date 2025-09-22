@@ -37,8 +37,9 @@ export class TagsManager {
             'Status Effects': '#8e44ad',
             'Incapacitation': '#9b59b6',
             'Disruption': '#e91e63',
+            'Self-Damage': '#dc2626',
             
-            // NEW: Timing/Power Curve tags
+            // Timing/Power Curve tags
             'Late Game Scaling': '#6b46c1',  // Deep purple for long-term growth
             'Strong Early': '#f97316'       // Bright orange for immediate impact
         };
@@ -124,11 +125,13 @@ export class TagsManager {
             'Beato': ['High-Value', 'Random', 'Card Draw'],
             'Cecilia': ['Attacker', 'Gold Generation', 'Damage Dealer'],
             'Darge': ['Attacker', 'Sniper', 'Damage Dealer'],
+            'Ghuanjun': ['Attacker', 'Defense', 'Setup'],
             'Gon': ['Support', 'Disruption', 'Status Effects'],
             'Heinz': ['Setup', 'Summoner', 'Card Draw', 'Late Game Scaling'],
             'Ida': ['Damage Dealer', 'Area Damage', 'Status Effects'],
             'Kazena': ['Card Draw', 'Support', 'Setup'],
             'Kyli': ['Summoner', 'Setup', 'Attacker', 'Potions', 'Late Game Scaling'],
+            'Luna': ['Status Effects', 'Area Damage', 'Self-Damage'],
             'Medea': ['Damage Dealer', 'Status Effects', 'Damage Over Time'],
             'Monia': ['Defense', 'Support', 'Attacker'],
             'Nicolas': ['Support', 'Card Draw', 'Potions', 'Strong Early'],
@@ -221,8 +224,9 @@ export class TagsManager {
             'Status Effects': '✨',
             'Incapacitation': '😵',
             'Disruption': '⚡',
+            'Self-Damage': '🩸',
             
-            // NEW: Timing/Power Curve tags
+            // Timing/Power Curve tags
             'Late Game Scaling': '📈',  // Chart showing growth over time
             'Strong Early': '🌅'       // Sunrise representing early advantage
         };
@@ -441,7 +445,7 @@ export class TagsManager {
                 background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
             }
 
-            /* NEW: Special styling for power curve tags */
+            /* Special styling for power curve tags */
             .card-tag.tag-late-game-scaling {
                 background: linear-gradient(135deg, #6b46c1 0%, #8b5cf6 100%);
                 position: relative;
@@ -484,6 +488,21 @@ export class TagsManager {
                     box-shadow: 
                         0 4px 12px rgba(249, 115, 22, 0.6),
                         inset 0 1px 0 rgba(255, 255, 255, 0.3);
+                }
+            }
+
+            @keyframes selfDamagePulse {
+                0%, 100% {
+                    box-shadow: 
+                        0 2px 4px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                }
+                50% {
+                    box-shadow: 
+                        0 4px 12px rgba(220, 38, 38, 0.8),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                        0 0 20px rgba(220, 38, 38, 0.4);
+                    transform: scale(1.02);
                 }
             }
 

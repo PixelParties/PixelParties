@@ -3,7 +3,6 @@
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js';
 
-import { AliceHeroEffect } from './Heroes/alice.js';
 import { MoniaHeroEffect } from './Heroes/monia.js';
 
 import { checkHeartOfIceEffects } from './Artifacts/heartOfIce.js';
@@ -1212,12 +1211,18 @@ export class BattleCombatManager {
             // Store damage for cannibalism calculation
             const damageForCannibalism = attack.damage;
             
+            // APPLY NON-LETHAL CAP FOR GHUANJUN BONUS ATTACKS
+            let finalDamage = attack.damage;
+            if (attack.hero._nonLethalAttack) {
+                finalDamage = this.applyNonLethalCap(attack.hero, attack.target.creature, attack.damage);
+            }
+            
             // Apply damage to creature - this now handles kill tracking and necromancy revival internally
             await this.authoritative_applyDamageToCreature({
                 hero: attack.target.hero,
                 creature: attack.target.creature,
                 creatureIndex: attack.target.creatureIndex,
-                damage: attack.damage,
+                damage: finalDamage, // Use capped damage
                 position: attack.target.position,
                 side: attack.target.side
             }, {
@@ -1254,8 +1259,8 @@ export class BattleCombatManager {
                 );
             }
             
-        } else {
-            // Hero-to-hero attack - NOW WITH SHIELD SUPPORT
+        }else {
+            // Hero-to-hero attack
             const defender = attack.target.hero;
             const attacker = attack.hero;
             const isRanged = attack.isRanged || false;
@@ -1276,12 +1281,18 @@ export class BattleCombatManager {
             // Store damage for cannibalism calculation before applying
             const damageForCannibalism = attack.damage;
             
+            // APPLY NON-LETHAL CAP FOR GHUANJUN BONUS ATTACKS
+            let finalDamage = attack.damage;
+            if (attacker._nonLethalAttack) {
+                finalDamage = this.applyNonLethalCap(attacker, defender, attack.damage);
+            }
+            
             // Use authoritative_applyDamage to ensure all status effects are processed
             const damageResult = await this.authoritative_applyDamage({
                 target: defender,
-                damage: attack.damage,
-                newHp: Math.max(0, defender.currentHp - attack.damage),
-                died: (defender.currentHp - attack.damage) <= 0
+                damage: finalDamage, // Use capped damage
+                newHp: Math.max(0, defender.currentHp - finalDamage), // Update calculation
+                died: (defender.currentHp - finalDamage) <= 0 // Update calculation
             }, {
                 source: 'attack',
                 attacker: attacker
@@ -1454,6 +1465,12 @@ export class BattleCombatManager {
             // Check for Heart of Ice effects when hero takes non-status damage
             if (this.battleManager.isAuthoritative && target.alive) {
                 checkHeartOfIceEffects(this.battleManager, target, finalDamage, damageSource);
+            }
+
+            // Check for Dichotomy of Luna and Tempeste effects when hero takes burn damage
+            if (this.battleManager.isAuthoritative && target.alive && damageSource === 'burn') {
+                const { checkDichotomyOfLunaAndTempesteEffects } = await import('../Artifacts/dichotomyOfLunaAndTempeste.js');
+                checkDichotomyOfLunaAndTempesteEffects(this.battleManager, target, finalDamage);
             }
 
             if (damageApplication.died && this.battleManager.isAuthoritative) {
@@ -1735,25 +1752,31 @@ export class BattleCombatManager {
     // Used by FuriousAnger, CrumTheClassPet, and other effects that grant extra actions
     async executeAdditionalAction(hero, position) {
         if (!this.battleManager.isAuthoritative) return;
-                
+
         // ============================================
-        // ALICE'S LASER EFFECT: Trigger for additional actions too
+        // HERO SPECIAL EFFECTS: Trigger for additional actions too
         // ============================================
-        
+
         // Check if Alice is taking an additional action and trigger her laser first
-        if (hero && hero.name === 'Alice' && hero.alive) {
-            try {
-                await AliceHeroEffect.checkAliceActionEffect(hero, this.battleManager);
-            } catch (error) {
-                console.error('Error triggering Alice laser effect in additional action:', error);
-            }
+        if (hero && hero.name === 'Alice' && hero.alive && this.battleManager.aliceManager) {
+            // Create actor object like the main battle flow does
+            const aliceActor = {
+                type: 'hero',
+                name: hero.name,
+                data: hero,
+                hero: hero
+            };
+            await this.battleManager.aliceManager.executeHeroAction(aliceActor, position);
         }
         
         // Check for spell casting before attacking
         let spellToCast = null;
         let willAttack = true;
 
-        if (this.battleManager.spellSystem) {
+        // Skip spellcasting if this is a Ghuanjun bonus attack
+        if (hero._skipSpellcastingThisAction) {
+            console.log(`⚔️ Skipping spellcasting for ${hero.name}'s bonus attack`);
+        } else if (this.battleManager.spellSystem) {
             // Create a version of the hero that only shows enabled spells
             const heroForSpells = this.createHeroWithEnabledSpellsOnly(hero);
             spellToCast = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
@@ -1849,6 +1872,54 @@ export class BattleCombatManager {
                 this.battleManager.addCombatLog(`🔍 ${hero.name} finds no targets for attack!`, 'info');
             }
         }
+    }
+
+    /**
+     * Apply non-lethal damage cap if needed
+     * @param {Object} attacker - The attacking hero
+     * @param {Object} target - The target (hero or creature)
+     * @param {number} damage - Original damage amount
+     * @returns {number} - Capped damage amount
+     */
+    applyNonLethalCap(attacker, target, damage) {
+        // Check if this is a Ghuanjun non-lethal bonus attack
+        if (!attacker._nonLethalAttack) {
+            return damage; // No cap needed
+        }
+        
+        const currentHp = target.currentHp;
+        
+        // Get current shield amount (heroes have shields, creatures don't)
+        const currentShield = (target.type === 'hero' || !target.type) 
+            ? (this.combatManager ? this.combatManager.getShield(target) : (target.currentShield || 0))
+            : 0;
+        
+        // Calculate total effective HP (HP + shields)
+        const totalEffectiveHp = currentHp + currentShield;
+        
+        if (totalEffectiveHp <= 1) {
+            // Target already at 1 effective HP or less, no damage
+            return 0;
+        }
+        
+        // Cap damage to leave target with exactly 1 HP after shields are depleted
+        // This means: totalEffectiveHp - damage = 1
+        // So: damage = totalEffectiveHp - 1
+        const maxDamage = totalEffectiveHp - 1;
+        
+        if (damage > maxDamage) {
+            console.log(`⚔️ Ghuanjun's bonus attack is non-lethal: ${damage} damage reduced to ${maxDamage} (accounting for ${currentShield} shield)`);
+            
+            // Add combat log message
+            this.battleManager.addCombatLog(
+                `⚔️ ${attacker.name}'s bonus attack shows mercy, leaving ${target.name} with 1 HP!`,
+                attacker.side === 'player' ? 'info' : 'warning'
+            );
+            
+            return maxDamage;
+        }
+        
+        return damage;
     }
 
     async checkImmortalRevival(target) {

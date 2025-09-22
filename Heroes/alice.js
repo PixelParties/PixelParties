@@ -1,6 +1,6 @@
-// ./Heroes/alice.js - Alice Hero Effect Implementation
+// ./Heroes/alice.js - Alice Hero Manager (following Luna/Creature manager pattern)
 
-export class AliceHeroEffect {
+export class AliceHeroManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.heroName = 'Alice';
@@ -14,27 +14,30 @@ export class AliceHeroEffect {
         // Inject CSS styles
         this.injectAliceLaserStyles();
         
-        console.log('🔴 Alice Hero effect initialized');
+        console.log('🔴 Alice Hero Manager initialized');
     }
 
-    // ============================================
-    // CORE ALICE EFFECT
-    // ============================================
+    // Static method to check if a hero is Alice (follows Creature pattern)
+    static isAlice(heroName) {
+        return heroName === 'Alice';
+    }
 
-    // Check and apply Alice's laser effect when she takes any action
-    static async checkAliceActionEffect(alice, battleManager) {
-        // Only trigger for Alice
-        if (!alice || alice.name !== 'Alice') return;
+    // Execute Alice's special action when she acts (called from battle flow)
+    async executeHeroAction(aliceActor, position) {
+        if (!this.battleManager.isAuthoritative) return;
+
+        const alice = aliceActor.data;
         
-        console.log(`🔴 Alice's laser effect triggered!`);
-        
-        // Initialize Alice effect instance if needed
-        if (!battleManager.aliceEffect) {
-            battleManager.aliceEffect = new AliceHeroEffect(battleManager);
+        // Safety check: ensure Alice is still alive
+        if (!alice.alive || alice.currentHp <= 0) {
+            console.log(`Alice is dead, cannot execute special action`);
+            return;
         }
+
+        console.log('🔴 Alice\'s laser effect triggered!');
         
         // Execute the laser effect
-        await battleManager.aliceEffect.executeLaserEffect(alice);
+        await this.executeLaserEffect(alice);
     }
 
     // ============================================
@@ -633,5 +636,28 @@ export class AliceHeroEffect {
         } catch (error) {
             console.warn('Error cleaning up orphaned lasers:', error);
         }
+
+        console.log('🔴 Alice Hero Manager cleaned up');
     }
 }
+
+// Static helper methods (following Creature pattern)
+export const AliceHelpers = {
+    // Check if any hero in a formation is Alice
+    hasAliceInFormation(formation) {
+        return Object.values(formation).some(hero => hero && AliceHeroManager.isAlice(hero.name));
+    },
+
+    // Get Alice from formation if present
+    getAliceFromFormation(formation) {
+        for (const position in formation) {
+            const hero = formation[position];
+            if (hero && AliceHeroManager.isAlice(hero.name)) {
+                return { hero, position };
+            }
+        }
+        return null;
+    }
+};
+
+export default AliceHeroManager;

@@ -597,6 +597,31 @@ export class BattleNetworkManager {
                 this.handleDeckUpdate(data);
                 break;
 
+            case 'potion_usage':
+                if (window.potionHandler) {
+                    window.potionHandler.guest_handlePotionUsageVisual(data);
+                }
+                break;
+
+            case 'potion_effect_added':
+                if (window.potionHandler) {
+                    window.potionHandler.guest_handlePotionEffectAddedVisual(data);
+                }
+                break;
+
+            case 'potion_effects_applied':
+                if (window.potionHandler) {
+                    window.potionHandler.guest_handlePotionEffectsAppliedVisual(data);
+                }
+                break;
+
+            case 'potion_effects_cleared':
+                if (window.potionHandler) {
+                    window.potionHandler.guest_handlePotionEffectsClearedVisual(data);
+                }
+                break;
+                
+
             case 'necromancy_revival':
                 bm.guest_handleNecromancyRevival(data);
                 break;
@@ -777,7 +802,27 @@ export class BattleNetworkManager {
                 break;
 
             case 'alice_laser_effect':
-                bm.guest_handleAliceLaserEffect(data);
+                if (bm.aliceManager) {
+                    bm.aliceManager.guest_handleAliceLaserEffect(data);
+                }
+                break;
+
+            case 'luna_burn_cleansing':
+                if (bm.lunaManager) {
+                    bm.lunaManager.handleGuestBurnCleansingEffect(data);
+                } 
+                break;
+
+            case 'ghuanjun_bonus_attack':
+                if (bm.ghuanjunManager) {
+                    bm.ghuanjunManager.handleGuestBonusAttack(data);
+                }
+                break;
+
+            case 'ghuanjun_round_reset':
+                if (bm.ghuanjunManager) {
+                    bm.ghuanjunManager.handleGuestRoundReset(data);
+                }
                 break;
 
             case 'yuki_onna_blizzard_attack':
@@ -822,6 +867,18 @@ export class BattleNetworkManager {
             case 'demons_gate_spell_cast':
                 if (bm.demonsGateManager) {
                     bm.demonsGateManager.handleGuestSpellCast(data);
+                }
+                break;
+
+            case 'luna_kiai_flame_attack':
+                if (bm.lunaKiaiManager) {
+                    bm.lunaKiaiManager.handleGuestFlameAttack(data);
+                }
+                break;
+
+            case 'priest_of_luna_cleansing': 
+                if (bm.priestOfLunaManager) {
+                    bm.priestOfLunaManager.handleGuestCleansing(data);
                 }
                 break;
 
@@ -1056,6 +1113,25 @@ export class BattleNetworkManager {
                 });
                 break;
 
+            case 'heart_mountain_effects_complete':
+                import('./Artifacts/heartOfTheMountain.js').then(({ handleGuestHeartOfMountainEffects }) => {
+                    handleGuestHeartOfMountainEffects(data, this.battleManager);
+                });
+                break;
+
+            case 'heart_mountain_burn':
+                import('./Artifacts/heartOfTheMountain.js').then(({ handleGuestHeartOfMountainBurn }) => {
+                    handleGuestHeartOfMountainBurn(data, this.battleManager);
+                });
+                break;
+
+            case 'dichotomy_luna_tempeste_shield':
+                if (!bm.isAuthoritative) {
+                    const { handleGuestDichotomyShieldEffect } = await import('./Artifacts/dichotomyOfLunaAndTempeste.js');
+                    handleGuestDichotomyShieldEffect(data, bm);
+                }
+                break;
+
             case 'cloud_pillow_effects_complete':
                 return this.battleManager.guest_handleCloudPillowEffectsComplete(data);
 
@@ -1138,6 +1214,30 @@ export class BattleNetworkManager {
                     this.battleManager.spellSystem.spellImplementations.has('HeavyHit')) {
                     const heavyHitSpell = this.battleManager.spellSystem.spellImplementations.get('HeavyHit');
                     heavyHitSpell.handleGuestEffect(data);
+                }
+                break;
+
+            case 'blow_of_the_venom_snake_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('BlowOfTheVenomSnake')) {
+                    const blowOfTheVenomSnakeSpell = this.battleManager.spellSystem.spellImplementations.get('BlowOfTheVenomSnake');
+                    blowOfTheVenomSnakeSpell.handleGuestEffect(data);
+                }
+                break;
+
+            case 'strong_ox_headbutt_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('StrongOxHeadbutt')) {
+                    const strongOxHeadbuttSpell = this.battleManager.spellSystem.spellImplementations.get('StrongOxHeadbutt');
+                    strongOxHeadbuttSpell.handleGuestEffect(data);
+                }
+                break;
+
+            case 'ferocious_tiger_kick_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('FerociousTigerKick')) {
+                    const ferociousTigerKickSpell = this.battleManager.spellSystem.spellImplementations.get('FerociousTigerKick');
+                    ferociousTigerKickSpell.handleGuestEffect(data);
                 }
                 break;
                 
@@ -1235,6 +1335,14 @@ export class BattleNetworkManager {
                     handleGuestTearingMountainSelfTarget(data, this.battleManager);
                 }).catch(error => {
                     console.error('Error handling guest tearing mountain self target:', error);
+                });
+                break;
+
+            case 'graveyard_limited_power_effects':
+                import('./Spells/graveyardOfLimitedPower.js').then(({ handleGuestGraveyardOfLimitedPowerEffects }) => {
+                    handleGuestGraveyardOfLimitedPowerEffects(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling guest graveyard effects:', error);
                 });
                 break;
 

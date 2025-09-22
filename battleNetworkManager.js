@@ -803,7 +803,7 @@ export class BattleNetworkManager {
 
             case 'alice_laser_effect':
                 if (bm.aliceManager) {
-                    bm.aliceManager.guest_handleAliceLaserEffect(data);
+                    bm.aliceManager.handleGuestLaserEffect(data);
                 }
                 break;
 

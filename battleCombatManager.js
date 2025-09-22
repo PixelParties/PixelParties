@@ -1469,7 +1469,7 @@ export class BattleCombatManager {
 
             // Check for Dichotomy of Luna and Tempeste effects when hero takes burn damage
             if (this.battleManager.isAuthoritative && target.alive && damageSource === 'burn') {
-                const { checkDichotomyOfLunaAndTempesteEffects } = await import('../Artifacts/dichotomyOfLunaAndTempeste.js');
+                const { checkDichotomyOfLunaAndTempesteEffects } = await import('./Artifacts/dichotomyOfLunaAndTempeste.js');
                 checkDichotomyOfLunaAndTempesteEffects(this.battleManager, target, finalDamage);
             }
 

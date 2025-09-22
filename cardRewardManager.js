@@ -61,6 +61,7 @@ export class CardRewardManager {
             'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'Fighting', 'RainbowsArrow', 'RainOfArrows'],
+            'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechFists', 'FutureTechLamp', 'FutureTechCopyDevice'],
             'Ida': ['BottledFlame', 'BurningFinger', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],

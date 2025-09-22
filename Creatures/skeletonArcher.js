@@ -174,7 +174,6 @@ export class SkeletonArcherCreature {
             );
 
             // Fire this arrow (don't await - let them fly simultaneously with staggered starts)
-            // FIXED: Pass the attacking archer creature
             this.fireSalvoArrow(archerElement, target, i + 1, archerCreature);
             
             // Small delay before firing the next arrow
@@ -214,7 +213,7 @@ export class SkeletonArcherCreature {
         // Wait for projectile to reach target
         await this.battleManager.delay(adjustedTravelTime);
         
-        // Apply damage when projectile hits (only host applies actual damage) - FIXED: Use attackingArcher
+        // Apply damage when projectile hits (only host applies actual damage)
         this.applyArcherDamage(target, attackingArcher);
         
         // Add impact effect
@@ -353,6 +352,7 @@ export class SkeletonArcherCreature {
                     type: 'hero',
                     heroName: hero.name,
                     position: position,
+                    side: targetSide, 
                     targetName: hero.name
                 });
                 
@@ -364,6 +364,7 @@ export class SkeletonArcherCreature {
                                 type: 'creature',
                                 creatureName: creature.name,
                                 position: position,
+                                side: targetSide,
                                 creatureIndex: index,
                                 targetName: creature.name
                             });
@@ -384,14 +385,14 @@ export class SkeletonArcherCreature {
     findTargetElementForGuest(target) {
         if (target.type === 'hero') {
             const heroElement = document.querySelector(
-                `.${target.position === 'player' ? 'player' : 'opponent'}-slot.${target.position}-slot .battle-hero-card`
+                `.${target.side}-slot.${target.position}-slot .battle-hero-card`
             );
             return heroElement || document.querySelector(
-                `.${target.position === 'player' ? 'player' : 'opponent'}-slot.${target.position}-slot`
+                `.${target.side}-slot.${target.position}-slot`
             );
         } else if (target.type === 'creature') {
             return document.querySelector(
-                `.${target.position === 'player' ? 'player' : 'opponent'}-slot.${target.position}-slot .creature-icon[data-creature-index="${target.creatureIndex}"]`
+                `.${target.side}-slot.${target.position}-slot .creature-icon[data-creature-index="${target.creatureIndex}"]`
             );
         }
         return null;

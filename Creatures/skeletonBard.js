@@ -120,7 +120,7 @@ export class SkeletonBardCreature {
         // Wait for music notes to travel
         await this.battleManager.delay(800);
         
-        // Now trigger the target creature's special attack
+        // Now trigger the target creature's special attack using centralized activation
         await this.triggerCreatureSpecialAttack(targetCreature, position);
         
         this.battleManager.addCombatLog(
@@ -129,25 +129,9 @@ export class SkeletonBardCreature {
         );
     }
 
-    // Trigger the special attack of the target creature
+    // Trigger the special attack of the target creature - NOW USES CENTRALIZED LOGIC
     async triggerCreatureSpecialAttack(targetCreature, originalPosition) {
         try {
-            // Import creature classes dynamically to avoid circular dependencies
-            const JigglesCreature = (await import('./jiggles.js')).default;
-            const SkeletonArcherCreature = (await import('./skeletonArcher.js')).default;
-            const SkeletonNecromancerCreature = (await import('./skeletonNecromancer.js')).default;
-            const SkeletonDeathKnightCreature = (await import('./skeletonDeathKnight.js')).default;
-            const BurningSkeletonCreature = (await import('./burningSkeleton.js')).default;
-            const SkeletonReaperCreature = (await import('./skeletonReaper.js')).default;
-            const ArcherCreature = (await import('./archer.js')).default;
-            const ColdHeartedYukiOnnaCreature = (await import('./cold-HeartedYuki-Onna.js')).default;
-            const CrumTheClassPetCreature = (await import('./crumTheClassPet.js')).default;
-            const FrontSoldierCreature = (await import('./frontSoldier.js')).default;
-            const GrinningCatCreature = (await import('./grinningCat.js')).default;
-            const MoonlightButterflyCreature = (await import('./moonlightButterfly.js')).default;
-            const RoyalCorgiCreature = (await import('./royalCorgi.js')).default;
-            const SkeletonMageCreature = (await import('./skeletonMage.js')).default;
-
             // Create actor data for the target creature
             const targetActor = {
                 type: 'creature',
@@ -157,100 +141,11 @@ export class SkeletonBardCreature {
                 hero: targetCreature.hero
             };
 
-            const creatureName = targetCreature.creature.name;
-            const bm = this.battleManager;
-            
-            // Determine creature type and call appropriate special attack
-            if (JigglesCreature.isJiggles(creatureName)) {
-                if (bm.jigglesManager) {
-                    await bm.jigglesManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (SkeletonArcherCreature.isSkeletonArcher(creatureName)) {
-                if (bm.skeletonArcherManager) {
-                    await bm.skeletonArcherManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(creatureName)) {
-                if (bm.skeletonNecromancerManager) {
-                    await bm.skeletonNecromancerManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(creatureName)) {
-                if (bm.skeletonDeathKnightManager) {
-                    await bm.skeletonDeathKnightManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (BurningSkeletonCreature.isBurningSkeleton(creatureName)) {
-                if (bm.burningSkeletonManager) {
-                    await bm.burningSkeletonManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (SkeletonReaperCreature.isSkeletonReaper(creatureName)) {
-                if (bm.skeletonReaperManager) {
-                    await bm.skeletonReaperManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            }else if (ArcherCreature.isArcher(creatureName)) {
-                if (bm.archerManager) {
-                    await bm.archerManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (ColdHeartedYukiOnnaCreature.isColdHeartedYukiOnna(creatureName)) {
-                if (bm.coldHeartedYukiOnnaManager) {
-                    await bm.coldHeartedYukiOnnaManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (CrumTheClassPetCreature.isCrumTheClassPet(creatureName)) {
-                if (bm.crumTheClassPetManager) {
-                    // Note: CrumTheClassPet uses executeCrumTheClassPetAction, not executeSpecialAttack
-                    await bm.crumTheClassPetManager.executeCrumTheClassPetAction(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (FrontSoldierCreature.isFrontSoldier(creatureName)) {
-                if (bm.frontSoldierManager) {
-                    await bm.frontSoldierManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (GrinningCatCreature.isGrinningCat(creatureName)) {
-                if (bm.grinningCatManager) {
-                    // Note: GrinningCat uses executeGrinningCatAction, not executeSpecialAttack
-                    await bm.grinningCatManager.executeGrinningCatAction(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (MoonlightButterflyCreature.isMoonlightButterfly(creatureName)) {
-                if (bm.moonlightButterflyManager) {
-                    // Note: MoonlightButterfly uses executeMoonlightButterflyAction, not executeSpecialAttack
-                    await bm.moonlightButterflyManager.executeMoonlightButterflyAction(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (RoyalCorgiCreature.isRoyalCorgi(creatureName)) {
-                if (bm.royalCorgiManager) {
-                    // Note: RoyalCorgi uses executeRoyalCorgiAction, not executeSpecialAttack
-                    await bm.royalCorgiManager.executeRoyalCorgiAction(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
-            } else if (SkeletonMageCreature.isSkeletonMage(creatureName)) {
-                if (bm.skeletonMageManager) {
-                    await bm.skeletonMageManager.executeSpecialAttack(targetActor, targetCreature.position);
-                } else {
-                    await this.fallbackCreatureActivation(targetActor, targetCreature.position);
-                }
+            // Use the centralized creature activation from BattleFlowManager
+            if (this.battleManager.flowManager && this.battleManager.flowManager.activateCreatureSpecialAttack) {
+                await this.battleManager.flowManager.activateCreatureSpecialAttack(targetActor, targetCreature.position);
             } else {
-                // Regular creature without special attack - just do shake animation
+                // Fallback if flowManager or method not available
                 await this.fallbackCreatureActivation(targetActor, targetCreature.position);
             }
             

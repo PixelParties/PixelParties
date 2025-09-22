@@ -153,6 +153,37 @@ export class MonsterInABottlePotion {
         }, 50); // Small delay to ensure creature is rendered
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get ally heroes from guest's perspective
+        const allyHeroes = isHostPotion ? 
+            Object.values(battleManager.opponentHeroes) : // Host's heroes (guest's opponents when host used potion)
+            Object.values(battleManager.playerHeroes); // Guest's own heroes
+        
+        const targets = allyHeroes.filter(hero => hero && hero.alive);
+        
+        if (targets.length === 0) return;
+        
+        // Show summoning effects on ally heroes
+        for (const hero of targets) {
+            this.playQuickSummoningEffect(hero);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        const bottleText = effectCount === 1 ? 'Monster in a Bottle' : `${effectCount} Monster in a Bottles`;
+        battleManager.addCombatLog(
+            `🎲 ${playerName}'s ${bottleText} summons creatures to aid heroes!`,
+            logType
+        );
+    }
+
     /**
      * Inject CSS for creature summoning animations
      */

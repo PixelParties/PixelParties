@@ -262,6 +262,49 @@ export class BottledLightningPotion {
         }
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get all enemy targets from guest's perspective
+        const enemyTargets = isHostPotion ? 
+            this.getEnemyTargets('guest', battleManager) : // From guest's perspective, targeting host's side
+            this.getEnemyTargets('host', battleManager);   // From host's perspective, targeting guest's side
+        
+        if (enemyTargets.length === 0) return;
+        
+        // Show simplified lightning effects (no actual damage/targeting logic)
+        const selectedTargets = this.selectThreeDifferentTargets(enemyTargets, battleManager);
+        const damageValues = [150, 100, 50];
+        
+        // Execute visual chain lightning
+        for (let i = 0; i < selectedTargets.length; i++) {
+            const target = selectedTargets[i];
+            const damage = damageValues[i] || 0;
+
+            if (damage > 0) {
+                await this.showLightningStrike(target, damage, battleManager, i === 0);
+                
+                if (i < selectedTargets.length - 1) {
+                    await this.showLightningChain(selectedTargets[i], selectedTargets[i + 1], battleManager);
+                }
+                
+                await battleManager.delay(400);
+            }
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `⚡ ${playerName}'s Bottled Lightning chains through ${selectedTargets.length} targets!`,
+            logType
+        );
+    }
+
     // Apply lightning damage to target
     applyLightningDamage(target, damage, battleManager) {
         if (target.type === 'hero') {

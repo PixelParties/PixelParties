@@ -312,6 +312,51 @@ export class BottledFlamePotion {
         setTimeout(() => flash.remove(), 250);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get all enemy targets (heroes and creatures) from guest's perspective
+        const targetHeroes = isHostPotion ? 
+            Object.values(battleManager.playerHeroes) : // Guest's targets (host's enemies)
+            Object.values(battleManager.opponentHeroes); // Host's targets (guest's enemies)
+        
+        const targets = [];
+        
+        targetHeroes.forEach(hero => {
+            if (hero && hero.alive) {
+                targets.push(hero);
+                
+                // Add living creatures
+                if (hero.creatures) {
+                    hero.creatures.forEach(creature => {
+                        if (creature && creature.alive) {
+                            targets.push(creature);
+                        }
+                    });
+                }
+            }
+        });
+        
+        if (targets.length === 0) return;
+        
+        // Show flame burst effects on all targets
+        for (const target of targets) {
+            await this.showBurstingFlameEffect(target, battleManager);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `🔥 ${playerName}'s Bottled Flame ignites! ${targets.length} targets burned!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Get the DOM element for a target (hero or creature)

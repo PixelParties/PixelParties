@@ -309,6 +309,55 @@ export class PunchInTheBoxPotion {
         this.addAnimationToDocument(animationName, keyframes);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get enemy heroes from guest's perspective
+        const enemyHeroes = isHostPotion ? 
+            Object.values(battleManager.playerHeroes) : // Guest's own heroes (host's enemies)
+            Object.values(battleManager.opponentHeroes); // Host's heroes (guest's enemies)
+        
+        const targets = [];
+        
+        // Collect all enemy heroes and creatures
+        enemyHeroes.forEach(hero => {
+            if (hero && hero.alive) {
+                targets.push(hero);
+            }
+            
+            if (hero && hero.creatures && Array.isArray(hero.creatures)) {
+                hero.creatures.forEach(creature => {
+                    if (creature && creature.alive) {
+                        targets.push(creature);
+                    }
+                });
+            }
+        });
+        
+        if (targets.length === 0) return;
+        
+        // Show punch effects on random targets (simulate random zone targeting)
+        const effectsToShow = Math.min(targets.length, effectCount * 3); // Show some punch effects
+        const selectedTargets = targets.slice(0, effectsToShow);
+        
+        for (const target of selectedTargets) {
+            await this.showPunchEffect(target, battleManager);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        const punchText = effectCount === 1 ? 'Punch in the Box' : `${effectCount} Punch in the Boxes`;
+        battleManager.addCombatLog(
+            `👊 ${playerName}'s ${punchText} strikes! Random zones targeted!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Get the DOM element for a target (hero or creature)

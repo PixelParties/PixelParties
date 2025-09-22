@@ -273,6 +273,36 @@ export class BoulderInABottlePotion {
         document.head.appendChild(style);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get ally hero targets from guest's perspective
+        const targetHeroes = isHostPotion ? 
+            Object.values(battleManager.opponentHeroes) : // Host's allies (from guest's POV)
+            Object.values(battleManager.playerHeroes);    // Guest's allies (from guest's POV)
+        
+        const targets = targetHeroes.filter(hero => hero && hero.alive);
+        
+        if (targets.length === 0) return;
+        
+        // Show boulder summoning effects on all targets
+        for (const target of targets) {
+            this.playQuickSummoningEffect(target);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `🪨 ${playerName} summons ${targets.length} Boulder(s) to defend heroes!`,
+            logType
+        );
+    }
+
     /**
      * Utility delay function that works with battle manager speed
      * @param {Object} battleManager - Battle manager instance

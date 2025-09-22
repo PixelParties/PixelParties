@@ -1,5 +1,5 @@
 // potionHandler.js - Enhanced Potion Management System with Persistent Battle Effects and Multi-Player Support
-// UPDATED: Added ElixirOfStrength support and P2P visual synchronization
+// UPDATED: Added ElixirOfStrength support, P2P visual synchronization, and potion-specific guest visual effects
 
 export class PotionHandler {
     constructor() {
@@ -236,12 +236,6 @@ export class PotionHandler {
 
             // Show usage notification
             this.showPotionUsage(cardName);
-            
-            // Send visual sync to guest
-            this.sendPotionVisualSync('potion_usage', {
-                potionName: cardName,
-                visualType: 'usage'
-            }, heroSelection);
 
             // Update UI displays
             if (heroSelection.updateHandDisplay) {
@@ -505,6 +499,379 @@ export class PotionHandler {
         return effectsApplied;
     }
 
+    // ===== NEW: POTION-SPECIFIC VISUAL EFFECTS HANDLER =====
+
+    // Handle potion-specific visual effects for guest
+    async handlePotionSpecificVisual(data) {
+        const { potionName, visualType, playerSide, effectCount = 1 } = data;
+        
+        if (visualType !== 'potion_effects') {
+            console.log('Ignoring non-potion-effects visual message');
+            return;
+        }
+        
+        // Get battle manager from window or global context
+        let battleManager = null;
+        if (window.battleManager) {
+            battleManager = window.battleManager;
+        } else if (typeof window !== 'undefined' && window.heroSelection && window.heroSelection.battleManager) {
+            battleManager = window.heroSelection.battleManager;
+        }
+        
+        if (!battleManager) {
+            console.warn('No battle manager available for potion visual effects');
+            return;
+        }
+        
+        // Only process on guest side
+        if (battleManager.isAuthoritative) {
+            return;
+        }
+        
+        console.log(`🎨 Guest handling visual effects for ${potionName} from ${playerSide}`);
+        
+        try {
+            // Route to specific potion module for visual effects
+            switch (potionName) {
+                case 'AcidVial':
+                    const { AcidVialPotion } = await import('./Potions/acidVial.js');
+                    const acidVialPotion = new AcidVialPotion();
+                    await this.applyGuestVisualEffects(acidVialPotion, data, battleManager);
+                    break;
+                    
+                case 'BottledFlame':
+                    const { BottledFlamePotion } = await import('./Potions/bottledFlame.js');
+                    const bottledFlamePotion = new BottledFlamePotion();
+                    await this.applyGuestVisualEffects(bottledFlamePotion, data, battleManager);
+                    break;
+                    
+                case 'BottledLightning':
+                case 'bottledLightning':
+                    const { BottledLightningPotion } = await import('./Potions/bottledLightning.js');
+                    const bottledLightningPotion = new BottledLightningPotion();
+                    await bottledLightningPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+                    
+                case 'ElixirOfCold':
+                case 'elixirOfCold':
+                    const { ElixirOfColdPotion } = await import('./Potions/elixirOfCold.js');
+                    const elixirOfColdPotion = new ElixirOfColdPotion();
+                    await this.applyGuestVisualEffects(elixirOfColdPotion, data, battleManager);
+                    break;
+                    
+                case 'CloudInABottle':
+                    const { CloudInABottlePotion } = await import('./Potions/cloudInABottle.js');
+                    const cloudInABottlePotion = new CloudInABottlePotion();
+                    await this.applyGuestVisualEffects(cloudInABottlePotion, data, battleManager);
+                    break;
+                    
+                case 'ElixirOfImmortality':
+                    const { ElixirOfImmortality } = await import('./Potions/elixirOfImmortality.js');
+                    const elixirOfImmortality = new ElixirOfImmortality();
+                    await this.applyGuestVisualEffects(elixirOfImmortality, data, battleManager);
+                    break;
+                    
+                case 'BoulderInABottle':
+                    const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
+                    const boulderInABottlePotion = new BoulderInABottlePotion();
+                    await this.applyGuestVisualEffects(boulderInABottlePotion, data, battleManager);
+                    break;
+
+                case 'ElixirOfStrength':
+                    const { ElixirOfStrengthPotion } = await import('./Potions/elixirOfStrength.js');
+                    const elixirOfStrengthPotion = new ElixirOfStrengthPotion();
+                    await elixirOfStrengthPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'LifeSerum':
+                    const { LifeSerumPotion } = await import('./Potions/lifeSerum.js');
+                    const lifeSerumPotion = new LifeSerumPotion();
+                    await lifeSerumPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'PoisonVial':
+                    const { PoisonVialPotion } = await import('./Potions/poisonVial.js');
+                    const poisonVialPotion = new PoisonVialPotion();
+                    await poisonVialPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'SwordInABottle':
+                    const { SwordInABottlePotion } = await import('./Potions/swordInABottle.js');
+                    const swordInABottlePotion = new SwordInABottlePotion();
+                    await swordInABottlePotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'TeleportationPowder':
+                    const { TeleportationPowderPotion } = await import('./Potions/teleportationPowder.js');
+                    const teleportationPowderPotion = new TeleportationPowderPotion();
+                    await teleportationPowderPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'PunchInTheBox':
+                    const { PunchInTheBoxPotion } = await import('./Potions/punchInTheBox.js');
+                    const punchInTheBoxPotion = new PunchInTheBoxPotion();
+                    await punchInTheBoxPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'ExperimentalPotion':
+                    const { ExperimentalPotionPotion } = await import('./Potions/experimentalPotion.js');
+                    const experimentalPotionPotion = new ExperimentalPotionPotion();
+                    await experimentalPotionPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'MonsterInABottle':
+                    const { MonsterInABottlePotion } = await import('./Potions/monsterInABottle.js');
+                    const monsterInABottlePotion = new MonsterInABottlePotion();
+                    await monsterInABottlePotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'OverflowingChalice':
+                    const { OverflowingChalicePotion } = await import('./Potions/overflowingChalice.js');
+                    const overflowingChalicePotion = new OverflowingChalicePotion();
+                    await overflowingChalicePotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+
+                case 'MagicLamp':
+                    const { MagicLampPotion } = await import('./Potions/magicLamp.js');
+                    const magicLampPotion = new MagicLampPotion();
+                    await magicLampPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
+                    
+                // Add more potion cases as needed
+                default:
+                    console.log(`No guest visual effects handler for potion: ${potionName}`);
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error handling guest visual effects for ${potionName}:`, error);
+        }
+    }
+
+    // Apply guest visual effects using the potion's visual methods
+    async applyGuestVisualEffects(potionInstance, data, battleManager) {
+        const { potionName, playerSide, effectCount = 1 } = data;
+        
+        // Determine targets from guest's perspective
+        // If host used the potion, determine the appropriate targets based on potion type
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get targets based on potion type and who used it
+        let targets = [];
+        
+        // Check potion targeting type
+        const targetType = this.getPotionTargetType(potionName);
+        
+        switch (targetType) {
+            case 'enemy_all':
+                // Targets all enemies (from user's perspective)
+                targets = isHostPotion ? 
+                    this.getGuestTargetsForHostPotion(battleManager, 'enemy') :
+                    this.getGuestTargetsForGuestPotion(battleManager, 'enemy');
+                break;
+                
+            case 'ally_all':
+                // Targets all allies (from user's perspective)
+                targets = isHostPotion ? 
+                    this.getGuestTargetsForHostPotion(battleManager, 'ally') :
+                    this.getGuestTargetsForGuestPotion(battleManager, 'ally');
+                break;
+                
+            case 'enemy_heroes_only':
+                // Targets only enemy heroes
+                targets = isHostPotion ? 
+                    this.getGuestHeroTargetsForHostPotion(battleManager, 'enemy') :
+                    this.getGuestHeroTargetsForGuestPotion(battleManager, 'enemy');
+                break;
+                
+            case 'ally_heroes_only':
+                // Targets only ally heroes
+                targets = isHostPotion ? 
+                    this.getGuestHeroTargetsForHostPotion(battleManager, 'ally') :
+                    this.getGuestHeroTargetsForGuestPotion(battleManager, 'ally');
+                break;
+                
+            default:
+                console.warn(`Unknown target type for ${potionName}: ${targetType}`);
+                return;
+        }
+        
+        if (targets.length === 0) {
+            console.log(`No valid targets found for ${potionName} visual effects`);
+            return;
+        }
+        
+        // Apply visual effects to all targets
+        const visualPromises = targets.map(target => {
+            // Call the appropriate visual method based on potion type
+            switch (potionName) {
+                case 'AcidVial':
+                    return potionInstance.showAcidSplashEffect(target, battleManager);
+                case 'BottledFlame':
+                    return potionInstance.showBurstingFlameEffect(target, battleManager);
+                case 'ElixirOfCold':
+                case 'elixirOfCold':
+                    return potionInstance.showColdBlessing(target, battleManager);
+                case 'CloudInABottle':
+                    return potionInstance.showCloudedApplicationEffect(target, battleManager);
+                case 'ElixirOfImmortality':
+                    return potionInstance.showImmortalApplicationEffect(target, battleManager);
+                case 'BoulderInABottle':
+                    return potionInstance.playQuickSummoningEffect(target, battleManager);
+                // ADD THESE NEW CASES:
+                case 'ElixirOfStrength':
+                    return potionInstance.showStrengthBoostEffect(target, battleManager, potionInstance.attackBonus * effectCount);
+                case 'LifeSerum':
+                    return potionInstance.showLifeBoostEffect(target, battleManager, potionInstance.hpBonus * effectCount);
+                case 'PoisonVial':
+                    return potionInstance.showPoisonCloudEffect(target, battleManager);
+                case 'TeleportationPowder':
+                    // TeleportationPowder targets creatures, so we need creature info
+                    if (target.type === 'creature') {
+                        const creatureInfo = this.findCreatureInfoForTarget(target, battleManager);
+                        if (creatureInfo) {
+                            return potionInstance.showDarkEnergyEffect(target, battleManager, creatureInfo);
+                        }
+                    }
+                    return Promise.resolve();
+                case 'PunchInTheBox':
+                    return potionInstance.showPunchEffect(target, battleManager);
+                case 'ExperimentalPotion':
+                    return potionInstance.showTransformationEffect(playerRole, battleManager);
+                case 'MonsterInABottle':
+                    return potionInstance.playQuickSummoningEffect(target);
+                case 'SwordInABottle':
+                case 'OverflowingChalice':
+                case 'MagicLamp':
+                    // These potions don't have specific target-based visual methods
+                    return Promise.resolve();
+                default:
+                    return Promise.resolve();
+            }
+        });
+        
+        await Promise.all(visualPromises);
+        
+        // Show battle log message from guest's perspective
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success'; // From guest's perspective
+        
+        const formattedName = this.formatCardName(potionName);
+        let message;
+        if (effectCount === 1) {
+            message = `🧪 ${playerName}'s ${formattedName} affects ${targets.length} target(s)!`;
+        } else {
+            message = `🧪 ${playerName}'s ${effectCount} ${formattedName}s affect ${targets.length} target(s)!`;
+        }
+        
+        battleManager.addCombatLog(message, logType);
+    }
+
+    // Helper method to find creature info for TeleportationPowder visual effects
+    findCreatureInfoForTarget(creature, battleManager) {
+        // Search through all heroes and their creatures to find the creature info
+        for (const side of ['player', 'opponent']) {
+            const heroes = side === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
+            
+            for (const position of ['left', 'center', 'right']) {
+                const hero = heroes[position];
+                if (!hero || !hero.creatures) continue;
+                
+                const creatureIndex = hero.creatures.indexOf(creature);
+                if (creatureIndex !== -1) {
+                    return {
+                        hero: hero,
+                        creatureIndex: creatureIndex,
+                        heroPosition: position,
+                        heroSide: side
+                    };
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    // Get potion target type
+    getPotionTargetType(potionName) {
+        const targetTypes = {
+            'AcidVial': 'enemy_heroes_only',
+            'BottledFlame': 'enemy_all',
+            'BottledLightning': 'enemy_all',
+            'bottledLightning': 'enemy_all',
+            'ElixirOfCold': 'ally_heroes_only',
+            'elixirOfCold': 'ally_heroes_only',
+            'CloudInABottle': 'ally_all',
+            'ElixirOfImmortality': 'ally_heroes_only',
+            'BoulderInABottle': 'ally_heroes_only',
+            'PoisonVial': 'enemy_all',
+            'LifeSerum': 'ally_heroes_only',
+            'ElixirOfStrength': 'ally_heroes_only'
+        };
+        
+        return targetTypes[potionName] || 'enemy_all';
+    }
+
+    // Get targets for host potion from guest perspective
+    getGuestTargetsForHostPotion(battleManager, targetType) {
+        if (targetType === 'enemy') {
+            // Host's enemies are guest's own heroes/creatures
+            return this.getAllTargetsFromHeroes(Object.values(battleManager.playerHeroes));
+        } else {
+            // Host's allies are guest's opponent heroes/creatures
+            return this.getAllTargetsFromHeroes(Object.values(battleManager.opponentHeroes));
+        }
+    }
+
+    // Get targets for guest potion from guest perspective
+    getGuestTargetsForGuestPotion(battleManager, targetType) {
+        if (targetType === 'enemy') {
+            // Guest's enemies are host's heroes/creatures (guest's opponents)
+            return this.getAllTargetsFromHeroes(Object.values(battleManager.opponentHeroes));
+        } else {
+            // Guest's allies are guest's own heroes/creatures
+            return this.getAllTargetsFromHeroes(Object.values(battleManager.playerHeroes));
+        }
+    }
+
+    // Get hero targets only
+    getGuestHeroTargetsForHostPotion(battleManager, targetType) {
+        if (targetType === 'enemy') {
+            return Object.values(battleManager.playerHeroes).filter(hero => hero && hero.alive);
+        } else {
+            return Object.values(battleManager.opponentHeroes).filter(hero => hero && hero.alive);
+        }
+    }
+
+    getGuestHeroTargetsForGuestPotion(battleManager, targetType) {
+        if (targetType === 'enemy') {
+            return Object.values(battleManager.opponentHeroes).filter(hero => hero && hero.alive);
+        } else {
+            return Object.values(battleManager.playerHeroes).filter(hero => hero && hero.alive);
+        }
+    }
+
+    // Get all targets (heroes and creatures) from hero array
+    getAllTargetsFromHeroes(heroes) {
+        const targets = [];
+        
+        heroes.forEach(hero => {
+            if (hero && hero.alive) {
+                targets.push(hero);
+                
+                // Add living creatures
+                if (hero.creatures) {
+                    hero.creatures.forEach(creature => {
+                        if (creature && creature.alive) {
+                            targets.push(creature);
+                        }
+                    });
+                }
+            }
+        });
+        
+        return targets;
+    }
+
     // ===== P2P VISUAL SYNCHRONIZATION =====
 
     // Send visual sync message to guest
@@ -512,7 +879,11 @@ export class PotionHandler {
         // Try to get battleManager from various contexts
         let battleManager = null;
         
-        if (heroSelection && heroSelection.battleManager) {
+        // First try the passed battleManager from battle start context
+        if (data && data.battleManager) {
+            battleManager = data.battleManager;
+            delete data.battleManager; // Remove from data before sending
+        } else if (heroSelection && heroSelection.battleManager) {
             battleManager = heroSelection.battleManager;
         } else if (window.battleManager) {
             battleManager = window.battleManager;
@@ -524,11 +895,14 @@ export class PotionHandler {
             const syncData = {
                 ...data,
                 timestamp: Date.now(),
-                playerSide: battleManager.isHost ? 'host' : 'guest'
+                // Only set playerSide if not already provided
+                playerSide: data.playerSide || (battleManager.isHost ? 'host' : 'guest')
             };
             
             battleManager.sendBattleUpdate(messageType, syncData);
             console.log(`Sent potion visual sync: ${messageType}`, syncData);
+        } else {
+            console.warn('Could not send potion visual sync - no valid battleManager context');
         }
     }
 
@@ -585,6 +959,7 @@ export class PotionHandler {
                 return await this.handleElixirOfStrengthEffects(effects, playerRole, battleManager);
             
             case 'ElixirOfCold':
+            case 'elixirOfCold':
                 return await this.handleElixirOfColdEffects(effects, playerRole, battleManager);
 
             case 'LifeSerum':
@@ -594,6 +969,7 @@ export class PotionHandler {
                 return await this.handleBottledFlameEffects(effects, playerRole, battleManager);
             
             case 'BottledLightning':
+            case 'bottledLightning':
                 return await this.handleBottledLightningEffects(effects, playerRole, battleManager);
 
             case 'PoisonVial':
@@ -645,6 +1021,15 @@ export class PotionHandler {
             const { PunchInTheBoxPotion } = await import('./Potions/punchInTheBox.js');
             const punchInTheBoxPotion = new PunchInTheBoxPotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'PunchInTheBox',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             // Delegate everything to the PunchInTheBox module
             const effectsProcessed = await punchInTheBoxPotion.handlePotionEffectsForPlayer(
                 effects, 
@@ -652,7 +1037,7 @@ export class PotionHandler {
                 battleManager
             );
             
-            console.log(`👊 PunchInTheBox delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            console.log(`💊 PunchInTheBox delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
             return effectsProcessed;
             
         } catch (error) {
@@ -661,7 +1046,7 @@ export class PotionHandler {
             // Fallback: log failure
             const playerName = playerRole === 'host' ? 'Host' : 'Guest';
             battleManager.addCombatLog(
-                `👊 ${playerName}'s Punch in the Box failed to activate properly`, 
+                `💊 ${playerName}'s Punch in the Box failed to activate properly`, 
                 'warning'
             );
             
@@ -674,6 +1059,15 @@ export class PotionHandler {
             // Import and use the MagicLamp module
             const { MagicLampPotion } = await import('./Potions/magicLamp.js');
             const magicLampPotion = new MagicLampPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'MagicLamp',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the MagicLamp module
             const effectsProcessed = await magicLampPotion.handlePotionEffectsForPlayer(
@@ -705,6 +1099,15 @@ export class PotionHandler {
             const { TeleportationPowderPotion } = await import('./Potions/teleportationPowder.js');
             const teleportationPowderPotion = new TeleportationPowderPotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'TeleportationPowder',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             // Delegate everything to the TeleportationPowder module
             const effectsProcessed = await teleportationPowderPotion.handlePotionEffectsForPlayer(
                 effects, 
@@ -734,6 +1137,15 @@ export class PotionHandler {
             const { OverflowingChalicePotion } = await import('./Potions/overflowingChalice.js');
             const overflowingChalicePotion = new OverflowingChalicePotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'OverflowingChalice',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             const effectsProcessed = await overflowingChalicePotion.handlePotionEffectsForPlayer(
                 effects, playerRole, battleManager
             );
@@ -752,6 +1164,15 @@ export class PotionHandler {
             // Import and use the CloudInABottle module
             const { CloudInABottlePotion } = await import('./Potions/cloudInABottle.js');
             const cloudInABottlePotion = new CloudInABottlePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'CloudInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the CloudInABottle module
             const effectsProcessed = await cloudInABottlePotion.handlePotionEffectsForPlayer(
@@ -803,6 +1224,15 @@ export class PotionHandler {
             // Import and use the MonsterInABottle module
             const { MonsterInABottlePotion } = await import('./Potions/monsterInABottle.js');
             const monsterInABottlePotion = new MonsterInABottlePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'MonsterInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the MonsterInABottle module
             const effectsProcessed = await monsterInABottlePotion.handlePotionEffectsForPlayer(
@@ -857,6 +1287,15 @@ export class PotionHandler {
             const { ElixirOfImmortality } = await import('./Potions/elixirOfImmortality.js');
             const elixirOfImmortality = new ElixirOfImmortality();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ElixirOfImmortality',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             const effectsProcessed = await elixirOfImmortality.handlePotionEffectsForPlayer(
                 effects, playerRole, battleManager
             );
@@ -875,6 +1314,15 @@ export class PotionHandler {
             // Import and use the ExperimentalPotion module
             const { ExperimentalPotionPotion } = await import('./Potions/experimentalPotion.js');
             const experimentalPotionPotion = new ExperimentalPotionPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ExperimentalPotion',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the ExperimentalPotion module
             const effectsProcessed = await experimentalPotionPotion.handlePotionEffectsForPlayer(
@@ -901,67 +1349,85 @@ export class PotionHandler {
     }
 
     async handleAcidVialEffects(effects, playerRole, battleManager) {
-    try {
-        // Import and use the AcidVial module
-        const { AcidVialPotion } = await import('./Potions/acidVial.js');
-        const acidVialPotion = new AcidVialPotion();
-        
-        // Delegate everything to the AcidVial module
-        const effectsProcessed = await acidVialPotion.handlePotionEffectsForPlayer(
-            effects, 
-            playerRole, 
-            battleManager
-        );
-        
-        console.log(`✅ AcidVial delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
-        return effectsProcessed;
-        
-    } catch (error) {
-        console.error(`Error delegating AcidVial effects for ${playerRole}:`, error);
-        
-        // Fallback: try basic damage and heal-block application
-        const enemyHeroes = playerRole === 'host' ? 
-            Object.values(battleManager.opponentHeroes) : 
-            Object.values(battleManager.playerHeroes);
+        try {
+            // Import and use the AcidVial module
+            const { AcidVialPotion } = await import('./Potions/acidVial.js');
+            const acidVialPotion = new AcidVialPotion();
             
-        const effectCount = effects.length;
-        const damagePerVial = 100;
-        const healBlockPerVial = 3;
-        const totalDamage = damagePerVial * effectCount;
-        const totalHealBlock = healBlockPerVial * effectCount;
-        let fallbackTargets = 0;
-        
-        for (const hero of enemyHeroes) {
-            if (hero && hero.alive) {
-                // Apply damage
-                if (battleManager.isAuthoritative) {
-                    await battleManager.authoritative_applyDamage({
-                        target: hero,
-                        damage: totalDamage,
-                        newHp: Math.max(0, hero.currentHp - totalDamage),
-                        died: (hero.currentHp - totalDamage) <= 0
-                    }, { source: 'acid' });
-                }
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'AcidVial',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the AcidVial module
+            const effectsProcessed = await acidVialPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            console.log(`✅ AcidVial delegation completed: ${effectsProcessed} effects processed for ${playerRole}`);
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error(`Error delegating AcidVial effects for ${playerRole}:`, error);
+            
+            // Fallback: try basic damage and heal-block application
+            const enemyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.opponentHeroes) : 
+                Object.values(battleManager.playerHeroes);
                 
-                // Apply heal-block
-                if (battleManager.statusEffectsManager) {
-                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'healblock', totalHealBlock);
+            const effectCount = effects.length;
+            const damagePerVial = 100;
+            const healBlockPerVial = 3;
+            const totalDamage = damagePerVial * effectCount;
+            const totalHealBlock = healBlockPerVial * effectCount;
+            let fallbackTargets = 0;
+            
+            for (const hero of enemyHeroes) {
+                if (hero && hero.alive) {
+                    // Apply damage
+                    if (battleManager.isAuthoritative) {
+                        await battleManager.authoritative_applyDamage({
+                            target: hero,
+                            damage: totalDamage,
+                            newHp: Math.max(0, hero.currentHp - totalDamage),
+                            died: (hero.currentHp - totalDamage) <= 0
+                        }, { source: 'acid' });
+                    }
+                    
+                    // Apply heal-block
+                    if (battleManager.statusEffectsManager) {
+                        battleManager.statusEffectsManager.applyStatusEffect(hero, 'healblock', totalHealBlock);
+                    }
+                    
+                    fallbackTargets++;
                 }
-                
-                fallbackTargets++;
             }
+            
+            battleManager.addCombatLog(`🧪 Acid Vial effects applied (+${totalDamage} damage, +${totalHealBlock} heal-block to ${fallbackTargets} heroes)`, 'info');
+            return effectCount;
         }
-        
-        battleManager.addCombatLog(`🧪 Acid Vial effects applied (+${totalDamage} damage, +${totalHealBlock} heal-block to ${fallbackTargets} heroes)`, 'info');
-        return effectCount;
     }
-}
 
     async handleElixirOfStrengthEffects(effects, playerRole, battleManager) {
         try {
             // Import and use the ElixirOfStrength module
             const { ElixirOfStrengthPotion } = await import('./Potions/elixirOfStrength.js');
             const elixirOfStrengthPotion = new ElixirOfStrengthPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ElixirOfStrength',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the ElixirOfStrength module
             const effectsProcessed = await elixirOfStrengthPotion.handlePotionEffectsForPlayer(
@@ -1008,6 +1474,15 @@ export class PotionHandler {
             const { ElixirOfColdPotion } = await import('./Potions/elixirOfCold.js');
             const elixirOfColdPotion = new ElixirOfColdPotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ElixirOfCold',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             const effectsProcessed = await elixirOfColdPotion.handlePotionEffectsForPlayer(
                 effects, 
                 playerRole, 
@@ -1027,6 +1502,15 @@ export class PotionHandler {
         try {
             const { LifeSerumPotion } = await import('./Potions/lifeSerum.js');
             const lifeSerumPotion = new LifeSerumPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'LifeSerum',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             const effectsProcessed = await lifeSerumPotion.handlePotionEffectsForPlayer(
                 effects, playerRole, battleManager
@@ -1070,6 +1554,15 @@ export class PotionHandler {
             const { SwordInABottlePotion } = await import('./Potions/swordInABottle.js');
             const swordInABottlePotion = new SwordInABottlePotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'SwordInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             // Use the individual player method (fallback)
             const effectsProcessed = await swordInABottlePotion.handlePotionEffectsForPlayer(
                 effects, 
@@ -1095,6 +1588,15 @@ export class PotionHandler {
             const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
             const boulderInABottlePotion = new BoulderInABottlePotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'BoulderInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             // Delegate everything to the BoulderInABottle module
             const effectsProcessed = await boulderInABottlePotion.handlePotionEffectsForPlayer(
                 effects, 
@@ -1116,6 +1618,15 @@ export class PotionHandler {
             // Import and use the enhanced BottledFlame module
             const { BottledFlamePotion } = await import('./Potions/bottledFlame.js');
             const bottledFlamePotion = new BottledFlamePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'BottledFlame',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the BottledFlame module
             const effectsProcessed = await bottledFlamePotion.handlePotionEffectsForPlayer(
@@ -1155,6 +1666,15 @@ export class PotionHandler {
             const { BottledLightningPotion } = await import('./Potions/bottledLightning.js');
             const bottledLightningPotion = new BottledLightningPotion();
             
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'BottledLightning',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
             // Delegate everything to the BottledLightning module
             const effectsProcessed = await bottledLightningPotion.handlePotionEffectsForPlayer(
                 effects, 
@@ -1176,6 +1696,15 @@ export class PotionHandler {
             // Import and use the PoisonVial module
             const { PoisonVialPotion } = await import('./Potions/poisonVial.js');
             const poisonVialPotion = new PoisonVialPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'PoisonVial',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
             
             // Delegate everything to the PoisonVial module
             const effectsProcessed = await poisonVialPotion.handlePotionEffectsForPlayer(

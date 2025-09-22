@@ -327,6 +327,36 @@ export class AcidVialPotion {
         }, 1200);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get enemy hero targets from guest's perspective
+        const targetHeroes = isHostPotion ? 
+            Object.values(battleManager.playerHeroes) : // Guest's own heroes (host's enemies)
+            Object.values(battleManager.opponentHeroes); // Host's heroes (guest's enemies)
+        
+        const targets = targetHeroes.filter(hero => hero && hero.alive);
+        
+        if (targets.length === 0) return;
+        
+        // Show acid splash effects on all targets
+        for (const target of targets) {
+            await this.showAcidSplashEffect(target, battleManager);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `🧪 ${playerName}'s Acid Vial corrodes! ${targets.length} enemy heroes affected!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Get the DOM element for a target (hero only)

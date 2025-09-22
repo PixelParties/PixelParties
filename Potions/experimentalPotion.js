@@ -406,6 +406,33 @@ export class ExperimentalPotionPotion {
         return 1; // Return 1 to indicate something was attempted
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Show transformation effects for each experimental potion
+        for (let i = 0; i < effectCount; i++) {
+            this.showTransformationEffect(playerSide, battleManager);
+            
+            // Small delay between multiple potions
+            if (i < effectCount - 1) {
+                await battleManager.delay(300);
+            }
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        const potionText = effectCount === 1 ? 'Experimental Potion bubbles' : `${effectCount} Experimental Potions bubble`;
+        battleManager.addCombatLog(
+            `🧪 ${playerName}'s ${potionText} and transforms with chaotic energy!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Format potion name for display

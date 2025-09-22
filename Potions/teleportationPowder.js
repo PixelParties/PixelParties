@@ -426,6 +426,58 @@ export class TeleportationPowderPotion {
         }, 1200);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get enemy creatures from guest's perspective
+        const enemyHeroes = isHostPotion ? 
+            Object.values(battleManager.playerHeroes) : // Guest's own heroes (host's enemies)
+            Object.values(battleManager.opponentHeroes); // Host's heroes (guest's enemies)
+        
+        const enemyCreatures = [];
+        
+        // Collect all living enemy creatures
+        enemyHeroes.forEach(hero => {
+            if (hero && hero.creatures && Array.isArray(hero.creatures)) {
+                hero.creatures.forEach((creature, index) => {
+                    if (creature && creature.alive) {
+                        enemyCreatures.push({
+                            creature: creature,
+                            hero: hero,
+                            creatureIndex: index,
+                            heroPosition: hero.position,
+                            heroSide: hero.side
+                        });
+                    }
+                });
+            }
+        });
+        
+        if (enemyCreatures.length === 0) return;
+        
+        // Select up to 5 random creatures per potion for visual effects
+        const maxCreatures = this.maxTargets * effectCount;
+        const selectedCreatures = enemyCreatures.slice(0, Math.min(maxCreatures, enemyCreatures.length));
+        
+        // Show dark energy effects on selected creatures
+        for (const creatureInfo of selectedCreatures) {
+            await this.showDarkEnergyEffect(creatureInfo.creature, battleManager, creatureInfo);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        const powderText = effectCount === 1 ? 'Teleportation Powder' : `${effectCount} Teleportation Powders`;
+        battleManager.addCombatLog(
+            `🌀 ${playerName}'s ${powderText} swirls! ${selectedCreatures.length} enemy creatures affected!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Get the DOM element for a creature

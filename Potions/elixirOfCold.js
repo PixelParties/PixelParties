@@ -189,6 +189,36 @@ export class ElixirOfColdPotion {
         particles.forEach(particle => particle.remove());
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get ally hero targets from guest's perspective
+        const targetHeroes = isHostPotion ? 
+            Object.values(battleManager.opponentHeroes) : // Host's allies (from guest's POV)
+            Object.values(battleManager.playerHeroes);    // Guest's allies (from guest's POV)
+        
+        const targets = targetHeroes.filter(hero => hero && hero.alive);
+        
+        if (targets.length === 0) return;
+        
+        // Show cold blessing effects on all targets
+        for (const target of targets) {
+            await this.showColdBlessing(target, battleManager);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `❄️ ${playerName}'s Elixir of Cold blesses! ${targets.length} ally heroes gain freezing attacks!`,
+            logType
+        );
+    }
+
     // Create the main cold aura element
     createColdAuraElement() {
         const coldAura = document.createElement('div');

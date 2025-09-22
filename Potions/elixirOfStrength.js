@@ -328,6 +328,36 @@ export class ElixirOfStrengthPotion {
         setTimeout(() => flash.remove(), 500);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get ally hero targets from guest's perspective  
+        const targetHeroes = isHostPotion ? 
+            Object.values(battleManager.opponentHeroes) : // Host's heroes (guest's opponents when host used potion)
+            Object.values(battleManager.playerHeroes); // Guest's own heroes
+        
+        const targets = targetHeroes.filter(hero => hero && hero.alive);
+        
+        if (targets.length === 0) return;
+        
+        // Show strength boost effects on all targets
+        for (const target of targets) {
+            await this.showStrengthBoostEffect(target, battleManager, this.attackBonus * effectCount);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `⚔️ ${playerName}'s Elixir of Strength empowers! ${targets.length} heroes gain +${this.attackBonus * effectCount} attack!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Get the DOM element for a target (hero only)

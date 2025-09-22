@@ -620,6 +620,10 @@ export class BattleNetworkManager {
                     window.potionHandler.guest_handlePotionEffectsClearedVisual(data);
                 }
                 break;
+
+            case 'potion_specific_visual':
+                await window.potionHandler.handlePotionSpecificVisual(data);
+                break;
                 
 
             case 'necromancy_revival':
@@ -703,11 +707,15 @@ export class BattleNetworkManager {
                 break;
 
             case 'skeleton_bard_inspiration':
-                bm.guest_handleSkeletonBardInspiration(data);
+                if (bm.skeletonBardManager) {
+                    bm.skeletonBardManager.handleGuestInspiration(data);
+                }
                 break;
 
             case 'skeleton_bard_death_inspiration':
-                bm.guest_handleSkeletonBardDeathInspiration(data);
+                if (bm.skeletonBardManager) {
+                    bm.skeletonBardManager.handleGuestDeathInspiration(data);
+                }
                 break;
 
             case 'skeleton_mage_lightning_bolt':

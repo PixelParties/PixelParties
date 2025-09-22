@@ -316,6 +316,54 @@ export class PoisonVialPotion {
         setTimeout(() => tint.remove(), 400);
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get enemy targets from guest's perspective (heroes and creatures)
+        const enemyHeroes = isHostPotion ? 
+            Object.values(battleManager.playerHeroes) : // Guest's own heroes (host's enemies)
+            Object.values(battleManager.opponentHeroes); // Host's heroes (guest's enemies)
+        
+        const targets = [];
+        
+        // Collect enemy heroes
+        enemyHeroes.forEach(hero => {
+            if (hero && hero.alive) {
+                targets.push(hero);
+            }
+        });
+        
+        // Collect enemy creatures
+        enemyHeroes.forEach(hero => {
+            if (hero && hero.creatures && Array.isArray(hero.creatures)) {
+                hero.creatures.forEach(creature => {
+                    if (creature && creature.alive) {
+                        targets.push(creature);
+                    }
+                });
+            }
+        });
+        
+        if (targets.length === 0) return;
+        
+        // Show poison cloud effects on all targets
+        for (const target of targets) {
+            await this.showPoisonCloudEffect(target, battleManager);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `☠️ ${playerName}'s Poison Vial spreads! ${targets.length} enemies poisoned!`,
+            logType
+        );
+    }
+
     // ===== UTILITY METHODS =====
 
     // Get the DOM element for a target (hero or creature)

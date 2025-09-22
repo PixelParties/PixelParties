@@ -190,6 +190,36 @@ export class ElixirOfImmortality {
         lightRays.forEach(ray => ray.remove());
     }
 
+    // ===== GUEST-SIDE VISUAL HANDLER =====
+    async guest_handleVisualEffects(data, battleManager) {
+        if (!battleManager || battleManager.isAuthoritative) return;
+        
+        const { playerSide, effectCount = 1 } = data;
+        const isHostPotion = (playerSide === 'host');
+        
+        // Get ally hero targets from guest's perspective
+        const targetHeroes = isHostPotion ? 
+            Object.values(battleManager.opponentHeroes) : // Host's allies (from guest's POV)
+            Object.values(battleManager.playerHeroes);    // Guest's allies (from guest's POV)
+        
+        const targets = targetHeroes.filter(hero => hero && hero.alive);
+        
+        if (targets.length === 0) return;
+        
+        // Show immortal blessing effects on all targets
+        for (const target of targets) {
+            await this.showImmortalApplicationEffect(target, battleManager);
+        }
+        
+        // Show battle log message
+        const playerName = isHostPotion ? 'Host' : 'Guest';
+        const logType = isHostPotion ? 'error' : 'success';
+        battleManager.addCombatLog(
+            `✨ ${playerName}'s Elixir of Immortality blesses! ${targets.length} ally heroes gain immortal protection!`,
+            logType
+        );
+    }
+
     // Create the main immortal blessing element
     createImmortalBlessingElement() {
         const immortalBlessing = document.createElement('div');

@@ -143,7 +143,7 @@ export const fieldStandardArtifact = {
         activationBurst.innerHTML = `
             <div class="standard-burst">
                 <span class="standard-particle">🎺</span>
-                <span class="standard-particle">🏴</span>
+                <span class="standard-particle">🚴</span>
                 <span class="standard-particle">🎺</span>
             </div>
             <div class="standard-text">Field Standard Raised!</div>
@@ -174,7 +174,7 @@ export const fieldStandardArtifact = {
     },
     
     // ============================================
-    // BATTLE START EFFECT (unchanged)
+    // BATTLE START EFFECT
     // ============================================
     
     /**
@@ -291,7 +291,7 @@ export const fieldStandardArtifact = {
         // Show trumpet animation
         await this.createTrumpetAnimation(battleManager, chosenCreature);
         
-        // Execute the creature's special attack
+        // Execute the creature's rally using centralized activation
         await this.executeCreatureRally(battleManager, chosenCreature);
         
         // Log the rally
@@ -376,7 +376,7 @@ export const fieldStandardArtifact = {
     },
     
     /**
-     * Execute the creature's rally (special attack)
+     * Execute the creature's rally (special attack) - NOW USES CENTRALIZED ACTIVATION
      * @param {BattleManager} battleManager - The battle manager instance
      * @param {Object} creatureData - Information about the creature
      */
@@ -390,83 +390,15 @@ export const fieldStandardArtifact = {
             hero: creatureData.hero
         };
         
-        // Execute creature special attack based on type
         try {
-            const creatureName = creatureData.creature.name;
-            
-            // Import creature classes as needed and execute their special attacks
-            if (creatureName.includes('Jiggles')) {
-                if (battleManager.jigglesManager) {
-                    await battleManager.jigglesManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
+            // Use the centralized creature activation from BattleFlowManager
+            if (battleManager.flowManager && battleManager.flowManager.activateCreatureSpecialAttack) {
+                await battleManager.flowManager.activateCreatureSpecialAttack(actor, creatureData.position);
+            } else {
+                // Fallback if flowManager or method not available
+                console.warn('BattleFlowManager or activateCreatureSpecialAttack method not available, using fallback');
+                await battleManager.animationManager.shakeCreature(creatureData.side, creatureData.position, creatureData.creatureIndex);
             }
-            
-            if (creatureName === 'SkeletonArcher') {
-                if (battleManager.skeletonArcherManager) {
-                    await battleManager.skeletonArcherManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'SkeletonNecromancer') {
-                if (battleManager.skeletonNecromancerManager) {
-                    await battleManager.skeletonNecromancerManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'SkeletonDeathKnight') {
-                if (battleManager.skeletonDeathKnightManager) {
-                    await battleManager.skeletonDeathKnightManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'BurningSkeleton') {
-                if (battleManager.burningSkeletonManager) {
-                    await battleManager.burningSkeletonManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'SkeletonReaper') {
-                if (battleManager.skeletonReaperManager) {
-                    await battleManager.skeletonReaperManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'SkeletonBard') {
-                if (battleManager.skeletonBardManager) {
-                    await battleManager.skeletonBardManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'SkeletonMage') {
-                if (battleManager.skeletonMageManager) {
-                    await battleManager.skeletonMageManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'FrontSoldier') {
-                if (battleManager.frontSoldierManager) {
-                    await battleManager.frontSoldierManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            if (creatureName === 'Archer') {
-                if (battleManager.archerManager) {
-                    await battleManager.archerManager.executeSpecialAttack(actor, creatureData.position);
-                    return;
-                }
-            }
-            
-            // Default action for creatures without special attacks - just shake
-            await battleManager.animationManager.shakeCreature(creatureData.side, creatureData.position, creatureData.creatureIndex);
             
         } catch (error) {
             console.error('Error executing creature rally:', error);
@@ -476,7 +408,7 @@ export const fieldStandardArtifact = {
     },
     
     // ============================================
-    // GUEST HANDLERS (unchanged)
+    // GUEST HANDLERS
     // ============================================
     
     /**

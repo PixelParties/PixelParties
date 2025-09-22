@@ -322,7 +322,7 @@ export const divineGiftOfMagicSpell = {
         popup.className = 'divine-gift-popup';
         popup.innerHTML = `
             <div class="divine-gift-header">
-                <span class="divine-gift-icon">âœ¨</span>
+                <span class="divine-gift-icon">✨</span>
                 <span class="divine-gift-title">Divine Gift!</span>
             </div>
             <div class="divine-gift-spell">
@@ -367,11 +367,11 @@ export const divineGiftOfMagicSpell = {
     // Get icon for spell school (reuse from ButterflyCloud)
     getSpellSchoolIcon(spellSchool) {
         const icons = {
-            'DestructionMagic': 'ðŸ"¥',
-            'DecayMagic': 'â˜ ï¸', 
-            'SupportMagic': 'âœ¨'
+            'DestructionMagic': '🔥',
+            'DecayMagic': '☠️', 
+            'SupportMagic': '✨'
         };
-        return icons[spellSchool] || 'ðŸ"œ';
+        return icons[spellSchool] || '🪄';
     },
     
     // Handle click activation (main activation method)
@@ -396,7 +396,7 @@ function showDivineGiftSuccess(message) {
     feedbackDiv.className = 'divine-gift-success-popup';
     feedbackDiv.innerHTML = `
         <div class="divine-gift-success-content">
-            <span class="divine-gift-success-icon">âœ¨</span>
+            <span class="divine-gift-success-icon">✨</span>
             <span class="divine-gift-success-text">${message}</span>
         </div>
     `;
@@ -435,7 +435,7 @@ function showDivineGiftError(message) {
     feedbackDiv.className = 'divine-gift-error-popup';
     feedbackDiv.innerHTML = `
         <div class="divine-gift-error-content">
-            <span class="divine-gift-error-icon">âš ï¸</span>
+            <span class="divine-gift-error-icon">⚠️</span>
             <span class="divine-gift-error-text">${message}</span>
         </div>
     `;

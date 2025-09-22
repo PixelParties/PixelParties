@@ -267,7 +267,56 @@ export class ArrowSystem {
         // Update display
         this.updateArrowDisplay(hero.side, hero.position);
         
+        if (this.battleManager.isAuthoritative) {
+            this.battleManager.sendBattleUpdate('arrow_counter_consumed', {
+                attackerAbsoluteSide: hero.absoluteSide,
+                attackerPosition: hero.position,
+                arrowType: arrowType,
+                newCount: currentCount - 1,
+                timestamp: Date.now()
+            });
+        }
+        
         return true;
+    }
+
+    /**
+     * Handle guest update for arrow counter consumption
+     * @param {Object} data - Sync data from host
+     */
+    handleGuestArrowCounterConsumed(data) {
+        if (this.battleManager.isAuthoritative) return; // Only process on guest side
+        
+        const { attackerAbsoluteSide, attackerPosition, arrowType, newCount } = data;
+        
+        // Determine local side for guest
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Find the hero
+        const heroes = attackerLocalSide === 'player' ? 
+            this.battleManager.playerHeroes : 
+            this.battleManager.opponentHeroes;
+        const hero = heroes[attackerPosition];
+        
+        if (!hero) return;
+        
+        // Update the guest's arrow counter directly
+        const heroId = `${attackerLocalSide}_${attackerPosition}`;
+        const heroCounters = this.heroCounters.get(heroId);
+        
+        if (heroCounters) {
+            heroCounters.set(arrowType, newCount);
+            
+            // Update the visual display on guest side
+            this.updateArrowDisplay(attackerLocalSide, attackerPosition);
+            
+            // Log for debugging
+            const arrowConfig = this.arrowTypes.get(arrowType);
+            if (arrowConfig) {
+                console.log(`🏹 Guest: ${hero.name} arrow counter updated: ${arrowConfig.displayName} (${newCount} remaining)`);
+            }
+        }
     }
 
     // ============================================

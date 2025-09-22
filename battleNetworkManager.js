@@ -1188,6 +1188,12 @@ export class BattleNetworkManager {
                 bm.guest_handleRainbowsArrowGoldAward(data);
                 break;
 
+            case 'arrow_counter_consumed':
+                if (bm.attackEffectsManager && bm.attackEffectsManager.arrowSystem) {
+                    bm.attackEffectsManager.arrowSystem.handleGuestArrowCounterConsumed(data);
+                }
+                break;
+
             case 'elixir_cold_freeze':
                 bm.attackEffectsManager.handleGuestElixirColdFreeze(data);
                 break;

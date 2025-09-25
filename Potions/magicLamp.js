@@ -236,6 +236,9 @@ export class MagicLampPotion {
             return this.validSpells;
         }
         
+        // SPECIAL EXCLUSIONS: Spells that cannot be used by Magic Lamp
+        const excludedSpells = ['PhoenixTackle', 'VictoryPhoenixCannon'];
+        
         const allCardNames = getAllCardNames();
         const validSpells = [];
         
@@ -256,6 +259,12 @@ export class MagicLampPotion {
             // Must NOT be global
             if (cardInfo.global === true) continue;
             
+            // SPECIAL EXCLUSION: Exclude Phoenix spells that cannot be used by Magic Lamp
+            if (excludedSpells.includes(cardName)) {
+                console.log(`🔥 Magic Lamp cannot grant spell: ${cardName} - excluding from random selection`);
+                continue;
+            }
+            
             // Add to valid spells list
             validSpells.push(cardInfo);
         }
@@ -263,7 +272,7 @@ export class MagicLampPotion {
         // Cache the result
         this.validSpells = validSpells;
         
-        console.log(`🪔 Found ${validSpells.length} valid spells for Magic Lamp:`, 
+        console.log(`🪔 Found ${validSpells.length} valid spells for Magic Lamp (Phoenix spells excluded):`, 
                    validSpells.map(spell => spell.name));
         
         return validSpells;

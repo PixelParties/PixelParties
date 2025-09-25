@@ -17,9 +17,7 @@ export class SwordInABottlePotion {
         if (!effects || effects.length === 0) {
             return 0;
         }
-        
-        console.log(`⚔️ Processing ${effects.length} Sword in a Bottle effects for ${playerRole}`);
-        
+                
         let totalAttacks = 0;
         const effectCount = effects.length;
         
@@ -31,7 +29,6 @@ export class SwordInABottlePotion {
         const aliveAttackingHeroes = attackingHeroes.filter(hero => hero && hero.alive);
         
         if (aliveAttackingHeroes.length === 0) {
-            console.log(`⚔️ No alive heroes for ${playerRole} to perform SwordInABottle attacks`);
             const bottleText = effectCount === 1 ? 'Sword in a Bottle' : 'Swords in a Bottle';
             battleManager.addCombatLog(`⚔️ ${playerRole === 'host' ? 'Your' : 'Opponent\'s'} ${bottleText} found no heroes to empower!`, 'warning');
             return effectCount; // Still count as processed
@@ -68,7 +65,6 @@ export class SwordInABottlePotion {
                 
                 // Check if battle ended early due to the attacks
                 if (battleManager.checkBattleEnd()) {
-                    console.log('⚔️ Battle ended during SwordInABottle attacks');
                     battleManager.addCombatLog('⚔️ The mystical swords claimed victory before the battle could begin!', 'info');
                     return effectCount;
                 }
@@ -80,7 +76,6 @@ export class SwordInABottlePotion {
             }
         }
         
-        console.log(`⚔️ Sword in a Bottle completed: ${totalAttacks} total attacks from ${effectCount} bottles`);
         battleManager.addCombatLog(
             `⚔️ Mystical sword barrage complete! ${totalAttacks} spectral strikes unleashed!`, 
             'success'
@@ -104,9 +99,7 @@ export class SwordInABottlePotion {
         if (totalBottles === 0) {
             return 0;
         }
-        
-        console.log(`⚔️ Processing ${hostCount} host + ${guestCount} guest Sword in a Bottle effects simultaneously`);
-        
+                
         // Calculate max iterations needed (some players might have more bottles)
         const maxBottles = Math.max(hostCount, guestCount);
         
@@ -165,13 +158,11 @@ export class SwordInABottlePotion {
             
             // Check if battle ended early due to the attacks
             if (battleManager.checkBattleEnd()) {
-                console.log('⚔️ Battle ended during Sword in a Bottle attacks');
                 battleManager.addCombatLog('⚔️ The mystical swords claimed victory before the battle could begin!', 'info');
                 return totalBottles;
             }
         }
         
-        console.log(`⚔️ Sword in a Bottle completed: ${totalAttacks} total simultaneous attacks from ${totalBottles} bottles`);
         battleManager.addCombatLog(
             `⚔️ Mystical sword storm complete! ${totalAttacks} spectral strikes unleashed simultaneously!`, 
             'success'
@@ -216,11 +207,21 @@ export class SwordInABottlePotion {
         // Determine attacker side for targeting
         const attackerSide = playerRole === 'host' ? 'player' : 'opponent';
         
-        // Find target using existing targeting logic
-        const target = battleManager.combatManager.authoritative_findTargetWithCreatures(
-            hero.position, 
-            attackerSide
-        );
+        // FIXED: Check if hero is Darge for ranged targeting
+        let target;
+        if (hero.name === 'Darge') {
+            // Darge uses ranged attacks - ignore creatures
+            target = battleManager.combatManager.authoritative_findTargetIgnoringCreatures(
+                hero.position, 
+                attackerSide
+            );
+        } else {
+            // Normal melee targeting
+            target = battleManager.combatManager.authoritative_findTargetWithCreatures(
+                hero.position, 
+                attackerSide
+            );
+        }
         
         if (!target) {
             return null;
@@ -249,7 +250,8 @@ export class SwordInABottlePotion {
             damage: finalDamage,
             effectsTriggered: effectsTriggered,
             playerRole: playerRole,
-            attackerSide: attackerSide
+            attackerSide: attackerSide,
+            isRanged: hero.name === 'Darge'
         };
     }
 
@@ -261,16 +263,17 @@ export class SwordInABottlePotion {
      */
     async executeSimultaneousAttacks(allAttacks, battleManager) {
         if (allAttacks.length === 0) return 0;
-        
-        console.log(`⚔️ Executing ${allAttacks.length} simultaneous Sword in a Bottle attacks`);
-        
-        // Log all attacks first
+                
+        // Log all attacks first and send network sync for each
         allAttacks.forEach(attack => {
             const targetName = attack.target.type === 'creature' ? attack.target.creature.name : attack.target.hero.name;
             battleManager.addCombatLog(
                 `⚔️ ${attack.hero.name} conjures a mystical sword and strikes ${targetName} for ${attack.damage} damage!`,
                 attack.attackerSide === 'player' ? 'success' : 'error'
             );
+            
+            // Send network sync for guest
+            this.sendAttackSync(attack, battleManager);
         });
         
         // Start all attack animations simultaneously
@@ -324,14 +327,23 @@ export class SwordInABottlePotion {
         // Determine attacker side for targeting (host uses 'player', guest uses 'opponent')
         const attackerSide = playerRole === 'host' ? 'player' : 'opponent';
         
-        // Find target using the existing targeting logic
-        const target = battleManager.combatManager.authoritative_findTargetWithCreatures(
-            hero.position, 
-            attackerSide
-        );
+        // FIXED: Check if hero is Darge for ranged targeting
+        let target;
+        if (hero.name === 'Darge') {
+            // Darge uses ranged attacks - ignore creatures
+            target = battleManager.combatManager.authoritative_findTargetIgnoringCreatures(
+                hero.position, 
+                attackerSide
+            );
+        } else {
+            // Normal melee targeting
+            target = battleManager.combatManager.authoritative_findTargetWithCreatures(
+                hero.position, 
+                attackerSide
+            );
+        }
         
         if (!target) {
-            console.log(`⚔️ ${hero.name} has no valid target for Sword in a Bottle attack`);
             battleManager.addCombatLog(
                 `⚔️ ${hero.name}'s mystical sword finds no target to strike!`, 
                 'warning'
@@ -361,7 +373,8 @@ export class SwordInABottlePotion {
             hero: hero,
             target: target,
             damage: finalDamage,
-            effectsTriggered: effectsTriggered
+            effectsTriggered: effectsTriggered,
+            isRanged: hero.name === 'Darge'
         };
         
         // Log the attack with appropriate styling
@@ -370,6 +383,9 @@ export class SwordInABottlePotion {
             `⚔️ ${hero.name} conjures a mystical sword and strikes ${targetName} for ${finalDamage} damage!`,
             attackerSide === 'player' ? 'success' : 'error'
         );
+        
+        // FIXED: Send network sync to guest BEFORE animation
+        this.sendAttackSync(attack, battleManager, attackerSide);
         
         // Perform attack animation
         await battleManager.animationManager.animateHeroAttack(hero, target);
@@ -389,6 +405,101 @@ export class SwordInABottlePotion {
         
         // Small pause for visual effect
         await battleManager.delay(100);
+    }
+
+    /**
+     * Send attack synchronization to guest
+     * @param {Object} attack - The attack data
+     * @param {Object} battleManager - The battle manager instance
+     * @param {string} attackerSide - Optional attacker side override
+     */
+    sendAttackSync(attack, battleManager, attackerSide = null) {
+        if (!battleManager.isAuthoritative) return;
+        
+        const actualAttackerSide = attackerSide || attack.attackerSide;
+        
+        // Create attack data for guest synchronization
+        const attackData = {
+            attackerData: {
+                absoluteSide: attack.hero.absoluteSide,
+                position: attack.hero.position,
+                name: attack.hero.name
+            },
+            targetData: attack.target ? {
+                type: attack.target.type,
+                absoluteSide: attack.target.type === 'creature' ? attack.target.hero.absoluteSide : attack.target.hero.absoluteSide,
+                position: attack.target.position,
+                ...(attack.target.type === 'creature' ? {
+                    creatureIndex: attack.target.creatureIndex,
+                    creatureName: attack.target.creature.name
+                } : {
+                    name: attack.target.hero.name
+                })
+            } : null,
+            damage: attack.damage,
+            isRanged: attack.isRanged || false
+        };
+        
+        // Send to guest for animation sync
+        battleManager.sendBattleUpdate('sword_in_bottle_attack', attackData);
+    }
+
+    /**
+     * Handle guest-side Sword in a Bottle attack animation
+     * @param {Object} data - Attack data from host
+     * @param {Object} battleManager - The battle manager instance
+     */
+    async guest_handleSwordInBottleAttack(data, battleManager) {
+        if (battleManager.isAuthoritative) return;
+        
+        const { attackerData, targetData, damage, isRanged } = data;
+        
+        // Find attacker hero on guest side
+        const myAbsoluteSide = battleManager.isHost ? 'host' : 'guest';
+        const attackerLocalSide = (attackerData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const attackerHeroes = attackerLocalSide === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
+        const attacker = attackerHeroes[attackerData.position];
+        
+        if (!attacker) return;
+        
+        // Find target on guest side
+        let target = null;
+        if (targetData) {
+            const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+            const targetHeroes = targetLocalSide === 'player' ? battleManager.playerHeroes : battleManager.opponentHeroes;
+            const targetHero = targetHeroes[targetData.position];
+            
+            if (targetData.type === 'creature' && targetHero?.creatures?.[targetData.creatureIndex]) {
+                target = {
+                    type: 'creature',
+                    hero: targetHero,
+                    creature: targetHero.creatures[targetData.creatureIndex],
+                    creatureIndex: targetData.creatureIndex,
+                    position: targetData.position,
+                    side: targetLocalSide
+                };
+            } else if (targetData.type === 'hero' && targetHero) {
+                target = {
+                    type: 'hero',
+                    hero: targetHero,
+                    position: targetData.position,
+                    side: targetLocalSide
+                };
+            }
+        }
+        
+        if (target) {
+            // Log the attack
+            const targetName = target.type === 'creature' ? target.creature.name : target.hero.name;
+            battleManager.addCombatLog(
+                `⚔️ ${attacker.name} conjures a mystical sword and strikes ${targetName} for ${damage} damage!`,
+                attackerLocalSide === 'player' ? 'success' : 'error'
+            );
+            
+            // Animate the attack using the same system as normal attacks
+            await battleManager.animationManager.animateHeroAttack(attacker, target);
+            await battleManager.animationManager.animateReturn(attacker, attackerLocalSide);
+        }
     }
 
     /**

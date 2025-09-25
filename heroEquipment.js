@@ -16,8 +16,6 @@ export class HeroEquipmentManager {
         this.formationManager = null;
         this.goldManager = null;
         this.onEquipmentChangeCallback = null;
-        
-        console.log('HeroEquipmentManager initialized');
     }
     
     // Initialize with dependencies
@@ -85,11 +83,8 @@ export class HeroEquipmentManager {
         // Deduct gold if cost > 0
         if (artifactCost > 0 && this.goldManager) {
             this.goldManager.addPlayerGold(-artifactCost, `equipped_${artifactCardName}`);
-            console.log(`💰 Spent ${artifactCost} gold to equip ${artifactCardName}`);
         }
-        
-        console.log(`⚔️ ${hero.name} equipped ${artifactCardName}!`);
-        
+                
         // Trigger Ancient Tech effect update if this is an Energy Core
         if (artifactCardName === 'AncientTechInfiniteEnergyCore' && 
             window.ancientTechInfiniteEnergyCoreEffect) {
@@ -126,9 +121,7 @@ export class HeroEquipmentManager {
         }
         
         const removedArtifact = equipment.splice(artifactIndex, 1)[0];
-        
-        console.log(`🗑️ Removed ${removedArtifact.name} from ${heroPosition} hero's equipment`);
-        
+                
         // Trigger callback
         if (this.onEquipmentChangeCallback) {
             this.onEquipmentChangeCallback({
@@ -168,7 +161,6 @@ export class HeroEquipmentManager {
     clearHeroEquipment(heroPosition) {
         if (['left', 'center', 'right'].includes(heroPosition)) {
             this.heroEquipment[heroPosition] = [];
-            console.log(`🧹 Cleared equipment for ${heroPosition} hero`);
         }
     }
     
@@ -185,8 +177,6 @@ export class HeroEquipmentManager {
         
         this.heroEquipment[fromPosition] = toEquipment;
         this.heroEquipment[toPosition] = fromEquipment;
-        
-        console.log(`🔄 Swapped equipment between ${fromPosition} and ${toPosition}`);
     }
     
     // Check if hero has a specific artifact equipped
@@ -232,7 +222,6 @@ export class HeroEquipmentManager {
             ['left', 'center', 'right'].forEach(position => {
                 if (Array.isArray(state.heroEquipment[position])) {
                     this.heroEquipment[position] = [...state.heroEquipment[position]];
-                    console.log(`✅ Restored ${this.heroEquipment[position].length} equipment items for ${position} hero`);
                 }
             });
             
@@ -250,7 +239,6 @@ export class HeroEquipmentManager {
             center: [],
             right: []
         };
-        console.log('🔄 Hero equipment manager reset');
     }
     
     // Get equipment statistics

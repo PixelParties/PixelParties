@@ -97,7 +97,6 @@ export class StrongOxHeadbuttSpell {
         const attackerElement = this.getTargetElement(attacker);
         
         if (!attackerElement) {
-            console.warn('Could not find element for Strong Ox Headbutt effect');
             return;
         }
 
@@ -193,7 +192,6 @@ export class StrongOxHeadbuttSpell {
             // Creature element
             const creatureInfo = this.findCreatureInfo(target);
             if (!creatureInfo) {
-                console.warn('Could not find creature info for Strong Ox Headbutt target');
                 return null;
             }
 
@@ -266,7 +264,6 @@ export class StrongOxHeadbuttSpell {
         const localAttacker = this.findTargetFromSyncInfo(attackerInfo);
         
         if (!localAttacker) {
-            console.warn('Could not find local attacker for Strong Ox Headbutt effect');
             return;
         }
 

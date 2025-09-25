@@ -133,9 +133,7 @@ export class HeroSpellbookManager {
                 reactivatedCount++;
             }
         });
-        
-        console.log(`🔒 Locked spellbook for ${hero.name} and reactivated ${reactivatedCount} spells`);
-        
+                
         // Notify state change
         if (this.onStateChange) {
             this.onStateChange();
@@ -153,7 +151,6 @@ export class HeroSpellbookManager {
 
         // Check if spellbook is locked
         if (this.isSpellbookLocked(heroPosition)) {
-            console.log(`🔒 Cannot toggle spell - spellbook is locked for ${heroPosition}`);
             return false;
         }
 
@@ -165,9 +162,7 @@ export class HeroSpellbookManager {
 
         // Toggle the enabled state
         spellbook[spellIndex].enabled = !spellbook[spellIndex].enabled;
-        
-        console.log(`🔀 Toggled spell ${spellbook[spellIndex].name} at ${heroPosition}[${spellIndex}] to ${spellbook[spellIndex].enabled ? 'enabled' : 'disabled'}`);
-        
+                
         // Notify state change for persistence
         if (this.onStateChange) {
             this.onStateChange();
@@ -393,16 +388,6 @@ export class HeroSpellbookManager {
         this.handManager = null;
         this.formationManager = null;
         this.onStateChange = null;
-    }
-
-    // Debug method to log current state
-    logSpellbookState() {
-        for (const position in this.heroSpellbooks) {
-            const spellbook = this.heroSpellbooks[position];
-            spellbook.forEach((spell, index) => {
-                console.log(`${position}[${index}]: ${spell.name} (${spell.enabled ? 'enabled' : 'disabled'})`);
-            });
-        }
     }
 }
 

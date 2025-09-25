@@ -132,6 +132,7 @@ export class TagsManager {
             'Kazena': ['Card Draw', 'Support', 'Setup'],
             'Kyli': ['Summoner', 'Setup', 'Attacker', 'Potions', 'Late Game Scaling'],
             'Luna': ['Status Effects', 'Area Damage', 'Self-Damage'],
+            'Mary': ['Summoner', 'Damage Dealer', 'Late Game Scaling'],
             'Medea': ['Damage Dealer', 'Status Effects', 'Damage Over Time'],
             'Monia': ['Defense', 'Support', 'Attacker'],
             'Nicolas': ['Support', 'Card Draw', 'Potions', 'Strong Early'],

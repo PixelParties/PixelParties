@@ -100,9 +100,10 @@ export class WebRTCManager {
                     candidate: event.candidate,
                     from: this.roomManager.playerId
                 }).catch(error => {
-                    console.error('Error sending ICE candidate:', error);
+                    // Error handling for ICE candidate sending
                 });
             } else if (!event.candidate) {
+                // ICE gathering complete
             }
         };
     }
@@ -124,7 +125,7 @@ export class WebRTCManager {
                 try {
                     await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
                 } catch (error) {
-                    console.warn('Error adding ICE candidate:', error);
+                    // Error handling for ICE candidate addition
                 }
             } else {
                 // Store candidate for later
@@ -140,6 +141,7 @@ export class WebRTCManager {
                 try {
                     await this.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
                 } catch (error) {
+                    // Error handling for pending ICE candidates
                 }
             }
             this.pendingIceCandidates = [];
@@ -215,11 +217,11 @@ export class WebRTCManager {
                 
                 // Update battle sync status based on latency
                 if (latency < 50) {
-                    console.log('Excellent latency for battle synchronization');
+                    // Excellent latency for battle synchronization
                 } else if (latency < 100) {
-                    console.log('Good latency for battle synchronization');
+                    // Good latency for battle synchronization
                 } else {
-                    console.log('Higher latency - battle sync may use Firebase fallback');
+                    // Higher latency - battle sync may use Firebase fallback
                 }
             } else if (data.type === 'welcome' && !this.roomManager.getIsHost()) {
                 this.uiManager.showConnectionDetails(`🎉 Host says: ${data.message}<br>✅ P2P connection confirmed!<br>🔗 Direct communication established!<br>⚔️ Battle synchronization ready!`);
@@ -234,7 +236,6 @@ export class WebRTCManager {
         };
         
         channel.onerror = (error) => {
-            console.error('Data channel error:', error);
             this.battleSyncEnabled = false;
             this.uiManager.showStatus('⚠️ P2P connection error - using Firebase backup...', 'waiting', true);
             this.uiManager.showConnectionDetails('❌ Direct P2P error occurred<br>📡 Switching to Firebase relay mode<br>🔄 Game functionality maintained...<br>⚔️ Battle sync via Firebase');
@@ -253,7 +254,6 @@ export class WebRTCManager {
                 this.dataChannel.send(JSON.stringify(message));
                 return true;
             } catch (error) {
-                console.warn('P2P send failed:', error);
                 return false;
             }
         }
@@ -311,22 +311,20 @@ export class WebRTCManager {
                 const sanitizedMessage = this.sanitizeForFirebase(message);
                 
                 const gameDataRef = roomRef.child('game_data').push();
+                
                 gameDataRef.set(sanitizedMessage).then(() => {
-                    if (isBattleMessage) {
-                        console.log(`Battle message sent via Firebase fallback: ${gameDataType}`);
-                    } else {
-                        console.log(`Game data sent via Firebase: ${gameDataType}`);
-                    }
+                    // Firebase write successful
                 }).catch(error => {
-                    console.error('Firebase game data send failed:', error);
+                    // Firebase write failed
                 });
+                
                 return true;
+                
             } catch (error) {
-                console.error('Firebase game data fallback failed:', error);
+                // Firebase write exception
             }
         }
         
-        console.error('No available connection method for game data');
         return false;
     }
 
@@ -338,6 +336,7 @@ export class WebRTCManager {
             
             messagesToProcess.forEach(message => {
                 if (this.battleSyncEnabled && this.sendMessage(message)) {
+                    // P2P send successful
                 } else {
                     // Still fallback to Firebase if P2P fails
                     const roomRef = this.roomManager.getRoomRef();
@@ -347,8 +346,9 @@ export class WebRTCManager {
                         
                         const gameDataRef = roomRef.child('game_data').push();
                         gameDataRef.set(sanitizedMessage).then(() => {
+                            // Queued battle message sent successfully
                         }).catch(error => {
-                            console.error('Failed to send queued battle message:', error);
+                            // Failed to send queued battle message
                         });
                     }
                 }

@@ -12,7 +12,6 @@ export class StorageManager {
             localStorage.removeItem('test');
             return true;
         } catch (e) {
-            console.log('localStorage not available - using memory storage');
             return false;
         }
     }
@@ -24,7 +23,6 @@ export class StorageManager {
                 localStorage.setItem(key, JSON.stringify(data));
                 return true;
             } catch (e) {
-                console.log('localStorage save failed, using memory storage');
                 this.memoryStorage[key] = data;
                 return true;
             }
@@ -41,7 +39,6 @@ export class StorageManager {
                 const data = localStorage.getItem(key);
                 return data ? JSON.parse(data) : null;
             } catch (e) {
-                console.log('localStorage load failed, using memory storage');
                 return this.memoryStorage[key] || null;
             }
         } else {
@@ -55,7 +52,6 @@ export class StorageManager {
             try {
                 localStorage.removeItem(key);
             } catch (e) {
-                console.log('localStorage remove failed');
             }
         }
         delete this.memoryStorage[key];
@@ -64,7 +60,6 @@ export class StorageManager {
     // Save username
     saveUsername(username) {
         this.save('p2p_game_username', username);
-        console.log('Username saved:', username);
     }
 
     // Get saved username
@@ -83,7 +78,6 @@ export class StorageManager {
         };
         
         this.save('p2p_game_data', gameData);
-        console.log('Game data saved');
         return gameData;
     }
 
@@ -96,6 +90,5 @@ export class StorageManager {
     clearGameData() {
         const username = this.getSavedUsername();
         this.remove('p2p_game_data');
-        console.log('Game data cleared, username preserved');
     }
 }

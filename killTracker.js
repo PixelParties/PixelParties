@@ -67,11 +67,20 @@ export class KillTracker {
     }
     
     // Record a kill made by an attacker against a target
-    // NOTE: This is called whenever a target's HP drops to 0, regardless of whether
+    // This is called whenever a target's HP drops to 0, regardless of whether
     // they are subsequently revived by Necromancy or other effects
     recordKill(attacker, target, targetType = 'unknown') {
         if (!attacker || !attacker.side || !attacker.position) {
             return;
+        }
+        
+        // DEFENSIVE: Ensure the kills data structure exists for this attacker
+        if (!this.kills[attacker.side]) {
+            this.kills[attacker.side] = {};
+        }
+        
+        if (!this.kills[attacker.side][attacker.position]) {
+            this.kills[attacker.side][attacker.position] = [];
         }
         
         // Check for duplicate kills
@@ -98,11 +107,11 @@ export class KillTracker {
             wasRevived: false
         };
         
-        // Add to kill list for this attacker
+        // Add to kill list for this attacker (now safe)
         this.kills[attacker.side][attacker.position].push(killRecord);
         
         // ============================================
-        // NEW: Check for Waflav evolution counter reward
+        // Check for Waflav evolution counter reward
         // ============================================
         this.checkWaflavKillReward(attacker);
         
@@ -285,6 +294,19 @@ export class KillTracker {
             player: { left: [], center: [], right: [] },
             opponent: { left: [], center: [], right: [] }
         };
+        
+        // DEFENSIVE: Ensure the structure is completely initialized
+        ['player', 'opponent'].forEach(side => {
+            if (!this.kills[side]) {
+                this.kills[side] = {};
+            }
+            ['left', 'center', 'right'].forEach(position => {
+                if (!this.kills[side][position]) {
+                    this.kills[side][position] = [];
+                }
+            });
+        });
+        
         // Clear duplicate prevention tracking
         this.recentKills.clear();
     }

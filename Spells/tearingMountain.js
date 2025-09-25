@@ -67,8 +67,6 @@ export class TearingMountainEffect {
 
     // Cast MountainTearRiver on the owner's own side instead of enemy side
     async castSelfTargetedMountainTearRiver(battleManager, ownerSide) {
-        console.log(`🏔️ ${ownerSide} casting self-targeted MountainTearRiver!`);
-
         // Import MountainTearRiver spell system
         try {
             const { MountainTearRiverSpell } = await import('./mountainTearRiver.js');
@@ -78,7 +76,6 @@ export class TearingMountainEffect {
             const allFriendlyTargets = this.findAllFriendlyTargets(battleManager, ownerSide);
             
             if (allFriendlyTargets.length === 0) {
-                console.log(`🏔️ ${ownerSide} Tearing Mountain: No valid friendly targets found!`);
                 return;
             }
             
@@ -97,10 +94,8 @@ export class TearingMountainEffect {
             // Play visual effects (reuse MountainTearRiver visuals but on own side)
             await this.playSelfTargetedLavaFlowAnimation(allFriendlyTargets, ownerSide, battleManager, resistanceResults);
             
-            console.log(`🏔️ ${ownerSide} Tearing Mountain self-targeting completed!`);
-            
         } catch (error) {
-            console.error('Error casting self-targeted MountainTearRiver:', error);
+            // Error handled silently
         }
     }
 
@@ -140,7 +135,6 @@ export class TearingMountainEffect {
             }
         });
         
-        console.log(`🎯 Tearing Mountain found ${targets.length} friendly targets on ${ownerSide} side`);
         return targets;
     }
 
@@ -168,8 +162,6 @@ export class TearingMountainEffect {
         const bonusStacks = Math.floor(effectiveLevel / 3);
         const totalStacks = baseBurnStacks + bonusStacks;
         
-        console.log(`🏔️ ${ownerSide} Tearing Mountain DestructionMagic level ${maxDestructionLevel} (effective: ${effectiveLevel}): ${totalStacks} burn stacks (${baseBurnStacks} base + ${bonusStacks} bonus)`);
-        
         return totalStacks;
     }
 
@@ -190,10 +182,6 @@ export class TearingMountainEffect {
             
             const key = this.getTargetKey(target);
             resistanceMap.set(key, resisted);
-            
-            if (resisted) {
-                console.log(`🛡️ Friendly target resisted: ${target.type} at ${target.position}${target.type === 'creature' ? ` (index ${target.creatureIndex})` : ''}`);
-            }
         });
         
         return resistanceMap;
@@ -244,14 +232,11 @@ export class TearingMountainEffect {
         
         if (actualTarget && battleManager.statusEffectsManager) {
             battleManager.statusEffectsManager.applyStatusEffect(actualTarget, 'burned', burnStacks);
-            console.log(`🔥 Applied ${burnStacks} burn stacks to friendly ${actualTarget.name}`);
         }
     }
 
     // Play self-targeted lava flow animation (reuse MountainTearRiver visuals)
     async playSelfTargetedLavaFlowAnimation(targets, ownerSide, battleManager, resistanceResults) {
-        console.log(`🏔️ Playing self-targeted lava flow animation on ${ownerSide} side...`);
-        
         // Import and reuse MountainTearRiver's visual system
         try {
             const { MountainTearRiverSpell } = await import('./mountainTearRiver.js');
@@ -264,7 +249,7 @@ export class TearingMountainEffect {
             await this.createSelfTargetedLavaFlow(targets, ownerSide, battleManager, resistanceResults);
             
         } catch (error) {
-            console.error('Error playing self-targeted lava animation:', error);
+            // Error handled silently
         }
     }
 
@@ -275,7 +260,7 @@ export class TearingMountainEffect {
         // Find the friendly side area by looking for hero elements
         const friendlySlots = document.querySelectorAll(`.${ownerSide}-slot`);
         if (friendlySlots.length === 0) {
-            console.warn('Could not find friendly slots for self-targeted lava flow');
+            // Could not find friendly slots for self-targeted lava flow
         }
         
         // Calculate the area to cover for friendly side

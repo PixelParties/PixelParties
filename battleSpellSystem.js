@@ -36,6 +36,9 @@ import DarkDealSpell from './Spells/darkDeal.js';
 import BlowOfTheVenomSnakeSpell from './Spells/blowOfTheVenomSnake.js';
 import StrongOxHeadbuttSpell from './Spells/strongOxHeadbutt.js';
 import FerociousTigerKickSpell from './Spells/ferociousTigerKick.js';
+import PhoenixTackleSpell from './Spells/phoenixTackle.js';
+import VictoryPhoenixCannonSpell from './Spells/victoryPhoenixCannon.js';
+import SupplyChainSpell from './Spells/supplyChain.js';
 
 
 
@@ -197,6 +200,18 @@ export class BattleSpellSystem {
         // Register FerociousTigerKick (Fighting spell)
         const ferociousTigerKick = new FerociousTigerKickSpell(this.battleManager);
         this.spellImplementations.set('FerociousTigerKick', ferociousTigerKick);
+        
+        // Register PhoenixTackle
+        const phoenixTackle = new PhoenixTackleSpell(this.battleManager);
+        this.spellImplementations.set('PhoenixTackle', phoenixTackle);
+
+        // Register VictoryPhoenixCannon
+        const victoryPhoenixCannon = new VictoryPhoenixCannonSpell(this.battleManager);
+        this.spellImplementations.set('VictoryPhoenixCannon', victoryPhoenixCannon);
+        
+        // Register SupplyChain
+        const supplyChain = new SupplyChainSpell(this.battleManager);
+        this.spellImplementations.set('SupplyChain', supplyChain);
     }
 
     // ============================================

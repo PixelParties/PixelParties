@@ -237,8 +237,6 @@ export class CardPreviewManager {
                      style="max-width: 340px; max-height: 85%; object-fit: contain;">
             </div>
         `;
-        
-        console.log(`Showing reward screen preview for: ${cardData.displayName} (stable layout)`);
     }
 
     // FIXED: Hide reward screen preview with stable layout
@@ -586,7 +584,6 @@ export class CardPreviewManager {
 
         // Check if this character is already being previewed
         if (this.currentlyPreviewedCharacter && this.currentlyPreviewedCharacter.id === character.id) {
-            console.log(`${characterName} cards already visible`);
             return;
         }
 

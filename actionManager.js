@@ -5,8 +5,6 @@ export class ActionManager {
         this.playerActions = 1;
         this.maxActions = 1;
         this.onActionChangeCallback = null;
-        
-        console.log('ActionManager initialized - Starting with 1 Action per turn (Team Building only)');
     }
 
     // Initialize with callback
@@ -53,9 +51,7 @@ export class ActionManager {
         if (this.playerActions > 0) {
             const oldActions = this.playerActions;
             this.playerActions--;
-            
-            console.log(`Action consumed: ${oldActions} → ${this.playerActions}`);
-            
+                        
             this.notifyActionChange({
                 player: true,
                 oldValue: oldActions,
@@ -74,9 +70,7 @@ export class ActionManager {
     addPlayerActions(amount) {
         const oldActions = this.playerActions;
         this.playerActions += amount;
-        
-        console.log(`Actions added: ${oldActions} → ${this.playerActions}`);
-        
+                
         this.notifyActionChange({
             player: true,
             oldValue: oldActions,
@@ -90,9 +84,7 @@ export class ActionManager {
         const oldPlayerActions = this.playerActions;
         
         this.playerActions = this.maxActions;
-        
-        console.log(`Actions reset: ${oldPlayerActions} → ${this.playerActions}`);
-        
+                
         this.notifyActionChange({
             player: true,
             oldValue: oldPlayerActions,
@@ -180,8 +172,6 @@ export class ActionManager {
         if (actionData.maxActions !== undefined) {
             this.maxActions = actionData.maxActions;
         }
-        
-        console.log('Action data imported:', this.exportActionData());
         return true;
     }
 
@@ -189,7 +179,6 @@ export class ActionManager {
     reset() {
         this.playerActions = 1;
         this.maxActions = 1;
-        console.log('ActionManager reset');
     }
 
     // Get action statistics - SIMPLIFIED WITHOUT OPPONENT
@@ -200,14 +189,6 @@ export class ActionManager {
             playerHasActions: this.playerActions > 0,
             playerActionsUsed: this.maxActions - this.playerActions
         };
-    }
-
-    // Log action state (for debugging) - SIMPLIFIED WITHOUT OPPONENT
-    logActionState() {
-        console.log('=== ACTION STATE ===');
-        console.log('Player Actions:', this.playerActions, '/', this.maxActions);
-        console.log('Player Has Actions:', this.hasActions());
-        console.log('===================');
     }
 }
 

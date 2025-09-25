@@ -7,7 +7,6 @@ import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
 export class DamageSourceManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
-        console.log('⚔️ DamageSourceManager initialized');
     }
 
     // ============================================
@@ -295,8 +294,6 @@ export class DamageSourceManager {
             `🗿 ${targetName}'s Stoneskin reduces physical damage by ${reduction}! (${originalDamage} → ${reducedDamage})`,
             logType
         );
-        
-        console.log(`🗿 GUEST: ${targetName} stoneskin reduced damage ${originalDamage} → ${reducedDamage}`);
     }
 
     // ============================================
@@ -325,7 +322,6 @@ export class DamageSourceManager {
      */
     registerDamageSourceType(sourceType, classifier) {
         // Future implementation for extensible damage source types
-        console.log(`📝 Registered new damage source type: ${sourceType}`);
     }
 
     // ============================================
@@ -336,7 +332,6 @@ export class DamageSourceManager {
      * Cleanup method (called when battle ends)
      */
     cleanup() {
-        console.log('⚔️ DamageSourceManager cleaned up');
     }
 }
 

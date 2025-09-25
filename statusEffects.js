@@ -133,8 +133,6 @@ export class StatusEffectsManager {
                 description: 'Deals half damage on attacks. Reduces by 1 stack each turn.'
             }
         };
-        
-        console.log('🎭 StatusEffectsManager initialized');
     }
 
     // ============================================
@@ -210,7 +208,6 @@ export class StatusEffectsManager {
         // Don't apply status effects to dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
-            console.log(`⚰️ Ignoring status effect application to dead target: ${target.name}`);
             return false;
         }
 
@@ -380,8 +377,6 @@ export class StatusEffectsManager {
                 timestamp: Date.now()
             });
         }
-        
-        console.log(`🧃 Juice consumed from ${targetSide} side! Player remaining: ${this.battleManager.playerPermanentArtifacts ? this.battleManager.playerPermanentArtifacts.filter(a => a.name === 'Juice').length : 0}, Opponent remaining: ${this.battleManager.opponentPermanentArtifacts ? this.battleManager.opponentPermanentArtifacts.filter(a => a.name === 'Juice').length : 0}`);
         return true;
     }
 
@@ -419,8 +414,6 @@ export class StatusEffectsManager {
             `🧃 ${target.name} consumes Juice to negate ${stacks} stack${stacks > 1 ? 's' : ''} of ${effectName}!`,
             logType
         );
-        
-        console.log(`🧃 GUEST: Juice negation synchronized. Remaining: ${remainingJuice}`);
     }
 
     createJuiceNegationEffect(target, effectName) {
@@ -492,7 +485,6 @@ export class StatusEffectsManager {
         // Don't update indicators for dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
-            console.log(`⚰️ Skipping status indicator update for dead target: ${target.name}`);
             return;
         }
 
@@ -522,9 +514,7 @@ export class StatusEffectsManager {
     }
 
     // Refresh all status effect visuals (for guest sync)
-    refreshAllStatusEffectVisuals() {
-        console.log('🔄 Refreshing all status effect visuals...');
-        
+    refreshAllStatusEffectVisuals() {        
         // Refresh player heroes
         ['left', 'center', 'right'].forEach(position => {
             if (this.battleManager.playerHeroes[position]) {
@@ -573,8 +563,6 @@ export class StatusEffectsManager {
                 }
             }
         });
-        
-        console.log('✅ Status effect visual refresh completed');
     }
 
     // Get status effect from target
@@ -603,8 +591,6 @@ export class StatusEffectsManager {
     // Process all status effects for a target at the end of their turn
     async processStatusEffectsAfterTurn(target) {
         if (!target.statusEffects || target.statusEffects.length === 0) return;
-
-        console.log(`🎭 Processing status effects for ${target.name}...`);
 
         // Process damage-dealing effects first
         await this.processPoisonDamage(target);
@@ -813,7 +799,6 @@ export class StatusEffectsManager {
             }
         } catch (error) {
             // TearingMountain not available, proceed normally
-            console.log('TearingMountain check failed, burn will be consumed normally:', error);
         }
 
         // Only remove burn stack if Tearing Mountain doesn't prevent it
@@ -970,10 +955,9 @@ export class StatusEffectsManager {
 
     // Create visual effect for status application/damage
     createStatusVisualEffect(target, effectName, actionType) {
-        // ✅ FIX: Don't create visual effects for dead targets
+        // Don't create visual effects for dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
-            console.log(`⚰️ Skipping visual effect creation for dead target: ${target.name}`);
             return;
         }
 
@@ -1045,7 +1029,6 @@ export class StatusEffectsManager {
         // Don't create indicators for dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
-            console.log(`⚰️ Skipping status indicator creation for dead target: ${target.name}`);
             return;
         }
 
@@ -1501,10 +1484,6 @@ export class StatusEffectsManager {
         const beforeCount = target.statusEffects.length;
         target.statusEffects = target.statusEffects.filter(effect => effect.stacks > 0);
         const afterCount = target.statusEffects.length;
-        
-        if (beforeCount !== afterCount) {
-            console.log(`🧹 Cleaned up ${beforeCount - afterCount} expired status effects from ${target.name}`);
-        }
     }
 
     /**
@@ -1608,7 +1587,6 @@ export class StatusEffectsManager {
         // Don't apply status effects to dead targets
         const isTargetAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         if (!isTargetAlive) {
-            console.log(`⚰️ Ignoring status effect update for dead target: ${target.name}`);
             return;
         }
 
@@ -1650,8 +1628,6 @@ export class StatusEffectsManager {
             `🛡️ ${target.name}'s Fireshield protects against the frozen effect! (${fireshieldStacks} stacks)`,
             logType
         );
-        
-        console.log(`🛡️ GUEST: ${target.name} resisted frozen due to fireshield (${fireshieldStacks} stacks)`);
     }
 
     // Find target from sync info
@@ -1727,7 +1703,6 @@ export class StatusEffectsManager {
         
         const isAlive = (target.type === 'hero' || !target.type) ? target.alive : target.alive;
         const clearingMode = completeClearing ? 'COMPLETE' : 'PARTIAL';
-        console.log(`🧹 ${clearingMode} cleared status effects from ${target.name} (alive: ${isAlive}), preserved ${effectsToPreserve.length} effects`);
     }
 
     // Add a safety cleanup method to be called after death
@@ -1752,7 +1727,6 @@ export class StatusEffectsManager {
         });
         
         const clearingMode = completeClearing ? 'COMPLETE' : 'PARTIAL';
-        console.log(`🧹 ${clearingMode} cleaned up status visuals for dead target: ${target.name}`);
     }
 
     // Check if attacker is weakened and should deal reduced damage
@@ -1778,9 +1752,7 @@ export class StatusEffectsManager {
     }
 
     // Clear all status effects from all targets (battle end)
-    clearAllBattleStatusEffects() {
-        console.log('🧹 COMPLETE battle cleanup: Clearing ALL status effects from ALL targets...');
-        
+    clearAllBattleStatusEffects() {        
         // Clear from all heroes with COMPLETE clearing
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
@@ -1801,8 +1773,6 @@ export class StatusEffectsManager {
                 }
             });
         });
-        
-        console.log('✅ ALL status effects completely cleared from battle - fresh start for next battle!');
     }
 
     // Cleanup (called when battle ends)
@@ -1812,8 +1782,6 @@ export class StatusEffectsManager {
         // Remove CSS if needed
         const css = document.getElementById('statusEffectsCSS');
         if (css) css.remove();
-        
-        console.log('🎭 StatusEffectsManager cleaned up');
     }
 
     // ============================================
@@ -1840,10 +1808,13 @@ export class StatusEffectsManager {
         return true;
     }
 
-    // Restore visual effects for all existing status effects - ✅ FIXED
-    restoreAllStatusVisualEffects() {
-        console.log('🎭 Restoring status effect visual indicators...');
-        
+    updateCreatureStatusIndicator(creature, effectName) {
+        if (!creature.alive) return;
+        this.updateStatusVisualIndicator(creature, effectName);
+    }
+
+    // Restore visual effects for all existing status effects
+    restoreAllStatusVisualEffects() {       
         // Restore for all heroes
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
@@ -1859,10 +1830,10 @@ export class StatusEffectsManager {
                     });
                 }
                 
-                // Restore for creatures - ENHANCED SAFETY CHECKS
+                // Restore for creatures
                 if (hero && hero.creatures) {
                     hero.creatures.forEach(creature => {
-                        // CRITICAL FIX: Only restore indicators for alive creatures with status effects
+                        // Only restore indicators for alive creatures with status effects
                         if (creature.alive && creature.statusEffects && creature.statusEffects.length > 0) {
                             creature.statusEffects.forEach(effect => {
                                 this.createPersistentStatusIndicator(
@@ -1879,8 +1850,6 @@ export class StatusEffectsManager {
                 }
             });
         });
-        
-        console.log('✅ Status effect visual restoration completed with enhanced safety checks');
     }
 }
 

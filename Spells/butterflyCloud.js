@@ -125,7 +125,7 @@ export const butterflyCloudSpell = {
                     });
                 }
             } catch (error) {
-                console.warn('Error accessing card database:', error);
+                // Error accessing card database
             }
         }
         
@@ -166,7 +166,6 @@ export const butterflyCloudSpell = {
             });
         });
         
-        console.log('ButterflyCloud: Found', eligibleSpells.length, 'eligible spells:', eligibleSpells.map(s => s.name));
         return eligibleSpells;
     },
     
@@ -289,7 +288,6 @@ export const butterflyCloudSpell = {
             };
             
         } catch (error) {
-            console.error('Error activating Butterfly Cloud:', error);
             return {
                 success: false,
                 message: 'Failed to activate Butterfly Cloud',

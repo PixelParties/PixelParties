@@ -24,9 +24,7 @@ export class HeroTooltipManager {
 
     toggleLockedMode() {
         this.lockedMode = !this.lockedMode;
-        
-        console.log(`Tooltip locked mode: ${this.lockedMode ? 'ON' : 'OFF'}`);
-        
+                
         // Update any currently visible tooltip
         if (this.activeTooltipElement) {
             this.updateTooltipLockedState();
@@ -113,9 +111,7 @@ export class HeroTooltipManager {
                         // Lock Beato's spellbook automatically
                         const lockResult = spellbookManager.lockHeroSpellbook(heroPosition);
                         
-                        if (lockResult) {
-                            console.log(`🔒 Auto-locked ${hero.name}'s spellbook (Beato special rule)`);
-                            
+                        if (lockResult) {                            
                             // Save game state after auto-locking
                             if (window.heroSelection.saveGameState) {
                                 window.heroSelection.saveGameState().catch(error => {
@@ -183,13 +179,11 @@ export class HeroTooltipManager {
         // Add mouseenter listener
         tooltipElement._lockedModeMouseEnter = () => {
             this.tooltipHoverState = true;
-            console.log('Tooltip hover: ENTER (locked mode)');
         };
         
         // Add mouseleave listener
         tooltipElement._lockedModeMouseLeave = () => {
             this.tooltipHoverState = false;
-            console.log('Tooltip hover: LEAVE (locked mode)');
             
             // Check if we should hide tooltip
             this.checkTooltipHideConditions();
@@ -214,7 +208,6 @@ export class HeroTooltipManager {
     // Called when hero hover ends
     handleHeroHoverLeave() {
         if (this.lockedMode && this.activeTooltipElement) {
-            console.log('Hero hover: LEAVE (locked mode)');
             // Don't hide immediately, check conditions
             setTimeout(() => {
                 this.checkTooltipHideConditions();
@@ -231,15 +224,8 @@ export class HeroTooltipManager {
         const heroSelectionUI = window.heroSelection?.heroSelectionUI;
         const isHeroHovered = heroSelectionUI?.isHeroHovered || false;
         
-        console.log('Checking hide conditions:', {
-            isHeroHovered,
-            tooltipHoverState: this.tooltipHoverState,
-            lockedMode: this.lockedMode
-        });
-        
         // Hide only if both hero AND tooltip are not hovered
         if (!isHeroHovered && !this.tooltipHoverState) {
-            console.log('Hiding tooltip - neither hero nor tooltip hovered');
             this.hideActiveTooltip();
         }
     }

@@ -465,7 +465,5 @@ export class UIManager {
         
         // Show main menu buttons
         this.showMainMenuButtons();
-        
-        console.log('Returned to main menu');
     }
 }

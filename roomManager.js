@@ -95,9 +95,7 @@ export class RoomManager {
     async clearGameState() {
         if (!this.roomRef) return;
         
-        try {
-            console.log('Clearing old game state...');
-            
+        try {           
             // Only clear the old game data, don't reset the current game flags
             await Promise.all([
                 this.roomRef.child('gameState').remove(),
@@ -110,8 +108,6 @@ export class RoomManager {
                     lastSurrender: null
                 })
             ]);
-            
-            console.log('Old game state cleared successfully');
             return true;
         } catch (error) {
             console.error('Error clearing game state:', error);
@@ -243,7 +239,6 @@ export class RoomManager {
     // Toggle ready state
     async toggleReadyState() {
         if (!this.roomRef) {
-            console.log('No room reference');
             return false;
         }
         
@@ -252,7 +247,6 @@ export class RoomManager {
             const room = snapshot.val();
             
             if (!room) {
-                console.log('Room no longer exists');
                 return false;
             }
             
@@ -268,7 +262,6 @@ export class RoomManager {
             }
             
             await this.roomRef.update(updateData);
-            console.log(`Ready state toggled: ${currentReady} -> ${!currentReady}`);
             return true;
             
         } catch (error) {
@@ -313,9 +306,7 @@ export class RoomManager {
     async handleSurrender() {
         if (!this.roomRef) return;
         
-        try {
-            console.log('Handling surrender...');
-            
+        try {           
             // Mark the surrender and end the current game
             await this.roomRef.update({
                 lastSurrender: this.isHost ? 'host' : 'guest',
@@ -332,8 +323,6 @@ export class RoomManager {
                 this.roomRef.child('game_data').remove(),
                 this.roomRef.child('ice_candidates').remove()
             ]);
-            
-            console.log('Surrender handled and game reset for new game');
         } catch (error) {
             console.error('Error handling surrender:', error);
             throw error;
@@ -369,7 +358,6 @@ export class RoomManager {
             
             for (const roomId of roomsToDelete) {
                 await this.database.ref('rooms/' + roomId).remove();
-                console.log(`Cleaned up abandoned room: ${roomId} (age: ${Math.floor(roomAge/60000)}min, activity: ${Math.floor(lastActivity/60000)}min ago)`);
             }
             
         } catch (error) {
@@ -393,8 +381,6 @@ export class RoomManager {
             this.roomsListRef.off();
             this.roomsListRef = null;
         }
-        
-        console.log('Room manager cleanup completed');
     }
 
     // Get current room reference
@@ -428,7 +414,6 @@ export class RoomManager {
                     });
                 }
             } catch (error) {
-                console.log('Room update error on unload:', error);
             }
         }
     }

@@ -38,10 +38,12 @@ import { KyliEffectManager } from './Heroes/kyli.js';
 import { BeatoEffectManager } from './Heroes/beato.js';
 import { WaflavEffectManager } from './Heroes/waflav.js';
 import { StormkissedWaflavEffectManager } from './Heroes/stormkissedWaflav.js';
+import { MaryEffectManager } from './Heroes/mary.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
 import { skullNecklaceEffect } from './Artifacts/skullNecklace.js'; 
+import { cuteCrownEffect } from './Artifacts/cuteCrown.js';
 
 import { resetDoomClockCountersIfNeeded } from './Spells/doomClock.js';
 import { crystalWellManager } from './Spells/crystalWell.js';
@@ -52,6 +54,8 @@ import { NimbleMonkeeCreature } from './Creatures/nimbleMonkee.js';
 import { ResilientMonkeeCreature } from './Creatures/resilientMonkee.js';
 import { CriminalMonkeeCreature } from './Creatures/criminalMonkee.js';
 import DemonsGateCreature from './Creatures/demonsGate.js';
+import CuteBirdCreature from './Creatures/cuteBird.js';
+
 
 
 
@@ -85,6 +89,7 @@ export class HeroSelection {
             goldenBananas: 0,
             evolutionCounters: 1,
             lunaBuffs: 0,
+            supplyChain: 0,
         };
         this.opponentCounters = {
             birthdayPresent: 0,
@@ -92,6 +97,7 @@ export class HeroSelection {
             goldenBananas: 0,
             evolutionCounters: 1,
             lunaBuffs: 0,
+            supplyChain: 0,
         };
 
 
@@ -135,6 +141,7 @@ export class HeroSelection {
         this.beatoEffectManager = new BeatoEffectManager();
         this.waflavEffectManager = new WaflavEffectManager();
         this.stormkissedWaflavEffectManager = new StormkissedWaflavEffectManager();
+        this.maryEffectManager = new MaryEffectManager();
 
         
         this.graveWormCreature = new GraveWormCreature(this);
@@ -142,11 +149,13 @@ export class HeroSelection {
         this.resilientMonkeeCreature = new ResilientMonkeeCreature(this);
         this.criminalMonkeeCreature = new CriminalMonkeeCreature(this);
         this.demonsGateCreature = new DemonsGateCreature(null);
+        this.cuteBirdCreature = new CuteBirdCreature(this);
 
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
         this.ancientTechInfiniteEnergyCoreEffect = ancientTechInfiniteEnergyCoreEffect;
         this.skullNecklaceEffect = skullNecklaceEffect; 
+        this.cuteCrownEffect = cuteCrownEffect;
 
 
         // Initialize hero abilities manager with references
@@ -203,6 +212,7 @@ export class HeroSelection {
                 await this.saveGameState();
                 this.ancientTechInfiniteEnergyCoreEffect.onEquipmentChange();
                 this.skullNecklaceEffect.onEquipmentChange();
+                this.cuteCrownEffect.onEquipmentChange();
             }
         );
 
@@ -238,6 +248,7 @@ export class HeroSelection {
             'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
             'Kyli': ['Biomancy',  'Occultism', 'MonsterInABottle', 'OverflowingChalice', 'BloodSoakedCoin', 'DoomClock', 'GraveWorm', 'TheRootOfAllEvil'],
             'Luna': ['DestructionMagic',  'Friendship', 'TearingMountain', 'MountainTearRiver', 'LunaKiai', 'PriestOfLuna', 'HeartOfTheMountain', 'DichotomyOfLunaAndTempeste'],
+            'Mary': ['Charme',  'Leadership', 'CuteBird', 'CutePhoenix', 'PhoenixTackle', 'VictoryPhoenixCannon', 'CuteCrown', 'PinkSky'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
@@ -314,6 +325,7 @@ export class HeroSelection {
         this.crusaderArtifactsHandler.init(this);
         this.ancientTechInfiniteEnergyCoreEffect.init(this);
         this.skullNecklaceEffect.init(this); 
+        this.cuteCrownEffect.init(this);
 
         this.inventingAbility.init();
 
@@ -727,7 +739,8 @@ export class HeroSelection {
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
-                'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png'
+                'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
+                'Mary.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -764,7 +777,8 @@ export class HeroSelection {
                 'Alice.png', 'Cecilia.png', 'Gon.png', 'Ida.png', 'Medea.png',
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
-                'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png'
+                'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
+                'Mary.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -1356,7 +1370,7 @@ export class HeroSelection {
         if (opponentCountersData) {
             this.opponentCounters = { ...opponentCountersData };
         } else {
-            this.opponentCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0  };
+            this.opponentCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0, supplyChain: 0  };
         }
 
         // Restore area card data
@@ -1530,12 +1544,12 @@ export class HeroSelection {
 
         if (playerCountersData) {
             this.playerCounters = { 
-                ...{ birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0 },
+                ...{ birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0, supplyChain: 0 },
                 ...playerCountersData // override with saved data
             };
         } else {
             // Initialize default counters if no saved data
-            this.playerCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0 };
+            this.playerCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0, supplyChain: 0 };
         }
         
         // Initialize life manager with turn tracker after restoration
@@ -1842,7 +1856,7 @@ export class HeroSelection {
                 hand: handData,
                 deck: deckData,
                 graveyard: graveyardData,
-                playerCounters: this.playerCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0  },
+                playerCounters: this.playerCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0, supplyChain: 0  },
                 playerAreaCard: areaFormationData.playerAreaCard,
                 opponentAreaCard: areaFormationData.opponentAreaCard, 
                 ...areaFormationData
@@ -2223,10 +2237,17 @@ export class HeroSelection {
             if (this.stormkissedWaflavEffectManager) {
                 await this.stormkissedWaflavEffectManager.processPostBattleEmpowerment(this);
             }
+            if (this.maryEffectManager) {
+                await this.maryEffectManager.processPostBattleEmpowerment(this);
+            }
 
             // ===== PROCESS DEMON'S GATE DESTRUCTION MAGIC ENHANCEMENT =====
             if (this.demonsGateCreature) {
                 this.demonsGateCreature.processPostBattleDestructionMagicEnhancement(this);
+            }
+            // ===== PROCESS CUTE BIRD EVOLUTION =====
+            if (this.cuteBirdCreature) {
+                await this.cuteBirdCreature.processPostBattleEvolution(this);
             }
 
             
@@ -3591,6 +3612,9 @@ export class HeroSelection {
         if (this.kyliEffectManager) {
             this.kyliEffectManager.reset();
         }
+        if (this.maryEffectManager) {
+            this.maryEffectManager.reset();
+        }
 
 
         // Reset Abilities
@@ -3611,6 +3635,9 @@ export class HeroSelection {
         if (this.skullNecklaceEffect) {
             this.skullNecklaceEffect.reset();
         }
+        if (this.cuteCrownEffect) {
+            this.cuteCrownEffect.reset();
+        }
 
         // Reset Creature handlers
         if (this.graveWormCreature) {
@@ -3624,6 +3651,9 @@ export class HeroSelection {
         }
         if (this.resilientMonkeeCreature) {
             this.resilientMonkeeCreature.reset();
+        }
+        if (this.cuteBirdCreature) {
+            this.cuteBirdCreature.reset();
         }
 
         

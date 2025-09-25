@@ -22,8 +22,6 @@ export class ArrowSystem {
         
         // Register built-in arrow types
         this.registerBuiltInArrows();
-        
-        console.log('🏹 ArrowSystem initialized');
     }
 
     // ============================================
@@ -72,7 +70,6 @@ export class ArrowSystem {
         };
 
         this.arrowTypes.set(config.name, arrowConfig);
-        console.log(`🏹 Registered arrow type: ${config.displayName}`);
         return true;
     }
 
@@ -143,8 +140,6 @@ export class ArrowSystem {
             syncMessageType: 'lightning_arrow_impact',
             impactEffect: this.createLightningArrowImpact.bind(this)
         });
-
-        console.log(`🏹 Registered ${this.arrowTypes.size} built-in arrow types`);
     }
 
     // ============================================
@@ -155,8 +150,6 @@ export class ArrowSystem {
      * Initialize arrow counters for all heroes at battle start
      */
     initializeArrowCounters() {
-        console.log('🏹 Initializing arrow counters for all heroes...');
-
         ['player', 'opponent'].forEach(side => {
             const heroes = side === 'player' ? 
                 this.battleManager.playerHeroes : 
@@ -189,9 +182,7 @@ export class ArrowSystem {
             
             if (arrowCount > 0) {
                 heroCounters.set(arrowName, arrowCount);
-                
-                console.log(`🏹 ${hero.name} receives ${arrowCount} ${arrowConfig.displayName} counter${arrowCount > 1 ? 's' : ''}`);
-                
+                                
                 this.battleManager.addCombatLog(
                     `🏹 ${hero.name} receives ${arrowCount} ${arrowConfig.displayName} counter${arrowCount > 1 ? 's' : ''}!`,
                     side === 'player' ? 'success' : 'info'
@@ -262,7 +253,6 @@ export class ArrowSystem {
         heroCounters.set(arrowType, currentCount - 1);
         
         const arrowConfig = this.arrowTypes.get(arrowType);
-        console.log(`🏹 ${hero.name} uses ${arrowConfig.displayName} counter (${currentCount - 1} remaining)`);
 
         // Update display
         this.updateArrowDisplay(hero.side, hero.position);
@@ -312,10 +302,7 @@ export class ArrowSystem {
             this.updateArrowDisplay(attackerLocalSide, attackerPosition);
             
             // Log for debugging
-            const arrowConfig = this.arrowTypes.get(arrowType);
-            if (arrowConfig) {
-                console.log(`🏹 Guest: ${hero.name} arrow counter updated: ${arrowConfig.displayName} (${newCount} remaining)`);
-            }
+            this.arrowTypes.get(arrowType);
         }
     }
 
@@ -353,8 +340,6 @@ export class ArrowSystem {
                         target: target,
                         bonusDamage: arrowConfig.damageBonus
                     });
-
-                    console.log(`🏹 ${arrowConfig.displayName} enhances attack: +${arrowConfig.damageBonus} damage`);
                 }
             }
         });
@@ -880,8 +865,6 @@ export class ArrowSystem {
 
             // Update displays after restoration
             this.updateAllArrowDisplays();
-
-            console.log('🏹 Arrow system state restored from checkpoint');
             return true;
         } catch (error) {
             console.error('Error importing arrow state:', error);
@@ -1011,8 +994,6 @@ export class ArrowSystem {
         // Remove CSS
         const css = document.getElementById('arrowSystemCSS');
         if (css) css.remove();
-
-        console.log('🏹 ArrowSystem cleaned up');
     }
 }
 
@@ -1028,13 +1009,8 @@ export function applyArrowStartOfBattleEffects(battleManager) {
     // Access arrow system through attackEffectsManager
     if (battleManager.attackEffectsManager && battleManager.attackEffectsManager.arrowSystem) {
         battleManager.attackEffectsManager.arrowSystem.initializeArrowCounters();
-        console.log('🏹 Arrow start-of-battle effects applied');
     } else {
         console.warn('🏹 Arrow system not available for start-of-battle initialization');
-        console.log('Available:', {
-            attackEffectsManager: !!battleManager.attackEffectsManager,
-            arrowSystem: !!(battleManager.attackEffectsManager?.arrowSystem)
-        });
     }
 }
 

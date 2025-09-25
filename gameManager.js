@@ -25,8 +25,6 @@ export class GameManager {
 
         // Surrender victory handler - replaces old game_surrender handler
         this.webRTCManager.registerMessageHandler('surrender_victory', (data) => {
-            console.log('🏳️ Received surrender victory message:', data); // Debug log
-            
             if (this.heroSelection && this.heroSelection.victoryScreen) {
                 // The surrendering player is the loser, so we (the receiver) are the winner
                 const winnerData = {
@@ -35,13 +33,9 @@ export class GameManager {
                     isLocalPlayer: true // We won because opponent surrendered
                 };
                 
-                console.log('🏆 Showing victory screen for winner:', winnerData); // Debug log
-                
                 // Show victory screen
                 this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
                 this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
-            } else {
-                console.error('⚠️ Cannot show victory screen - missing heroSelection or victoryScreen');
             }
         });
 
@@ -150,8 +144,6 @@ export class GameManager {
         this.webRTCManager.registerMessageHandler('sid_card_theft', (data) => {
             if (this.heroSelection && this.heroSelection.cardRewardManager) {
                 this.heroSelection.cardRewardManager.handleTheftMessage(data, this.heroSelection);
-            } else {
-                console.error('🎭 GAMEMANAGER: No heroSelection or cardRewardManager available');
             }
         });
 
@@ -164,8 +156,6 @@ export class GameManager {
                 if (data.victimSide === currentPlayerSide) {
                     this.heroSelection.cardRewardManager.handleOpponentSidTheft(data, this.heroSelection);
                 }
-            } else {
-                console.error('🎭 GAMEMANAGER: No heroSelection or cardRewardManager available');
             }
         });
 
@@ -265,35 +255,27 @@ export class GameManager {
         this.processedMessages = new Set();
         
         this.firebaseGameDataListener = roomRef.child('game_data').on('child_added', (snapshot) => {
-            const message = snapshot.val();
-            
-            // Skip our own messages
-            const ourPlayerId = this.roomManager.playerId;
-            const isHost = this.roomManager.getIsHost();
-            const ourRole = isHost ? 'host' : 'guest';
-            
-            if (!message || message.from === ourRole) {
-                return;
-            }
+        const message = snapshot.val();
+        
+        // Skip our own messages
+        const ourPlayerId = this.roomManager.playerId;
+        const isHost = this.roomManager.getIsHost();
+        const ourRole = isHost ? 'host' : 'guest';
+        
+        if (!message || message.from === ourRole) {
+            return;
+        }
 
-            // Create a unique message ID to prevent duplicate processing
-            const messageId = `${message.type}_${message.timestamp}_${message.from}`;
-            
-            if (this.processedMessages.has(messageId)) {
-                return;
-            }
-            
-            this.processedMessages.add(messageId);
-            
-            // Clean up old processed message IDs (keep only last 50)
-            if (this.processedMessages.size > 50) {
-                const entries = Array.from(this.processedMessages);
-                this.processedMessages.clear();
-                // Keep the last 25
-                entries.slice(-25).forEach(id => this.processedMessages.add(id));
-            }
-
-            // Handle the message based on type - UPDATED with selective UI updates
+        // Create a unique message ID to prevent duplicate processing
+        const messageId = `${message.type}_${message.timestamp}_${message.from}`;
+        
+        if (this.processedMessages.has(messageId)) {
+            return;
+        }
+        
+        this.processedMessages.add(messageId);
+        
+        // Handle the message based on type
             if (message.type === 'character_selection' && this.heroSelection) {
                 this.heroSelection.receiveCharacterSelection(message.data);
                 this.smartUpdateUI('character_selection');
@@ -358,15 +340,11 @@ export class GameManager {
                 this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
             } else if (message.type === 'surrender_victory' && this.heroSelection && this.heroSelection.victoryScreen) {
                 // Handle surrender victory via Firebase fallback
-                console.log('🏳️ Received surrender victory via Firebase:', message); // Debug log
-                
                 const winnerData = {
                     playerName: this.uiManager.getCurrentUsername(),
                     heroes: this.getPlayerHeroes(),
                     isLocalPlayer: true // We won because opponent surrendered
                 };
-                
-                console.log('🏆 Showing victory screen via Firebase for winner:', winnerData); // Debug log
                 
                 this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
                 this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
@@ -771,13 +749,11 @@ export class GameManager {
         // Only draw initial hand if this is NOT a reconnection AND player doesn't already have cards
         if (currentHandSize === 0 && !isReconnection) {
             if (this.heroSelection) {
-                console.log("FOUND IT!"); // This should only log for truly new games now
                 const drawnCards = this.heroSelection.drawInitialHand();
             }
         } else if (isReconnection && currentHandSize === 0) {
             // During reconnection with empty hand - this is expected in some game states
             // Don't draw new cards, the empty hand might be intentional
-            console.log("Reconnection detected with empty hand - not drawing new cards");
         }
         
         // Update the battle formation UI to show the hand
@@ -830,7 +806,6 @@ export class GameManager {
             await this.roomManager.handleSurrender();
             
         } catch (error) {
-            console.error('Error during surrender:', error);
             // Fallback to original surrender behavior
             await this.roomManager.handleSurrender();
             this.webRTCManager.sendMessage({
@@ -1076,7 +1051,7 @@ export class GameManager {
             });
             
         } catch (error) {
-            console.error('Error saving surrender victory data:', error);
+            // Error saving surrender victory data - silently handle
         }
     }
 }

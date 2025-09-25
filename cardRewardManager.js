@@ -44,6 +44,7 @@ export class CardRewardManager {
             { name: 'Kazena', image: './Cards/Characters/Kazena.png' },
             { name: 'Kyli', image: './Cards/Characters/Kyli.png' },
             { name: 'Luna', image: './Cards/Characters/Luna.png' },
+            { name: 'Mary', image: './Cards/Characters/Mary.png' },
             { name: 'Medea', image: './Cards/Characters/Medea.png' },
             { name: 'Monia', image: './Cards/Characters/Monia.png' },
             { name: 'Nicolas', image: './Cards/Characters/Nicolas.png' },
@@ -68,6 +69,7 @@ export class CardRewardManager {
             'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
             'Kyli': ['Biomancy',  'Occultism', 'MonsterInABottle', 'OverflowingChalice', 'BloodSoakedCoin', 'DoomClock', 'GraveWorm', 'TheRootOfAllEvil'],
             'Luna': ['DestructionMagic',  'Friendship', 'TearingMountain', 'MountainTearRiver', 'LunaKiai', 'PriestOfLuna', 'HeartOfTheMountain', 'DichotomyOfLunaAndTempeste'],
+            'Mary': ['Charme',  'Leadership', 'CuteBird', 'CutePhoenix', 'PhoenixTackle', 'VictoryPhoenixCannon', 'CuteCrown', 'PinkSky'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
@@ -377,12 +379,53 @@ export class CardRewardManager {
             }, 3000);
         }
 
+        // Check for Supply Chain bonus cards
+        let supplyChainBonusCards = 0;
+        if (heroSelection.playerCounters && heroSelection.playerCounters.supplyChain) {
+            supplyChainBonusCards = heroSelection.playerCounters.supplyChain;
+            
+            // Clear the counter since it's been used
+            heroSelection.playerCounters.supplyChain = 0;
+        }
+
+        // Add Supply Chain bonus cards to hand if any
+        if (supplyChainBonusCards > 0 && this.handManager) {
+            this.handManager.drawCards(supplyChainBonusCards);
+            
+            // Show notification
+            const notification = document.createElement('div');
+            notification.textContent = `Supply Chain bonus: +${supplyChainBonusCards} cards!`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 30%;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(34, 139, 34, 0.9);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: bold;
+                z-index: 10000;
+                animation: fadeIn 0.3s ease-out;
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'fadeOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+            
+            // Store this for the breakdown display
+            this.supplyChainBonusCards = supplyChainBonusCards;
+        }
+
         // Check for Birthday Present bonus cards from opponent
         let birthdayPresentBonusCards = 0;
 
         // Use the correct field name and add fallback
         const opponentCounter = heroSelection.opponentCounters?.birthdayPresent || 
-                       heroSelection.opponentBirthdayPresentCounterData || 0;
+                    heroSelection.opponentBirthdayPresentCounterData || 0;
 
         if (opponentCounter > 0) {
             birthdayPresentBonusCards = opponentCounter;
@@ -396,7 +439,7 @@ export class CardRewardManager {
                 notification.textContent = `Birthday Present bonus: +${birthdayPresentBonusCards} cards!`;
                 notification.style.cssText = `
                     position: fixed;
-                    top: 30%;
+                    top: 35%;
                     left: 50%;
                     transform: translateX(-50%);
                     background: rgba(255, 192, 203, 0.9);

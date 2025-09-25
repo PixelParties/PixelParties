@@ -87,7 +87,6 @@ export class BlowOfTheVenomSnakeSpell {
         const targetElement = this.getTargetElement(target);
         
         if (!attackerElement || !targetElement) {
-            console.warn('Could not find elements for Blow Of The Venom Snake effect');
             return;
         }
 
@@ -183,7 +182,6 @@ export class BlowOfTheVenomSnakeSpell {
             // Creature element
             const creatureInfo = this.findCreatureInfo(target);
             if (!creatureInfo) {
-                console.warn('Could not find creature info for Blow Of The Venom Snake target');
                 return null;
             }
 
@@ -257,7 +255,6 @@ export class BlowOfTheVenomSnakeSpell {
         const localTarget = this.findTargetFromSyncInfo(targetInfo);
         
         if (!localAttacker || !localTarget) {
-            console.warn('Could not find local targets for Blow Of The Venom Snake effect');
             return;
         }
 

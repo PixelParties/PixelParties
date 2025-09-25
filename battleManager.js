@@ -51,6 +51,7 @@ export class BattleManager {
         this.goldManager = null;
         this.onBattleEnd = null;
         this.turnInProgress = false;
+        this._processingSimultaneousAttack = false;
 
         // Area storage
         this.playerAreaCard = null;
@@ -1371,11 +1372,6 @@ export class BattleManager {
                 }
             });
         });
-        
-        // Call the refresh helper to ensure proper visual states
-        setTimeout(() => {
-            this.refreshAllCreatureVisuals();
-        }, 100);
     }
 
     // Update creature health bar
@@ -1756,7 +1752,18 @@ export class BattleManager {
         const creatureName = creatureData.name;
 
         // Handle MoonlightButterfly counter updates
-        if (creatureName === 'MoonlightButterfly') {
+        if (creatureName === 'RoyalCorgi') {
+            if (!this.royalCorgiManager) {
+                import('./Creatures/royalCorgi.js').then(({ default: RoyalCorgiCreature }) => {
+                    this.royalCorgiManager = new RoyalCorgiCreature(this);
+                    this.royalCorgiManager.handleGuestCounterUpdate(data);
+                });
+            } else {
+                this.royalCorgiManager.handleGuestCounterUpdate(data);
+            }
+        }
+        // Handle MoonlightButterfly counter updates
+        else if (creatureName === 'MoonlightButterfly') {
             if (!this.moonlightButterflyManager) {
                 import('./Creatures/moonlightButterfly.js').then(({ default: MoonlightButterflyCreature }) => {
                     this.moonlightButterflyManager = new MoonlightButterflyCreature(this);
@@ -1864,19 +1871,18 @@ export class BattleManager {
     guest_handleActorAction(data) {
         const { position, playerActor, opponentActor } = data;
         
-        const shakePromises = [];
-        
+        // Only log creature activations - don't shake them
+        // The actual animation will come from creature-specific messages
         if (playerActor && playerActor.type === 'creature') {
-            shakePromises.push(this.animationManager.shakeCreature('player', position, playerActor.index));
             this.addCombatLog(`⚡ ${playerActor.name} activates!`, 'success');
         }
         
         if (opponentActor && opponentActor.type === 'creature') {
-            shakePromises.push(this.animationManager.shakeCreature('opponent', position, opponentActor.index));
             this.addCombatLog(`⚡ ${opponentActor.name} activates!`, 'error');
         }
         
-        return Promise.all(shakePromises);
+        // Heroes don't need handling here since they're handled by
+        // 'hero_turn_execution' messages
     }
 
     guest_handleHeroTurnExecution(data) {
@@ -1939,24 +1945,29 @@ export class BattleManager {
 
     // GUEST: Handle combined turn execution
     async guest_handleCombinedTurnExecution(data) {
-        const { playerAction, opponentAction, position, damageModifiers } = data;  // NEW: damageModifiers added
-        
+        const { playerAction, opponentAction, position, damageModifiers, animationTiming } = data;
+
+        // Update guest hero displays
         this.updateGuestHeroDisplays(playerAction, opponentAction);
         
+        // Add combat log messages
         if (playerAction && opponentAction) {
             this.addCombatLog(`⚔️ Both heroes attack!`, 'warning');
         } else if (playerAction) {
             this.addCombatLog(`🗡️ Player hero attacks!`, 'success');
         } else if (opponentAction) {
             this.addCombatLog(`🗡️ Opponent hero attacks!`, 'error');
+        } else {
+            console.warn('⚠️ [HANDLER DEBUG] No actions to execute - both playerAction and opponentAction are falsy');
         }
 
+        // Execute attack animations with timing data
         if (playerAction && opponentAction) {
-            await this.guest_executeSimultaneousAttacks(playerAction, opponentAction);
+            await this.guest_executeSimultaneousAttacks(playerAction, opponentAction, animationTiming);
         } else if (playerAction) {
-            await this.guest_executeSingleAttack(playerAction);
+            await this.guest_executeSingleAttack(playerAction, animationTiming);
         } else if (opponentAction) {
-            await this.guest_executeSingleAttack(opponentAction);
+            await this.guest_executeSingleAttack(opponentAction, animationTiming);
         }
         
         // ============================================
@@ -2073,55 +2084,74 @@ export class BattleManager {
     }
 
     // GUEST: Execute simultaneous attacks
-    async guest_executeSimultaneousAttacks(playerAction, opponentAction) {
+    async guest_executeSimultaneousAttacks(playerAction, opponentAction, animationTiming = null) {
+
         const heroes = this.getGuestHeroesForActions(playerAction, opponentAction);
+        
         
         if (heroes.playerHero && heroes.opponentHero) {
             const playerAttack = this.reconstructAttackObject(playerAction, heroes.playerHero, heroes.playerLocalSide);
             const opponentAttack = this.reconstructAttackObject(opponentAction, heroes.opponentHero, heroes.opponentLocalSide);
             
-            // FIX: Pass the correct local sides to the animation
-            // Instead of relying on the hardcoded 'player'/'opponent' in the animation method
-            // We need to use the actual local sides
-            
             const animations = [];
             
-            // Use the LOCAL sides for animations
-            if (playerAttack.target) {
+            // Player attack animation
+            if (playerAttack.target) {                
                 if (playerAttack.target.type === 'creature') {
                     animations.push(this.animationManager.animateHeroToCreatureAttack(
-                        playerAttack.hero, playerAttack.target, heroes.playerLocalSide
+                        playerAttack.hero, playerAttack.target, heroes.playerLocalSide, animationTiming
                     ));
                 } else {
+                    const targetElement = this.getHeroElement(playerAttack.target.side, playerAttack.target.position);
+                    
                     animations.push(this.animationManager.animateCollisionAttackTowards(
                         playerAttack.hero, 
-                        this.getHeroElement(playerAttack.target.side, playerAttack.target.position), 
-                        heroes.playerLocalSide
+                        targetElement, 
+                        heroes.playerLocalSide, animationTiming
                     ));
                 }
+            } else {
+                console.warn('❌ [ANIMATION DEBUG] Player attack animation SKIPPED - no target:', {
+                    reason: playerAttack.debugInfo?.reason || 'unknown'
+                });
             }
             
-            if (opponentAttack.target) {
+            // Opponent attack animation  
+            if (opponentAttack.target) {                
                 if (opponentAttack.target.type === 'creature') {
                     animations.push(this.animationManager.animateHeroToCreatureAttack(
-                        opponentAttack.hero, opponentAttack.target, heroes.opponentLocalSide
+                        opponentAttack.hero, opponentAttack.target, heroes.opponentLocalSide, animationTiming
                     ));
                 } else {
+                    const targetElement = this.getHeroElement(opponentAttack.target.side, opponentAttack.target.position);                    
                     animations.push(this.animationManager.animateCollisionAttackTowards(
                         opponentAttack.hero, 
-                        this.getHeroElement(opponentAttack.target.side, opponentAttack.target.position), 
-                        heroes.opponentLocalSide
+                        targetElement, 
+                        heroes.opponentLocalSide, animationTiming
                     ));
                 }
+            } else {
+                console.warn('❌ [ANIMATION DEBUG] Opponent attack animation SKIPPED - no target:', {
+                    reason: opponentAttack.debugInfo?.reason || 'unknown'
+                });
             }
             
-            await Promise.all(animations);
+            if (animations.length > 0) {
+                await Promise.all(animations);
+            } else {
+                console.error('❌ [ANIMATION DEBUG] NO ANIMATIONS TO RUN - both targets failed');
+            }
             
             // Return animations with correct local sides
             await Promise.all([
-                this.animationManager.animateReturn(heroes.playerHero, heroes.playerLocalSide),
-                this.animationManager.animateReturn(heroes.opponentHero, heroes.opponentLocalSide)
+                this.animationManager.animateReturn(heroes.playerHero, heroes.playerLocalSide, animationTiming),
+                this.animationManager.animateReturn(heroes.opponentHero, heroes.opponentLocalSide, animationTiming)
             ]);
+        } else {
+            console.error('❌ [ANIMATION DEBUG] Heroes not found for simultaneous attacks:', {
+                playerHeroMissing: !heroes.playerHero,
+                opponentHeroMissing: !heroes.opponentHero
+            });
         }
     }
 
@@ -2174,14 +2204,49 @@ export class BattleManager {
         
         // Find the target
         let target = null;
+        let debugInfo = { targetFound: false, reason: 'unknown' };
+        
+        if (!actionData || !actionData.targetData) {
+            debugInfo.reason = 'missing_action_or_target_data';
+            console.warn('❌ [ANIMATION DEBUG] Missing actionData or targetData');
+            return {
+                hero: attackerHero,
+                target: null,
+                damage: actionData?.damage || 0,
+                effectsTriggered: [],
+                isRanged: false,
+                debugInfo: debugInfo
+            };
+        }
+        
         if (actionData.targetData.type === 'creature') {
             const targetLocalSide = (actionData.targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
             const targetHeroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
             const targetHero = targetHeroes[actionData.targetData.position];
-            
-            if (targetHero && targetHero.creatures) {
+                        
+            if (!targetHero) {
+                debugInfo.reason = 'target_hero_not_found';
+                console.warn('❌ [ANIMATION DEBUG] Target hero not found:', {
+                    targetLocalSide,
+                    position: actionData.targetData.position,
+                    availableHeroes: Object.keys(targetHeroes)
+                });
+            } else if (!targetHero.creatures) {
+                debugInfo.reason = 'target_hero_no_creatures';
+                console.warn('❌ [ANIMATION DEBUG] Target hero has no creatures array');
+            } else if (actionData.targetData.creatureIndex >= targetHero.creatures.length) {
+                debugInfo.reason = 'creature_index_out_of_bounds';
+                console.warn('❌ [ANIMATION DEBUG] Creature index out of bounds:', {
+                    requestedIndex: actionData.targetData.creatureIndex,
+                    availableCreatures: targetHero.creatures.length,
+                    creatureNames: targetHero.creatures.map(c => c.name)
+                });
+            } else {
                 const creature = targetHero.creatures[actionData.targetData.creatureIndex];
-                if (creature) {
+                if (!creature) {
+                    debugInfo.reason = 'creature_not_found_at_index';
+                    console.warn('❌ [ANIMATION DEBUG] Creature not found at index:', actionData.targetData.creatureIndex);
+                } else {
                     target = {
                         type: 'creature',
                         hero: targetHero,
@@ -2190,31 +2255,45 @@ export class BattleManager {
                         position: actionData.targetData.position,
                         side: targetLocalSide
                     };
+                    debugInfo.targetFound = true;
+                    debugInfo.reason = 'creature_found';
                 }
             }
         } else {
+            // Hero target
             const targetLocalSide = (actionData.targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
             const targetHeroes = targetLocalSide === 'player' ? this.playerHeroes : this.opponentHeroes;
             const targetHero = targetHeroes[actionData.targetData.position];
             
-            if (targetHero) {
+            if (!targetHero) {
+                debugInfo.reason = 'target_hero_not_found';
+                console.warn('❌ [ANIMATION DEBUG] Target hero not found:', {
+                    targetLocalSide,
+                    position: actionData.targetData.position,
+                    availableHeroes: Object.keys(targetHeroes)
+                });
+            } else {                
                 target = {
                     type: 'hero',
                     hero: targetHero,
                     position: actionData.targetData.position,
                     side: targetLocalSide
                 };
+                debugInfo.targetFound = true;
+                debugInfo.reason = 'hero_found';
             }
         }
         
-        // Return attack object in the same format as host expects
-        return {
+        const result = {
             hero: attackerHero,
             target: target,
             damage: actionData.damage || 0,
-            effectsTriggered: [], // Guest doesn't have this info, but animations don't need it
-            isRanged: false // Guest doesn't have this info, but animations don't need it
+            effectsTriggered: [],
+            isRanged: false,
+            debugInfo: debugInfo
         };
+        
+        return result;
     }
 
     calculateWealthBonus(heroes) {
@@ -2553,14 +2632,18 @@ export class BattleManager {
                     birthdayPresent: 0, 
                     teleports: 0, 
                     goldenBananas: 0, 
-                    evolutionCounters: 1 
+                    evolutionCounters: 1,
+                    lunaBuffs: 0,
+                    supplyChain: 0 
                 };
                 // The opponent's counters become the host's opponent counter data
                 window.heroSelection.opponentCounters = this.opponentCounters || { 
                     birthdayPresent: 0, 
                     teleports: 0, 
                     goldenBananas: 0, 
-                    evolutionCounters: 1 
+                    evolutionCounters: 1,
+                    lunaBuffs: 0,
+                    supplyChain: 0 
                 };
             }
 
@@ -2597,21 +2680,31 @@ export class BattleManager {
                 }
             }
 
-            // Store Royal Corgi draws
-            let royalCorgiBonusCards = 0;
-            if (this.isAuthoritative && this.royalCorgiManager) {
-                const playerCreatures = {
+            // Calculate Royal Corgi bonuses for BOTH players
+            let hostRoyalCorgiBonusCards = 0;
+            let guestRoyalCorgiBonusCards = 0;
+            
+            if (this.royalCorgiManager) {
+                // Host's bonus (their playerHeroes)
+                const hostCreatures = {
                     left: this.playerHeroes.left?.creatures || [],
                     center: this.playerHeroes.center?.creatures || [],
                     right: this.playerHeroes.right?.creatures || []
                 };
+                hostRoyalCorgiBonusCards = this.royalCorgiManager.calculateBonusCardsForPlayer(hostCreatures);
                 
-                royalCorgiBonusCards = this.royalCorgiManager.calculateBonusCardsForPlayer(playerCreatures);
+                // Guest's bonus (host's opponentHeroes)
+                const guestCreatures = {
+                    left: this.opponentHeroes.left?.creatures || [],
+                    center: this.opponentHeroes.center?.creatures || [],
+                    right: this.opponentHeroes.right?.creatures || []
+                };
+                guestRoyalCorgiBonusCards = this.royalCorgiManager.calculateBonusCardsForPlayer(guestCreatures);
             }
             
-            // Store this for the reward system to use
+            // Store host's Royal Corgi bonus for the reward system
             if (window.heroSelection && window.heroSelection.cardRewardManager) {
-                window.heroSelection.cardRewardManager.cachedRoyalCorgiBonusCards = royalCorgiBonusCards;
+                window.heroSelection.cardRewardManager.cachedRoyalCorgiBonusCards = hostRoyalCorgiBonusCards;
             }
             
             // ===== CLEAR POTION EFFECTS AFTER BATTLE =====
@@ -2628,11 +2721,6 @@ export class BattleManager {
                 const { syncDoomCountersAfterBattle } = await import('./Spells/doomClock.js');
                 syncDoomCountersAfterBattle(this);
             }
-
-            console.log('🏠 HOST: Battle ending, collecting counter data');
-            console.log('🏠 HOST: this.playerCounters.evolutionCounters =', this.playerCounters?.evolutionCounters);
-            console.log('🏠 HOST: this.opponentCounters.evolutionCounters =', this.opponentCounters?.evolutionCounters);
-
             
             const battleEndData = {
                 hostResult,
@@ -2649,21 +2737,22 @@ export class BattleManager {
                     birthdayPresent: 0, 
                     teleports: 0, 
                     goldenBananas: 0, 
-                    evolutionCounters: 1 
+                    evolutionCounters: 1,
+                    lunaBuffs: 0,
+                    supplyChain: 0
                 },
                 guestPlayerCounters: this.opponentCounters || { 
                     birthdayPresent: 0, 
                     teleports: 0, 
                     goldenBananas: 0, 
-                    evolutionCounters: 1 
-                }
+                    evolutionCounters: 1,
+                    lunaBuffs: 0,
+                    supplyChain: 0
+                },
+                // ADD ROYAL CORGI BONUS DATA
+                hostRoyalCorgiBonusCards: hostRoyalCorgiBonusCards,
+                guestRoyalCorgiBonusCards: guestRoyalCorgiBonusCards
             };
-
-            console.log('🏠 HOST: Sending battleEndData.hostPlayerCounters.evolutionCounters =', battleEndData.hostPlayerCounters?.evolutionCounters);
-            console.log('🏠 HOST: Sending battleEndData.guestPlayerCounters.evolutionCounters =', battleEndData.guestPlayerCounters?.evolutionCounters);
-            console.log('🏠 HOST: isHost =', this.isHost);
-            console.log('🏠 HOST: Full battleEndData.hostPlayerCounters =', battleEndData.hostPlayerCounters);
-            console.log('🏠 HOST: Full battleEndData.guestPlayerCounters =', battleEndData.guestPlayerCounters);
             
             // Save final battle state before cleanup
             await this.saveFinalBattleState();
@@ -3077,6 +3166,10 @@ export class BattleManager {
             this.priestOfLunaManager.cleanup();
             this.priestOfLunaManager = null;
         }
+        if (this.cutePhoenixManager) {
+            this.cutePhoenixManager.cleanup();
+            this.cutePhoenixManager = null;
+        }
 
 
 
@@ -3095,6 +3188,10 @@ export class BattleManager {
         if (this.tearingMountainEffect) {
             this.tearingMountainEffect.cleanup();
             this.tearingMountainEffect = null;
+        }
+        if (this.pinkSkyEffect) {
+            this.pinkSkyEffect.cleanup();
+            this.pinkSkyEffect = null;
         }
 
         
@@ -3793,6 +3890,10 @@ export class BattleManager {
         if (this.tearingMountainEffect) {
             this.tearingMountainEffect.cleanup();
             this.tearingMountainEffect = null;
+        }
+        if (this.pinkSkyEffect) {
+            this.pinkSkyEffect.cleanup();
+            this.pinkSkyEffect = null;
         }
 
         

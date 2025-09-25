@@ -94,9 +94,21 @@ export class BattleStartManager {
         const bm = this.battleManager;
         
         try {
+            // ============================================
             // Apply Gathering Storm effects
+            // ============================================
             const { applyGatheringStormBattleEffects } = await import('./Spells/gatheringStorm.js');
             await applyGatheringStormBattleEffects(bm);
+
+            // ============================================
+            // Apply PinkSky effects
+            // ============================================
+            try {
+                const { applyPinkSkyBattleEffects } = await import('./Spells/pinkSky.js');
+                await applyPinkSkyBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying PinkSky effects:', error);
+            }
 
             // ============================================
             // Apply Tearing Mountain effects

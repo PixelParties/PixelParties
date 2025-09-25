@@ -12,7 +12,8 @@ export class BattleAnimationManager {
 
     // Get speed-adjusted delay from battle manager
     getSpeedAdjustedDelay(ms) {
-        return this.battleManager.getSpeedAdjustedDelay(ms);
+        const adjusted = this.battleManager.getSpeedAdjustedDelay(ms);
+        return Math.max(adjusted, 50);
     }
 
     // Async delay utility
@@ -25,9 +26,6 @@ export class BattleAnimationManager {
     getHeroElement(side, position) {
         const selector = `.${side}-slot.${position}-slot`;
         const element = document.querySelector(selector);
-        if (!element) {
-            console.error(`Could not find hero element with selector: ${selector}`);
-        }
         return element;
     }
 
@@ -37,17 +35,56 @@ export class BattleAnimationManager {
 
     // Animate hero attack (single)
     async animateHeroAttack(hero, target) {
-        // Safety check for null target
-        if (!target) {
-            console.warn('animateHeroAttack called with null target, skipping animation');
+        if (!hero || !target) {
             return;
         }
         
-        if (target.type === 'creature') {
-            await this.animateHeroToCreatureAttack(hero, target, hero.side);
-        } else {
-            await this.animateFullAttack(hero, target.hero);
+        // Get the hero element and card
+        const heroElement = this.getHeroElement(hero.side, hero.position);
+        
+        if (!heroElement) {
+            return;
         }
+        
+        const heroCard = heroElement.querySelector('.battle-hero-card');
+        
+        if (!heroCard) {
+            return;
+        }
+        
+        // Get target element based on target type
+        let targetElement = null;
+        
+        if (target.type === 'creature') {
+            const targetSelector = `.${target.side}-slot.${target.position}-slot .creature-icon[data-creature-index="${target.creatureIndex}"]`;
+            targetElement = document.querySelector(targetSelector);
+        } else {
+            targetElement = this.getHeroElement(target.side, target.position);
+        }
+        
+        if (!targetElement) {
+            return;
+        }
+        
+        // Calculate movement distance
+        const heroRect = heroElement.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        
+        const deltaX = targetRect.left + targetRect.width/2 - (heroRect.left + heroRect.width/2);
+        const deltaY = targetRect.top + targetRect.height/2 - (heroRect.top + heroRect.height/2);
+        
+        const duration = Math.max(this.getSpeedAdjustedDelay(120), 50);
+        
+        // Add attacking class and animate
+        heroCard.classList.add('attacking');
+        heroCard.style.transition = `transform ${duration}ms ease-out`;
+        heroCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
+        
+        // Wait for animation to complete
+        await new Promise(resolve => setTimeout(resolve, duration));
+        
+        // Create impact effect on target
+        this.createImpactEffect(targetElement);
     }
 
     // Animate simultaneous hero attacks
@@ -79,7 +116,6 @@ export class BattleAnimationManager {
         const opponentElement = this.getHeroElement('opponent', opponentHero.position);
         
         if (!playerElement || !opponentElement) {
-            console.error('Could not find hero elements for collision animation');
             return;
         }
 
@@ -92,24 +128,36 @@ export class BattleAnimationManager {
     }
 
     // Animate collision attack towards target
-    async animateCollisionAttackTowards(attacker, targetElement, attackerSide) {
+    async animateCollisionAttackTowards(attacker, targetElement, attackerSide, customTiming = null) {
         const attackerElement = this.getHeroElement(attackerSide, attacker.position);
-        if (!attackerElement || !targetElement) return;
+        
+        if (!attackerElement) {
+            return;
+        }
+        
+        if (!targetElement) {
+            return;
+        }
 
         const attackerCard = attackerElement.querySelector('.battle-hero-card');
-        if (!attackerCard) return;
+        if (!attackerCard) {
+            return;
+        }
 
         const attackerRect = attackerElement.getBoundingClientRect();
         const targetRect = targetElement.getBoundingClientRect();
         
         const deltaX = (targetRect.left - attackerRect.left) * 0.5;
         const deltaY = (targetRect.top - attackerRect.top) * 0.5;
+
+        const duration = customTiming?.attackDuration || this.getSpeedAdjustedDelay(80);
         
         attackerCard.classList.add('attacking');
-        attackerCard.style.transition = `transform ${this.getSpeedAdjustedDelay(80)}ms ease-out`;
+        attackerCard.style.transition = `transform ${duration}ms ease-out`;
         attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1)`;
         
-        await this.delay(80);
+        await new Promise(resolve => setTimeout(resolve, duration));
+        
         this.createCollisionEffect();
     }
 
@@ -119,7 +167,6 @@ export class BattleAnimationManager {
         const targetElement = this.getHeroElement(target.side, target.position);
         
         if (!attackerElement || !targetElement) {
-            console.error(`Could not find elements for attack: ${attacker.name} -> ${target.name}`);
             return;
         }
 
@@ -141,7 +188,7 @@ export class BattleAnimationManager {
     }
 
     // Animate hero attacking a creature
-    async animateHeroToCreatureAttack(hero, creatureTarget, heroSide) {
+    async animateHeroToCreatureAttack(hero, creatureTarget, heroSide, customTiming = null) {
         const heroElement = this.getHeroElement(heroSide, hero.position);
         const creatureElement = document.querySelector(
             `.${creatureTarget.side}-slot.${creatureTarget.position}-slot .creature-icon[data-creature-index="${creatureTarget.creatureIndex}"]`
@@ -158,11 +205,13 @@ export class BattleAnimationManager {
         const deltaX = creatureRect.left + creatureRect.width/2 - (heroRect.left + heroRect.width/2);
         const deltaY = creatureRect.top + creatureRect.height/2 - (heroRect.top + heroRect.height/2);
             
+        const duration = customTiming?.attackDuration || this.getSpeedAdjustedDelay(120);
+        
         heroCard.classList.add('attacking');
-        heroCard.style.transition = `transform ${this.getSpeedAdjustedDelay(120)}ms ease-out`;
+        heroCard.style.transition = `transform ${duration}ms ease-out`;
         heroCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
         
-        await this.delay(120);
+        await new Promise(resolve => setTimeout(resolve, duration));
         this.createImpactEffect(creatureElement);
     }
 
@@ -196,18 +245,20 @@ export class BattleAnimationManager {
     }
 
     // Animate return to position
-    async animateReturn(hero, side) {
+    async animateReturn(hero, side, customTiming = null) {
         const heroElement = this.getHeroElement(side, hero.position);
         if (!heroElement) return;
 
         const card = heroElement.querySelector('.battle-hero-card');
         if (!card) return;
-
-        card.style.transition = `transform ${this.getSpeedAdjustedDelay(80)}ms ease-in-out`;
+    
+        const duration = customTiming?.returnDuration || this.getSpeedAdjustedDelay(80);
+        
+        card.style.transition = `transform ${duration}ms ease-in-out`;
         card.style.transform = 'translate(0, 0) scale(1)';
         card.classList.remove('attacking');
         
-        await this.delay(80);
+        await new Promise(resolve => setTimeout(resolve, duration));
     }
 
 
@@ -219,7 +270,6 @@ export class BattleAnimationManager {
     // Main Monia protection dash method
     async animateMoniaProtectionDash(protectingMonia, target) {
         if (!target) {
-            console.warn('animateMoniaProtectionDash called with null target, skipping animation');
             return;
         }
             
@@ -239,7 +289,6 @@ export class BattleAnimationManager {
         const targetElement = this.getHeroElement(targetHero.side, targetHero.position);
         
         if (!moniaElement || !targetElement) {
-            console.error(`Could not find elements for Monia protection dash: ${protectingMonia.name} -> ${targetHero.name}`);
             return;
         }
 
@@ -274,7 +323,6 @@ export class BattleAnimationManager {
         );
         
         if (!moniaElement || !creatureElement) {
-            console.error(`Could not find elements for Monia creature protection dash: ${protectingMonia.name} -> creature`);
             return;
         }
         

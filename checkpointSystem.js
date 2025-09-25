@@ -323,6 +323,9 @@ export class CheckpointSystem {
         if (this.battleManager.doomClockEffect) {
             states.doomClockEffect = this.battleManager.doomClockEffect.exportState();
         }
+        if (this.battleManager.pinkSkyEffect) {
+            states.pinkSkyEffect = this.battleManager.pinkSkyEffect.exportState();
+        }
         
         // Speed Manager State
         if (this.battleManager.speedManager) {
@@ -521,11 +524,16 @@ export class CheckpointSystem {
             
             // 7. Restore battle log
             this.restoreBattleLog(checkpoint.battleLog);
+
+            // 8. RE-INITIALIZE CREATURE MANAGERS
+            if (this.battleManager.flowManager) {
+                await this.battleManager.flowManager.initializeAllCreatures();
+            }
             
-            // 8. Restore extended state
+            // 9. Restore extended state
             this.restoreExtendedState(checkpoint.extendedState);
             
-            // 9. Update all visuals
+            // 10. Update all visuals
             this.updateAllVisuals();
             
             // Store this as current checkpoint
@@ -837,6 +845,20 @@ export class CheckpointSystem {
                 });
             } else {
                 this.battleManager.doomClockEffect.importState(managerStates.doomClockEffect);
+            }
+        }
+        // Restore PinkSky Effect
+        if (managerStates.pinkSkyEffect) {
+            // Import the PinkSky effect class if needed
+            if (!this.battleManager.pinkSkyEffect) {
+                import('./Spells/pinkSky.js').then(({ PinkSkyEffect }) => {
+                    this.battleManager.pinkSkyEffect = new PinkSkyEffect();
+                    this.battleManager.pinkSkyEffect.importState(managerStates.pinkSkyEffect);
+                }).catch(error => {
+                    console.error('Error importing PinkSky effect:', error);
+                });
+            } else {
+                this.battleManager.pinkSkyEffect.importState(managerStates.pinkSkyEffect);
             }
         }
     }

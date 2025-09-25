@@ -113,7 +113,7 @@ export const divineGiftOfMagicSpell = {
                     });
                 }
             } catch (error) {
-                console.warn('Error accessing card database:', error);
+                // Error handled silently
             }
         }
         
@@ -144,7 +144,7 @@ export const divineGiftOfMagicSpell = {
                 return;
             }
             
-            // NEW: Check if spell is level 3 or higher
+            // Check if spell is level 3 or higher
             const spellLevel = cardInfo.level || 0;
             if (spellLevel < minimumLevel) {
                 return;
@@ -158,7 +158,6 @@ export const divineGiftOfMagicSpell = {
             });
         });
         
-        console.log('DivineGiftOfMagic: Found', eligibleSpells.length, 'eligible level 3+ spells:', eligibleSpells.map(s => s.name));
         return eligibleSpells;
     },
     
@@ -290,7 +289,6 @@ export const divineGiftOfMagicSpell = {
             };
             
         } catch (error) {
-            console.error('Error activating Divine Gift Of Magic:', error);
             return {
                 success: false,
                 message: 'Failed to activate Divine Gift Of Magic',

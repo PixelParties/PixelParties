@@ -250,8 +250,6 @@ export function initializeHowToPlayScreen() {
     
     // Set up card image tooltips (only for ./Cards images, not ./Icons)
     setupCardImageTooltips();
-    
-    console.log('✅ How to Play screen initialized');
 }
 
 // Add tooltip functionality for card images

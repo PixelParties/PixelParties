@@ -1017,6 +1017,7 @@ export class BattleCombatManager {
                 playerValidAttack ? playerHeroActor.data : null, playerTarget, playerDamage,
                 opponentValidAttack ? opponentHeroActor.data : null, opponentTarget, opponentDamage
             );
+            turnData.animationDuration = Math.max(this.battleManager.getSpeedAdjustedDelay(120), 50);
             
             // Add damage modifier info to turn data for network sync
             if (playerEffectsTriggered.length > 0 || opponentEffectsTriggered.length > 0) {
@@ -1142,9 +1143,27 @@ export class BattleCombatManager {
                 await this.battleManager.delay(200);
             }
             
-            // Apply damage with potentially modified values - now includes ranged flag
-            this.applyAttackDamageToTarget(playerAttack);
-            this.applyAttackDamageToTarget(opponentAttack);
+            // ============================================
+            // NEW: ATOMIC DAMAGE APPLICATION FOR SIMULTANEOUS ATTACKS
+            // Apply both damages before any battle end processing
+            // ============================================
+            
+            // Temporarily disable battle end checking during simultaneous damage
+            const wasSimultaneousAttack = this.battleManager._processingSimultaneousAttack;
+            this.battleManager._processingSimultaneousAttack = true;
+            
+            try {
+                // Apply both attacks' damage
+                this.applyAttackDamageToTarget(playerAttack);
+                this.applyAttackDamageToTarget(opponentAttack);
+                
+                // Small delay to ensure both damage updates are sent to guest
+                await this.battleManager.delay(50);
+                
+            } finally {
+                // Re-enable battle end checking
+                this.battleManager._processingSimultaneousAttack = wasSimultaneousAttack;
+            }
             
             await Promise.all([
                 this.battleManager.animationManager.animateReturn(playerAttack.hero, 'player'),
@@ -1152,7 +1171,7 @@ export class BattleCombatManager {
             ]);
             
         } else if (playerAttack || opponentAttack) {
-            // Only one hero attacks - full dash animation (to target)
+            // Only one hero attacks - existing logic unchanged
             const attack = playerAttack || opponentAttack;
             const side = playerAttack ? 'player' : 'opponent';
             
@@ -1360,8 +1379,6 @@ export class BattleCombatManager {
 
     // Apply damage to target - UPDATED FOR SHIELDS
     async authoritative_applyDamage(damageResult, context = {}) {
-        console.log("CONTEXT: ");
-        console.log(context);
         if (!this.battleManager) {
             console.error('CRITICAL: Combat manager not initialized when applying damage!');
             return;
@@ -1716,7 +1733,12 @@ export class BattleCombatManager {
             turn: this.battleManager.currentTurn,
             position: position,
             playerAction: createActionData(playerHero, playerTarget, playerDamage),
-            opponentAction: createActionData(opponentHero, opponentTarget, opponentDamage)
+            opponentAction: createActionData(opponentHero, opponentTarget, opponentDamage),
+            animationTiming: {
+                attackDuration: Math.max(this.battleManager.getSpeedAdjustedDelay(120), 50),
+                returnDuration: Math.max(this.battleManager.getSpeedAdjustedDelay(80), 40),
+                effectsDelay: Math.max(this.battleManager.getSpeedAdjustedDelay(100), 50)
+            }
         };
     }
 
@@ -1775,7 +1797,6 @@ export class BattleCombatManager {
 
         // Skip spellcasting if this is a Ghuanjun bonus attack
         if (hero._skipSpellcastingThisAction) {
-            console.log(`⚔️ Skipping spellcasting for ${hero.name}'s bonus attack`);
         } else if (this.battleManager.spellSystem) {
             // Create a version of the hero that only shows enabled spells
             const heroForSpells = this.createHeroWithEnabledSpellsOnly(hero);
@@ -1907,9 +1928,7 @@ export class BattleCombatManager {
         // So: damage = totalEffectiveHp - 1
         const maxDamage = totalEffectiveHp - 1;
         
-        if (damage > maxDamage) {
-            console.log(`⚔️ Ghuanjun's bonus attack is non-lethal: ${damage} damage reduced to ${maxDamage} (accounting for ${currentShield} shield)`);
-            
+        if (damage > maxDamage) {           
             // Add combat log message
             this.battleManager.addCombatLog(
                 `⚔️ ${attacker.name}'s bonus attack shows mercy, leaving ${target.name} with 1 HP!`,

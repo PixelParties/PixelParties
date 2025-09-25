@@ -97,8 +97,6 @@ export class GraveyardOfLimitedPowerEffect {
 
     // Play dark energy animation on all affected heroes
     async playDarkEnergyAnimation(affectedHeroes, battleManager) {
-        console.log(`💀 Playing dark energy animation on ${affectedHeroes.length} heroes`);
-        
         // Ensure CSS is available
         this.ensureGraveyardCSS();
         
@@ -133,7 +131,6 @@ export class GraveyardOfLimitedPowerEffect {
         const { hero, side, position, element } = heroData;
         
         if (!element) {
-            console.warn(`Could not find element for ${hero.name} at ${side} ${position}`);
             return;
         }
         
@@ -205,8 +202,6 @@ export class GraveyardOfLimitedPowerEffect {
         if (heroCard) {
             heroCard.classList.add('graveyard-weakened');
         }
-        
-        console.log(`💀 Dark energy effect applied to ${hero.name}`);
     }
 
     // Clean up all dark energy effects
@@ -340,10 +335,6 @@ export class GraveyardOfLimitedPowerEffect {
                     this.applyHpDebuff(hero, hpDebuff);
                     
                     debuffResults[side + 'Heroes'].affected++;
-                    
-                    console.log(`💀 ${ownerSide} Graveyard debuffed ${hero.name}: ${attackDebuff} ATK, ${hpDebuff} HP`);
-                } else {
-                    console.log(`🛡️ ${hero.name} resists graveyard curse (has Necromancy)`);
                 }
             }
         });
@@ -357,8 +348,6 @@ export class GraveyardOfLimitedPowerEffect {
         
         // Use the existing battle bonus system with the limited debuff
         hero.battleAttackBonus += actualAttackDebuff;
-        
-        console.log(`💀 ${hero.name} ATK: ${currentAttack} -> ${newAttack} (${actualAttackDebuff})`);
     }
 
     // Apply HP debuff to hero (ensuring minimum of 1 HP)
@@ -381,8 +370,6 @@ export class GraveyardOfLimitedPowerEffect {
         } else {
             hero.currentHp = 1;
         }
-        
-        console.log(`💀 ${hero.name} HP: ${oldMaxHp} -> ${newMaxHp} (${actualHpDebuff}), Current: ${oldCurrentHp} -> ${hero.currentHp}`);
     }
 
     // Log the debuff results
@@ -598,8 +585,6 @@ export class GraveyardOfLimitedPowerEffect {
         } else {
             hero.currentHp = 1;
         }
-        
-        console.log(`💀 Guest: Applied debuffs to ${hero.name}: ATK ${currentAttack}->${newAttack} (${actualAttackDebuff}), HP ${oldMaxHp}->${newMaxHp} (${actualHpDebuff})`);
     }
 
     // Log debuff results on guest side

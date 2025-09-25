@@ -70,7 +70,78 @@ export class BattleFlowManager {
             bm.moniaEffect = null;
         }
 
+        await this.initializeAllCreatures();
+
         try {
+            // Initialize Furious Anger effect
+            const { initFuriousAngerEffect } = await import('./Spells/furiousAnger.js');
+            bm.furiousAngerEffect = initFuriousAngerEffect(bm);
+        } catch (error) {
+            // Error handled silently
+        }
+
+        // Ensure randomness is initialized before battle starts
+        if (bm.isAuthoritative && !bm.randomnessInitialized) {
+            bm.initializeRandomness();
+        }
+        
+        // Log pre-calculated hero stats instead of recalculating
+        this.logPreCalculatedHeroStats();
+        
+        // ============================================
+        // CHECKPOINT #1: After battle initialization
+        // ============================================
+        if (bm.isAuthoritative && bm.checkpointSystem) {
+            try {
+                await bm.checkpointSystem.createBattleCheckpoint('battle_start');
+            } catch (error) {
+                // Error handled silently
+            }
+        }
+        
+        // ============================================
+        // APPLY ALL START-OF-BATTLE EFFECTS (CENTRALIZED)
+        // ============================================
+        await this.battleStartManager.applyAllStartOfBattleEffects();
+
+        // Initialize area effects
+        if (!bm.doomClockEffect) {
+            await applyDoomClockBattleEffects(bm);
+        } else {
+            // DoomClock already exists (likely from reconnection), just re-verify area cards
+            bm.doomClockEffect.initializeDoomClock(bm);
+        }
+        
+        // ============================================
+        // CHECKPOINT #2: After all start-of-battle effects
+        // ============================================
+        if (bm.isAuthoritative && bm.checkpointSystem) {
+            try {
+                await bm.checkpointSystem.createBattleCheckpoint('effects_complete');
+            } catch (error) {
+                // Error handled silently
+            }
+        }
+        
+        // Save battle state to persistence (legacy system - still works as fallback)
+        await bm.saveBattleStateToPersistence();
+        
+        // Start the battle loop
+        if (bm.isAuthoritative) {
+            if (!bm.opponentConnected) {
+                bm.pauseBattle('Opponent not connected at battle start');
+            } else {
+                await bm.delay(50);
+                this.authoritative_battleLoop();
+            }
+        }
+    }
+
+    async initializeAllCreatures() {
+        const bm = this.battleManager;
+        
+        try {
+            // CREATURES - Initialize all creature managers
             const JigglesCreature = (await import('./Creatures/jiggles.js')).default;
             bm.jigglesManager = new JigglesCreature(bm);
 
@@ -146,9 +217,18 @@ export class BattleFlowManager {
             const PriestOfLunaCreature = (await import('./Creatures/priestOfLuna.js')).default; 
             bm.priestOfLunaManager = new PriestOfLunaCreature(bm);
 
-            // Initialize Biomancy Token manager
+            const CutePhoenixCreature = (await import('./Creatures/cutePhoenix.js')).default;
+            bm.cutePhoenixManager = new CutePhoenixCreature(bm);
+
+
+
+
+            // Initialize Token managers
             const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
             bm.biomancyTokenManager = new BiomancyTokenCreature(bm);
+
+
+
 
             // HEROES
             const LunaHeroManager = (await import('./Heroes/luna.js')).default;
@@ -160,7 +240,15 @@ export class BattleFlowManager {
             const GhuanjunHeroManager = (await import('./Heroes/ghuanjun.js')).default;
             bm.ghuanjunManager = new GhuanjunHeroManager(bm);
 
+            // Initialize Cavalry manager with better error handling
+            try {
+                this.cavalryManager = new CavalryCreature(bm);
+            } catch (error) {
+                this.cavalryManager = null;
+            }
+
         } catch (error) {
+            console.error('Error initializing creature managers:', error);
             // Initialize fallback null managers to prevent undefined errors
             if (!bm.jigglesManager) bm.jigglesManager = null;
             if (!bm.skeletonArcherManager) bm.skeletonArcherManager = null;
@@ -176,77 +264,11 @@ export class BattleFlowManager {
             if (!bm.blueIceDragonManager) bm.blueIceDragonManager = null;
             if (!bm.explodingSkullManager) bm.explodingSkullManager = null;
             if (!bm.demonsGateManager) bm.demonsGateManager = null;
+            if (!bm.cutePhoenixManager) bm.cutePhoenixManager = null;
             if (!bm.priestOfLunaManager) bm.priestOfLunaManager = null;
             if (!bm.biomancyTokenManager) bm.biomancyTokenManager = null;
             if (!bm.lunaManager) bm.lunaManager = null;
             if (!bm.aliceManager) bm.aliceManager = null;
-        }
-
-        try {
-            // Initialize Furious Anger effect
-            const { initFuriousAngerEffect } = await import('./Spells/furiousAnger.js');
-            bm.furiousAngerEffect = initFuriousAngerEffect(bm);
-        } catch (error) {
-            // Error handled silently
-        }
-
-        // Ensure randomness is initialized before battle starts
-        if (bm.isAuthoritative && !bm.randomnessInitialized) {
-            bm.initializeRandomness();
-        }
-        
-        // Log pre-calculated hero stats instead of recalculating
-        this.logPreCalculatedHeroStats();
-        
-        // ============================================
-        // CHECKPOINT #1: After battle initialization
-        // ============================================
-        if (bm.isAuthoritative && bm.checkpointSystem) {
-            try {
-                await bm.checkpointSystem.createBattleCheckpoint('battle_start');
-            } catch (error) {
-                // Error handled silently
-            }
-        }
-        
-        // ============================================
-        // APPLY ALL START-OF-BATTLE EFFECTS (CENTRALIZED)
-        // ============================================
-        await this.battleStartManager.applyAllStartOfBattleEffects();
-
-        // Initialize area effects
-        if (!bm.doomClockEffect) {
-            await applyDoomClockBattleEffects(bm);
-        } else {
-            // DoomClock already exists (likely from reconnection), just re-verify area cards
-            bm.doomClockEffect.initializeDoomClock(bm);
-        }
-        
-        // Final visual refresh after all start effects
-        await this.battleStartManager.refreshAllVisuals();
-        
-        // ============================================
-        // CHECKPOINT #2: After all start-of-battle effects
-        // ============================================
-        if (bm.isAuthoritative && bm.checkpointSystem) {
-            try {
-                await bm.checkpointSystem.createBattleCheckpoint('effects_complete');
-            } catch (error) {
-                // Error handled silently
-            }
-        }
-        
-        // Save battle state to persistence (legacy system - still works as fallback)
-        await bm.saveBattleStateToPersistence();
-        
-        // Start the battle loop
-        if (bm.isAuthoritative) {
-            if (!bm.opponentConnected) {
-                bm.pauseBattle('Opponent not connected at battle start');
-            } else {
-                await bm.delay(50);
-                this.authoritative_battleLoop();
-            }
         }
     }
 
@@ -298,7 +320,8 @@ export class BattleFlowManager {
             const DemonsGateCreature = (await import('./Creatures/demonsGate.js')).default;
             const ThreeHeadedGiantCreature = (await import('./Creatures/3HeadedGiant.js')).default;
             const LunaKiaiCreature = (await import('./Creatures/lunaKiai.js')).default;
-            const PriestOfLunaCreature = (await import('./Creatures/priestOfLuna.js')).default; 
+            const PriestOfLunaCreature = (await import('./Creatures/priestOfLuna.js')).default;
+            const CutePhoenixCreature = (await import('./Creatures/cutePhoenix.js')).default;
             const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
 
             const creatureName = actor.name;
@@ -309,49 +332,49 @@ export class BattleFlowManager {
                 if (bm.jigglesManager) {
                     return await bm.jigglesManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonArcherCreature.isSkeletonArcher(creatureName)) {
                 if (bm.skeletonArcherManager) {
                     return await bm.skeletonArcherManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonNecromancerCreature.isSkeletonNecromancer(creatureName)) {
                 if (bm.skeletonNecromancerManager) {
                     return await bm.skeletonNecromancerManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonDeathKnightCreature.isSkeletonDeathKnight(creatureName)) {
                 if (bm.skeletonDeathKnightManager) {
                     return await bm.skeletonDeathKnightManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (BurningSkeletonCreature.isBurningSkeleton(creatureName)) {
                 if (bm.burningSkeletonManager) {
                     return await bm.burningSkeletonManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonReaperCreature.isSkeletonReaper(creatureName)) {
                 if (bm.skeletonReaperManager) {
                     return await bm.skeletonReaperManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonBardCreature.isSkeletonBard(creatureName)) {
                 if (bm.skeletonBardManager) {
                     return await bm.skeletonBardManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonMageCreature.isSkeletonMage(creatureName)) {
                 if (bm.skeletonMageManager) {
                     return await bm.skeletonMageManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (BoulderCreature.isBoulder(creatureName)) {
                 if (!bm.boulderManager) {
@@ -362,19 +385,19 @@ export class BattleFlowManager {
                 if (bm.archerManager) {
                     return await bm.archerManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (FrontSoldierCreature.isFrontSoldier(creatureName)) {
                 if (bm.frontSoldierManager) {
                     return await bm.frontSoldierManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (RoyalCorgiCreature.isRoyalCorgi(creatureName)) {
                 if (bm.royalCorgiManager) {
                     return await bm.royalCorgiManager.executeRoyalCorgiAction(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (MoonlightButterflyCreature.isMoonlightButterfly(creatureName)) {
                 if (!bm.moonlightButterflyManager) {
@@ -390,25 +413,25 @@ export class BattleFlowManager {
                 if (bm.coldHeartedYukiOnnaManager) {
                     return await bm.coldHeartedYukiOnnaManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (GrinningCatCreature.isGrinningCat(creatureName)) {
                 if (bm.grinningCatManager) {
                     return await bm.grinningCatManager.executeGrinningCatAction(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (FutureTechMechCreature.isFutureTechMech(creatureName)) {
                 if (bm.futureTechMechManager) {
                     return await bm.futureTechMechManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (BiomancyTokenCreature.isBiomancyToken(creatureName)) {
                 if (bm.biomancyTokenManager) {
                     return await bm.biomancyTokenManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (TheRootOfAllEvilCreature.isTheRootOfAllEvil(creatureName)) {
                 if (!bm.theRootOfAllEvilManager) {
@@ -419,25 +442,25 @@ export class BattleFlowManager {
                 if (bm.graveWormManager) {
                     return await bm.graveWormManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (CheekyMonkeeCreature.isCheekyMonkee(creatureName)) {
                 if (bm.cheekyMonkeeManager) {
                     return await bm.cheekyMonkeeManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (SkeletonKingSkullmaelCreature.isSkeletonKingSkullmael(creatureName)) {
                 if (bm.skeletonKingSkullmaelManager) {
                     return await bm.skeletonKingSkullmaelManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (BlueIceDragonCreature.isBlueIceDragon(creatureName)) {
                 if (bm.blueIceDragonManager) {
                     return await bm.blueIceDragonManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (ExplodingSkullCreature.isExplodingSkull(creatureName)) {
                 if (!bm.explodingSkullManager) {
@@ -448,36 +471,64 @@ export class BattleFlowManager {
                 if (bm.demonsGateManager) {
                     return await bm.demonsGateManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (ThreeHeadedGiantCreature.isThreeHeadedGiant(creatureName)) {
                 if (bm.threeHeadedGiantManager) {
                     return await bm.threeHeadedGiantManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (LunaKiaiCreature.isLunaKiai(creatureName)) {
                 if (bm.lunaKiaiManager) {
                     return await bm.lunaKiaiManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else if (PriestOfLunaCreature.isPriestOfLuna(creatureName)) { 
                 if (bm.priestOfLunaManager) {
                     return await bm.priestOfLunaManager.executeSpecialAttack(actor, position);
                 } else {
-                    return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                    return await this.executeCreatureFallbackAction(actor, position);
+                }
+            } else if (CutePhoenixCreature.isCutePhoenix(creatureName)) {
+                if (bm.cutePhoenixManager) {
+                    return await bm.cutePhoenixManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await this.executeCreatureFallbackAction(actor, position);
                 }
             } else {
-                // Default action for creatures without special attacks
-                return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
+                // Default action for creatures without special attacks - now with network sync
+                return await this.executeCreatureFallbackAction(actor, position);
             }
             
         } catch (error) {
             console.error('Error in centralized creature activation:', error);
-            // Fallback to simple shake animation
-            return await bm.animationManager.shakeCreature(actor.hero.side, position, actor.index);
+            // Fallback to sync'd shake animation instead of local-only
+            return await this.executeCreatureFallbackAction(actor, position);
         }
+    }
+
+    async executeCreatureFallbackAction(actor, position) {
+        const bm = this.battleManager;
+        const heroSide = actor.hero.side;
+        
+        // Send network message to guest (if host is authoritative)
+        if (bm.isAuthoritative) {
+            const creatureActionData = {
+                position: position,
+                creatureName: actor.name,
+                creatureIndex: actor.index,
+                heroSide: heroSide,
+                actionType: 'shake_fallback'
+            };
+            
+            // Send to guest using existing creature action message type
+            bm.sendBattleUpdate('creature_shake_action', creatureActionData);
+        }
+        
+        // Execute local shake animation
+        return await bm.animationManager.shakeCreature(heroSide, position, actor.index);
     }
 
     // Battle loop with connection awareness and persistence
@@ -569,7 +620,6 @@ export class BattleFlowManager {
                 // FORCE FULL CREATURE STATE SYNC AT END OF TURN
                 // ============================================
                 if (bm.currentTurn > 1 && bm.isAuthoritative) {
-                    console.log(`🔄 Forcing complete creature state sync at end of Turn ${bm.currentTurn}`);
                     bm.sendCreatureStateSync();
                     await bm.delay(100); // Allow sync to process
                 }
@@ -632,14 +682,15 @@ export class BattleFlowManager {
         const playerCanAct = playerHero && playerHero.alive;
         const opponentCanAct = opponentHero && opponentHero.alive;
         
-        if (!playerCanAct && !opponentCanAct) {
+        // Build complete actor lists for both sides to check if anyone can act
+        const playerActors = this.buildActorList(playerHero, playerCanAct);
+        const opponentActors = this.buildActorList(opponentHero, opponentCanAct);
+        
+        // NEW FIX: Check if ANY actors exist (heroes OR creatures) before returning early
+        if (playerActors.length === 0 && opponentActors.length === 0) {
             bm.turnInProgress = false;
             return;
         }
-
-        // Build complete actor lists for both sides
-        const playerActors = this.buildActorList(playerHero, playerCanAct);
-        const opponentActors = this.buildActorList(opponentHero, opponentCanAct);
         
         // Process all actors in paired sequence
         const maxActors = Math.max(playerActors.length, opponentActors.length);
@@ -701,7 +752,6 @@ export class BattleFlowManager {
             await bm.delay(300); // Brief pause between actor pairs (now speed-adjusted)
         }
         
-        
         // Clear temporary modifiers at end of turn
         this.clearTurnModifiers(playerHero, opponentHero, position);
         
@@ -723,7 +773,6 @@ export class BattleFlowManager {
         // SYNC CREATURE STATES AFTER POSITION PROCESSING
         // ============================================
         if (bm.currentTurn > 1 && bm.isAuthoritative) {
-            console.log(`🔄 Syncing creature states after ${position} position processing (Turn ${bm.currentTurn})`);
             bm.sendCreatureStateSync();
             await bm.delay(50); // Brief delay to ensure sync message is sent
         }
@@ -734,6 +783,13 @@ export class BattleFlowManager {
     // Check if an actor is alive
     isActorAlive(actor) {
         if (!actor) return false;
+        
+        // Special case: certain dead creatures can still act (like CutePhoenix)
+        // They are marked with isDead flag and should be allowed to take their turn
+        if (actor.isDead && actor.type === 'creature') {
+            // Use the same check as buildActorList uses
+            return this.canCreatureActWhileDead(actor.name);
+        }
         
         if (actor.type === 'hero') {
             return actor.data && actor.data.alive;
@@ -756,7 +812,15 @@ export class BattleFlowManager {
         // Creatures can act even if their hero is dead
         const livingCreatures = hero.creatures.filter(c => c.alive);
         
-        // Process creatures in normal order - first creature acts first
+        // Also check for dead creatures that can act while dead
+        const deadCreaturesWithSpecialAbility = hero.creatures.filter(c => {
+            if (c.alive) return false; // Already handled above
+            
+            // Check if this creature type can act while dead
+            return this.canCreatureActWhileDead(c.name);
+        });
+        
+        // Process living creatures in normal order - first creature acts first
         for (let i = 0; i < livingCreatures.length; i++) {
             const creature = livingCreatures[i];
             const originalIndex = hero.creatures.indexOf(creature);
@@ -767,6 +831,20 @@ export class BattleFlowManager {
                 data: creature,
                 index: originalIndex,
                 hero: hero
+            });
+        }
+        
+        // Add dead creatures that can act (they act after living creatures)
+        for (const creature of deadCreaturesWithSpecialAbility) {
+            const originalIndex = hero.creatures.indexOf(creature);
+            
+            actors.push({
+                type: 'creature',
+                name: creature.name,
+                data: creature,
+                index: originalIndex,
+                hero: hero,
+                isDead: true  // Mark this as a dead creature acting
             });
         }
         
@@ -781,6 +859,19 @@ export class BattleFlowManager {
         }
         
         return actors;
+    }
+
+    // Helper method to check if a creature can act while dead
+    canCreatureActWhileDead(creatureName) {
+        // Check CutePhoenix
+        if (creatureName === 'CutePhoenix') {
+            return true; // CutePhoenix can potentially act while dead
+        }
+        
+        // Add future creatures here that can act while dead
+        // if (creatureName === 'Undying') return true;
+        
+        return false;
     }
 
     // Execute actor actions (with Ice Age support) - NOW USES CENTRALIZED ACTIVATION
@@ -1000,6 +1091,12 @@ export class BattleFlowManager {
     // Check if battle should end
     checkBattleEnd() {
         const bm = this.battleManager;
+        
+        // Don't end battle during simultaneous attack processing
+        // This prevents race conditions where battle ends before all damage is applied/synced
+        if (bm._processingSimultaneousAttack) {
+            return false;
+        }
         
         const playerHeroesAlive = Object.values(bm.playerHeroes).filter(hero => hero && hero.alive);
         const opponentHeroesAlive = Object.values(bm.opponentHeroes).filter(hero => hero && hero.alive);

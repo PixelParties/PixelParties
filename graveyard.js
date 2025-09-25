@@ -17,12 +17,10 @@ export class GraveyardManager {
 
         // Check if card is a Token - if so, ignore it completely
         if (isToken(cardName)) {
-            console.log(`Token card ${cardName} discarded but not added to graveyard (tokens are removed from game)`);
             return true; // Return true because this is expected behavior
         }
 
         this.graveyard.push(cardName);
-        console.log(`Added ${cardName} to graveyard`);
         return true;
     }
 

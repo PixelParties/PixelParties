@@ -1323,7 +1323,7 @@ export class BattleScreen {
         `;
     }
 
-    // NECROMANCY INTEGRATION: Enhanced renderCreaturesAfterInit with necromancy display updates
+    // Enhanced renderCreaturesAfterInit with necromancy display updates
     renderCreaturesAfterInit() {
         ['left', 'center', 'right'].forEach(position => {
             ['player', 'opponent'].forEach(side => {
@@ -1334,7 +1334,10 @@ export class BattleScreen {
                 if (heroInstance && heroInstance.creatures && heroInstance.creatures.length > 0) {
                     const heroSlot = document.querySelector(`.${side}-slot.${position}-slot`);
                     if (heroSlot) {
-                        // Remove existing creatures if any
+                        // PRESERVE STATUS INDICATORS BEFORE REMOVING CREATURES
+                        const preservedStatusIndicators = this.extractStatusIndicators(heroSlot, heroInstance.creatures);
+                        
+                        // Remove existing creatures (this will destroy the DOM but we've saved the indicators)
                         const existingCreatures = heroSlot.querySelector('.battle-hero-creatures');
                         if (existingCreatures) {
                             existingCreatures.remove();
@@ -1344,7 +1347,10 @@ export class BattleScreen {
                         const creaturesHTML = this.createCreaturesHTML(heroInstance.creatures, side, position);
                         heroSlot.insertAdjacentHTML('beforeend', creaturesHTML);
                         
-                        // NECROMANCY INTEGRATION: Update necromancy displays
+                        // RESTORE PRESERVED STATUS INDICATORS
+                        this.restoreStatusIndicators(heroSlot, preservedStatusIndicators, heroInstance.creatures);
+                        
+                        // Update necromancy displays
                         if (this.battleManager.necromancyManager) {
                             this.battleManager.necromancyManager.updateNecromancyDisplayForHeroWithCreatures(
                                 side, position, heroInstance
@@ -1354,7 +1360,105 @@ export class BattleScreen {
                 }
             });
         });
+        
+        // Call the refresh helper to ensure proper visual states (without status effect restoration since we preserved them)
+        setTimeout(() => {
+            this.battleManager.refreshAllCreatureVisuals();
+        }, 100);
     }
+
+    // Extract status indicators before DOM destruction
+    extractStatusIndicators(heroSlot, creatures) {
+        const preservedIndicators = [];
+        
+        creatures.forEach((creature, creatureIndex) => {
+            if (!creature.alive) return; // Skip dead creatures
+            
+            const creatureElement = heroSlot.querySelector(
+                `.creature-icon[data-creature-index="${creatureIndex}"]`
+            );
+            
+            if (creatureElement) {
+                // Find all status indicators for this creature
+                const statusIndicators = creatureElement.querySelectorAll('.status-indicator');
+                
+                if (statusIndicators.length > 0) {
+                    const creatureIndicators = {
+                        creatureName: creature.name,
+                        creatureIndex: creatureIndex,
+                        indicators: []
+                    };
+                    
+                    statusIndicators.forEach(indicator => {
+                        // Clone the indicator element and extract its data
+                        const indicatorData = {
+                            element: indicator.cloneNode(true),
+                            effectName: this.extractEffectNameFromIndicator(indicator),
+                            className: indicator.className,
+                            innerHTML: indicator.innerHTML,
+                            styles: indicator.style.cssText
+                        };
+                        
+                        creatureIndicators.indicators.push(indicatorData);
+                    });
+                    
+                    preservedIndicators.push(creatureIndicators);
+                }
+            }
+        });
+        
+        return preservedIndicators;
+    }
+
+    // Extract effect name from indicator class
+    extractEffectNameFromIndicator(indicator) {
+        const classList = Array.from(indicator.classList);
+        for (const className of classList) {
+            if (className.startsWith('status-indicator-')) {
+                return className.replace('status-indicator-', '');
+            }
+        }
+        return null;
+    }
+
+    // Restore status indicators after DOM recreation
+    restoreStatusIndicators(heroSlot, preservedIndicators, creatures) {
+        if (!preservedIndicators || preservedIndicators.length === 0) return;
+        
+        preservedIndicators.forEach(creatureIndicators => {
+            // Find the matching creature by name and verify it's still alive
+            const matchingCreatureIndex = creatures.findIndex(creature => 
+                creature.name === creatureIndicators.creatureName && creature.alive
+            );
+            
+            if (matchingCreatureIndex !== -1) {
+                // Find the new DOM element for this creature
+                const newCreatureElement = heroSlot.querySelector(
+                    `.creature-icon[data-creature-index="${matchingCreatureIndex}"]`
+                );
+                
+                if (newCreatureElement) {
+                    // Restore all status indicators for this creature
+                    creatureIndicators.indicators.forEach((indicatorData, index) => {
+                        // Create the indicator element
+                        const restoredIndicator = indicatorData.element.cloneNode(true);
+                        
+                        // Reposition the indicator based on current indicator count
+                        const xOffset = index * 25;
+                        const currentStyle = restoredIndicator.style.cssText;
+                        restoredIndicator.style.cssText = currentStyle.replace(
+                            /left: calc\(50% \+ \d+px\)/,
+                            `left: calc(50% + ${xOffset}px)`
+                        );
+                        
+                        // Attach to the new creature element
+                        newCreatureElement.appendChild(restoredIndicator);
+                    });
+                }
+            }
+        });
+    }
+
 
     // Display ability info for debugging
     displayAbilityInfo() {

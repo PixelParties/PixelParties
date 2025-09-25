@@ -157,6 +157,20 @@ const CARD_DATABASE = {
         ability2: 'Friendship',
         tags: ["Status Effects", "Area Damage", "Self-Damage"]
     },
+    'Mary': {
+        name: 'Mary',
+        image: './Cards/Characters/Mary.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 250,
+        atk: 20,
+        ability1: 'Charme',
+        ability2: 'Leadership',
+        tags: ["Summoner", "Damage Dealer", "Late-Game"]
+    },
     'Medea': {
         name: 'Medea',
         image: './Cards/Characters/Medea.png',
@@ -1491,6 +1505,16 @@ const CARD_DATABASE = {
         spellSchool: 'DecayMagic',
         subtype: null
     },
+    'SupplyChain': {
+        name: 'SupplyChain',
+        image: './Cards/All/SupplyChain.png',
+        cardType: 'Spell',
+        level: 2,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: null
+    },
     'SkeletonKingSkullmael': {
         name: 'SkeletonKingSkullmael',
         image: './Cards/All/SkeletonKingSkullmael.png',
@@ -2114,6 +2138,72 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
+        subtype: null
+    },
+
+
+    //MARY
+    'CuteBird': {
+        name: 'CuteBird',
+        image: './Cards/All/CuteBird.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 10,
+        physicalAttack: false
+    },
+    'CutePhoenix': {
+        name: 'CutePhoenix',
+        image: './Cards/All/CutePhoenix.png',
+        cardType: 'Spell',
+        level: 3,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 10,
+        physicalAttack: false
+    },
+    'CuteCrown': {
+        name: 'CuteCrown',
+        image: './Cards/All/CuteCrown.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
+    'PinkSky': {
+        name: 'PinkSky',
+        image: './Cards/All/PinkSky.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: 'Area'
+    },
+    'PhoenixTackle': {
+        name: 'PhoenixTackle',
+        image: './Cards/All/PhoenixTackle.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
+        subtype: null
+    },
+    'VictoryPhoenixCannon': {
+        name: 'VictoryPhoenixCannon',
+        image: './Cards/All/VictoryPhoenixCannon.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'DestructionMagic',
         subtype: null
     },
 

@@ -15,8 +15,6 @@ export class BattleRandomness {
         
         // Store the original seed for debugging/logging
         this.originalSeed = this.seed;
-        
-        console.log(`🎲 BattleRandomness initialized with seed: ${this.seed.slice(0, 8)}...`);
     }
     
     // Generate a cryptographically secure seed
@@ -263,7 +261,6 @@ export class BattleRandomness {
         this.callCount = savedState.callCount;
         this.initialState = this.hashSeed(this.seed);
         
-        console.log(`🎲 BattleRandomness state restored: seed ${this.seed.slice(0, 8)}..., calls: ${this.callCount}`);
         return true;
     }
     
@@ -271,7 +268,6 @@ export class BattleRandomness {
     reset() {
         this.state = this.initialState;
         this.callCount = 0;
-        console.log(`🎲 BattleRandomness reset to initial state with seed: ${this.seed.slice(0, 8)}...`);
     }
     
     // Get debug information

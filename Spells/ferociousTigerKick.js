@@ -44,7 +44,7 @@ export class FerociousTigerKickSpell {
         if (healingAmount <= 0) {
             // No healing to apply, just show visual effect
             this.battleManager.addCombatLog(
-                `🐅 ${attacker.name}'s Ferocious Tiger Kick strikes but provides no healing!`,
+                `🅰️ ${attacker.name}'s Ferocious Tiger Kick strikes but provides no healing!`,
                 attacker.side === 'player' ? 'success' : 'error'
             );
         } else {
@@ -59,7 +59,7 @@ export class FerociousTigerKickSpell {
                 
                 // Add combat log
                 this.battleManager.addCombatLog(
-                    `🐅 ${attacker.name}'s Ferocious Tiger Kick heals for ${actualHealing} HP! (${attackDamage} dmg ÷ 2 = ${healingAmount})`,
+                    `🅰️ ${attacker.name}'s Ferocious Tiger Kick heals for ${actualHealing} HP! (${attackDamage} dmg ÷ 2 = ${healingAmount})`,
                     attacker.side === 'player' ? 'success' : 'error'
                 );
                 
@@ -69,7 +69,7 @@ export class FerociousTigerKickSpell {
                 }
             } else {
                 this.battleManager.addCombatLog(
-                    `🐅 ${attacker.name}'s Ferocious Tiger Kick strikes but ${attacker.name} is already at full health!`,
+                    `🅰️ ${attacker.name}'s Ferocious Tiger Kick strikes but ${attacker.name} is already at full health!`,
                     attacker.side === 'player' ? 'success' : 'error'
                 );
             }
@@ -104,7 +104,6 @@ export class FerociousTigerKickSpell {
         const attackerElement = this.battleManager.getHeroElement(attacker.side, attacker.position);
         
         if (!attackerElement) {
-            console.warn('Could not find element for Ferocious Tiger Kick effect');
             return;
         }
 
@@ -127,7 +126,7 @@ export class FerociousTigerKickSpell {
     createTigerOnAttacker(attackerElement) {
         const tiger = document.createElement('div');
         tiger.className = 'ferocious-tiger-kick';
-        tiger.innerHTML = '🐅';
+        tiger.innerHTML = '🅰️';
         
         tiger.style.cssText = `
             position: absolute;
@@ -262,7 +261,6 @@ export class FerociousTigerKickSpell {
         const localAttacker = this.findTargetFromSyncInfo(attackerInfo);
         
         if (!localAttacker) {
-            console.warn('Could not find local attacker for Ferocious Tiger Kick effect');
             return;
         }
 
@@ -275,7 +273,7 @@ export class FerociousTigerKickSpell {
         // Log the effect
         if (actualHealing > 0) {
             this.battleManager.addCombatLog(
-                `🐅 ${localAttacker.name}'s Ferocious Tiger Kick heals for ${actualHealing} HP! (${attackDamage} dmg ÷ 2 = ${healingAmount})`,
+                `🅰️ ${localAttacker.name}'s Ferocious Tiger Kick heals for ${actualHealing} HP! (${attackDamage} dmg ÷ 2 = ${healingAmount})`,
                 localAttacker.side === 'player' ? 'success' : 'error'
             );
             
@@ -285,12 +283,12 @@ export class FerociousTigerKickSpell {
             }
         } else if (healingAmount > 0) {
             this.battleManager.addCombatLog(
-                `🐅 ${localAttacker.name}'s Ferocious Tiger Kick strikes but ${localAttacker.name} is already at full health!`,
+                `🅰️ ${localAttacker.name}'s Ferocious Tiger Kick strikes but ${localAttacker.name} is already at full health!`,
                 localAttacker.side === 'player' ? 'success' : 'error'
             );
         } else {
             this.battleManager.addCombatLog(
-                `🐅 ${localAttacker.name}'s Ferocious Tiger Kick strikes but provides no healing!`,
+                `🅰️ ${localAttacker.name}'s Ferocious Tiger Kick strikes but provides no healing!`,
                 localAttacker.side === 'player' ? 'success' : 'error'
             );
         }

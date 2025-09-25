@@ -109,7 +109,6 @@ export class AscendedManager {
                 if (requiredCounters !== undefined) {
                     window.heroSelection.playerCounters.evolutionCounters -= requiredCounters;
                     consumedCounters = requiredCounters;
-                    console.log(`🧬 Consumed ${requiredCounters} Evolution Counters for ${ascendedCardName} ascension`);
                 }
             }
 
@@ -142,10 +141,6 @@ export class AscendedManager {
                 ascendedStack: newAscendedStack  // CRITICAL: Set the evolution history
                 // Preserve existing bonuses without adding stat differences
             };
-
-            // Log the ascension for debugging (can be removed in production)
-            console.log(`Ascension: ${originalHero.name} -> ${ascendedCardName}`);
-            console.log(`Evolution history: [${newAscendedStack.join(' → ')} → ${ascendedCardName}]`);
 
             // Play ascension animation (card already removed from hand)
             await this.playAscensionAnimation(targetPosition, originalHero.name, ascendedCardName);

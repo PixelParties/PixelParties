@@ -198,7 +198,6 @@ export const auroraBorealisSpell = {
             coreSpellSuccess = true;
             
         } catch (error) {
-            console.error('Core Aurora Borealis execution error:', error);
             return {
                 success: false,
                 message: 'Failed to cast Aurora Borealis - core execution failed',
@@ -240,7 +239,6 @@ export const auroraBorealisSpell = {
             
         } catch (error) {
             // Log the error but don't fail the spell since core functionality worked
-            console.error('Aurora Borealis post-execution error (non-critical):', error);
         }
         
         return {

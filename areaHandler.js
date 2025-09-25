@@ -281,6 +281,15 @@ export class AreaHandler {
             }
         }
 
+        // Initialize PinkSky
+        if (cardName === 'PinkSky') {
+            import('../Spells/pinkSky.js').then(({ initializePinkSkyArea }) => {
+                initializePinkSkyArea(newAreaCard);
+            }).catch(error => {
+                console.error('Error initializing PinkSky:', error);
+            });
+        }
+
         // Reset CrystalWell when new area is placed
         if (cardName === 'CrystalWell') {
             const { crystalWellManager } = await import('../Spells/crystalWell.js');
@@ -358,17 +367,11 @@ export class AreaHandler {
             // Import the MagicArts redraw system
             if (typeof window !== 'undefined' && window.magicArtsRedraw) {
                 // Use the existing global MagicArts redraw system
-                const redrawSuccess = await window.magicArtsRedraw.handleMagicArtsRedraw(cardName, this.heroSelection);
-                if (redrawSuccess) {
-                    console.log(`MagicArts redraw triggered for area spell: ${cardName}`);
-                }
+                await window.magicArtsRedraw.handleMagicArtsRedraw(cardName, this.heroSelection);
             } else {
                 // Fallback: try to import the module
                 const { magicArtsRedraw } = await import('../Abilities/magicArts.js');
-                const redrawSuccess = await magicArtsRedraw.handleMagicArtsRedraw(cardName, this.heroSelection);
-                if (redrawSuccess) {
-                    console.log(`MagicArts redraw triggered for area spell: ${cardName}`);
-                }
+                await magicArtsRedraw.handleMagicArtsRedraw(cardName, this.heroSelection);
             }
         } catch (error) {
             console.error('Error processing MagicArts redraw for area spell:', error);

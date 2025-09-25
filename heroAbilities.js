@@ -50,14 +50,10 @@ export class HeroAbilitiesManager {
             right: false
         };
 
-
-
         // References to other managers (will be set by heroSelection)
         this.handManager = null;
         this.formationManager = null;
         this.onStateChange = null; // Callback for when state changes
-        
-        console.log('HeroAbilitiesManager initialized with turn-based attachment limits, Leadership tracking, and stat bonus system');
     }
 
     // Initialize with references to other managers
@@ -65,7 +61,6 @@ export class HeroAbilitiesManager {
         this.handManager = handManager;
         this.formationManager = formationManager;
         this.onStateChange = onStateChange;
-        console.log('HeroAbilitiesManager initialized with manager references');
     }
 
     //Helper function for CamelCase
@@ -85,7 +80,6 @@ export class HeroAbilitiesManager {
     // Check if a hero can receive an ability this turn
     canHeroReceiveAbilityThisTurn(heroPosition) {
         if (!this.heroAbilityAttachedThisTurn.hasOwnProperty(heroPosition)) {
-            console.error(`Invalid hero position: ${heroPosition}`);
             return false;
         }
         
@@ -96,7 +90,6 @@ export class HeroAbilitiesManager {
     markHeroReceivedAbility(heroPosition) {
         if (this.heroAbilityAttachedThisTurn.hasOwnProperty(heroPosition)) {
             this.heroAbilityAttachedThisTurn[heroPosition] = true;
-            console.log(`${heroPosition} hero marked as having received ability this turn`);
         }
     }
 
@@ -105,7 +98,6 @@ export class HeroAbilitiesManager {
     // Check if a hero can use Leadership this turn
     canUseLeadership(heroPosition) {
         if (!this.heroLeadershipUsedThisTurn.hasOwnProperty(heroPosition)) {
-            console.error(`Invalid hero position: ${heroPosition}`);
             return false;
         }
         return !this.heroLeadershipUsedThisTurn[heroPosition];
@@ -115,17 +107,14 @@ export class HeroAbilitiesManager {
     markLeadershipUsed(heroPosition) {
         if (this.heroLeadershipUsedThisTurn.hasOwnProperty(heroPosition)) {
             this.heroLeadershipUsedThisTurn[heroPosition] = true;
-            console.log(`${heroPosition} hero's Leadership marked as used this turn`);
             return true;
         }
         return false;
     }
 
-
     // Check if hero can use Navigation this turn
     canUseNavigation(heroPosition) {
         if (!this.heroNavigationUsedThisTurn.hasOwnProperty(heroPosition)) {
-            console.error(`Invalid hero position: ${heroPosition}`);
             return false;
         }
         return !this.heroNavigationUsedThisTurn[heroPosition];
@@ -135,13 +124,10 @@ export class HeroAbilitiesManager {
     markNavigationUsed(heroPosition) {
         if (this.heroNavigationUsedThisTurn.hasOwnProperty(heroPosition)) {
             this.heroNavigationUsedThisTurn[heroPosition] = true;
-            console.log(`${heroPosition} hero's Navigation marked as used this turn`);
             return true;
         }
         return false;
     }
-
-
 
     // Reset turn-based tracking (called after battle)
     resetTurnBasedTracking() {
@@ -162,15 +148,12 @@ export class HeroAbilitiesManager {
             center: false,
             right: false
         };
-        
-        console.log('Turn-based ability attachment and Leadership tracking reset for new turn');
     }
 
     // Check if there's a hero at the given position
     hasHeroAtPosition(heroPosition) {
         // Validate position
         if (!this.heroAbilityZones.hasOwnProperty(heroPosition)) {
-            console.error(`Invalid hero position: ${heroPosition}`);
             return false;
         }
         
@@ -179,15 +162,10 @@ export class HeroAbilitiesManager {
             const formation = this.formationManager.getBattleFormation();
             const hasHero = formation && formation[heroPosition] !== null && formation[heroPosition] !== undefined;
             
-            if (!hasHero) {
-                console.log(`No hero in formation at position: ${heroPosition}`);
-            }
-            
             return hasHero;
         }
         
         // If FormationManager is not available, log an error
-        console.error('FormationManager reference not available in HeroAbilitiesManager');
         return false;
     }
 
@@ -201,33 +179,26 @@ export class HeroAbilitiesManager {
 
     // Handle team slot drag over (for ability cards)
     handleTeamSlotDragOver(event, heroPosition) {
-        console.log('🎯 handleTeamSlotDragOver called for position:', heroPosition);
-        
         // Check if we're dragging a hand card
         if (!this.handManager || !this.handManager.isHandDragging()) {
-            console.log('🎯 No hand dragging detected');
             return false;
         }
         
         const dragState = this.handManager.getHandDragState();
         const cardName = dragState.draggedCardName;
-        console.log('🎯 Dragged card name:', cardName);
         
         // Only allow drop if it's an ability card
         if (!this.isAbilityCard(cardName)) {
-            console.log('🎯 Not an ability card');
             return false;
         }
         
         // Check if there's actually a hero in this slot
         if (!this.hasHeroAtPosition(heroPosition)) {
-            console.log('🎯 No hero at position:', heroPosition);
             return false;
         }
         
         // Check if this hero can receive abilities this turn
         if (!this.canHeroReceiveAbilityThisTurn(heroPosition)) {
-            console.log('🎯 Hero cannot receive abilities this turn');
             return false;
         }
         
@@ -237,7 +208,6 @@ export class HeroAbilitiesManager {
         // Set drop effect
         event.dataTransfer.dropEffect = 'move';
         
-        console.log('🎯 All checks passed, returning true');
         return true;
     }
 
@@ -300,7 +270,6 @@ export class HeroAbilitiesManager {
             const zoneName = `zone${i}`;
             if (!this.heroAbilityZones[heroPosition][zoneName]) {
                 this.heroAbilityZones[heroPosition][zoneName] = [];
-                console.warn(`Repaired missing ${zoneName} for ${heroPosition} hero`);
             }
         }
         
@@ -336,21 +305,18 @@ export class HeroAbilitiesManager {
         
         // Only allow drop if it's an ability card
         if (!this.isAbilityCard(cardName)) {
-            console.log(`${cardName} is not an ability card, cannot drop on hero`);
             this.handManager.handleInvalidDrop();
             return false;
         }
         
         // Check if there's actually a hero in this slot
         if (!this.hasHeroAtPosition(heroPosition)) {
-            console.log(`No hero in ${heroPosition} position, cannot attach ability`);
             this.handManager.handleInvalidDrop();
             return false;
         }
         
         // Check turn-based limitation
         if (!this.canHeroReceiveAbilityThisTurn(heroPosition)) {
-            console.log(`${heroPosition} hero has already received an ability this turn`);
             this.handManager.handleInvalidDrop();
             
             // Show feedback to player
@@ -374,10 +340,8 @@ export class HeroAbilitiesManager {
                 await this.onStateChange();
             }
             
-            console.log(result.message);
             return true;
         } else {
-            console.log(result.message);
             this.handManager.handleInvalidDrop();
             return false;
         }
@@ -443,13 +407,6 @@ export class HeroAbilitiesManager {
                 // Add to leftmost free zone
                 const success = this.addAbilityToZone(heroPosition, freeZone, abilityInfo);
                 if (success) {
-                    // NEW: Log the stat impact for immediate feedback
-                    if (cardName === 'Toughness') {
-                        console.log(`💪 ${heroPosition} hero gains +200 HP from Toughness!`);
-                    } else if (cardName === 'Fighting') {
-                        console.log(`⚔️ ${heroPosition} hero gains +10 Attack from Fighting!`);
-                    }
-                    
                     return { 
                         success: true, 
                         message: `Added ${cardName} to ${heroPosition} hero's zone ${freeZone}` 
@@ -512,7 +469,6 @@ export class HeroAbilitiesManager {
     // Initialize hero with their starting abilities
     initializeHeroStartingAbilities(heroPosition, heroData) {
         if (!heroData || !heroPosition) {
-            console.error('Invalid hero data or position for ability initialization');
             return false;
         }
         
@@ -524,7 +480,6 @@ export class HeroAbilitiesManager {
         const ability2 = heroData.ability2;
         
         if (!ability1 || !ability2) {
-            console.log(`Hero ${heroData.name} has no starting abilities defined`);
             return false;
         }
         
@@ -533,7 +488,6 @@ export class HeroAbilitiesManager {
         const ability2Info = getCardInfo(ability2);
         
         if (!ability1Info || !ability2Info) {
-            console.error(`Could not find ability info for ${ability1} or ${ability2}`);
             return false;
         }
         
@@ -543,7 +497,6 @@ export class HeroAbilitiesManager {
             this.addAbilityToZone(heroPosition, 1, ability1Info);
             // Add second copy, bypassing unique check since it's a starting ability
             this.addAbilityToZone(heroPosition, 1, ability1Info, true);
-            console.log(`Added ${ability1} x2 to ${heroData.name} at ${heroPosition} (zone 1)`);
         } else {
             // Different abilities - sort alphabetically
             const abilities = [
@@ -554,8 +507,6 @@ export class HeroAbilitiesManager {
             // Add to zones 1 and 2
             this.addAbilityToZone(heroPosition, 1, abilities[0].info);
             this.addAbilityToZone(heroPosition, 2, abilities[1].info);
-            
-            console.log(`Added ${abilities[0].name} to zone 1 and ${abilities[1].name} to zone 2 for ${heroData.name} at ${heroPosition}`);
         }
         
         return true;
@@ -575,7 +526,6 @@ export class HeroAbilitiesManager {
     // Check if a hero can accept a specific ability (not already having it)
     canHeroAcceptAbility(heroPosition, abilityName) {
         if (!this.heroAbilityRegistry[heroPosition]) {
-            console.error(`Invalid hero position: ${heroPosition}`);
             return false;
         }
         
@@ -591,14 +541,11 @@ export class HeroAbilitiesManager {
         this.ensureValidZoneStructure(heroPosition);
         
         if (!this.heroAbilityZones[heroPosition] || !this.heroAbilityZones[heroPosition][zoneName]) {
-            console.error(`Invalid hero position or zone: ${heroPosition}, ${zoneName}`);
-            console.error('Zone structure:', this.heroAbilityZones[heroPosition]);
             return false;
         }
         
         // First check if hero can accept this ability (unless bypassing for starting abilities)
         if (!bypassUniqueCheck && !this.canHeroAcceptAbility(heroPosition, ability.name)) {
-            console.log(`Hero at ${heroPosition} already has ability: ${ability.name}`);
             return false;
         }
         
@@ -607,8 +554,6 @@ export class HeroAbilitiesManager {
         
         // Register ability for uniqueness tracking (only if not already registered)
         this.heroAbilityRegistry[heroPosition].add(ability.name);
-        
-        console.log(`Added ${ability.name} to ${heroPosition} hero's ${zoneName}`);
         
         // NEW: Trigger stat update if this is a stat-affecting ability
         this.triggerStatUpdateForAbility(heroPosition, ability.name, 'added');
@@ -621,13 +566,11 @@ export class HeroAbilitiesManager {
         const zoneName = `zone${zoneNumber}`;
         
         if (!this.heroAbilityZones[heroPosition] || !this.heroAbilityZones[heroPosition][zoneName]) {
-            console.error(`Invalid hero position or zone: ${heroPosition}, ${zoneName}`);
             return null;
         }
         
         const zone = this.heroAbilityZones[heroPosition][zoneName];
         if (abilityIndex < 0 || abilityIndex >= zone.length) {
-            console.error(`Invalid ability index: ${abilityIndex}`);
             return null;
         }
         
@@ -639,8 +582,6 @@ export class HeroAbilitiesManager {
         if (!stillHasAbility) {
             this.heroAbilityRegistry[heroPosition].delete(removedAbility.name);
         }
-        
-        console.log(`Removed ${removedAbility.name} from ${heroPosition} hero's ${zoneName}`);
         
         // NEW: Trigger stat update if this was a stat-affecting ability
         this.triggerStatUpdateForAbility(heroPosition, removedAbility.name, 'removed');
@@ -654,8 +595,6 @@ export class HeroAbilitiesManager {
         const isStatAffecting = abilityName === 'Toughness' || abilityName === 'Fighting';
         
         if (isStatAffecting) {
-            console.log(`📊 ${action} ${abilityName} ${action === 'added' ? 'to' : 'from'} ${heroPosition} hero - triggering stat update`);
-            
             // Trigger UI update with delay to ensure DOM is ready
             setTimeout(() => {
                 if (window.heroSelection && window.heroSelection.refreshHeroStats) {
@@ -697,13 +636,6 @@ export class HeroAbilitiesManager {
         let fromStatAbilities = this.countStatAbilities(fromAbilities);
         let toStatAbilities = this.countStatAbilities(toAbilities);
         
-        if (fromStatAbilities.toughness > 0 || fromStatAbilities.fighting > 0) {
-            console.log(`📊 Moving abilities from ${fromPosition}: ${fromStatAbilities.toughness} Toughness, ${fromStatAbilities.fighting} Fighting`);
-        }
-        if (toStatAbilities.toughness > 0 || toStatAbilities.fighting > 0) {
-            console.log(`📊 Moving abilities to ${toPosition}: ${toStatAbilities.toughness} Toughness, ${toStatAbilities.fighting} Fighting`);
-        }
-        
         // Swap ability zones
         const tempZones = this.heroAbilityZones[fromPosition];
         this.heroAbilityZones[fromPosition] = this.heroAbilityZones[toPosition];
@@ -723,8 +655,6 @@ export class HeroAbilitiesManager {
         const tempLeadershipTracking = this.heroLeadershipUsedThisTurn[fromPosition];
         this.heroLeadershipUsedThisTurn[fromPosition] = this.heroLeadershipUsedThisTurn[toPosition];
         this.heroLeadershipUsedThisTurn[toPosition] = tempLeadershipTracking;
-        
-        console.log(`Moved abilities from ${fromPosition} to ${toPosition}`);
         
         // Validate structures after swap
         this.ensureValidZoneStructure(fromPosition);
@@ -766,10 +696,6 @@ export class HeroAbilitiesManager {
         const currentAbilities = this.heroAbilityZones[heroPosition] || {};
         const statCount = this.countStatAbilities(currentAbilities);
         
-        if (statCount.toughness > 0 || statCount.fighting > 0) {
-            console.log(`📊 Clearing ${statCount.toughness} Toughness and ${statCount.fighting} Fighting from ${heroPosition}`);
-        }
-        
         // Force complete reinitialization
         this.heroAbilityZones[heroPosition] = {
             zone1: [],
@@ -783,8 +709,6 @@ export class HeroAbilitiesManager {
         
         // Reset Leadership tracking for this position
         this.heroLeadershipUsedThisTurn[heroPosition] = false;
-        
-        console.log(`Cleared abilities for ${heroPosition} hero`);
         
         // Double-check the structure is valid
         this.ensureValidZoneStructure(heroPosition);
@@ -839,8 +763,6 @@ export class HeroAbilitiesManager {
     importAbilitiesState(state) {
         if (!state) return false;
         
-        console.log('📥 Importing abilities state...');
-        
         if (state.heroAbilityZones) {
             this.heroAbilityZones = JSON.parse(JSON.stringify(state.heroAbilityZones));
             
@@ -890,17 +812,10 @@ export class HeroAbilitiesManager {
                 right: false
             };
         }
-        
 
-
-        console.log('Imported hero abilities state with Leadership tracking and zone validation');
-        
         // Log imported stat abilities and trigger stat updates
         ['left', 'center', 'right'].forEach(position => {
             const statCount = this.countStatAbilities(this.heroAbilityZones[position]);
-            if (statCount.toughness > 0 || statCount.fighting > 0) {
-                console.log(`📊 Restored ${position}: ${statCount.toughness} Toughness, ${statCount.fighting} Fighting`);
-            }
         });
         
         // Trigger stat updates after import
@@ -974,8 +889,6 @@ export class HeroAbilitiesManager {
         this.handManager = null;
         this.formationManager = null;
         this.onStateChange = null;
-        
-        console.log('HeroAbilitiesManager reset with Leadership tracking and stat bonus system');
     }
 }
 

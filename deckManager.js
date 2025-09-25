@@ -73,7 +73,6 @@ export class DeckManager {
 
         // CHANGED: Always add card, duplicates are now allowed
         this.deck.push(cardName);
-        console.log(`Added card ${cardName} to deck (duplicates allowed)`);
         return true;
     }
 
@@ -116,9 +115,6 @@ export class DeckManager {
         this.deck = this.deck.filter(card => card !== cardName);
         const removedCount = initialLength - this.deck.length;
         
-        if (removedCount > 0) {
-            console.log(`Removed ${removedCount} instances of ${cardName} from deck`);
-        }
         
         return removedCount;
     }

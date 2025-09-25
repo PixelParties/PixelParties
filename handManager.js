@@ -27,7 +27,7 @@ export class HandManager {
         this.AUTO_ADD_TEST_CARD = true;
         // Up to 5 test cards to add (empty strings mean no card in that slot)
         this.TEST_CARD_NAMES = [
-            '',  // Card slot 1
+            '',                // Card slot 1
             '',                // Card slot 2 (empty)
             '',                // Card slot 3 (empty)
             '',                // Card slot 4 (empty)

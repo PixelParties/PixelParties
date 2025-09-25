@@ -92,6 +92,9 @@ export class BeatoEffectManager {
         const validSchools = ['DestructionMagic', 'DecayMagic', 'SupportMagic'];
         const excludedSubtypes = ['Creature', 'Permanent', 'Area'];
         
+        // SPECIAL EXCLUSIONS: Spells that cannot be learned by Beato
+        const excludedSpells = ['PhoenixTackle', 'VictoryPhoenixCannon'];
+        
         // Get all card names using the same logic as ButterflyCloud
         let allCardNames = [];
         
@@ -142,6 +145,12 @@ export class BeatoEffectManager {
                 return;
             }
             
+            // SPECIAL EXCLUSION: Exclude Phoenix spells that cannot be learned by Beato
+            if (excludedSpells.includes(cardName)) {
+                console.log(`🔥 Beato cannot learn spell: ${cardName} - excluding from random selection`);
+                return;
+            }
+            
             // Add to eligible list
             eligibleSpells.push({
                 name: cardName,
@@ -151,6 +160,7 @@ export class BeatoEffectManager {
             });
         });
         
+        console.log(`📚 Beato eligible spells: ${eligibleSpells.length} (Phoenix spells excluded)`);
         return eligibleSpells;
     }
 

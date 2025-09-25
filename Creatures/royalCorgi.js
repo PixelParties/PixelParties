@@ -8,12 +8,10 @@ export class RoyalCorgiCreature {
         // Royal Corgi stats
         this.CARD_DRAW_ANIMATION_TIME = 1000; // 1 second card draw animation
         this.COUNTERS_PER_CARD_DRAW = 3;
-        this.MAX_BONUS_CARDS_PER_CORGI = 2;
+        this.MAX_BONUS_CARDS_PER_CORGI = 99;
         
         // Inject CSS styles
         this.injectRoyalCorgiStyles();
-        
-        console.log('👑🐕 Royal Corgi Creature module initialized');
     }
 
     // Check if a creature is Royal Corgi
@@ -31,7 +29,6 @@ export class RoyalCorgiCreature {
         
         // Safety check: ensure Corgi is still alive
         if (!corgi.alive || corgi.currentHp <= 0) {
-            console.log(`Royal Corgi is dead, cannot execute action`);
             return;
         }
         
@@ -267,11 +264,10 @@ export class RoyalCorgiCreature {
     // Calculate bonus cards for all Royal Corgis owned by a player
     calculateBonusCardsForPlayer(heroCreatures) {
         let totalBonusCards = 0;
-        console.log("CORGI TEST!");
         Object.values(heroCreatures).forEach(heroCreatureList => {
             if (Array.isArray(heroCreatureList)) {
                 heroCreatureList.forEach(creature => {
-                    if (RoyalCorgiCreature.isRoyalCorgi(creature.name) && creature.alive) {
+                    if (RoyalCorgiCreature.isRoyalCorgi(creature.name)) {  // Remove && creature.alive
                         const counters = creature.counters || 0;
                         const bonusCards = Math.floor(counters / this.COUNTERS_PER_CARD_DRAW);
                         const cappedBonusCards = Math.min(bonusCards, this.MAX_BONUS_CARDS_PER_CORGI);
@@ -287,9 +283,7 @@ export class RoyalCorgiCreature {
     }
 
     // Clean up all active animations (called on battle end/reset)
-    cleanup() {
-        console.log(`Cleaning up ${this.activeAnimations.size} active Royal Corgi animations`);
-        
+    cleanup() {        
         this.activeAnimations.forEach(animation => {
             try {
                 if (animation && animation.parentNode) {
@@ -310,10 +304,6 @@ export class RoyalCorgiCreature {
                     animation.remove();
                 }
             });
-            
-            if (orphanedAnimations.length > 0) {
-                console.log(`Cleaned up ${orphanedAnimations.length} orphaned Royal Corgi animations`);
-            }
         } catch (error) {
             console.warn('Error cleaning up orphaned Royal Corgi animations:', error);
         }

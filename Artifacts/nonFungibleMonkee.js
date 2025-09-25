@@ -5,30 +5,24 @@ export const nonFungibleMonkeeArtifact = {
     cardName: 'NonFungibleMonkee',
     
     // Handle card click
-    async handleClick(cardIndex, cardName, heroSelection) {
-        console.log(`NonFungibleMonkee clicked at index ${cardIndex}`);
-        
+    async handleClick(cardIndex, cardName, heroSelection) {        
         // Consume the card and give Monkee reward
         await this.consumeAndReward(cardIndex, heroSelection);
     },
     
     // Handle card being dragged outside the hand
-    async handleDraggedOutside(cardIndex, cardName, heroSelection) {
-        console.log(`NonFungibleMonkee dragged outside hand from index ${cardIndex}`);
-        
+    async handleDraggedOutside(cardIndex, cardName, heroSelection) {        
         // Consume the card and give Monkee reward
         await this.consumeAndReward(cardIndex, heroSelection);
     },
     
     // Core logic to consume card and award random Monkee
     async consumeAndReward(cardIndex, heroSelection) {
-        console.log("NonFungibleMonkee Checkpoint -1");
         if (!heroSelection) {
             console.error('No heroSelection instance available');
             return;
         }
         
-        console.log("NonFungibleMonkee Checkpoint -2");
         // Get managers
         const handManager = heroSelection.getHandManager();
         const goldManager = heroSelection.getGoldManager();
@@ -39,7 +33,6 @@ export const nonFungibleMonkeeArtifact = {
             return;
         }
         
-        console.log("NonFungibleMonkee Checkpoint -3");
         // Get cost from card database
         const cardInfo = heroSelection.getCardInfo(this.cardName);
         const cost = cardInfo?.cost || 10; // Fallback cost if not defined
@@ -54,12 +47,9 @@ export const nonFungibleMonkeeArtifact = {
             return;
         }
         
-        console.log("NonFungibleMonkee Checkpoint -4");
         // Spend the gold (use negative amount to subtract)
         goldManager.addPlayerGold(-cost, 'NonFungibleMonkee');
-        
-        console.log(`NonFungibleMonkee: Spent ${cost} gold to activate`);
-        
+                
         // Remove card from hand
         const removedCard = handManager.removeCardFromHandByIndex(cardIndex);
         
@@ -68,7 +58,6 @@ export const nonFungibleMonkeeArtifact = {
             return;
         }
         
-        console.log("NonFungibleMonkee Checkpoint -5");
         // Get 1 prioritized Monkee
         const selectedMonkee = this.selectPrioritizedMonkee(heroSelection);
         
@@ -77,7 +66,6 @@ export const nonFungibleMonkeeArtifact = {
             return;
         }
         
-        console.log("NonFungibleMonkee Checkpoint -6");
         // Add Monkee to deck
         deckManager.addCardReward(selectedMonkee);
         
@@ -100,11 +88,6 @@ export const nonFungibleMonkeeArtifact = {
         
         // Save game state
         await heroSelection.saveGameState();
-        
-        console.log(`NonFungibleMonkee consumed! Player gained ${selectedMonkee} for ${cost} gold`);
-        if (addedToHand) {
-            console.log(`${selectedMonkee} also added to hand`);
-        }
     },
     
     // Show error message when not enough gold
@@ -165,7 +148,6 @@ export const nonFungibleMonkeeArtifact = {
     
     // Select prioritized Monkee creature (least owned first)
     selectPrioritizedMonkee(heroSelection) {
-        console.log("NonFungibleMonkee Checkpoint 0");
         try {
             // Get all Monkee creatures
             const monkeeCreatures = this.getMonkeeCreatures(heroSelection);
@@ -197,7 +179,6 @@ export const nonFungibleMonkeeArtifact = {
             const randomIndex = Math.floor(Math.random() * leastOwnedMonkees.length);
             const selectedMonkee = leastOwnedMonkees[randomIndex];
             
-            console.log(`Selected ${selectedMonkee} (count: ${minCount}) from least owned Monkees:`, leastOwnedMonkees);
             return selectedMonkee;
             
         } catch (error) {
@@ -208,7 +189,6 @@ export const nonFungibleMonkeeArtifact = {
     
     // Get list of all Monkee creatures
     getMonkeeCreatures(heroSelection) {
-        console.log("NonFungibleMonkee Checkpoint 1");
         try {
             // Use hardcoded list of known Monkee creatures from cardDatabase
             // This is more reliable than trying to query the database dynamically
@@ -222,9 +202,7 @@ export const nonFungibleMonkeeArtifact = {
                        cardInfo.subtype === 'Creature' &&
                        cardInfo.archetype === 'Monkees';
             });
-            
-            console.log(`NonFungibleMonkee: Found ${validMonkeeCreatures.length} valid Monkee creatures:`, validMonkeeCreatures);
-            
+                        
             if (validMonkeeCreatures.length === 0) {
                 console.warn('No valid Monkee creatures found, using fallback list');
                 return allMonkeeCreatures; // Use all known Monkees as fallback
@@ -303,41 +281,72 @@ export const nonFungibleMonkeeArtifact = {
         }
         
         const handManager = heroSelection.getHandManager();
-        if (!handManager) {
-            console.error('HandManager not available for disenchant effect');
+        const deckManager = heroSelection.getDeckManager();
+        
+        if (!handManager || !deckManager) {
+            console.error('HandManager or DeckManager not available for disenchant effect');
             return false;
         }
         
-        // Add GoldenBananas to hand if there's space
         let addedToHand = false;
+        let addedToDeck = false;
+        
+        // Add GoldenBananas to hand if there's space
         if (!handManager.isHandFull()) {
             const added = handManager.addCardToHand('GoldenBananas');
             if (added) {
                 addedToHand = true;
                 console.log('NonFungibleMonkee disenchant: Added GoldenBananas to hand');
-                
-                // Show visual feedback
-                this.showDisenchantReward();
-                
-                // Update UI
-                heroSelection.updateHandDisplay();
-                
-                // Save state
-                heroSelection.autoSave();
             }
         }
         
-        return addedToHand;
+        // Always add GoldenBananas to deck (increases future draw chances)
+        const deckAdded = deckManager.addCardReward('GoldenBananas');
+        if (deckAdded) {
+            addedToDeck = true;
+            console.log('NonFungibleMonkee disenchant: Added GoldenBananas to deck');
+        }
+        
+        // Show visual feedback if either addition was successful
+        if (addedToHand || addedToDeck) {
+            this.showDisenchantReward(addedToHand, addedToDeck);
+            
+            // Update UI
+            if (addedToHand) {
+                heroSelection.updateHandDisplay();
+            }
+            if (addedToDeck) {
+                heroSelection.updateDeckDisplay();
+            }
+            
+            // Save state
+            heroSelection.autoSave();
+        }
+        
+        return addedToHand || addedToDeck;
     },
     
     // Show disenchant reward feedback
-    showDisenchantReward() {
+    showDisenchantReward(addedToHand = false, addedToDeck = false) {
         const feedback = document.createElement('div');
         feedback.className = 'nonfungible-monkee-disenchant-reward';
+        
+        // Create message based on what was added
+        let message = '';
+        if (addedToHand && addedToDeck) {
+            message = '+Golden Bananas to hand & deck!';
+        } else if (addedToHand) {
+            message = '+Golden Bananas to hand!';
+        } else if (addedToDeck) {
+            message = '+Golden Bananas to deck!';
+        } else {
+            message = 'Golden Bananas effect triggered!';
+        }
+        
         feedback.innerHTML = `
             <div class="disenchant-reward-content">
-                <span class="disenchant-reward-icon">🍌</span>
-                <span class="disenchant-reward-text">+Golden Bananas!</span>
+                <span class="disenchant-reward-icon">🌟</span>
+                <span class="disenchant-reward-text">${message}</span>
             </div>
         `;
         

@@ -18,12 +18,33 @@ export const heartOfTheMountainArtifact = {
             return;
         }
         
-        // Get hand manager
+        // Get managers
         const handManager = heroSelection.getHandManager();
+        const goldManager = heroSelection.getGoldManager();
         
-        if (!handManager) {
-            console.error('Hand manager not available');
+        if (!handManager || !goldManager) {
+            console.error('Required managers not available');
             return;
+        }
+        
+        // Get cost from card database
+        const cardInfo = heroSelection.getCardInfo(this.cardName);
+        const cost = cardInfo?.cost || 0; // Default cost of 0 if not defined
+        
+        // Check if player has enough gold (if there's a cost)
+        if (cost > 0) {
+            const currentGold = goldManager.getPlayerGold();
+            if (currentGold < cost) {
+                this.showHeartOfMountainError(
+                    `Need ${cost} Gold. Have ${currentGold} Gold.`,
+                    cardIndex
+                );
+                return;
+            }
+            
+            // Spend the gold (use negative amount to subtract)
+            goldManager.addPlayerGold(-cost, 'HeartOfTheMountain');
+            console.log(`🔥 Heart of the Mountain: Spent ${cost} gold to activate`);
         }
         
         // Remove card from hand
@@ -45,18 +66,75 @@ export const heartOfTheMountainArtifact = {
         }
         
         // Show visual feedback
-        this.showHeartOfMountainActivation(cardIndex);
+        this.showHeartOfMountainActivation(cardIndex, cost);
         
         // Update UI
         heroSelection.updateHandDisplay();
+        heroSelection.updateGoldDisplay(); // Update gold display after spending
         
         // Save game state
         await heroSelection.saveGameState();
         await heroSelection.sendFormationUpdate();
     },
     
-    // Show activation animation
-    showHeartOfMountainActivation(cardIndex) {
+    // Show error message when not enough gold
+    showHeartOfMountainError(message, cardIndex) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'heart-mountain-error';
+        errorDiv.innerHTML = `
+            <div class="heart-mountain-error-content">
+                <span class="heart-mountain-error-icon">⛔</span>
+                <span class="heart-mountain-error-text">${message}</span>
+            </div>
+        `;
+        
+        // Position near the card or center of hand
+        const handContainer = document.querySelector('.hand-cards');
+        if (handContainer) {
+            const handCards = handContainer.querySelectorAll('.hand-card');
+            if (handCards[cardIndex]) {
+                const cardRect = handCards[cardIndex].getBoundingClientRect();
+                errorDiv.style.left = `${cardRect.left + cardRect.width / 2}px`;
+                errorDiv.style.top = `${cardRect.top - 60}px`;
+            } else {
+                // Fallback to center of hand
+                const handRect = handContainer.getBoundingClientRect();
+                errorDiv.style.left = `${handRect.left + handRect.width / 2}px`;
+                errorDiv.style.top = `${handRect.top - 60}px`;
+            }
+        } else {
+            // Fallback to center of screen
+            errorDiv.style.left = '50%';
+            errorDiv.style.top = '50%';
+        }
+        
+        errorDiv.style.cssText += `
+            position: fixed;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10000;
+            pointer-events: none;
+            animation: heartMountainErrorBounce 0.5s ease-out;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        `;
+        
+        document.body.appendChild(errorDiv);
+        
+        // Remove after showing
+        setTimeout(() => {
+            errorDiv.style.animation = 'heartMountainErrorFade 0.3s ease-out forwards';
+            setTimeout(() => errorDiv.remove(), 300);
+        }, 2500);
+    },
+    
+    // Show activation animation (updated to include cost)
+    showHeartOfMountainActivation(cardIndex, cost) {
         const activationBurst = document.createElement('div');
         activationBurst.className = 'heart-mountain-activation';
         activationBurst.innerHTML = `
@@ -67,6 +145,7 @@ export const heartOfTheMountainArtifact = {
             </div>
             <div class="mountain-text">Heart of the Mountain Armed!</div>
             <div class="mountain-subtext">Will burn all targets at battle start</div>
+            ${cost > 0 ? `<div class="mountain-cost">Cost: ${cost} Gold</div>` : ''}
         `;
         
         // Position near the card
@@ -505,6 +584,65 @@ if (typeof document !== 'undefined' && !document.getElementById('heartMountainSt
             text-align: center;
             opacity: 0;
             animation: fadeInUp 0.5s ease-out 0.3s forwards;
+        }
+        
+        .mountain-cost {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 15px rgba(255, 215, 0, 0.7);
+            text-align: center;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out 0.5s forwards;
+        }
+        
+        /* Error styles */
+        .heart-mountain-error {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .heart-mountain-error-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .heart-mountain-error-icon {
+            font-size: 20px;
+        }
+        
+        .heart-mountain-error-text {
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        @keyframes heartMountainErrorBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-5px) scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes heartMountainErrorFade {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
         }
         
         /* Heart of the Mountain Flame Styles */

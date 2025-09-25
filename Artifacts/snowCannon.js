@@ -19,12 +19,33 @@ export const snowCannonArtifact = {
             return;
         }
         
-        // Get hand manager
+        // Get managers
         const handManager = heroSelection.getHandManager();
+        const goldManager = heroSelection.getGoldManager();
         
-        if (!handManager) {
-            console.error('Hand manager not available');
+        if (!handManager || !goldManager) {
+            console.error('Required managers not available');
             return;
+        }
+        
+        // Get cost from card database
+        const cardInfo = heroSelection.getCardInfo(this.cardName);
+        const cost = cardInfo?.cost || 0; // Default cost of 0 if not defined
+        
+        // Check if player has enough gold (if there's a cost)
+        if (cost > 0) {
+            const currentGold = goldManager.getPlayerGold();
+            if (currentGold < cost) {
+                this.showSnowCannonError(
+                    `Need ${cost} Gold. Have ${currentGold} Gold.`,
+                    cardIndex
+                );
+                return;
+            }
+            
+            // Spend the gold (use negative amount to subtract)
+            goldManager.addPlayerGold(-cost, 'SnowCannon');
+            console.log(`❄️ Snow Cannon: Spent ${cost} gold to activate`);
         }
         
         // Remove card from hand
@@ -47,22 +68,77 @@ export const snowCannonArtifact = {
         }
         
         // Show visual feedback
-        this.showSnowCannonActivation(cardIndex);
+        this.showSnowCannonActivation(cardIndex, cost);
         
         // Update UI
         heroSelection.updateHandDisplay();
+        heroSelection.updateGoldDisplay(); // Update gold display after spending
         
         // Save game state
         await heroSelection.saveGameState();
-        
-
         await heroSelection.sendFormationUpdate();
 
         console.log(`❄️ Snow Cannon consumed and added to permanent artifacts!`);
     },
     
-    // Show activation animation
-    showSnowCannonActivation(cardIndex) {
+    // Show error message when not enough gold
+    showSnowCannonError(message, cardIndex) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'snow-cannon-error';
+        errorDiv.innerHTML = `
+            <div class="snow-cannon-error-content">
+                <span class="snow-cannon-error-icon">⛔</span>
+                <span class="snow-cannon-error-text">${message}</span>
+            </div>
+        `;
+        
+        // Position near the card or center of hand
+        const handContainer = document.querySelector('.hand-cards');
+        if (handContainer) {
+            const handCards = handContainer.querySelectorAll('.hand-card');
+            if (handCards[cardIndex]) {
+                const cardRect = handCards[cardIndex].getBoundingClientRect();
+                errorDiv.style.left = `${cardRect.left + cardRect.width / 2}px`;
+                errorDiv.style.top = `${cardRect.top - 60}px`;
+            } else {
+                // Fallback to center of hand
+                const handRect = handContainer.getBoundingClientRect();
+                errorDiv.style.left = `${handRect.left + handRect.width / 2}px`;
+                errorDiv.style.top = `${handRect.top - 60}px`;
+            }
+        } else {
+            // Fallback to center of screen
+            errorDiv.style.left = '50%';
+            errorDiv.style.top = '50%';
+        }
+        
+        errorDiv.style.cssText += `
+            position: fixed;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10000;
+            pointer-events: none;
+            animation: snowCannonErrorBounce 0.5s ease-out;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        `;
+        
+        document.body.appendChild(errorDiv);
+        
+        // Remove after showing
+        setTimeout(() => {
+            errorDiv.style.animation = 'snowCannonErrorFade 0.3s ease-out forwards';
+            setTimeout(() => errorDiv.remove(), 300);
+        }, 2500);
+    },
+    
+    // Show activation animation (updated to include cost)
+    showSnowCannonActivation(cardIndex, cost) {
         const activationBurst = document.createElement('div');
         activationBurst.className = 'snow-cannon-activation';
         activationBurst.innerHTML = `
@@ -73,6 +149,7 @@ export const snowCannonArtifact = {
             </div>
             <div class="cannon-text">Snow Cannon Armed!</div>
             <div class="cannon-subtext">Will freeze enemies at battle start</div>
+            ${cost > 0 ? `<div class="cannon-cost">Cost: ${cost} Gold</div>` : ''}
         `;
         
         // Position near the card
@@ -428,6 +505,65 @@ if (typeof document !== 'undefined' && !document.getElementById('snowCannonStyle
             text-align: center;
             opacity: 0;
             animation: fadeInUp 0.5s ease-out 0.3s forwards;
+        }
+        
+        .cannon-cost {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 
+                1px 1px 3px rgba(0, 0, 0, 0.8),
+                0 0 15px rgba(255, 215, 0, 0.7);
+            text-align: center;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out 0.5s forwards;
+        }
+        
+        /* Error styles */
+        .snow-cannon-error {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        
+        .snow-cannon-error-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .snow-cannon-error-icon {
+            font-size: 20px;
+        }
+        
+        .snow-cannon-error-text {
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        @keyframes snowCannonErrorBounce {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px) scale(0.8);
+            }
+            60% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-5px) scale(1.05);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+        }
+        
+        @keyframes snowCannonErrorFade {
+            from {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-10px);
+            }
         }
         
         /* Snowball projectile animation */

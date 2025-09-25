@@ -970,7 +970,9 @@ class CrusaderArtifactsHandler {
         ['left', 'center', 'right'].forEach(position => {
             const hero = enemyHeroes[position];
             if (hero && hero.alive) {
+                // CRITICAL FIX: Return target with proper structure including 'type' property
                 aliveEnemyHeroes.push({
+                    type: 'hero',        // Add missing type property
                     hero: hero,
                     position: position,
                     side: enemySide
@@ -987,6 +989,7 @@ class CrusaderArtifactsHandler {
         // No living heroes - no valid targets
         return null;
     }
+
 
     // Create flintlock attack animation
     async createFlintlockAttackAnimation(attack) {
@@ -1264,11 +1267,23 @@ class CrusaderArtifactsHandler {
 
     // Handle guest flintlock attack
     handleGuestFlintlockAttack(data) {
-        const { attackerInfo, targetInfo, damage, flintlockCount } = data;
+        const { attackerInfo, targetInfo, damage, flintlockCount, isCecilia } = data;
+        
+        // DEFENSIVE FIX: Check if targetInfo exists before using it
+        if (!targetInfo) {
+            console.warn('Flintlock attack received without target info, skipping animation');
+            // Still log the attack for consistency
+            this.battleManager.addCombatLog(
+                `🔫 ${attackerInfo.name}'s Crusader Flintlock fires ${flintlockCount} shot(s) but finds no target!`,
+                'warning'
+            );
+            return;
+        }
         
         // Add to battle log
+        const attackerName = isCecilia ? `⚡ ${attackerInfo.name}'s empowered` : `${attackerInfo.name}'s`;
         this.battleManager.addCombatLog(
-            `🔫 ${attackerInfo.name}'s Crusader Flintlock fires ${flintlockCount} shot(s) for ${damage} damage each!`,
+            `🔫 ${attackerName} Crusader Flintlock fires ${flintlockCount} shot(s) for ${damage} damage!`,
             'warning'
         );
 
@@ -1293,7 +1308,8 @@ class CrusaderArtifactsHandler {
                 side: targetLocalSide
             },
             flintlockCount: flintlockCount,
-            damage: damage
+            damage: damage,
+            isCecilia: isCecilia
         };
         
         // Play visual effects on guest side (no damage application)
@@ -1531,7 +1547,16 @@ class CrusaderArtifactsHandler {
 
     // Get target sync data for network synchronization
     getTargetSyncData(target) {
+        if (!target || !target.type) {
+            console.warn('getTargetSyncData called with invalid target:', target);
+            return null;
+        }
+        
         if (target.type === 'hero') {
+            if (!target.hero || !target.hero.absoluteSide) {
+                console.warn('getTargetSyncData: hero target missing required properties:', target);
+                return null;
+            }
             return {
                 type: 'hero',
                 absoluteSide: target.hero.absoluteSide,
@@ -1539,8 +1564,16 @@ class CrusaderArtifactsHandler {
                 name: target.hero.name
             };
         } else if (target.type === 'creature') {
+            if (!target.hero || !target.hero.absoluteSide || !target.creature) {
+                console.warn('getTargetSyncData: creature target missing required properties:', target);
+                return null;
+            }
             // Find the creature index in the hero's creatures array
             const creatureIndex = target.hero.creatures.indexOf(target.creature);
+            if (creatureIndex === -1) {
+                console.warn('getTargetSyncData: creature not found in hero creatures array:', target);
+                return null;
+            }
             return {
                 type: 'creature',
                 absoluteSide: target.hero.absoluteSide,
@@ -2115,13 +2148,29 @@ class CrusaderArtifactsHandler {
 
     // Handle guest cannonball animation
     handleGuestCannonBarrage(data) {
-        const { targetSide, damage, cannonCount, targets } = data;
+        const { targetSide, damage, cannonCount, targets, hasCecilia } = data;
         
         // Log the effect for guest
-        this.battleManager.addCombatLog(
-            `💥 Crusaders Arm-Cannon barrage! ${cannonCount} cannon(s) fire for ${damage} damage each!`, 
-            'warning'
-        );
+        let logMessage = `💥 Crusaders Arm-Cannon barrage! ${cannonCount} cannon(s) fire for ${damage} damage each!`;
+        if (hasCecilia) {
+            logMessage += ` ⚡ Cecilia's cannons deal extra damage!`;
+        }
+        this.battleManager.addCombatLog(logMessage, 'warning');
+
+        // CRITICAL FIX: Convert targetSide from host perspective to guest perspective
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        let guestLocalTargetSide;
+        
+        // If I'm the guest, I need to flip the perspective:
+        // - Host's 'player' becomes guest's 'opponent' 
+        // - Host's 'opponent' becomes guest's 'player'
+        if (this.battleManager.isHost) {
+            // If somehow a host gets this message, use it as-is
+            guestLocalTargetSide = targetSide;
+        } else {
+            // Guest perspective conversion
+            guestLocalTargetSide = targetSide === 'player' ? 'opponent' : 'player';
+        }
 
         // Convert target data back to target objects for animation
         const targetObjects = targets.map(targetInfo => {
@@ -2129,24 +2178,26 @@ class CrusaderArtifactsHandler {
             let target = null;
 
             if (targetInfo.type === 'hero') {
-                const heroes = targetSide === 'player' ? 
+                // Use the corrected guest local target side
+                const heroes = guestLocalTargetSide === 'player' ? 
                     this.battleManager.playerHeroes : 
                     this.battleManager.opponentHeroes;
                 target = heroes[targetInfo.position];
                 targetElement = this.getTargetElement({
                     type: 'hero',
-                    side: targetSide,
+                    side: guestLocalTargetSide,  // Use corrected side
                     position: targetInfo.position
                 });
             } else if (targetInfo.type === 'creature') {
-                const heroes = targetSide === 'player' ? 
+                // Use the corrected guest local target side
+                const heroes = guestLocalTargetSide === 'player' ? 
                     this.battleManager.playerHeroes : 
                     this.battleManager.opponentHeroes;
                 const hero = heroes[targetInfo.position];
                 target = hero?.creatures?.[targetInfo.creatureIndex];
                 targetElement = this.getTargetElement({
                     type: 'creature',
-                    side: targetSide,
+                    side: guestLocalTargetSide,  // Use corrected side
                     position: targetInfo.position,
                     creatureIndex: targetInfo.creatureIndex
                 });
@@ -2157,7 +2208,7 @@ class CrusaderArtifactsHandler {
                 position: targetInfo.position,
                 creatureIndex: targetInfo.creatureIndex,
                 target: target,
-                side: targetSide,
+                side: guestLocalTargetSide,  // Use corrected side for animation direction
                 element: targetElement
             };
         }).filter(t => t.target && t.element); // Filter out invalid targets

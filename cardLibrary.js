@@ -152,18 +152,20 @@ export function generateCardLibraryContent() {
     const totalCards = cardClasses.reduce((sum, cardClass) => sum + cardClass.cards.length, 0);
     
     const headerHTML = `
-        <div class="card-library-header">
-            <h2 class="card-library-title">📚 Card Library</h2>
-            <p class="card-library-subtitle">Browse all ${totalCards} cards in the game</p>
+        <div class="card-library-sticky-header">
+            <button id="backFromCardLibraryBtn" class="anchored-back-button">← Back to Main Menu</button>
+            <div class="card-library-header">
+                <h2 class="card-library-title">📚 Card Library</h2>
+                <p class="card-library-subtitle">Browse all ${totalCards} cards in the game</p>
+            </div>
         </div>
     `;
     
     const cardWallHTML = generateCardWallHTML(cardClasses);
     
     return `
-        <button id="backFromCardLibraryBtn" class="anchored-back-button">← Back to Main Menu</button>
         ${headerHTML}
-        <div class="card-library-content">
+        <div class="card-library-scrollable-content">
             ${cardWallHTML}
         </div>
     `;
@@ -335,8 +337,11 @@ export function showCardLibraryScreen() {
         menu.classList.add('hidden');
         cardLibraryScreen.classList.remove('hidden');
         
-        // Scroll to top of the content
-        cardLibraryScreen.scrollTop = 0;
+        // Scroll to top of the scrollable content
+        const scrollableContent = cardLibraryScreen.querySelector('.card-library-scrollable-content');
+        if (scrollableContent) {
+            scrollableContent.scrollTop = 0;
+        }
     }
 }
 

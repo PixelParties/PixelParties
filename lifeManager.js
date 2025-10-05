@@ -195,6 +195,9 @@ export class LifeManager {
                     <button id="toBattleBtn" class="to-battle-button" onclick="window.handleToBattleClick()">
                         ⚔️ To Battle!
                     </button>
+                    <button class="how-to-play-button" onclick="window.toggleFormationHowToPlay()">
+                        How to Play
+                    </button>
                 </div>
                 <div class="opponent-trophies">
                     ${opponentTrophies}

@@ -197,9 +197,12 @@ export function generateHowToPlayContent() {
     
     // Generate header HTML
     const headerHTML = `
-        <div class="how-to-play-header">
-            <h2 class="how-to-play-title">${content.header.title}</h2>
-            <p class="how-to-play-subtitle">${content.header.subtitle}</p>
+        <div class="how-to-play-sticky-header">
+            <button id="backFromHowToPlayBtn" class="anchored-back-button">← Back to Main Menu</button>
+            <div class="how-to-play-header">
+                <h2 class="how-to-play-title">${content.header.title}</h2>
+                <p class="how-to-play-subtitle">${content.header.subtitle}</p>
+            </div>
         </div>
     `;
     
@@ -243,9 +246,8 @@ export function generateHowToPlayContent() {
     }).join('');
     
     return `
-        <button id="backFromHowToPlayBtn" class="anchored-back-button">← Back to Main Menu</button>
         ${headerHTML}
-        <div class="how-to-play-content">
+        <div class="how-to-play-scrollable-content">
             ${sectionsHTML}
         </div>
     `;
@@ -352,7 +354,10 @@ export function showHowToPlayScreen() {
         howToPlayScreen.classList.remove('hidden');
         
         // Scroll to top of the content
-        howToPlayScreen.scrollTop = 0;
+        const scrollableContent = howToPlayScreen.querySelector('.how-to-play-scrollable-content');
+        if (scrollableContent) {
+            scrollableContent.scrollTop = 0;
+        }
     }
 }
 

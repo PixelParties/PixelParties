@@ -7,6 +7,8 @@ import { RoomManager } from './roomManager.js';
 import { WebRTCManager } from './webRTCManager.js';
 import { GameManager } from './gameManager.js';
 import { showCardLibraryScreen } from './cardLibrary.js';
+import { howToPlayOverlay } from './howToPlayOverlay.js';
+
 
 class ProjectPixelParties {
     constructor() {

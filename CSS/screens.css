@@ -1,0 +1,449 @@
+/* ============================================
+   SCREENS.CSS - How to Play & Card Library Screens
+   Sticky headers with scrollable content
+   OPERA-COMPATIBLE VERSION
+   ============================================ */
+
+/* ============================================
+   HOW TO PLAY SCREEN - STICKY HEADER
+   ============================================ */
+
+#howToPlayScreen {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.how-to-play-sticky-header {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(16, 33, 62, 0.98) 100%);
+    border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    padding: 20px 40px 15px 40px;
+    flex-shrink: 0;
+    will-change: auto;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* Opera-specific optimization */
+@supports (-webkit-appearance:none) {
+    .how-to-play-sticky-header {
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+}
+
+.how-to-play-sticky-header .anchored-back-button {
+    margin-bottom: 15px;
+}
+
+.how-to-play-header {
+    text-align: center;
+    margin: 0;
+}
+
+.how-to-play-title {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin: 0 0 10px 0;
+    background: linear-gradient(45deg, #667eea, #764ba2, #f093fb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: -1px;
+}
+
+.how-to-play-subtitle {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    font-weight: 500;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+.how-to-play-scrollable-content {
+    height: calc(100vh - 140px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 30px 40px;
+    flex: 1;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* How to Play content styling */
+.guide-section {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.guide-section h3 {
+    color: #667eea;
+    font-size: 1.5rem;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-weight: 700;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
+}
+
+.guide-section p {
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
+    margin-bottom: 15px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.guide-section ul {
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.8;
+    margin-left: 20px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+.guide-section ul li {
+    margin-bottom: 10px;
+}
+
+.guide-section-image {
+    max-width: 200px;
+    height: auto;
+    display: block;
+    margin: 15px auto;
+    border-radius: 8px;
+    border: 2px solid rgba(102, 126, 234, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+.guide-section-image:hover {
+    transform: scale(1.05);
+    border-color: rgba(102, 126, 234, 0.6);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+
+.highlight-box {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.15));
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.95);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+.highlight-box strong {
+    color: #ffc107;
+    font-weight: 700;
+}
+
+/* ============================================
+   CARD LIBRARY SCREEN - STICKY HEADER
+   ============================================ */
+
+#cardLibraryScreen {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 25%, #0f3460 75%, #533483 100%);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-library-sticky-header {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(16, 33, 62, 0.98) 100%);
+    border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    padding: 20px 40px 15px 40px;
+    flex-shrink: 0;
+    will-change: auto;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* Opera-specific optimization */
+@supports (-webkit-appearance:none) {
+    .card-library-sticky-header {
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+}
+
+.card-library-sticky-header .anchored-back-button {
+    margin-bottom: 15px;
+}
+
+.card-library-header {
+    text-align: center;
+    margin: 0;
+}
+
+.card-library-title {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin: 0 0 10px 0;
+    background: linear-gradient(45deg, #667eea, #764ba2, #f093fb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: -1px;
+    padding-right: 100px;
+}
+
+.card-library-subtitle {
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    font-weight: 500;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+.card-library-scrollable-content {
+    height: calc(100vh - 140px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 30px 50px;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    isolation: isolate;
+    -webkit-overflow-scrolling: touch;
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+}
+
+/* Card Library content styling */
+.card-class-section {
+    margin-bottom: 40px;
+}
+
+.card-class-title {
+    color: #667eea;
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+    font-weight: 700;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 1px;
+}
+
+.card-wall {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 15px;
+    padding: 10px;
+}
+
+.card-wall-item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 12px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.card-wall-item:hover {
+    transform: translateY(-5px);
+    border-color: rgba(102, 126, 234, 0.5);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.card-wall-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+.card-wall-placeholder {
+    width: 100%;
+    aspect-ratio: 5/7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    border: 2px dashed rgba(102, 126, 234, 0.3);
+}
+
+.card-wall-name {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+    text-align: center;
+    padding: 5px;
+    font-weight: 600;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   SCROLLBAR STYLING FOR BOTH SCREENS
+   ============================================ */
+
+.how-to-play-scrollable-content::-webkit-scrollbar,
+.card-library-scrollable-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.how-to-play-scrollable-content::-webkit-scrollbar-track,
+.card-library-scrollable-content::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 5px;
+}
+
+.how-to-play-scrollable-content::-webkit-scrollbar-thumb,
+.card-library-scrollable-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 5px;
+}
+
+.how-to-play-scrollable-content::-webkit-scrollbar-thumb:hover,
+.card-library-scrollable-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #7c8df0 0%, #8655b8 100%);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .how-to-play-sticky-header,
+    .card-library-sticky-header {
+        padding: 15px 20px 12px 20px;
+    }
+    
+    .how-to-play-title,
+    .card-library-title {
+        font-size: 2rem;
+        letter-spacing: -0.5px;
+    }
+    
+    .how-to-play-subtitle,
+    .card-library-subtitle {
+        font-size: 1rem;
+    }
+    
+    .how-to-play-scrollable-content,
+    .card-library-scrollable-content {
+        height: calc(100vh - 120px);
+        padding: 20px;
+    }
+    
+    /* Remove extra padding on mobile */
+    .card-library-scrollable-content {
+        padding-right: 20px;
+    }
+    
+    .guide-section {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .guide-section h3 {
+        font-size: 1.3rem;
+    }
+    
+    .card-class-title {
+        font-size: 1.5rem;
+    }
+    
+    .card-wall {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .how-to-play-sticky-header,
+    .card-library-sticky-header {
+        padding: 12px 15px 10px 15px;
+    }
+    
+    .how-to-play-title,
+    .card-library-title {
+        font-size: 1.6rem;
+        letter-spacing: 0px;
+    }
+    
+    .how-to-play-subtitle,
+    .card-library-subtitle {
+        font-size: 0.9rem;
+    }
+    
+    .how-to-play-scrollable-content,
+    .card-library-scrollable-content {
+        height: calc(100vh - 100px);
+        padding: 15px;
+    }
+    
+    /* Remove extra padding on mobile */
+    .card-library-scrollable-content {
+        padding-right: 15px;
+    }
+    
+    .guide-section {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .guide-section h3 {
+        font-size: 1.2rem;
+    }
+    
+    .guide-section-image {
+        max-width: 150px;
+    }
+    
+    .card-class-title {
+        font-size: 1.3rem;
+    }
+    
+    .card-wall {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 10px;
+        padding: 5px;
+    }
+    
+    .card-wall-name {
+        font-size: 0.7rem;
+    }
+}

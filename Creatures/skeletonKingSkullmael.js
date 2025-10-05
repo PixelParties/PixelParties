@@ -13,7 +13,8 @@ export class SkeletonKingSkullmaelCreature {
             'SkeletonArcher',
             'SkeletonBard', 
             'SkeletonReaper',
-            'BurningSkeleton'
+            'BurningSkeleton',
+            'SkeletonHealer'
         ];
         
         // Inject CSS styles for summoning animations (reuse BoulderInABottle styles)

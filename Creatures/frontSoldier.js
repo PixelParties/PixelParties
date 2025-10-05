@@ -11,8 +11,6 @@ export class FrontSoldierCreature {
         
         // Inject CSS styles
         this.injectFrontSoldierStyles();
-        
-        console.log('⚔️ Front Soldier Creature module initialized');
     }
 
     // Check if a creature is Front Soldier
@@ -30,7 +28,6 @@ export class FrontSoldierCreature {
         
         // Safety check: ensure Front Soldier is still alive
         if (!frontSoldierCreature.alive || frontSoldierCreature.currentHp <= 0) {
-            console.log(`Front Soldier is dead, cannot execute special attack`);
             return;
         }
         
@@ -235,9 +232,7 @@ export class FrontSoldierCreature {
             
             document.body.appendChild(slashEffect);
             
-            console.log(`Created sword slash at target: ${slashAngle.toFixed(1)}°, animation time: ${adjustedAnimationTime}ms`);
             return slashEffect;
-            
         } catch (error) {
             console.error('Error creating sword slash effect:', error);
             return null;
@@ -337,7 +332,7 @@ export class FrontSoldierCreature {
                 side: target.side,
                 absoluteSide: target.hero.absoluteSide,
                 position: target.position,
-                creatureIndex: target.creatureIndex || null,
+                creatureIndex: target.creatureIndex !== undefined ? target.creatureIndex : null,
                 heroName: target.hero ? target.hero.name : null,
                 creatureName: target.creature ? target.creature.name : null
             },
@@ -377,7 +372,10 @@ export class FrontSoldierCreature {
                     `.${targetLocalSide}-slot.${targetData.position}-slot`
                 );
             }
-        } else if (targetData.type === 'creature' && targetData.creatureIndex !== null) {
+        } else if (targetData.type === 'creature' && 
+                targetData.creatureIndex !== null && 
+                targetData.creatureIndex !== undefined && 
+                targetData.creatureIndex >= 0) {
             targetElement = document.querySelector(
                 `.${targetLocalSide}-slot.${targetData.position}-slot .creature-icon[data-creature-index="${targetData.creatureIndex}"]`
             );
@@ -414,9 +412,7 @@ export class FrontSoldierCreature {
     }
 
     // Clean up all active slash effects (called on battle end/reset)
-    cleanup() {
-        console.log(`Cleaning up ${this.activeSlashEffects.size} active Front Soldier slash effects`);
-        
+    cleanup() {        
         this.activeSlashEffects.forEach(slashEffect => {
             try {
                 if (slashEffect && slashEffect.parentNode) {
@@ -437,10 +433,6 @@ export class FrontSoldierCreature {
                     slashEffect.remove();
                 }
             });
-            
-            if (orphanedSlashes.length > 0) {
-                console.log(`Cleaned up ${orphanedSlashes.length} orphaned Front Soldier slash effects`);
-            }
         } catch (error) {
             console.warn('Error cleaning up orphaned slash effects:', error);
         }

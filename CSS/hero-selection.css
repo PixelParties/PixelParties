@@ -1,8 +1,11 @@
 /* ============================================
-   HERO SELECTION & TEAM BUILDING
+   HERO SELECTION & TEAM BUILDING - REFACTORED
    ============================================ */
 
-/* Main Container */
+/* ============================================
+   MAIN LAYOUT
+   ============================================ */
+
 .hero-selection-screen {
     flex: 1;
     width: 100%;
@@ -33,7 +36,15 @@
     padding-bottom: 20px;
 }
 
-/* Left Column Layouts */
+/* Force layout recalculation after battle */
+.hero-selection-screen[data-post-battle="true"] .team-building-right {
+    transform: translateZ(0);
+}
+
+/* ============================================
+   COLUMN LAYOUTS
+   ============================================ */
+
 .character-selection-column,
 .team-building-left {
     flex: 1;
@@ -54,7 +65,6 @@
     user-select: none;
 }
 
-/* Right Column Layouts */
 .card-preview-column,
 .team-building-right {
     width: 600px;
@@ -75,11 +85,6 @@
 .team-building-right {
     justify-content: flex-start;
     padding-top: 100px;
-}
-
-/* Force layout recalculation after battle */
-.hero-selection-screen[data-post-battle="true"] .team-building-right {
-    transform: translateZ(0);
 }
 
 /* ============================================
@@ -152,8 +157,16 @@
     letter-spacing: 0.5px;
 }
 
+.team-header-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    text-align: center !important;
+}
+
 /* ============================================
-   CHARACTER SELECTION - 50% LARGER
+   CHARACTER CARDS
    ============================================ */
 
 .character-selection-grid {
@@ -193,9 +206,9 @@
     box-shadow: 0 15px 35px rgba(40, 167, 69, 0.4);
 }
 
+/* SIMPLIFIED CREATURE DRAG STYLES */
 .character-card.dragging {
     opacity: 0.5 !important;
-    transform: scale(0.9) !important;
     z-index: 100 !important;
 }
 
@@ -211,6 +224,46 @@
     box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
     border-color: rgba(102, 126, 234, 0.5);
 }
+
+/* Character cards with ability zones */
+.character-card.with-ability-zones {
+    min-height: 420px;
+    max-height: 420px;
+    overflow: hidden;
+}
+
+.character-card.with-ability-zones .character-image-container {
+    height: 240px;
+    flex-shrink: 0;
+}
+
+/* Turn limit and special states */
+.character-card.turn-limit-reached {
+    animation: shake 0.5s ease-in-out;
+}
+
+.character-card[data-ability-received="true"]::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    background-color: #28a745;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   CHARACTER IMAGE & CONTENT
+   ============================================ */
 
 .character-image-container {
     width: 100%;
@@ -247,7 +300,27 @@
     letter-spacing: 1px;
 }
 
-/* Character Tags Overlay */
+/* Nicolas & Waflav clickable states */
+.character-image-container.nicolas-clickable,
+.character-image-container.waflav-clickable {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.character-image-container.nicolas-clickable:hover,
+.character-image-container.waflav-clickable:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+.character-image-container.waflav-clickable:hover {
+    box-shadow: 0 0 15px rgba(142, 36, 170, 0.4);
+}
+
+/* ============================================
+   CHARACTER TAGS
+   ============================================ */
+
 .character-card:not(.with-ability-zones) .card-tags-container {
     position: absolute;
     top: 250px;
@@ -302,23 +375,58 @@
     animation: selectedCharacterTagGlow 2s ease-in-out infinite alternate;
 }
 
-/* ============================================
-   TEAM BUILDING LAYOUTS
-   ============================================ */
-
-/* Character cards with ability zones */
-.character-card.with-ability-zones {
-    min-height: 420px;
-    max-height: 420px;
+/* Hero reward card tags */
+.hero-reward-card .reward-hero-image-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    border-radius: 15px;
     overflow: hidden;
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
-.character-card.with-ability-zones .character-image-container {
-    height: 240px;
-    flex-shrink: 0;
+.hero-reward-card .card-tags-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    margin: 0;
+    padding: 0 6px;
+    max-width: calc(100% - 24px);
+    pointer-events: none;
 }
+
+.hero-reward-card .card-tag {
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    font-size: 12px;
+    padding: 3px 8px;
+    min-width: auto;
+    max-width: none;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transition: all 0.2s ease;
+}
+
+.hero-reward-card:hover .card-tag {
+    background: rgba(0, 0, 0, 0.95);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ============================================
+   ABILITY ZONES
+   ============================================ */
 
 .character-card .hero-ability-zones {
     display: flex;
@@ -421,48 +529,23 @@
     letter-spacing: 0.5px;
 }
 
-/* Turn limit and ability received states */
-.character-card.turn-limit-reached {
-    animation: shake 0.5s ease-in-out;
-}
-
-.character-card[data-ability-received="true"]::before {
-    content: '';
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 24px;
-    height: 24px;
-    background-color: #28a745;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    font-weight: bold;
-    z-index: 10;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
 .ability-zone.ability-clicked {
     animation: abilityClickPulse 0.3s ease-out;
 }
 
 /* ============================================
-   TEAM SLOTS LAYOUT - DECOUPLED
+   TEAM SLOTS LAYOUT
    ============================================ */
 
 .team-slots-container {
     display: flex;
     justify-content: center;
     margin-bottom: 0;
-    position: relative;
+    position: relative !important;
     width: 100%;
     min-height: 340px;
 }
 
-/* Hero Slots Container */
 .hero-slots-container {
     display: flex;
     justify-content: center;
@@ -488,36 +571,9 @@
     box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
 }
 
-.team-slot:not(.filled).drag-over::after {
-    content: "Drop here";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #667eea;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    font-weight: bold;
-    font-size: 16px;
-    z-index: 10;
-    text-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
-    letter-spacing: 1px;
-}
-
-.team-slot.filled.drag-over::after {
-    content: "Swap positions";
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(102, 126, 234, 0.9);
-    color: white;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    z-index: 20;
-    letter-spacing: 0.5px;
+.team-slot:not(.filled):hover {
+    transform: scale(1.02);
+    transition: var(--transition-fast);
 }
 
 .slot-placeholder {
@@ -531,107 +587,16 @@
 }
 
 /* ============================================
-   DRAG STATES
-   ============================================ */
-
-.team-slot.drag-over {
-    border-color: #667eea !important;
-    border-style: solid !important;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2)) !important;
-    box-shadow: var(--shadow-glow) !important;
-    cursor: copy !important;
-}
-
-.team-slot:not(.drag-over):hover {
-    transform: scale(1.02);
-    transition: var(--transition-fast);
-}
-
-.team-slot.invalid-drop {
-    border-color: #ff6b6b !important;
-    background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(238, 90, 36, 0.1)) !important;
-    box-shadow: 0 0 15px rgba(255, 107, 107, 0.4) !important;
-}
-
-.team-slot.hero-added {
-    animation: heroAddedGlow 1s ease-out;
-    border-color: #28a745 !important;
-    background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(32, 201, 151, 0.2)) !important;
-    box-shadow: 0 15px 35px rgba(40, 167, 69, 0.5) !important;
-}
-
-/* Ability drop states */
-.team-slot.filled.ability-drop-ready {
-    border-color: #4caf50 !important;
-    border-width: 4px !important;
-    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(56, 142, 60, 0.2)) !important;
-    box-shadow: 
-        0 0 30px rgba(76, 175, 80, 0.6),
-        inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
-    transform: scale(1.03);
-    animation: abilityDropPulse 1.5s ease-in-out infinite;
-}
-
-.team-slot.ability-drop-invalid {
-    border-color: #dc3545 !important;
-    border-width: 4px !important;
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(200, 35, 51, 0.1)) !important;
-    box-shadow: 
-        0 0 20px rgba(220, 53, 69, 0.4),
-        inset 0 0 15px rgba(220, 53, 69, 0.2) !important;
-}
-
-.team-slot.filled.ability-drop-invalid {
-    animation: invalidDropPulse 1.5s ease-in-out infinite;
-}
-
-.team-slot.spell-drop-ready {
-    border-color: #667eea !important;
-    box-shadow: 0 0 20px rgba(102, 126, 234, 0.6) !important;
-}
-
-.team-slot.spell-drop-invalid {
-    border-color: #f44336 !important;
-    box-shadow: 0 0 20px rgba(244, 67, 54, 0.6) !important;
-}
-
-.team-slot.global-spell-hover {
-    background: rgba(54, 162, 235, 0.1);
-    border-color: rgba(54, 162, 235, 0.5);
-    cursor: not-allowed;
-}
-
-.team-slot.global-spell-hover::after {
-    content: " Global spell - drop anywhere outside hand to activate!";
-    position: absolute;
-    top: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(54, 162, 235, 0.95);
-    color: white;
-    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    white-space: nowrap;
-    z-index: 1000;
-    pointer-events: none;
-    animation: fadeIn 0.2s ease-out;
-    letter-spacing: 0.5px;
-}
-
-/* ============================================
    AREA & DISCARD PILE SLOTS
    ============================================ */
 
 .area-slot {
-    position: absolute;
+    position: absolute !important;
     left: -20px;
     top: 0%;
     transform: translateY(0);
-    width: 200px;
-    min-height: 227px;
+    width: 200px !important;
+    min-height: 227px !important;
     border: 3px dashed rgba(76, 175, 80, 0.4);
     border-radius: var(--radius-large);
     display: flex;
@@ -642,6 +607,7 @@
     transition: var(--transition-medium);
     overflow: hidden;
     z-index: 1;
+    flex: none !important;
 }
 
 .area-slot.filled {
@@ -730,7 +696,294 @@
     letter-spacing: 1px;
 }
 
-/* Area & Discard Drop States */
+/* Area card styles */
+.area-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition-medium);
+}
+
+.area-card:hover {
+    transform: scale(1.02);
+}
+
+.area-card-image-container {
+    width: 120px;
+    height: 168px;
+    border-radius: var(--radius-medium);
+    overflow: hidden;
+    box-shadow: var(--shadow-medium);
+    position: relative;
+}
+
+.area-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition-medium);
+}
+
+.area-card:hover .area-card-image {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+/* SIMPLIFIED: Removed transform scale from area card dragging */
+.area-card.area-card-dragging {
+    opacity: 0.5 !important;
+    z-index: 1000 !important;
+}
+
+/* Emergency area-slot positioning fix */
+.hero-slots-container .area-slot {
+    position: absolute !important;
+    left: -250px !important;
+    top: 0 !important;
+    background: rgba(255, 0, 0, 0.3) !important;
+    border: 3px solid red !important;
+    z-index: 1000 !important;
+}
+
+.hero-slots-container .area-slot::before {
+    content: "ERROR: Area in Hero Container!";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1001;
+    pointer-events: none;
+}
+
+/* ============================================
+   SIMPLIFIED CREATURE DRAG STYLES
+   ============================================ */
+
+/* Simplified creature drag styles - delayed application */
+.creature-icon.creature-dragging-delayed {
+    opacity: 0.5 !important;
+    z-index: 100 !important;
+    filter: brightness(0.7) !important;
+    border: 2px dashed rgba(102, 126, 234, 0.8) !important;
+    border-radius: 4px !important;
+    transition: none !important;
+}
+
+/* Only disable pointer events on children, not the main element */
+.creature-icon.creature-dragging-delayed .creature-sprite {
+    pointer-events: none !important;
+}
+
+.creature-icon.creature-dragging-delayed .creature-sprite-container {
+    pointer-events: none !important;
+}
+
+/* Creature icon base styles - simplified */
+.creature-icon {
+    transition: all 0.2s ease;
+    cursor: grab;
+}
+
+.creature-icon:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.creature-icon[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* ============================================
+   DRAG STATES - SIMPLIFIED
+   ============================================ */
+
+.team-slot.drag-over {
+    border-color: #667eea !important;
+    border-style: solid !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2)) !important;
+    box-shadow: var(--shadow-glow) !important;
+    cursor: copy !important;
+}
+
+.team-slot.invalid-drop {
+    border-color: #ff6b6b !important;
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(238, 90, 36, 0.1)) !important;
+    box-shadow: 0 0 15px rgba(255, 107, 107, 0.4) !important;
+}
+
+.team-slot.hero-added {
+    animation: heroAddedGlow 1s ease-out;
+    border-color: #28a745 !important;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(32, 201, 151, 0.2)) !important;
+    box-shadow: 0 15px 35px rgba(40, 167, 69, 0.5) !important;
+}
+
+/* Drop tooltips */
+.team-slot:not(.filled).drag-over::after {
+    content: "Drop here";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #667eea;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-weight: bold;
+    font-size: 16px;
+    z-index: 10;
+    text-shadow: 0 0 10px rgba(102, 126, 234, 0.8);
+    letter-spacing: 1px;
+}
+
+.team-slot.filled.drag-over::after {
+    content: "Swap positions";
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 20;
+    letter-spacing: 0.5px;
+}
+
+/* Ability drop states */
+.team-slot.filled.ability-drop-ready {
+    border-color: #4caf50 !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(56, 142, 60, 0.2)) !important;
+    box-shadow: 
+        0 0 30px rgba(76, 175, 80, 0.6),
+        inset 0 0 20px rgba(76, 175, 80, 0.3) !important;
+    transform: scale(1.03);
+    animation: abilityDropPulse 1.5s ease-in-out infinite;
+}
+
+.team-slot.ability-drop-invalid,
+.team-slot.filled.ability-drop-invalid {
+    border-color: #dc3545 !important;
+    border-width: 4px !important;
+    background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(200, 35, 51, 0.1)) !important;
+    box-shadow: 
+        0 0 20px rgba(220, 53, 69, 0.4),
+        inset 0 0 15px rgba(220, 53, 69, 0.2) !important;
+}
+
+.team-slot.filled.ability-drop-invalid {
+    animation: invalidDropPulse 1.5s ease-in-out infinite;
+}
+
+/* Base tooltip styling for ability drops */
+.ability-drop-tooltip {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 6px;
+    white-space: nowrap;
+    min-width: 500px; /* Make tooltips wider */
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    animation: tooltipAppear 0.2s ease-out;
+}
+
+/* Success tooltip (green) - for when ability can be attached */
+.ability-drop-tooltip.can-attach {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Error tooltip (red) - for turn limit reached */
+.ability-drop-tooltip.limit-reached {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    min-width: 420px; /* Extra width for longer error messages */
+}
+
+/* Error tooltip (red) - for Divinity restriction */
+.ability-drop-tooltip.divinity-restriction {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    min-width: 640px; /* Extra width for the Divinity message */
+}
+
+/* Error tooltip (gray) - for empty slots */
+.ability-drop-tooltip.empty {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    min-width: 220px;
+}
+
+/* Tooltip appearance animation */
+@keyframes tooltipAppear {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.team-slot.spell-drop-ready {
+    border-color: #667eea !important;
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.6) !important;
+}
+
+.team-slot.spell-drop-invalid {
+    border-color: #f44336 !important;
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.6) !important;
+}
+
+.team-slot.global-spell-hover {
+    background: rgba(54, 162, 235, 0.1);
+    border-color: rgba(54, 162, 235, 0.5);
+    cursor: not-allowed;
+}
+
+.team-slot.global-spell-hover::after {
+    content: " Global spell - drop anywhere outside hand to activate!";
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(54, 162, 235, 0.95);
+    color: white;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.2s ease-out;
+    letter-spacing: 0.5px;
+}
+
+/* Area & Discard drop states */
 .area-slot.area-drop-ready,
 .discard-pile-slot.discard-drop-ready {
     border-style: solid !important;
@@ -768,7 +1021,6 @@
     animation: invalidDropPulse 1.5s ease-in-out infinite;
 }
 
-/* Drop Tooltips */
 .area-slot.area-drop-ready::after {
     content: "Drop Area Card Here";
     position: absolute;
@@ -809,47 +1061,19 @@
     letter-spacing: 0.5px;
 }
 
-/* Area card styles */
-.area-card {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    transition: var(--transition-medium);
+/* Simplified creature container drag states */
+.hero-creatures.creature-drop-ready {
+    background: rgba(102, 126, 234, 0.1) !important;
+    border: 2px dashed rgba(102, 126, 234, 0.5) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
 }
 
-.area-card:hover {
-    transform: scale(1.02);
-}
-
-.area-card-image-container {
-    width: 120px;
-    height: 168px;
-    border-radius: var(--radius-medium);
-    overflow: hidden;
-    box-shadow: var(--shadow-medium);
-    position: relative;
-}
-
-.area-card-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: var(--transition-medium);
-}
-
-.area-card:hover .area-card-image {
-    transform: scale(1.05);
-    filter: brightness(1.1);
-}
-
-.area-card.area-card-dragging {
-    opacity: 0.5 !important;
-    transform: scale(0.9) !important;
-    z-index: 1000 !important;
+.hero-creatures.creature-drop-invalid {
+    background: rgba(220, 53, 69, 0.1) !important;
+    border: 2px dashed rgba(220, 53, 69, 0.5) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
 }
 
 /* ============================================
@@ -959,7 +1183,7 @@
 }
 
 /* ============================================
-   HERO CREATURES MANAGEMENT
+   CREATURE MANAGEMENT
    ============================================ */
 
 .character-card .hero-creatures {
@@ -970,6 +1194,10 @@
     padding: 4px;
     box-sizing: border-box;
     scroll-behavior: smooth;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .character-card .hero-creatures::-webkit-scrollbar {
@@ -1010,19 +1238,30 @@
 
 .character-card .hero-creatures .creature-icon {
     flex-shrink: 0;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Simplified creature drop preview animation */
+.creature-icon.creature-drop-preview {
+    pointer-events: none;
+    animation: creatureDropPreview 1s ease-in-out infinite;
+}
+
+.hero-creatures.creature-drop-ready {
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px dashed rgba(102, 126, 234, 0.5);
+    border-radius: 8px;
+}
+
+.hero-creatures.creature-drop-invalid {
+    background: rgba(220, 53, 69, 0.1);
+    border: 2px dashed rgba(220, 53, 69, 0.5);
+    border-radius: 8px;
 }
 
 /* ============================================
-   GUARD CHANGE & SPECIAL STATES
+   SPECIAL STATES & INDICATORS
    ============================================ */
-
-.team-header-title {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    position: relative;
-    text-align: center !important;
-}
 
 .guard-change-indicator {
     position: relative;
@@ -1057,10 +1296,6 @@
     border-bottom: 8px solid transparent;
     border-right: 8px solid #4CAF50;
 }
-
-/* ============================================
-   INVENTING COUNTER DISPLAY
-   ============================================ */
 
 .inventing-counter-display {
     position: absolute;
@@ -1109,8 +1344,36 @@
     text-align: center;
 }
 
+.evolution-counter-display {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #8e24aa 0%, #5e35b1 100%);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    z-index: 15;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    animation: evolutionCounterFloat 3s ease-in-out infinite;
+}
+
+.evolution-counter-display:hover {
+    transform: translateX(-50%) scale(1.1);
+    box-shadow: 0 4px 12px rgba(142, 36, 170, 0.6);
+}
+
 /* ============================================
-   STATUS DISPLAYS
+   STATUS DISPLAYS & FEEDBACK
    ============================================ */
 
 .loading-heroes {
@@ -1210,10 +1473,6 @@
     letter-spacing: 0.5px;
 }
 
-/* ============================================
-   FEEDBACK ANIMATIONS
-   ============================================ */
-
 .discard-success-feedback {
     display: flex;
     align-items: center;
@@ -1289,6 +1548,15 @@
     }
     66% {
         transform: translateY(2px) rotate(-5deg);
+    }
+}
+
+@keyframes evolutionCounterFloat {
+    0%, 100% { 
+        box-shadow: 0 2px 6px rgba(142, 36, 170, 0.4);
+    }
+    50% { 
+        box-shadow: 0 4px 10px rgba(142, 36, 170, 0.6);
     }
 }
 
@@ -1401,6 +1669,20 @@
     }
 }
 
+/* Simplified creature drop preview animation */
+@keyframes creatureDropPreview {
+    0%, 100% {
+        opacity: 0.4 !important;
+        border-color: rgba(102, 126, 234, 0.6) !important;
+        background: rgba(102, 126, 234, 0.08) !important;
+    }
+    50% {
+        opacity: 0.6 !important;
+        border-color: rgba(102, 126, 234, 0.9) !important;
+        background: rgba(102, 126, 234, 0.15) !important;
+    }
+}
+
 @keyframes discardSuccessFeedback {
     0% {
         transform: translate(-50%, -50%) scale(0.8);
@@ -1449,6 +1731,18 @@
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
 }
 
 /* ============================================
@@ -1681,6 +1975,18 @@
     .character-card .hero-creatures {
         max-height: 300px;
     }
+    
+    .hero-stat[data-stat="hp"] {
+        left: 2px;
+    }
+    
+    .hero-stat[data-stat="attack"] {
+        right: 2px;
+    }
+    
+    .hero-stat .stat-value {
+        font-size: 10px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1756,89 +2062,234 @@
     }
 }
 
-/* Emergency styling if area-slot gets moved to wrong container */
-.hero-slots-container .area-slot {
-    position: absolute !important;
-    left: -250px !important;
-    top: 0 !important;
-    background: rgba(255, 0, 0, 0.3) !important;
-    border: 3px solid red !important;
-    z-index: 1000 !important;
+/* Actions display with Divinity bonuses */
+/* Actions display with Divinity bonuses */
+.action-display.has-divinity-bonus {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #fff59d 100%);
+    border: 2px solid #f57f17;
+    box-shadow: 
+        0 6px 20px rgba(255, 215, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-.hero-slots-container .area-slot::before {
-    content: "ERROR: Area in Hero Container!";
+.action-display.has-divinity-bonus:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 
+        0 8px 25px rgba(255, 215, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    border-color: #f9a825;
+}
+
+/* Divinity glow effect */
+.divinity-glow {
+    font-size: 12px;
+    margin-left: 4px;
+    animation: divinityGlow 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.8));
+}
+
+@keyframes divinityGlow {
+    0%, 100% { 
+        opacity: 0.7;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 1;
+        transform: scale(1.1);
+    }
+}
+
+/* Action bonus text */
+.action-bonus-text {
     position: absolute;
-    top: 50%;
+    bottom: -20px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(255, 0, 0, 0.9);
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #f57f17;
+    font-weight: bold;
+    white-space: nowrap;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+}
+
+/* Action orbs styling */
+.action-orb.bonus {
+    border: 2px solid #ffd700;
+    background: linear-gradient(135deg, #fff59d 0%, #ffeb3b 100%);
+    box-shadow: 
+        0 2px 8px rgba(255, 215, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.action-orb.bonus.filled {
+    background: linear-gradient(135deg, #ffd700 0%, #ff8f00 100%);
+    box-shadow: 
+        0 4px 12px rgba(255, 215, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    animation: bonusOrbPulse 2s ease-in-out infinite;
+}
+
+.action-orb.base.filled {
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    border: 2px solid #1b5e20;
+}
+
+.action-orbs {
+    transform: translateX(-20px); 
+}
+
+@keyframes bonusOrbPulse {
+    0%, 100% { 
+        box-shadow: 
+            0 4px 12px rgba(255, 215, 0, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+    50% { 
+        box-shadow: 
+            0 6px 18px rgba(255, 215, 0, 0.8),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    }
+}
+
+/* Enhanced action orbs changed animation */
+.action-orbs.action-orbs-changed {
+    animation: actionOrbsChanged 0.6s ease-out;
+}
+
+@keyframes actionOrbsChanged {
+    0% { 
+        transform: scale(1);
+    }
+    50% { 
+        transform: scale(1.1);
+    }
+    100% { 
+        transform: scale(1);
+    }
+}
+
+/* Action display container positioning adjustments */
+.action-display-container.compact {
+    position: relative;
+    margin-bottom: 25px; /* Extra space for bonus text */
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+    .action-bonus-text {
+        font-size: 8px;
+        bottom: -15px;
+    }
+    
+    .divinity-glow {
+        font-size: 10px;
+    }
+    
+    .action-display-container.compact {
+        margin-bottom: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .action-bonus-text {
+        font-size: 7px;
+        bottom: -12px;
+    }
+    
+    .divinity-glow {
+        font-size: 8px;
+        margin-left: 2px;
+    }
+    
+    .action-display-container.compact {
+        margin-bottom: 18px;
+    }
+}
+
+/* Tooltip for Actions display when hovering */
+.action-display.has-divinity-bonus:hover::after {
+    content: "Actions enhanced by Divinity abilities";
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
     color: white;
     padding: 4px 8px;
     border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    z-index: 1001;
-    pointer-events: none;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1000;
+    opacity: 0;
+    animation: tooltipFadeIn 0.3s ease-out 0.5s forwards;
 }
 
-/* Ensure positioning context */
-.team-slots-container {
-    position: relative !important;
+@keyframes tooltipFadeIn {
+    from { opacity: 0;  }
+    to { opacity: 1;  }
 }
 
-.area-slot {
-    position: absolute !important;
-    flex: none !important;
-    width: 200px !important;
-    min-height: 227px !important;
-}
-
-/* Hero Reward Tags Styling */
-.hero-reward-card .reward-hero-image-container {
-    position: relative;
-    width: 100%;
-    height: 300px;
-    border-radius: 15px;
-    overflow: hidden;
-    margin-bottom: 15px;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.hero-reward-card .card-tags-container {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 15;
-    margin: 0;
-    padding: 0 6px;
-    max-width: calc(100% - 24px);
-    pointer-events: none;
-}
-
-.hero-reward-card .card-tag {
-    background: rgba(0, 0, 0, 0.85);
+/* Action Tooltip Styles */
+.action-tooltip {
+    position: fixed;
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
     color: white;
-    font-size: 12px;
-    padding: 3px 8px;
-    min-width: auto;
-    max-width: none;
-    backdrop-filter: blur(4px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 
-        0 2px 8px rgba(0, 0, 0, 0.6),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    font-size: 14px;
+    font-weight: bold;
+    white-space: nowrap;
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(5px);
     transition: all 0.2s ease;
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.2);
+    pointer-events: none;
+    letter-spacing: 0.5px;
 }
 
-.hero-reward-card:hover .card-tag {
-    background: rgba(0, 0, 0, 0.95);
-    transform: translateY(-1px) scale(1.02);
+.action-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.action-tooltip.below {
+    transform: translateY(-5px);
+}
+
+.action-tooltip.below.visible {
+    transform: translateY(0);
+}
+
+/* Add hover cursor to action display */
+.action-display {
+    cursor: help;
+}
+
+/* Enhanced tooltip for Divinity bonuses */
+.action-display.has-divinity-bonus + .action-tooltip {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    border: 1px solid rgba(255, 215, 0, 0.5);
     box-shadow: 
-        0 4px 12px rgba(0, 0, 0, 0.7),
-        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        0 4px 12px rgba(243, 156, 18, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .action-tooltip {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .action-tooltip {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
 }

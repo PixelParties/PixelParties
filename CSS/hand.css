@@ -1,6 +1,7 @@
 /* ============================================
-   16. HAND DISPLAY WITH PIXEL FONT
+   16. HAND DISPLAY WITH PIXEL FONT & PHANTOM PREVIEW
    ============================================ */
+
 .hand-display-area {
     display: none;
 }
@@ -63,7 +64,7 @@
 }
 
 .hand-zone-drag-over .hand-title::after {
-    content: " ↔️ Reordering...";
+    content: " ↕️ Reordering...";
     color: rgba(102, 126, 234, 0.8);
     font-weight: bold;
     animation: pulse 1.5s ease-in-out infinite;
@@ -124,36 +125,36 @@
     letter-spacing: 0.5px;
 }
 
-/* Dynamic spacing based on number of cards */
-.hand-display-area-inline .hand-cards[data-card-count="1"] .hand-card,
-.hand-display-area-inline .hand-cards[data-card-count="2"] .hand-card,
-.hand-display-area-inline .hand-cards[data-card-count="3"] .hand-card,
-.hand-display-area-inline .hand-cards[data-card-count="4"] .hand-card,
-.hand-display-area-inline .hand-cards[data-card-count="5"] .hand-card {
+/* Dynamic spacing based on number of cards - excluding phantom cards */
+.hand-display-area-inline .hand-cards[data-card-count="1"] .hand-card:not(.hand-card-phantom),
+.hand-display-area-inline .hand-cards[data-card-count="2"] .hand-card:not(.hand-card-phantom),
+.hand-display-area-inline .hand-cards[data-card-count="3"] .hand-card:not(.hand-card-phantom),
+.hand-display-area-inline .hand-cards[data-card-count="4"] .hand-card:not(.hand-card-phantom),
+.hand-display-area-inline .hand-cards[data-card-count="5"] .hand-card:not(.hand-card-phantom) {
     margin-right: 15px;
 }
 
-.hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card {
+.hand-display-area-inline .hand-cards[data-card-count="6"] .hand-card:not(.hand-card-phantom) {
     margin-right: -20px;
 }
 
-.hand-display-area-inline .hand-cards[data-card-count="7"] .hand-card {
+.hand-display-area-inline .hand-cards[data-card-count="7"] .hand-card:not(.hand-card-phantom) {
     margin-right: -40px;
 }
 
-.hand-display-area-inline .hand-cards[data-card-count="8"] .hand-card {
+.hand-display-area-inline .hand-cards[data-card-count="8"] .hand-card:not(.hand-card-phantom) {
     margin-right: -55px;
 }
 
-.hand-display-area-inline .hand-cards[data-card-count="9"] .hand-card {
+.hand-display-area-inline .hand-cards[data-card-count="9"] .hand-card:not(.hand-card-phantom) {
     margin-right: -65px;
 }
 
-.hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card {
+.hand-display-area-inline .hand-cards[data-card-count="10"] .hand-card:not(.hand-card-phantom) {
     margin-right: -75px;
 }
 
-.hand-display-area-inline .hand-card:last-child {
+.hand-display-area-inline .hand-card:last-child:not(.hand-card-phantom) {
     margin-right: 0 !important;
 }
 
@@ -169,11 +170,28 @@
     transform: none;
 }
 
+/* Cards animating due to phantom repositioning */
+.hand-card.repositioning-left {
+    transition: transform 0.0s ease-out !important;
+    transform: translateX(var(--move-distance)) rotate(0deg) !important;
+}
+
+.hand-card.repositioning-right {
+    transition: transform 0.0s ease-out !important;
+    transform: translateX(var(--move-distance)) rotate(0deg) !important;
+}
+
+/* Reset animation state */
+.hand-card.repositioning-complete {
+    transition: transform 0.0s ease-out !important;
+    transform: translateX(0) rotate(0deg) !important;
+}
+
 .hand-card:active {
     cursor: grabbing;
 }
 
-.hand-display-area-inline .hand-card:hover:not(.preview-card) {
+.hand-display-area-inline .hand-card:hover:not(.preview-card):not(.hand-card-phantom):not(.hand-card-dragging) {
     transform: translateY(-12px) scale(1.08);
     z-index: 20;
     filter: brightness(1.1);
@@ -183,6 +201,70 @@
     opacity: 1;
     z-index: 21;
 }
+
+/* === ENHANCED DRAG ELEMENT STYLES === */
+
+/* Initial dragging state - when card is first picked up */
+.hand-card.hand-card-dragging {
+    opacity: 0.8 !important;
+    transform: scale(0.95) rotate(3deg) !important;
+    z-index: 1000 !important;
+    border: 2px solid rgba(102, 126, 234, 0.5) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    pointer-events: none !important;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4) !important;
+}
+
+/* Phantom state - when card is repositioned over hand to show drop position */
+.hand-card.hand-card-phantom {
+    opacity: 0.6 !important;
+    transform: scale(0.98) !important;
+    border: 2px dashed rgba(102, 126, 234, 0.8) !important;
+    border-radius: 8px !important;
+    background: rgba(102, 126, 234, 0.1) !important;
+    pointer-events: none !important;
+    position: relative !important;
+    z-index: 5 !important;
+    transition: all 0.2s ease !important;
+    animation: phantomCardPulse 1.5s ease-in-out infinite;
+    margin-right: 15px !important; /* Consistent spacing for phantom */
+    filter: brightness(1.1) !important;
+    box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3) !important;
+}
+
+/* Phantom card specific image styling */
+.hand-card.hand-card-phantom .hand-card-image {
+    filter: brightness(1.2) saturate(0.8) !important;
+    box-shadow: 
+        0 6px 12px rgba(102, 126, 234, 0.3) !important,
+        inset 0 0 20px rgba(102, 126, 234, 0.1) !important;
+}
+
+/* Phantom card name styling */
+.hand-card.hand-card-phantom .hand-card-name {
+    opacity: 0.9 !important;
+    background: rgba(102, 126, 234, 0.8) !important;
+    border-color: rgba(102, 126, 234, 0.6) !important;
+    color: white !important;
+    text-shadow: 
+        1px 1px 2px rgba(0,0,0,0.9),
+        0 0 4px rgba(102, 126, 234, 0.6) !important;
+}
+
+/* Make sure dragged/phantom cards don't respond to hover */
+.hand-card.hand-card-dragging:hover,
+.hand-card.hand-card-phantom:hover {
+    transform: scale(0.95) rotate(3deg) !important;
+    z-index: 1000 !important;
+}
+
+.hand-card.hand-card-phantom:hover {
+    transform: scale(0.98) !important;
+    z-index: 5 !important;
+}
+
+/* === EXISTING STYLES (modified for phantom compatibility) === */
 
 .hand-card.preview-card {
     animation: slideIntoPlace 0.2s ease-out;
@@ -269,7 +351,7 @@
         0 0 4px rgba(102, 126, 234, 0.6);
 }
 
-/* Enhanced insertion preview indicators */
+/* Enhanced insertion preview indicators (updated for phantom) */
 .hand-card.preview-card::before,
 .hand-card.preview-card::after {
     content: '';
@@ -337,13 +419,69 @@
     letter-spacing: 0.5px;
 }
 
+/* === ANIMATION KEYFRAMES === */
+
+/* Phantom card pulsing animation */
+@keyframes phantomCardPulse {
+    0%, 100% {
+        opacity: 0.4;
+        border-color: rgba(102, 126, 234, 0.6);
+        background: rgba(102, 126, 234, 0.08);
+        box-shadow: 0 4px 8px rgba(102, 126, 234, 0.2);
+    }
+    50% {
+        opacity: 0.6;
+        border-color: rgba(102, 126, 234, 0.9);
+        background: rgba(102, 126, 234, 0.15);
+        box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+    }
+}
+
+/* Slide into place animation for phantom cards */
+@keyframes slideIntoPlace {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(-10px);
+    }
+    to {
+        opacity: 0.95;
+        transform: scale(0.98) translateY(0);
+    }
+}
+
+/* Insertion glow animation */
+@keyframes insertionGlow {
+    0%, 100% {
+        opacity: 0.7;
+        box-shadow: 0 0 6px rgba(102, 126, 234, 0.8);
+    }
+    50% {
+        opacity: 1;
+        box-shadow: 0 0 12px rgba(102, 126, 234, 1);
+    }
+}
+
+/* Tooltip fade in animation */
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* === CARD TYPE INDICATORS (unchanged) === */
+
 /* Ability card states */
 .hand-card[data-card-type="ability"] {
     position: relative;
 }
 
 .hand-card[data-card-type="ability"]::after {
-    content: "↓";
+    content: "↕";
     position: absolute;
     bottom: 5px;
     right: 5px;
@@ -371,7 +509,7 @@
 }
 
 .hand-card.ability-card.partial-disabled::after {
-    content: '⚠';
+    content: '⚠ ';
     position: absolute;
     top: 5px;
     right: 5px;
@@ -418,7 +556,7 @@
 }
 
 .hand-card.no-actions-available:hover::before {
-    content: "No Actions!";
+    content: "Can't use that!";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -452,7 +590,41 @@
     padding: 5px 0 !important;
 }
 
-/* Responsive adjustments for hand display */
+/* === ANIMATION KEYFRAMES (continued) === */
+
+@keyframes actionPulse {
+    0%, 100% { 
+        opacity: 0.8; 
+        transform: scale(1); 
+    }
+    50% { 
+        opacity: 1; 
+        transform: scale(1.1); 
+    }
+}
+
+@keyframes noActionsPulse {
+    from {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { 
+        opacity: 0.8; 
+    }
+    50% { 
+        opacity: 1; 
+    }
+}
+
+/* === RESPONSIVE ADJUSTMENTS === */
+
 @media (max-width: 768px) {
     .hand-display-area-inline .hand-title {
         font-size: 1rem;
@@ -467,6 +639,11 @@
     .hand-zone-drag-over::before {
         font-size: 12px;
         letter-spacing: 0.3px;
+    }
+    
+    /* Smaller phantom cards on mobile */
+    .hand-card.hand-card-phantom {
+        margin-right: 10px !important;
     }
 }
 
@@ -484,5 +661,10 @@
     .hand-card.no-actions-available:hover::before {
         font-size: 12px;
         letter-spacing: 0.3px;
+    }
+    
+    /* Even smaller phantom cards on very small screens */
+    .hand-card.hand-card-phantom {
+        margin-right: 5px !important;
     }
 }

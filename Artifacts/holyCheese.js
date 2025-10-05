@@ -1,28 +1,24 @@
-// coolCheese.js - CoolCheese Artifact Handler Module
+// holyCheese.js - HolyCheese Artifact Handler Module
 
 import { getCardsBySpellSchool } from '../cardDatabase.js';
 
-export const coolCheeseArtifact = {
+export const holyCheeseArtifact = {
     // Card name this artifact handles
-    cardName: 'CoolCheese',
+    cardName: 'HolyCheese',
     
     // Handle card click
-    async handleClick(cardIndex, cardName, heroSelection) {
-        console.log(`CoolCheese clicked at index ${cardIndex}`);
-        
-        // Consume the card and distribute Fighting spells
+    async handleClick(cardIndex, cardName, heroSelection) {        
+        // Consume the card and distribute SupportMagic spells
         await this.consumeAndDistributeSpells(cardIndex, heroSelection);
     },
     
     // Handle card being dragged outside the hand
-    async handleDraggedOutside(cardIndex, cardName, heroSelection) {
-        console.log(`CoolCheese dragged outside hand from index ${cardIndex}`);
-        
-        // Consume the card and distribute Fighting spells
+    async handleDraggedOutside(cardIndex, cardName, heroSelection) {        
+        // Consume the card and distribute SupportMagic spells
         await this.consumeAndDistributeSpells(cardIndex, heroSelection);
     },
     
-    // Core logic to consume card and distribute Fighting spells to all heroes
+    // Core logic to consume card and distribute SupportMagic spells to all heroes
     async consumeAndDistributeSpells(cardIndex, heroSelection) {
         if (!heroSelection) {
             console.error('No heroSelection instance available');
@@ -48,7 +44,7 @@ export const coolCheeseArtifact = {
         // Check if player has enough gold
         const currentGold = goldManager.getPlayerGold();
         if (currentGold < cost) {
-            this.showCoolCheeseError(
+            this.showHolyCheeseError(
                 `Need ${cost} Gold. Have ${currentGold} Gold.`,
                 cardIndex
             );
@@ -56,10 +52,8 @@ export const coolCheeseArtifact = {
         }
         
         // Spend the gold (use negative amount to subtract)
-        goldManager.addPlayerGold(-cost, 'CoolCheese');
-        
-        console.log(`CoolCheese: Spent ${cost} gold to activate`);
-        
+        goldManager.addPlayerGold(-cost, 'HolyCheese');
+                
         // Remove card from hand
         const removedCard = handManager.removeCardFromHandByIndex(cardIndex);
         
@@ -68,14 +62,32 @@ export const coolCheeseArtifact = {
             return;
         }
         
-        // Get all Fighting spells from the database
-        const allFightingSpells = getCardsBySpellSchool('Fighting');
+        // Get all SupportMagic spells from the database
+        const allSupportMagicSpells = getCardsBySpellSchool('SupportMagic');
         
-        if (!allFightingSpells || allFightingSpells.length === 0) {
-            console.error('No Attacks found in database');
+        if (!allSupportMagicSpells || allSupportMagicSpells.length === 0) {
+            console.error('No SupportMagic spells found in database');
             return;
         }
         
+        // Filter out Area and global spells (these can't be taught to heroes)
+        const teachableSpells = allSupportMagicSpells.filter(spell => {
+            // Exclude Area subtype spells
+            if (spell.subtype === 'Area') {
+                return false;
+            }
+            // Exclude global spells
+            if (spell.global === true) {
+                return false;
+            }
+            return true;
+        });
+        
+        if (!teachableSpells || teachableSpells.length === 0) {
+            console.error('No teachable SupportMagic spells found after filtering');
+            return;
+        }
+                
         // Get current formation
         const formation = formationManager.getBattleFormation();
         const positions = ['left', 'center', 'right'];
@@ -89,37 +101,25 @@ export const coolCheeseArtifact = {
             
             // Skip if no hero in this position
             if (!hero) {
-                console.log(`No hero at ${position} position, skipping`);
                 continue;
             }
             
-            // Get the hero's Fighting ability level
-            const fightingLevel = heroAbilitiesManager.getAbilityStackCountForPosition(position, 'Fighting');
-            console.log(`${hero.name} at ${position} has Fighting level ${fightingLevel}`);
+            // Select a spell with weighted distribution based on level
+            const selectedSpell = this.selectWeightedSpell(teachableSpells);
             
-            // Filter Fighting spells that this hero can learn (level <= fightingLevel)
-            const eligibleSpells = allFightingSpells.filter(spell => {
-                const spellLevel = spell.level || 0;
-                return spellLevel <= fightingLevel;
-            });
-            
-            if (eligibleSpells.length === 0) {
-                console.log(`${hero.name} has no eligible Attacks (Fighting level ${fightingLevel})`);
+            if (!selectedSpell) {
+                console.error(`Failed to select a spell for ${hero.name}`);
                 continue;
             }
-            
-            // Randomly select one spell from eligible spells
-            const randomIndex = Math.floor(Math.random() * eligibleSpells.length);
-            const selectedSpell = eligibleSpells[randomIndex];
             
             // Add the spell to the hero's spellbook
             const success = heroSpellbookManager.addSpellToHero(position, selectedSpell.name);
             
             if (success) {
-                console.log(`🧀 Added ${selectedSpell.name} (level ${selectedSpell.level || 0}) to ${hero.name}'s spellbook`);
                 spellsAdded++;
                 addedSpells.push({
                     heroName: hero.name,
+                    heroPosition: position,
                     spellName: selectedSpell.name,
                     spellLevel: selectedSpell.level || 0
                 });
@@ -128,8 +128,8 @@ export const coolCheeseArtifact = {
             }
         }
         
-        // Show visual feedback
-        this.showCoolCheeseAnimation(cardIndex, spellsAdded, addedSpells, cost);
+        // Show visual feedback with light particles around empowered heroes
+        this.showHolyCheeseAnimation(cardIndex, spellsAdded, addedSpells, cost);
         
         // Update UI
         heroSelection.updateHandDisplay();
@@ -141,18 +141,16 @@ export const coolCheeseArtifact = {
         
         // Send formation update to opponent (includes spellbook data)
         await heroSelection.sendFormationUpdate();
-        
-        console.log(`🧀 CoolCheese consumed! Added ${spellsAdded} Attacks to heroes for ${cost} gold.`);
     },
     
     // Show error message when not enough gold
-    showCoolCheeseError(message, cardIndex) {
+    showHolyCheeseError(message, cardIndex) {
         const errorDiv = document.createElement('div');
-        errorDiv.className = 'cool-cheese-error';
+        errorDiv.className = 'holy-cheese-error';
         errorDiv.innerHTML = `
-            <div class="cool-cheese-error-content">
-                <span class="cool-cheese-error-icon">⛔</span>
-                <span class="cool-cheese-error-text">${message}</span>
+            <div class="holy-cheese-error-content">
+                <span class="holy-cheese-error-icon">⛔</span>
+                <span class="holy-cheese-error-text">${message}</span>
             </div>
         `;
         
@@ -187,7 +185,7 @@ export const coolCheeseArtifact = {
             font-weight: bold;
             z-index: 10000;
             pointer-events: none;
-            animation: coolCheeseErrorBounce 0.5s ease-out;
+            animation: holyCheeseErrorBounce 0.5s ease-out;
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.5);
             border: 2px solid rgba(255, 255, 255, 0.2);
         `;
@@ -196,16 +194,16 @@ export const coolCheeseArtifact = {
         
         // Remove after showing
         setTimeout(() => {
-            errorDiv.style.animation = 'coolCheeseErrorFade 0.3s ease-out forwards';
+            errorDiv.style.animation = 'holyCheeseErrorFade 0.3s ease-out forwards';
             setTimeout(() => errorDiv.remove(), 300);
         }, 2500);
     },
     
-    // Show cool cheese animation (updated to include cost)
-    showCoolCheeseAnimation(cardIndex, spellsAdded, addedSpells, cost) {
+    // Show holy cheese animation with light particles
+    showHolyCheeseAnimation(cardIndex, spellsAdded, addedSpells, cost) {
         // Create floating cheese animation (central)
         const cheeseBurst = document.createElement('div');
-        cheeseBurst.className = 'cool-cheese-spell-burst';
+        cheeseBurst.className = 'holy-cheese-spell-burst';
         
         // Create spell details for tooltip
         const spellDetails = addedSpells.map(spell => 
@@ -213,14 +211,14 @@ export const coolCheeseArtifact = {
         ).join('\n');
         
         cheeseBurst.innerHTML = `
-            <div class="cheese-icons">
-                <span class="cheese-icon">🧀</span>
-                <span class="cheese-icon">⚔️</span>
-                <span class="cheese-icon">🧀</span>
+            <div class="holy-cheese-icons">
+                <span class="holy-cheese-icon">🧀</span>
+                <span class="holy-cheese-icon">✨</span>
+                <span class="holy-cheese-icon">🧀</span>
             </div>
-            <div class="spell-text" title="${spellDetails}">
-                +${spellsAdded} Attack${spellsAdded !== 1 ? 's' : ''}!
-                <div class="cheese-cost">Cost: ${cost} Gold</div>
+            <div class="holy-spell-text" title="${spellDetails}">
+                +${spellsAdded} SupportMagic Spell${spellsAdded !== 1 ? 's' : ''}!
+                <div class="holy-cheese-cost">Cost: ${cost} Gold</div>
             </div>
         `;
         
@@ -243,8 +241,8 @@ export const coolCheeseArtifact = {
         // Add to body
         document.body.appendChild(cheeseBurst);
         
-        // Show individual spell names above each hero
-        this.showIndividualSpellNames(addedSpells);
+        // Show individual spell names above each hero with light particles
+        this.showIndividualSpellNamesWithParticles(addedSpells);
         
         // Remove after animation
         setTimeout(() => {
@@ -252,31 +250,17 @@ export const coolCheeseArtifact = {
         }, 3000);
         
         // Play sound effect if available
-        this.playCoolCheeseSound();
+        this.playHolyCheeseSound();
     },
     
-    // Show individual spell names above each hero
-    showIndividualSpellNames(addedSpells) {
+    // Show individual spell names above each hero with light particle effects
+    showIndividualSpellNamesWithParticles(addedSpells) {
         addedSpells.forEach((spellInfo, index) => {
-            // Get the hero position from formation data (like ButterflyCloud does)
-            let heroPosition = null;
-            if (window.heroSelection && window.heroSelection.formationManager) {
-                const formation = window.heroSelection.formationManager.getBattleFormation();
-                ['left', 'center', 'right'].forEach(pos => {
-                    if (formation[pos] && formation[pos].name === spellInfo.heroName) {
-                        heroPosition = pos;
-                    }
-                });
-            }
-            
-            if (!heroPosition) {
-                console.warn(`Could not find position for ${spellInfo.heroName}`);
-                return;
-            }
-            
             // Add delay for staggered effect
             setTimeout(() => {
-                this.showSpellNotificationAboveHero(heroPosition, spellInfo);
+                this.showSpellNotificationAboveHero(spellInfo.heroPosition, spellInfo);
+                // Create light particles around the hero
+                this.createLightParticles(spellInfo.heroPosition);
             }, index * 400);
         });
     },
@@ -286,32 +270,32 @@ export const coolCheeseArtifact = {
         if (!teamSlot) return;
         
         const notification = document.createElement('div');
-        notification.className = 'cheese-spell-notification';
+        notification.className = 'holy-cheese-spell-notification';
         notification.innerHTML = `
-            <div class="spell-notification-content">
-                <span class="spell-icon">⚔️</span>
+            <div class="holy-spell-notification-content">
+                <span class="holy-spell-icon">✨</span>
                 <span>${spellInfo.heroName} learned:</span>
-                <div class="spell-name">${this.formatSpellName(spellInfo.spellName)}</div>
-                <div class="spell-level">Level ${spellInfo.spellLevel}</div>
+                <div class="holy-spell-name">${this.formatSpellName(spellInfo.spellName)}</div>
+                <div class="holy-spell-level">Level ${spellInfo.spellLevel}</div>
             </div>
         `;
         
-        // Use the same positioning approach as ButterflyCloud
+        // Use the same positioning approach as CoolCheese
         notification.style.cssText = `
             position: absolute;
             top: -100px;
             left: 50%;
             transform: translateX(-50%);
-            background: linear-gradient(135deg, rgba(76, 175, 80, 0.95), rgba(139, 195, 74, 0.95));
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.95), rgba(255, 255, 255, 0.95));
             backdrop-filter: blur(10px);
-            border: 2px solid rgba(76, 175, 80, 0.8);
+            border: 2px solid rgba(255, 215, 0, 0.8);
             border-radius: 12px;
             padding: 12px 20px;
-            box-shadow: 0 8px 32px rgba(76, 175, 80, 0.4);
+            box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
             z-index: 1000;
-            animation: cheeseNotificationSlide 2.5s ease-out;
+            animation: holyNotificationSlide 2.5s ease-out;
             pointer-events: none;
-            color: white;
+            color: #8B4513;
             font-weight: bold;
             text-align: center;
             white-space: nowrap;
@@ -330,74 +314,131 @@ export const coolCheeseArtifact = {
             }
         }, 2500);
     },
-
-
     
-    // Find hero slot by hero name
-    findHeroSlot(heroName) {
-        console.log(`🧀 DEBUG: findHeroSlot called for hero: "${heroName}"`);
+    // Create light particles around a hero to indicate holy energy strengthening them
+    createLightParticles(heroPosition) {
+        const teamSlot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
+        if (!teamSlot) return;
         
-        // First, check the formation data directly to find which position the hero is at
-        if (window.heroSelection && window.heroSelection.formationManager) {
-            const formation = window.heroSelection.formationManager.getBattleFormation();
-            console.log(`🧀 DEBUG: Current formation:`, formation);
+        // Create particle container
+        const particleContainer = document.createElement('div');
+        particleContainer.className = 'holy-light-particles';
+        particleContainer.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+            z-index: 999;
+        `;
+        
+        // Create multiple light particles
+        const particleCount = 12;
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'holy-light-particle';
             
-            // Find which position has this hero
-            let heroPosition = null;
-            ['left', 'center', 'right'].forEach(pos => {
-                if (formation[pos] && formation[pos].name === heroName) {
-                    heroPosition = pos;
-                    console.log(`🧀 DEBUG: Found ${heroName} at position ${pos} in formation data`);
-                }
-            });
+            // Random starting position around the hero
+            const angle = (i / particleCount) * 2 * Math.PI;
+            const radius = 30 + Math.random() * 20;
+            const startX = 50 + Math.cos(angle) * radius;
+            const startY = 50 + Math.sin(angle) * radius;
             
-            // If we found the position, get the corresponding slot
-            if (heroPosition) {
-                const slot = document.querySelector(`.team-slot[data-position="${heroPosition}"]`);
-                if (slot) {
-                    console.log(`🧀 DEBUG: Found team slot for ${heroName} at position ${heroPosition}`);
-                    return slot;
-                }
-            }
+            // Random float target
+            const floatX = startX + (Math.random() - 0.5) * 40;
+            const floatY = startY - 30 - Math.random() * 40;
+            
+            particle.style.cssText = `
+                position: absolute;
+                left: ${startX}%;
+                top: ${startY}%;
+                width: 8px;
+                height: 8px;
+                background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 215, 0, 0.8) 50%, transparent 70%);
+                border-radius: 50%;
+                box-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.4);
+                animation: holyParticleFloat 2s ease-out forwards;
+                animation-delay: ${i * 0.1}s;
+                --float-x: ${floatX}%;
+                --float-y: ${floatY}%;
+                z-index: 999;
+            `;
+            
+            particleContainer.appendChild(particle);
         }
         
-        // Fallback: Try different selectors for hero names
-        const teamSlots = document.querySelectorAll('.team-slot');
-        console.log(`🧀 DEBUG: Found ${teamSlots.length} team slots, checking each...`);
+        // Add glow effect to the hero slot
+        const glowEffect = document.createElement('div');
+        glowEffect.className = 'holy-glow-effect';
+        glowEffect.style.cssText = `
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            width: 120%;
+            height: 120%;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 60%);
+            animation: holyGlowPulse 2s ease-out;
+            pointer-events: none;
+            z-index: 998;
+        `;
         
-        for (const slot of teamSlots) {
-            // Try multiple selectors that might contain the hero name
-            const selectors = [
-                '.character-name',
-                '.hero-name', 
-                '.character-card h3',
-                '.character-card h4',
-                '.hero-info',
-                '[data-hero-name]'
-            ];
-            
-            for (const selector of selectors) {
-                const nameElement = slot.querySelector(selector);
-                if (nameElement) {
-                    const elementText = nameElement.textContent.trim();
-                    console.log(`🧀 DEBUG: Found element with selector "${selector}": "${elementText}"`);
-                    if (elementText === heroName) {
-                        console.log(`🧀 DEBUG: MATCH FOUND!`);
-                        return slot;
-                    }
-                }
+        // Set team slot to relative positioning
+        teamSlot.style.position = 'relative';
+        
+        // Add effects to team slot
+        teamSlot.appendChild(glowEffect);
+        teamSlot.appendChild(particleContainer);
+        
+        // Remove after animations complete
+        setTimeout(() => {
+            particleContainer.remove();
+            glowEffect.remove();
+        }, 2500);
+    },
+    
+    // Select a spell with weighted distribution (lower level spells are more common)
+    selectWeightedSpell(spellList) {
+        // Roll for tier with weighted probability
+        const roll = Math.random() * 100;
+        let maxLevel;
+        let tierDescription;
+        
+        if (roll < 50) {
+            maxLevel = 1;
+            tierDescription = 'level 1 or lower';
+        } else if (roll < 80) {  // 50 + 30
+            maxLevel = 2;
+            tierDescription = 'level 2 or lower';
+        } else if (roll < 95) {  // 50 + 30 + 15
+            maxLevel = 3;
+            tierDescription = 'level 3 or lower';
+        } else {  // Remaining 5%
+            maxLevel = 999;  // Effectively no limit
+            tierDescription = 'any level';
+        }
+                
+        // Filter spells based on max level
+        const eligibleSpells = spellList.filter(spell => {
+            const level = spell.level || 0;
+            return level <= maxLevel;
+        });
+        
+        if (eligibleSpells.length === 0) {
+            console.error(`No SupportMagic spells found for ${tierDescription}`);
+            // Fall back to any spell if no eligible spells found
+            if (spellList.length > 0) {
+                const randomIndex = Math.floor(Math.random() * spellList.length);
+                return spellList[randomIndex];
             }
-            
-            // Also check data attributes
-            const dataHeroName = slot.getAttribute('data-hero-name');
-            if (dataHeroName === heroName) {
-                console.log(`🧀 DEBUG: MATCH FOUND via data-hero-name attribute!`);
-                return slot;
-            }
+            return null;
         }
         
-        console.log(`🧀 DEBUG: No slot found for hero "${heroName}"`);
-        return null;
+        // Select a random spell from eligible spells
+        const randomIndex = Math.floor(Math.random() * eligibleSpells.length);
+        const selectedSpell = eligibleSpells[randomIndex];
+        return selectedSpell;
     },
     
     // Format spell name for display (convert CamelCase to spaced words)
@@ -408,20 +449,19 @@ export const coolCheeseArtifact = {
             .trim();
     },
     
-    // Play cool cheese sound
-    playCoolCheeseSound() {
+    // Play holy cheese sound
+    playHolyCheeseSound() {
         // Placeholder for sound effect
-        console.log('🎵 Cool cheese spell distribution sound!');
     }
 };
 
-// Add styles for the animation (updated to include error styles and cost display)
-if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyles')) {
+// Add styles for the animation
+if (typeof document !== 'undefined' && !document.getElementById('holyCheeseStyles')) {
     const style = document.createElement('style');
-    style.id = 'coolCheeseStyles';
+    style.id = 'holyCheeseStyles';
     style.textContent = `
-        /* Cool Cheese Spell Burst Animation */
-        .cool-cheese-spell-burst {
+        /* Holy Cheese Spell Burst Animation */
+        .holy-cheese-spell-burst {
             position: fixed;
             transform: translate(-50%, -50%);
             z-index: 10000;
@@ -429,7 +469,7 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
             animation: fadeOut 3s ease-out forwards;
         }
         
-        .cheese-icons {
+        .holy-cheese-icons {
             display: flex;
             gap: 15px;
             margin-bottom: 12px;
@@ -437,50 +477,50 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
             justify-content: center;
         }
         
-        .cheese-icon {
+        .holy-cheese-icon {
             font-size: 40px;
-            animation: spin 1.8s ease-out, scatter 2.2s ease-out;
+            animation: spin 1.8s ease-out, holyScatter 2.2s ease-out;
             display: inline-block;
-            filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.6));
+            filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8));
         }
         
-        .cheese-icon:nth-child(1) {
+        .holy-cheese-icon:nth-child(1) {
             animation-delay: 0s, 0.1s;
             --scatter-x: -45px;
         }
         
-        .cheese-icon:nth-child(2) {
+        .holy-cheese-icon:nth-child(2) {
             animation-delay: 0.1s, 0.2s;
             --scatter-x: 0px;
-            font-size: 44px; /* Make the sword slightly larger */
+            font-size: 44px; /* Make the sparkles slightly larger */
         }
         
-        .cheese-icon:nth-child(3) {
+        .holy-cheese-icon:nth-child(3) {
             animation-delay: 0.2s, 0.3s;
             --scatter-x: 45px;
         }
         
-        .spell-text {
+        .holy-spell-text {
             font-size: 22px;
             font-weight: bold;
-            color: #ff6b35;
+            color: #FFD700;
             text-shadow: 
                 2px 2px 4px rgba(0, 0, 0, 0.8),
-                0 0 20px rgba(255, 107, 53, 0.8),
-                0 0 40px rgba(255, 107, 53, 0.4);
+                0 0 20px rgba(255, 215, 0, 0.8),
+                0 0 40px rgba(255, 215, 0, 0.4);
             text-align: center;
             animation: pulse 0.7s ease-out;
             cursor: help;
             background: rgba(0, 0, 0, 0.7);
             padding: 8px 16px;
             border-radius: 8px;
-            border: 2px solid rgba(255, 107, 53, 0.6);
+            border: 2px solid rgba(255, 215, 0, 0.6);
         }
         
-        .cheese-cost {
+        .holy-cheese-cost {
             font-size: 16px;
             font-weight: bold;
-            color: #ffd700;
+            color: #FFD700;
             text-shadow: 
                 1px 1px 3px rgba(0, 0, 0, 0.8),
                 0 0 15px rgba(255, 215, 0, 0.7);
@@ -488,27 +528,27 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
         }
         
         /* Error styles */
-        .cool-cheese-error {
+        .holy-cheese-error {
             display: flex;
             align-items: center;
             white-space: nowrap;
         }
         
-        .cool-cheese-error-content {
+        .holy-cheese-error-content {
             display: flex;
             align-items: center;
             gap: 8px;
         }
         
-        .cool-cheese-error-icon {
+        .holy-cheese-error-icon {
             font-size: 20px;
         }
         
-        .cool-cheese-error-text {
+        .holy-cheese-error-text {
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
         
-        @keyframes coolCheeseErrorBounce {
+        @keyframes holyCheeseErrorBounce {
             0% {
                 opacity: 0;
                 transform: translateX(-50%) translateY(20px) scale(0.8);
@@ -523,7 +563,7 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
             }
         }
         
-        @keyframes coolCheeseErrorFade {
+        @keyframes holyCheeseErrorFade {
             from {
                 opacity: 1;
                 transform: translateX(-50%) translateY(0);
@@ -535,48 +575,24 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
         }
         
         /* Individual Spell Name Display Above Heroes */
-        .individual-spell-float {
-            pointer-events: none;
-            animation: spellNameFloat 2.5s ease-out forwards;
-        }
-        
-        .spell-name-display {
+        .holy-spell-name-display {
             font-size: 18px;
             font-weight: bold;
-            color: #4CAF50;
+            color: #FFD700;
             text-shadow: 
                 2px 2px 4px rgba(0, 0, 0, 0.9),
-                0 0 15px rgba(76, 175, 80, 0.8),
-                0 0 30px rgba(76, 175, 80, 0.4);
+                0 0 15px rgba(255, 215, 0, 0.8),
+                0 0 30px rgba(255, 215, 0, 0.4);
             text-align: center;
             background: rgba(0, 0, 0, 0.8);
             padding: 6px 12px;
             border-radius: 6px;
-            border: 2px solid rgba(76, 175, 80, 0.6);
+            border: 2px solid rgba(255, 215, 0, 0.6);
             white-space: nowrap;
-            animation: spellNamePulse 0.5s ease-out;
+            animation: holySpellNamePulse 0.5s ease-out;
         }
         
-        @keyframes spellNameFloat {
-            0% {
-                transform: translate(-50%, -100%);
-                opacity: 0;
-            }
-            20% {
-                transform: translate(-50%, -130%);
-                opacity: 1;
-            }
-            80% {
-                transform: translate(-50%, -160%);
-                opacity: 1;
-            }
-            100% {
-                transform: translate(-50%, -180%);
-                opacity: 0;
-            }
-        }
-        
-        @keyframes spellNamePulse {
+        @keyframes holySpellNamePulse {
             0% {
                 transform: scale(0.5);
                 opacity: 0;
@@ -589,6 +605,7 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
                 opacity: 1;
             }
         }
+        
         @keyframes floatUp {
             from {
                 transform: translateY(0);
@@ -607,7 +624,7 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
             }
         }
         
-        @keyframes scatter {
+        @keyframes holyScatter {
             from {
                 transform: translateX(0) translateY(0);
                 opacity: 1;
@@ -648,12 +665,12 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
         }
         
         /* Add hover effect for spell details */
-        .spell-text:hover {
+        .holy-spell-text:hover {
             transform: scale(1.05);
             transition: transform 0.2s ease;
         }
 
-        @keyframes cheeseNotificationSlide {
+        @keyframes holyNotificationSlide {
             0% {
                 opacity: 0;
                 transform: translateX(-50%) translateY(20px) scale(0.8);
@@ -672,6 +689,39 @@ if (typeof document !== 'undefined' && !document.getElementById('coolCheeseStyle
             100% {
                 opacity: 0;
                 transform: translateX(-50%) translateY(-15px) scale(0.9);
+            }
+        }
+        
+        /* Light particle animations */
+        @keyframes holyParticleFloat {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            20% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            100% {
+                opacity: 0;
+                left: var(--float-x);
+                top: var(--float-y);
+                transform: translate(-50%, -50%) scale(0.3);
+            }
+        }
+        
+        @keyframes holyGlowPulse {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(1);
             }
         }
     `;

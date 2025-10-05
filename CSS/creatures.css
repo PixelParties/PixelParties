@@ -217,10 +217,9 @@
 /* Pause animations while dragging and show only middle frame of spritesheet */
 .creature-icon.creature-dragging .creature-sprite-container .creature-sprite {
     animation-play-state: paused !important;
-    width: 300% !important;
+    width: 100% !important;
     height: 100% !important;
     object-fit: none !important;
-    transform: translateX(-33.33%) !important;
     position: relative !important;
 }
 

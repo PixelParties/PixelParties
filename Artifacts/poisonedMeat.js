@@ -102,13 +102,13 @@ export const poisonedMeatArtifact = {
         }
         
         // Method 2: Fallback - store in heroSelection state
-        if (!heroSelection.delayedArtifactEffects) {
-            heroSelection.delayedArtifactEffects = [];
+        if (!heroSelection.delayedEffects) {
+            heroSelection.delayedEffects = [];
         }
         
         // 🔧 FIX 2: Don't remove existing effects - allow stacking
         // Find existing PoisonedMeat effect to accumulate stacks
-        let existingEffect = heroSelection.delayedArtifactEffects.find(
+        let existingEffect = heroSelection.delayedEffects.find(
             effect => effect.source === 'PoisonedMeat' && effect.type === 'poison_all_player_targets'
         );
         
@@ -119,7 +119,7 @@ export const poisonedMeatArtifact = {
             console.log(`🥩 Increased PoisonedMeat curse stacks to ${existingEffect.stacks}`);
         } else {
             // 🔧 FIX 2: Add new effect if none exists
-            heroSelection.delayedArtifactEffects.push({
+            heroSelection.delayedEffects.push({
                 type: 'poison_all_player_targets',
                 stacks: 1,
                 source: 'PoisonedMeat',
@@ -254,12 +254,12 @@ export const poisonedMeatArtifact = {
 // Static method to check for and apply battle-start poison effects
 // This should be called by the battle system at battle start
 export async function applyPoisonedMeatDelayedEffects(battleManager, heroSelection) {
-    if (!heroSelection || !heroSelection.delayedArtifactEffects) {
+    if (!heroSelection || !heroSelection.delayedEffects) {
         return;
     }
     
     // Find poison effects from PoisonedMeat
-    const poisonEffects = heroSelection.delayedArtifactEffects.filter(
+    const poisonEffects = heroSelection.delayedEffects.filter(
         effect => effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat'
     );
     
@@ -273,7 +273,7 @@ export async function applyPoisonedMeatDelayedEffects(battleManager, heroSelecti
     await poisonAllPlayerTargets(battleManager, poisonEffects);
     
     // Remove the processed effects
-    heroSelection.delayedArtifactEffects = heroSelection.delayedArtifactEffects.filter(
+    heroSelection.delayedEffects = heroSelection.delayedEffects.filter(
         effect => !(effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
     );
     
@@ -391,8 +391,8 @@ async function clearProcessedDelayedEffects(battleManager, hostEffects, guestEff
         
         // Update Firebase with filtered effects
         await roomRef.child('gameState').update({
-            hostDelayedArtifactEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
-            guestDelayedArtifactEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
+            hostdelayedEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
+            guestdelayedEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
             delayedEffectsProcessedAt: Date.now()
         });
         

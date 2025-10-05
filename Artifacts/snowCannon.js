@@ -5,9 +5,7 @@ export const snowCannonArtifact = {
     cardName: 'SnowCannon',
     
     // Handle card click/drag (consume and add to permanents)
-    async handleClick(cardIndex, cardName, heroSelection) {
-        console.log(`❄️ Snow Cannon activated at index ${cardIndex}`);
-        
+    async handleClick(cardIndex, cardName, heroSelection) {        
         // Consume the card and add to permanent list
         await this.consumeCard(cardIndex, heroSelection);
     },
@@ -45,7 +43,6 @@ export const snowCannonArtifact = {
             
             // Spend the gold (use negative amount to subtract)
             goldManager.addPlayerGold(-cost, 'SnowCannon');
-            console.log(`❄️ Snow Cannon: Spent ${cost} gold to activate`);
         }
         
         // Remove card from hand
@@ -59,7 +56,6 @@ export const snowCannonArtifact = {
         // Add to permanent artifacts list
         if (window.artifactHandler) {
             window.artifactHandler.addPermanentArtifact(this.cardName);
-            console.log('❄️ Snow Cannon added to permanent artifacts!');
             
             // Update the permanent artifacts indicator
             if (window.heroSelection && window.heroSelection.heroSelectionUI) {
@@ -77,8 +73,6 @@ export const snowCannonArtifact = {
         // Save game state
         await heroSelection.saveGameState();
         await heroSelection.sendFormationUpdate();
-
-        console.log(`❄️ Snow Cannon consumed and added to permanent artifacts!`);
     },
     
     // Show error message when not enough gold
@@ -196,16 +190,10 @@ export const snowCannonArtifact = {
         
         const totalSnowCannons = playerSnowCannons.length + opponentSnowCannons.length;
         
-        console.log("SNOW CANNON TEST!");
-        console.log(`Player Snow Cannons: ${playerSnowCannons.length}`);
-        console.log(`Opponent Snow Cannons: ${opponentSnowCannons.length}`);
-        console.log(`Total Snow Cannons: ${totalSnowCannons}`);
-        
         if (totalSnowCannons === 0) {
             return; // No Snow Cannons to process
         }
         
-        console.log(`❄️ Activating ${totalSnowCannons} Snow Cannon${totalSnowCannons > 1 ? 's' : ''}!`);
         battleManager.addCombatLog(
             `❄️ ${totalSnowCannons} Snow Cannon${totalSnowCannons > 1 ? 's' : ''} activate${totalSnowCannons === 1 ? 's' : ''}!`,
             'info'
@@ -287,7 +275,6 @@ export const snowCannonArtifact = {
         });
         
         if (allTargets.length === 0) {
-            console.log(`❄️ No valid targets for ${ownerSide}'s Snow Cannon`);
             return;
         }
         

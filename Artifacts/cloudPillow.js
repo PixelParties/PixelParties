@@ -5,9 +5,7 @@ export const cloudPillowArtifact = {
     cardName: 'CloudPillow',
     
     // Handle card click/drag (consume and add to permanents)
-    async handleClick(cardIndex, cardName, heroSelection) {
-        console.log(`Cloud Pillow activated at index ${cardIndex}`);
-        
+    async handleClick(cardIndex, cardName, heroSelection) {        
         // Check if player can afford the artifact
         const cardInfo = heroSelection.getCardInfo(cardName);
         const cost = cardInfo?.cost || 0;
@@ -53,7 +51,6 @@ export const cloudPillowArtifact = {
         // Add to permanent artifacts list
         if (window.artifactHandler) {
             window.artifactHandler.addPermanentArtifact(this.cardName);
-            console.log('Cloud Pillow added to permanent artifacts!');
             
             // Update the permanent artifacts indicator
             if (window.heroSelection && window.heroSelection.heroSelectionUI) {
@@ -71,8 +68,6 @@ export const cloudPillowArtifact = {
         await heroSelection.saveGameState();
         
         await heroSelection.sendFormationUpdate();
-
-        console.log(`Cloud Pillow consumed and added to permanent artifacts!`);
     },
     
     // Show activation animation
@@ -153,16 +148,10 @@ export const cloudPillowArtifact = {
         
         const totalCloudPillows = playerCloudPillows.length + opponentCloudPillows.length;
         
-        console.log("CLOUD PILLOW TEST!");
-        console.log(`Player Cloud Pillows: ${playerCloudPillows.length}`);
-        console.log(`Opponent Cloud Pillows: ${opponentCloudPillows.length}`);
-        console.log(`Total Cloud Pillows: ${totalCloudPillows}`);
-        
         if (totalCloudPillows === 0) {
             return; // No Cloud Pillows to process
         }
         
-        console.log(`Activating ${totalCloudPillows} Cloud Pillow${totalCloudPillows > 1 ? 's' : ''}!`);
         battleManager.addCombatLog(
             `${totalCloudPillows} Cloud Pillow${totalCloudPillows > 1 ? 's' : ''} activate${totalCloudPillows === 1 ? 's' : ''}!`,
             'info'
@@ -244,7 +233,6 @@ export const cloudPillowArtifact = {
         });
         
         if (allTargets.length === 0) {
-            console.log(`No valid ally targets for ${ownerSide}'s Cloud Pillow`);
             return;
         }
         

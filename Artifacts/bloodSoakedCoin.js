@@ -97,12 +97,12 @@ export const bloodSoakedCoinArtifact = {
         }
         
         // Method 2: Fallback - store in heroSelection state
-        if (!heroSelection.delayedArtifactEffects) {
-            heroSelection.delayedArtifactEffects = [];
+        if (!heroSelection.delayedEffects) {
+            heroSelection.delayedEffects = [];
         }
         
         // Find existing BloodSoakedCoin effect to accumulate stacks
-        let existingEffect = heroSelection.delayedArtifactEffects.find(
+        let existingEffect = heroSelection.delayedEffects.find(
             effect => effect.source === 'BloodSoakedCoin' && effect.type === 'damage_all_player_heroes'
         );
         
@@ -113,7 +113,7 @@ export const bloodSoakedCoinArtifact = {
             console.log(`🩸 Increased BloodSoakedCoin toll stacks to ${existingEffect.stacks}`);
         } else {
             // Add new effect if none exists
-            heroSelection.delayedArtifactEffects.push({
+            heroSelection.delayedEffects.push({
                 type: 'damage_all_player_heroes',
                 damageAmount: 100,
                 stacks: 1,
@@ -242,12 +242,12 @@ export const bloodSoakedCoinArtifact = {
 
 // Apply battle-start blood toll effects
 export async function applyBloodSoakedCoinDelayedEffects(battleManager, heroSelection) {
-    if (!heroSelection || !heroSelection.delayedArtifactEffects) {
+    if (!heroSelection || !heroSelection.delayedEffects) {
         return;
     }
     
     // Find blood toll effects from BloodSoakedCoin
-    const bloodTollEffects = heroSelection.delayedArtifactEffects.filter(
+    const bloodTollEffects = heroSelection.delayedEffects.filter(
         effect => effect.type === 'damage_all_player_heroes' && effect.source === 'BloodSoakedCoin'
     );
     
@@ -261,7 +261,7 @@ export async function applyBloodSoakedCoinDelayedEffects(battleManager, heroSele
     await damageAllPlayerHeroes(battleManager, bloodTollEffects);
     
     // Remove the processed effects
-    heroSelection.delayedArtifactEffects = heroSelection.delayedArtifactEffects.filter(
+    heroSelection.delayedEffects = heroSelection.delayedEffects.filter(
         effect => !(effect.type === 'damage_all_player_heroes' && effect.source === 'BloodSoakedCoin')
     );
     
@@ -602,8 +602,8 @@ async function clearProcessedBloodTollEffects(battleManager, hostEffects, guestE
         
         // Update Firebase with filtered effects
         await roomRef.child('gameState').update({
-            hostDelayedArtifactEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
-            guestDelayedArtifactEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
+            hostdelayedEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
+            guestdelayedEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
             bloodTollEffectsProcessedAt: Date.now()
         });
         

@@ -6,8 +6,6 @@ export class ResistanceManager {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.resistanceStacks = {}; // Track resistance stacks for each hero
-        
-        console.log('🛡️ Resistance ability manager initialized');
     }
 
     // ============================================
@@ -15,9 +13,7 @@ export class ResistanceManager {
     // ============================================
 
     // Initialize resistance stacks for all heroes at battle start
-    initializeResistanceStacks() {
-        console.log('🛡️ Initializing resistance stacks for all heroes...');
-        
+    initializeResistanceStacks() {        
         // Initialize for player heroes
         this.initializeResistanceForSide('player', this.battleManager.playerHeroes);
         
@@ -26,24 +22,13 @@ export class ResistanceManager {
     }
 
     // Initialize resistance for one side's heroes
-    initializeResistanceForSide(side, heroes) {
-        console.log(`🛡️ RESISTANCE DEBUG: Initializing resistance for ${side} side`);
-        
+    initializeResistanceForSide(side, heroes) {        
         ['left', 'center', 'right'].forEach(position => {
             const hero = heroes[position];
             
-            console.log(`🛡️ RESISTANCE DEBUG: Checking ${side} ${position}:`);
-            console.log(`  - Hero exists: ${!!hero}`);
-            
             if (!hero) {
-                console.log(`  - No hero at ${side} ${position}, skipping`);
                 return;
             }
-            
-            console.log(`  - Hero name: ${hero.name}`);
-            console.log(`  - Hero has Resistance ability: ${hero.hasAbility ? hero.hasAbility('Resistance') : 'hasAbility method missing'}`);
-            console.log(`  - Hero spellShields value: ${hero.spellShields} (type: ${typeof hero.spellShields})`);
-            console.log(`  - Hero spellShields > 0: ${hero.spellShields && hero.spellShields > 0}`);
             
             const hasResistanceAbility = hero.hasAbility && hero.hasAbility('Resistance');
             const hasSpellShields = hero.spellShields && hero.spellShields > 0;
@@ -56,16 +41,13 @@ export class ResistanceManager {
                 // Get base resistance if hero has the ability
                 if (hasResistanceAbility) {
                     baseResistanceLevel = hero.getAbilityStackCount('Resistance');
-                    console.log(`  - Base Resistance level: ${baseResistanceLevel}`);
                 }
                 
                 // Get spell shield bonus
                 if (hasSpellShields) {
                     spellShieldBonus = hero.spellShields;
-                    console.log(`  - Spell Shield bonus: ${spellShieldBonus}`);
                     
                     // Reset spell shields after applying them
-                    console.log(`  - Resetting hero.spellShields from ${hero.spellShields} to 0`);
                     hero.spellShields = 0;
                     
                     // Add combat log message if available
@@ -78,22 +60,14 @@ export class ResistanceManager {
                 }
                 
                 const totalResistance = baseResistanceLevel + spellShieldBonus;
-                console.log(`  - Total resistance: ${totalResistance} (${baseResistanceLevel} base + ${spellShieldBonus} shield)`);
                 
                 this.resistanceStacks[key] = totalResistance;
                 
                 // Store in hero's custom stats for persistence
                 hero.customStats.resistanceStacks = totalResistance;
-                
-                console.log(`  - Set resistanceStacks[${key}] = ${totalResistance}`);
-                console.log(`  - Set hero.customStats.resistanceStacks = ${totalResistance}`);
-            } else {
-                console.log(`  - Hero has no resistance ability and no spell shields, skipping`);
-            }
+            } 
         });
-        
-        console.log(`🛡️ RESISTANCE DEBUG: Final resistance stacks for ${side}:`, this.resistanceStacks);
-        
+                
         // Save the updated hero data back to heroSelection after resetting spell shields
         this.saveSpellShieldChangesToHeroSelection(side, heroes);
     }
@@ -122,8 +96,6 @@ export class ResistanceManager {
                     if (heroSelection.saveGameState) {
                         heroSelection.saveGameState();
                     }
-                    
-                    console.log(`💾 Saved spell shield changes for ${side} side`);
                 }
             }
         } catch (error) {
@@ -160,9 +132,7 @@ export class ResistanceManager {
                 `🛡️ ${target.name} resists ${this.formatSpellName(spellName)}!`,
                 target.side === 'player' ? 'success' : 'warning'
             );
-            
-            console.log(`🛡️ ${target.name} resisted ${spellName}! ${this.resistanceStacks[key]} stacks remaining`);
-            
+                        
             // Send update to guest if host
             if (this.battleManager.isAuthoritative) {
                 this.battleManager.sendBattleUpdate('resistance_used', {
@@ -255,8 +225,6 @@ export class ResistanceManager {
             `🛡️ ${heroName} resists ${this.formatSpellName(spellName)}!`,
             heroLocalSide === 'player' ? 'success' : 'warning'
         );
-        
-        console.log(`🛡️ GUEST: ${heroName} resisted ${spellName}! ${remainingStacks} stacks remaining`);
     }
 
     // ============================================
@@ -350,9 +318,7 @@ export class ResistanceManager {
         if (heroes[position2]) {
             heroes[position2].customStats.resistanceStacks = stacks1;
         }
-        
-        console.log(`🛡️ Swapped resistance stacks: ${position1}(${stacks1}→${stacks2}) ↔ ${position2}(${stacks2}→${stacks1})`);
-        
+                
         // Send network update if authoritative
         if (this.battleManager.isAuthoritative) {
             this.battleManager.sendBattleUpdate('resistance_stacks_swapped', {
@@ -387,8 +353,6 @@ export class ResistanceManager {
         if (heroes[position2]) {
             heroes[position2].customStats.resistanceStacks = stacks1;
         }
-        
-        console.log(`🛡️ Local swap resistance stacks: ${position1}(${stacks1}→${stacks2}) ↔ ${position2}(${stacks2}→${stacks1})`);
     }
 
     // Handle guest-side resistance stack swapping
@@ -424,8 +388,6 @@ export class ResistanceManager {
         if (heroes[position2]) {
             heroes[position2].customStats.resistanceStacks = stacks2;
         }
-        
-        console.log(`🛡️ GUEST: Resistance stacks swapped for ${localSide} side: ${position1}(${stacks1}) ↔ ${position2}(${stacks2})`);
     }
 
     // ============================================
@@ -438,8 +400,6 @@ export class ResistanceManager {
         
         // Also cleanup Ida effects
         IdaHeroEffect.cleanup();
-        
-        console.log('🛡️ Resistance manager cleaned up');
     }
 }
 

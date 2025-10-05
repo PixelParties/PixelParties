@@ -148,7 +148,13 @@ export const teleportSpell = {
             .filter(hero => hero !== null)
             .map(hero => hero.name);
         
-        // Get base hero names from any Ascended heroes currently in formation
+        // Get opponent's heroes to exclude them as well
+        const opponentFormation = heroSelection.formationManager.getOpponentBattleFormation();
+        const opponentHeroNames = Object.values(opponentFormation)
+            .filter(hero => hero !== null)
+            .map(hero => hero.name);
+        
+        // Get base hero names from any Ascended heroes currently in formation (player)
         const currentBaseHeroNames = Object.values(formation)
             .filter(hero => hero !== null)
             .map(hero => {
@@ -160,15 +166,42 @@ export const teleportSpell = {
             })
             .filter(baseHero => baseHero !== null);
 
-        // Get all available heroes excluding current ones and Ascended heroes
+        // Get base hero names from any Ascended heroes in opponent's formation
+        const opponentBaseHeroNames = Object.values(opponentFormation)
+            .filter(hero => hero !== null)
+            .map(hero => {
+                const heroInfo = heroSelection.getCardInfo(hero.name);
+                if (heroInfo && heroInfo.subtype === 'Ascended' && heroInfo.baseHero) {
+                    return heroInfo.baseHero;
+                }
+                return null;
+            })
+            .filter(baseHero => baseHero !== null);
+
+        // Get all available heroes excluding current ones, opponent's heroes, and Carris
         return heroSelection.allCharacters.filter(hero => {
-            // Skip if hero is already in formation
+            // Skip Carris - cannot be selected for teleportation
+            if (hero.name === 'Carris') {
+                return false;
+            }
+            
+            // Skip if hero is already in player's formation
             if (currentHeroNames.includes(hero.name)) {
                 return false;
             }
             
-            // Skip if hero's base form is already in play as an Ascended version
+            // Skip if hero is already in opponent's formation
+            if (opponentHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Skip if hero's base form is already in play as an Ascended version (player)
             if (currentBaseHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Skip if hero's base form is already in play as an Ascended version (opponent)
+            if (opponentBaseHeroNames.includes(hero.name)) {
                 return false;
             }
             

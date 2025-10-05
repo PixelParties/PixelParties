@@ -10,38 +10,12 @@ export class HasteSpell {
     }
 
     // ============================================
-    // SPELL CASTING CHECKS
-    // ============================================
-
-    // Check if the spell can be cast (usage tracking)
-    canCast(caster) {
-        // Get all copies of Haste for this hero
-        const hasteSpells = caster.getAllSpells().filter(spell => spell.name === this.spellName);
-        
-        // Check if any copy is still available for use
-        const hasAvailableCopy = hasteSpells.some(spell => {
-            const usedCount = spell.usedInBattle || 0;
-            return usedCount === 0; // Each copy can only be used once
-        });
-        
-        if (!hasAvailableCopy) {
-            console.log(`⚡ ${caster.name} has no available Haste copies to cast`);
-            return false;
-        }
-        
-        return true;
-    }
-
-    // ============================================
     // CORE SPELL EXECUTION
     // ============================================
 
     // Execute Haste spell effect
     async executeSpell(caster, spell) {
         console.log(`⚡ ${caster.name} casting ${this.displayName}!`);
-        
-        // Mark this specific spell copy as used
-        this.markSpellAsUsed(caster, spell);
         
         // Calculate number of targets based on SupportMagic level
         const targetCount = this.calculateTargetCount(caster);
@@ -68,29 +42,6 @@ export class HasteSpell {
         await this.grantAdditionalActions(targets);
         
         console.log(`⚡ ${this.displayName} completed!`);
-    }
-
-    // ============================================
-    // USAGE TRACKING
-    // ============================================
-
-    // Mark a specific spell copy as used
-    markSpellAsUsed(caster, spellToMark) {
-        const allSpells = caster.getAllSpells();
-        
-        // Find the first unused copy of Haste and mark it as used
-        for (let i = 0; i < allSpells.length; i++) {
-            const spell = allSpells[i];
-            if (spell.name === this.spellName) {
-                const usedCount = spell.usedInBattle || 0;
-                if (usedCount === 0) {
-                    // Mark this copy as used
-                    spell.usedInBattle = 1;
-                    console.log(`⚡ Marked Haste copy ${i} as used for ${caster.name}`);
-                    break;
-                }
-            }
-        }
     }
 
     // ============================================
@@ -702,11 +653,11 @@ export class HasteSpell {
         return {
             name: this.spellName,
             displayName: this.displayName,
-            description: 'Grants additional actions to random ally targets based on SupportMagic level. Each copy usable once per battle.',
+            description: 'Grants additional actions to random ally targets based on SupportMagic level.',
             effectFormula: 'Up to max(1, SupportMagic level) targets',
             targetType: 'random_allies',
             spellSchool: 'SupportMagic',
-            usageLimit: 'Once per copy per battle'
+            usageLimit: 'Unlimited'
         };
     }
 

@@ -1,4 +1,6 @@
 // ./Spells/healingMelody.js - Healing Melody Spell Implementation
+import { NaoHeroEffect } from '../Heroes/nao.js';
+
 
 export class HealingMelodySpell {
     constructor(battleManager) {
@@ -13,6 +15,12 @@ export class HealingMelodySpell {
 
     // Check if spell can be cast (requires eligible targets)
     canCast(caster) {
+        // Check if caster is Nao - use different logic
+        if (NaoHeroEffect.isNao(caster)) {
+            return NaoHeroEffect.canNaoCastHealingMelody(caster, this.battleManager);
+        }
+        
+        // Normal logic for other heroes
         const eligibleTargets = this.findEligibleTargets(caster);
         const canCast = eligibleTargets.heroes.length >= 1 || eligibleTargets.creatures.length >= 2;
         
@@ -76,18 +84,23 @@ export class HealingMelodySpell {
 
     // Execute Healing Melody spell effect
     async executeSpell(caster, spell) {
-        // Find all allies to heal (any with 0 heal-block, regardless of HP)
-        const allTargets = this.findAllHealableTargets(caster);
+        // Check if caster is Nao - use shield granting instead of healing
+        const isNao = NaoHeroEffect.isNao(caster);
+        
+        // Find all targets based on caster type
+        const allTargets = isNao 
+            ? NaoHeroEffect.findNaoHealingMelodyTargets(caster, this.battleManager)
+            : this.findAllHealableTargets(caster);
         
         if (allTargets.heroes.length === 0 && allTargets.creatures.length === 0) {
             return;
         }
         
         // Log the spell effect
-        this.logSpellEffect(caster, allTargets);
+        this.logSpellEffect(caster, allTargets, isNao);
         
-        // Play healing melody animation
-        await this.playHealingMelodyAnimation(caster, allTargets);
+        // Play healing melody animation (same animation, different effect)
+        await this.playHealingMelodyAnimation(caster, allTargets, isNao);
     }
 
     // Find all targets that can be healed (0 heal-block, regardless of HP)
@@ -178,67 +191,104 @@ export class HealingMelodySpell {
     // ============================================
 
     // Play the healing melody animation with music notes
-    async playHealingMelodyAnimation(caster, targets) {
-        // ✅ SEND NETWORK MESSAGE FIRST - before any animations or delays
-        // This ensures guest starts animation at the same time as host
+    async playHealingMelodyAnimation(caster, targets, isNao = false) {
+        // Send network message first
         this.sendAnimationStartToGuest(caster, targets);
         
         // Create music notes flying across the battlefield
         this.createMusicNotesAnimation(caster.side);
         
-        // Animation timing - FIXED to match CSS animations and respect battle speed
+        // Animation timing
         const musicNotesTime = this.battleManager.getSpeedAdjustedDelay(2500);
         const healingTime = this.battleManager.getSpeedAdjustedDelay(800);
         const musicNotesDelay = this.battleManager.getSpeedAdjustedDelay(1500);
         
-        // Wait for music notes to fly across before applying healing
+        // Wait for music notes to fly across before applying effect
         await this.battleManager.delay(musicNotesDelay);
         
-        // Apply healing to all targets
-        const healingResults = {
+        // Apply healing or shield based on caster
+        const effectResults = {
             heroes: [],
             creatures: []
         };
         
-        // Heal heroes
-        targets.heroes.forEach(heroData => {
-            const actualHeal = this.healHero(heroData);
-            healingResults.heroes.push({
-                ...heroData,
-                actualHeal
+        if (isNao) {
+            // Apply shield for Nao
+            const shieldAmount = 100; // Same as heal amount
+            
+            targets.heroes.forEach(heroData => {
+                const actualShield = NaoHeroEffect.applyShieldToHero(heroData, shieldAmount, this.battleManager);
+                effectResults.heroes.push({
+                    ...heroData,
+                    actualShield
+                });
             });
-        });
-        
-        // Heal creatures
-        targets.creatures.forEach(creatureData => {
-            const actualHeal = this.healCreature(creatureData);
-            healingResults.creatures.push({
-                ...creatureData,
-                actualHeal
+            
+            targets.creatures.forEach(creatureData => {
+                const actualShield = NaoHeroEffect.applyShieldToCreature(creatureData, shieldAmount, this.battleManager);
+                effectResults.creatures.push({
+                    ...creatureData,
+                    actualShield
+                });
             });
-        });
+        } else {
+            // Normal healing for other casters
+            targets.heroes.forEach(heroData => {
+                const actualHeal = this.healHero(heroData);
+                effectResults.heroes.push({
+                    ...heroData,
+                    actualHeal
+                });
+            });
+            
+            targets.creatures.forEach(creatureData => {
+                const actualHeal = this.healCreature(creatureData);
+                effectResults.creatures.push({
+                    ...creatureData,
+                    actualHeal
+                });
+            });
+        }
         
-        // Create healing visual effects on all targets
+        // Create visual effects on all targets
         this.createHealingEffects(targets);
         
-        // Send network update to guest (existing method - for HP updates)
-        this.sendHealingUpdate(caster, healingResults);
+        // Send network update
+        if (isNao) {
+            this.sendShieldUpdate(caster, effectResults);
+        } else {
+            this.sendHealingUpdate(caster, effectResults);
+        }
         
-        // Wait for all animations to complete
-        // Music notes started at the beginning and run for musicNotesTime
-        // Healing effects started now and run for healingTime
-        // We need to wait for whichever is longer to finish
+        // Wait for animations to complete
         const remainingMusicTime = musicNotesTime - musicNotesDelay;
         const totalWaitTime = Math.max(remainingMusicTime, healingTime);
         
         await this.battleManager.delay(totalWaitTime);
-        
-        // Small buffer to ensure everything is done
         await this.battleManager.delay(this.battleManager.getSpeedAdjustedDelay(200));
         
         // Cleanup
         this.cleanupHealingMelodyEffects();
     }
+
+    sendShieldUpdate(caster, shieldResults) {
+        // Send shield updates using the existing hero_shield_changed message type
+        shieldResults.heroes.forEach(heroData => {
+            this.battleManager.sendBattleUpdate('hero_shield_changed', {
+                targetAbsoluteSide: heroData.hero.absoluteSide,
+                targetPosition: heroData.position,
+                targetName: heroData.hero.name,
+                newShield: heroData.hero.currentShield,
+                shieldGained: heroData.actualShield,
+                source: 'HealingMelody_Nao',
+                timestamp: Date.now()
+            });
+        });
+        
+        // Note: Creature shields would need a new message type if you want to display them
+        // For now, they're stored but not visually shown
+    }
+
 
     sendAnimationStartToGuest(caster, targets) {
         this.battleManager.sendBattleUpdate('healing_melody_start', {
@@ -530,17 +580,20 @@ export class HealingMelodySpell {
     // ============================================
 
     // Log the spell effect to battle log
-    logSpellEffect(caster, targets) {
+    logSpellEffect(caster, targets, isNao = false) {
         const casterSide = caster.side;
         const logType = casterSide === 'player' ? 'success' : 'error';
         
         const totalTargets = targets.heroes.length + targets.creatures.length;
         
-        // Main spell effect log
-        const logMessage = `🎵 ${this.displayName} heals ${totalTargets} allies with soothing music!`;
+        // Different message for Nao's shield version
+        const logMessage = isNao 
+            ? `🎵🛡️ ${caster.name}'s ${this.displayName} grants shields to ${totalTargets} allies!`
+            : `🎵 ${this.displayName} heals ${totalTargets} allies with soothing music!`;
         
         this.battleManager.addCombatLog(logMessage, logType);
     }
+
 
     // ============================================
     // GUEST-SIDE HANDLING

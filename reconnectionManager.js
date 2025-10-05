@@ -271,7 +271,7 @@ export class ReconnectionManager {
                     gameState.hostPotionState,
                     gameState.hostNicolasState,
                     gameState.hostVacarnState,
-                    gameState.hostDelayedArtifactEffects,
+                    gameState.hostdelayedEffects,
                     gameState.hostSemiState,
                     gameState.hostHeinzState,
                     gameState.hostPermanentArtifacts,
@@ -322,7 +322,7 @@ export class ReconnectionManager {
                     gameState.guestPotionState,
                     gameState.guestNicolasState,
                     gameState.guestVacarnState,
-                    gameState.guestDelayedArtifactEffects,
+                    gameState.guestdelayedEffects,
                     gameState.guestSemiState,
                     gameState.guestHeinzState,
                     gameState.guestPermanentArtifacts,
@@ -515,6 +515,15 @@ export class ReconnectionManager {
                 await window.futureTechCopyDeviceArtifact.restoreCopyDeviceState(this.heroSelection, gameState.guestFutureTechCopyDeviceState);
             }
         }
+        if (this.isHost && gameState.hostPremonitionState) {
+            if (this.heroSelection.premonitionAbility) {
+                await this.heroSelection.premonitionAbility.restorePremonitionState(this.heroSelection, gameState.hostPremonitionState);
+            }
+        } else if (!this.isHost && gameState.guestPremonitionState) {
+            if (this.heroSelection.premonitionAbility) {
+                await this.heroSelection.premonitionAbility.restorePremonitionState(this.heroSelection, gameState.guestPremonitionState);
+            }
+        }
 
         // Restore potion state
         if (this.isHost && gameState.hostPotionState) {
@@ -684,7 +693,6 @@ export class ReconnectionManager {
                 this.heroSelection.inventingAbility.reset();
             }
         }
-
         if (this.isHost && gameState.hostOccultismState) {
             if (this.heroSelection.occultismAbility) {
                 this.heroSelection.occultismAbility.importState(gameState.hostOccultismState);
@@ -697,6 +705,19 @@ export class ReconnectionManager {
         } else {
             if (this.heroSelection.occultismAbility) {
                 this.heroSelection.occultismAbility.reset();
+            }
+        }
+        if (this.isHost && gameState.hostPremonitionState) {
+            if (this.heroSelection.premonitionAbility) {
+                await this.heroSelection.premonitionAbility.importState(gameState.hostPremonitionState, this.heroSelection);
+            }
+        } else if (!this.isHost && gameState.guestPremonitionState) {
+            if (this.heroSelection.premonitionAbility) {
+                await this.heroSelection.premonitionAbility.importState(gameState.guestPremonitionState, this.heroSelection);
+            }
+        } else {
+            if (this.heroSelection.premonitionAbility) {
+                this.heroSelection.premonitionAbility.reset();
             }
         }
 

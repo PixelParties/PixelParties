@@ -2,8 +2,13 @@
 // Handles the main battle flow, turn processing, and actor management
 
 import CavalryCreature from './Creatures/cavalry.js';
+
 import BattleStartManager from './battleStartManager.js';
+
 import { DoomClockEffect, applyDoomClockBattleEffects, processDoomClockRoundCompletion } from './Spells/doomClock.js';
+
+import { CarrisHeroEffect } from './Heroes/carris.js';
+
 
 
 export class BattleFlowManager {
@@ -11,7 +16,151 @@ export class BattleFlowManager {
         this.battleManager = battleManager;
         this.cavalryManager = null;
         this.battleStartManager = new BattleStartManager(battleManager);
+
+        this.currentPlayerActors = [];
+        this.currentOpponentActors = [];
+        this.currentActorIndex = -1;
+        this.currentPosition = null;
+        this.currentlyActingPlayer = null;
+        this.currentlyActingOpponent = null;
     }
+
+    // Get current actor processing state (for spell system)
+    getCurrentActorState() {
+        return {
+            playerActors: [...this.currentPlayerActors],
+            opponentActors: [...this.currentOpponentActors],
+            currentIndex: this.currentActorIndex,
+            position: this.currentPosition
+        };
+    }
+
+    // Remove actor from processing queue (for Slow spell)
+    removeActorFromQueue(side, index) {
+        if (side === 'player' && index >= 0 && index < this.currentPlayerActors.length) {
+            console.log(`🕰️ Removing actor at index ${index} from player queue`);
+            this.currentPlayerActors.splice(index, 1);
+            return true;
+        } else if (side === 'opponent' && index >= 0 && index < this.currentOpponentActors.length) {
+            console.log(`🕰️ Removing actor at index ${index} from opponent queue`);
+            this.currentOpponentActors.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+
+
+
+    // ============================================
+    // ROUND INITIATIVE MANAGEMENT (for spells like Slow)
+    // ============================================
+
+    // Initialize round initiative list at start of turn
+    initializeRoundInitiative() {
+        this.roundInitiative = {
+            allActors: [],
+            actedActors: new Set(),
+            removedActors: new Set()
+        };
+        
+        // Build actors for all positions
+        ['left', 'center', 'right'].forEach(position => {
+            const playerHero = this.battleManager.playerHeroes[position];
+            const opponentHero = this.battleManager.opponentHeroes[position];
+            
+            const playerCanAct = playerHero && playerHero.alive;
+            const opponentCanAct = opponentHero && opponentHero.alive;
+            
+            // Get actors for this position
+            const playerActors = this.buildActorList(playerHero, playerCanAct);
+            const opponentActors = this.buildActorList(opponentHero, opponentCanAct);
+            
+            // Add to global list with position and index tracking
+            playerActors.forEach((actor, localIndex) => {
+                const globalActor = {
+                    ...actor,
+                    position: position,
+                    side: 'player',
+                    localIndex: localIndex,
+                    globalId: `player_${position}_${actor.type}_${actor.index || localIndex}_${this.roundInitiative.allActors.length}`
+                };
+                this.roundInitiative.allActors.push(globalActor);
+            });
+            
+            opponentActors.forEach((actor, localIndex) => {
+                const globalActor = {
+                    ...actor,
+                    position: position,
+                    side: 'opponent',
+                    localIndex: localIndex,
+                    globalId: `opponent_${position}_${actor.type}_${actor.index || localIndex}_${this.roundInitiative.allActors.length}`
+                };
+                this.roundInitiative.allActors.push(globalActor);
+            });
+        });
+        
+        console.log(`🎯 Round ${this.battleManager.currentTurn} initiative initialized with ${this.roundInitiative.allActors.length} actors`);
+    }
+
+    // Get all actors that haven't acted yet for given side
+    getUnactedActorsForSide(targetSide) {
+        if (!this.roundInitiative) return [];
+        
+        return this.roundInitiative.allActors.filter(actor => {
+            // Must be on target side
+            if (actor.side !== targetSide) return false;
+            
+            // Must not have acted yet
+            if (this.roundInitiative.actedActors.has(actor.globalId)) return false;
+            
+            // Must not be removed (by Slow or other effects)
+            if (this.roundInitiative.removedActors.has(actor.globalId)) return false;
+            
+            // Must still be alive
+            return this.isActorAlive(actor);
+        });
+    }
+
+    // Mark actor as having acted
+    markActorAsActed(actor) {
+        if (!this.roundInitiative || !actor.globalId) return;
+        
+        this.roundInitiative.actedActors.add(actor.globalId);
+        console.log(`✅ Marked ${actor.name} (${actor.globalId}) as acted`);
+    }
+
+    // Remove actor from initiative (for Slow spell)
+    removeActorFromInitiative(globalId) {
+        if (!this.roundInitiative) return false;
+        
+        this.roundInitiative.removedActors.add(globalId);
+        console.log(`🕰️ Removed actor ${globalId} from initiative`);
+        return true;
+    }
+
+    // Get current round initiative state (for spell system)
+    getRoundInitiativeState() {
+        if (!this.roundInitiative) return null;
+        
+        return {
+            allActors: [...this.roundInitiative.allActors],
+            actedActors: new Set(this.roundInitiative.actedActors),
+            removedActors: new Set(this.roundInitiative.removedActors)
+        };
+    }
+
+    // Clean up round initiative
+    clearRoundInitiative() {
+        this.roundInitiative = null;
+        console.log(`🎯 Round initiative cleared`);
+    }
+
+
+
+
+
+
+
 
     // Start the battle
     async startBattle() {
@@ -220,6 +369,32 @@ export class BattleFlowManager {
             const CutePhoenixCreature = (await import('./Creatures/cutePhoenix.js')).default;
             bm.cutePhoenixManager = new CutePhoenixCreature(bm);
 
+            const SkeletonHealerCreature = (await import('./Creatures/skeletonHealer.js')).default;
+            bm.skeletonHealerManager = new SkeletonHealerCreature(bm);
+
+            const SoulShardIbCreature = (await import('./Creatures/soulShardIb.js')).default;
+            bm.soulShardIbManager = new SoulShardIbCreature(bm);
+            
+            const SoulShardKaCreature = (await import('./Creatures/soulShardKa.js')).default;
+            bm.soulShardKaManager = new SoulShardKaCreature(bm);
+            
+            const SoulShardKhetCreature = (await import('./Creatures/soulShardKhet.js')).default;
+            bm.soulShardKhetManager = new SoulShardKhetCreature(bm);
+            
+            const SoulShardBaCreature = (await import('./Creatures/soulShardBa.js')).default;
+            bm.soulShardBaManager = new SoulShardBaCreature(bm);
+
+            const SoulShardRenCreature = (await import('./Creatures/soulShardRen.js')).default;
+            bm.soulShardRenManager = new SoulShardRenCreature(bm);
+
+            const SoulShardSekhemCreature = (await import('./Creatures/soulShardSekhem.js')).default;
+            bm.soulShardSekhemManager = new SoulShardSekhemCreature(bm);
+
+            const SoulShardShutCreature = (await import('./Creatures/soulShardShut.js')).default;
+            bm.soulShardShutManager = new SoulShardShutCreature(bm);
+
+            const SoulShardSahCreature = (await import('./Creatures/soulShardSah.js')).default;
+            bm.soulShardSahManager = new SoulShardSahCreature(bm);
 
 
 
@@ -266,7 +441,12 @@ export class BattleFlowManager {
             if (!bm.demonsGateManager) bm.demonsGateManager = null;
             if (!bm.cutePhoenixManager) bm.cutePhoenixManager = null;
             if (!bm.priestOfLunaManager) bm.priestOfLunaManager = null;
+            if (!bm.skeletonHealerManager) bm.skeletonHealerManager = null;
+            if (!bm.soulShardIbManager) bm.soulShardIbManager = null;
+            if (!bm.soulShardSekhemManager) bm.soulShardSekhemManager = null;
+
             if (!bm.biomancyTokenManager) bm.biomancyTokenManager = null;
+
             if (!bm.lunaManager) bm.lunaManager = null;
             if (!bm.aliceManager) bm.aliceManager = null;
         }
@@ -291,6 +471,22 @@ export class BattleFlowManager {
      */
     async activateCreatureSpecialAttack(actor, position) {
         const bm = this.battleManager;
+            
+        //Shake the creature before executing its special attack
+        const heroSide = actor.hero.side;
+    
+        // Send shake message to guest BEFORE shaking locally
+        if (bm.isAuthoritative) {
+            bm.sendBattleUpdate('creature_shake_action', {
+                position: position,
+                creatureName: actor.name,
+                creatureIndex: actor.index,
+                heroSide: heroSide,
+                actionType: 'pre_action_shake'
+            });
+        }
+        
+        await bm.animationManager.shakeCreature(heroSide, position, actor.index);
         
         try {
             // Import creature classes dynamically to avoid circular dependencies
@@ -322,6 +518,19 @@ export class BattleFlowManager {
             const LunaKiaiCreature = (await import('./Creatures/lunaKiai.js')).default;
             const PriestOfLunaCreature = (await import('./Creatures/priestOfLuna.js')).default;
             const CutePhoenixCreature = (await import('./Creatures/cutePhoenix.js')).default;
+            const SkeletonHealerCreature = (await import('./Creatures/skeletonHealer.js')).default;
+            const SoulShardIbCreature = (await import('./Creatures/soulShardIb.js')).default;
+            const SoulShardKaCreature = (await import('./Creatures/soulShardKa.js')).default;
+            const SoulShardKhetCreature = (await import('./Creatures/soulShardKhet.js')).default;
+            const SoulShardBaCreature = (await import('./Creatures/soulShardBa.js')).default;
+            const SoulShardRenCreature = (await import('./Creatures/soulShardRen.js')).default;
+            const SoulShardSekhemCreature = (await import('./Creatures/soulShardSekhem.js')).default;
+            const SoulShardShutCreature = (await import('./Creatures/soulShardShut.js')).default;
+            const SoulShardSahCreature = (await import('./Creatures/soulShardSah.js')).default;
+
+
+
+
             const BiomancyTokenCreature = (await import('./Creatures/biomancyToken.js')).default;
 
             const creatureName = actor.name;
@@ -497,7 +706,54 @@ export class BattleFlowManager {
                 } else {
                     return await this.executeCreatureFallbackAction(actor, position);
                 }
-            } else {
+            } else if (SkeletonHealerCreature.isSkeletonHealer(creatureName)) {
+                if (bm.skeletonHealerManager) {
+                    return await bm.skeletonHealerManager.executeSpecialAttack(actor, position);
+                } else {
+                    return await this.executeCreatureFallbackAction(actor, position);
+                }
+            } else if (SoulShardIbCreature.isSoulShardIb(creatureName)) {
+                if (!bm.soulShardIbManager) {
+                    bm.soulShardIbManager = new SoulShardIbCreature(bm);
+                }
+                return await bm.soulShardIbManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardKaCreature.isSoulShardKa(creatureName)) {
+                if (!bm.soulShardKaManager) {
+                    bm.soulShardKaManager = new SoulShardKaCreature(bm);
+                }
+                return await bm.soulShardKaManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardKhetCreature.isSoulShardKhet(creatureName)) {
+                if (!bm.soulShardKhetManager) {
+                    bm.soulShardKhetManager = new SoulShardKhetCreature(bm);
+                }
+                return await bm.soulShardKhetManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardBaCreature.isSoulShardBa(creatureName)) {
+                if (!bm.soulShardBaManager) {
+                    bm.soulShardBaManager = new SoulShardBaCreature(bm);
+                }
+                return await bm.soulShardBaManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardRenCreature.isSoulShardRen(creatureName)) {
+                if (!bm.soulShardRenManager) {
+                    bm.soulShardRenManager = new SoulShardRenCreature(bm);
+                }
+                return await bm.soulShardRenManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardSekhemCreature.isSoulShardSekhem(creatureName)) {
+                if (!bm.soulShardSekhemManager) {
+                    bm.soulShardSekhemManager = new SoulShardSekhemCreature(bm);
+                }
+                return await bm.soulShardSekhemManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardShutCreature.isSoulShardShut(creatureName)) {
+                if (!bm.soulShardShutManager) {
+                    bm.soulShardShutManager = new SoulShardShutCreature(bm);
+                }
+                return await bm.soulShardShutManager.executeSpecialAttack(actor, position);
+            } else if (SoulShardSahCreature.isSoulShardSah(creatureName)) {
+                if (!bm.soulShardSahManager) {
+                    bm.soulShardSahManager = new SoulShardSahCreature(bm);
+                }
+                return await bm.soulShardSahManager.executeSpecialAttack(actor, position);
+            }
+            else {
                 // Default action for creatures without special attacks - now with network sync
                 return await this.executeCreatureFallbackAction(actor, position);
             }
@@ -574,6 +830,7 @@ export class BattleFlowManager {
                 }
                 
                 bm.sendBattleUpdate('turn_start', { turn: bm.currentTurn });
+                this.initializeRoundInitiative();
                             
                 // Process all positions for this turn
                 for (const position of ['left', 'center', 'right']) {
@@ -615,6 +872,22 @@ export class BattleFlowManager {
                     }
                 }
 
+                // ============================================
+                // RECORD HP SNAPSHOT FOR STALEMATE DETECTION
+                // ============================================
+                bm.recordCurrentHpSnapshot();
+
+                // ============================================  
+                // CHECK FOR STALEMATE BEFORE BATTLE END
+                // ============================================
+                if (bm.checkForStalemate()) {
+                    bm.addCombatLog('⚠️ Stalemate detected! No hero has taken damage for 20 turns.', 'warning');
+                    bm.addCombatLog('🤝 Battle ends in a draw!', 'info');
+                    
+                    // Force battle to end as draw
+                    this.forceDrawFromStalemate();
+                    break;
+                }
                 
                 // ============================================
                 // FORCE FULL CREATURE STATE SYNC AT END OF TURN
@@ -640,6 +913,8 @@ export class BattleFlowManager {
                 if (bm.battlePaused || !bm.opponentConnected) {
                     break;
                 }
+
+                this.clearRoundInitiative();
                 
                 // Create checkpoint at end of turn
                 if (bm.checkpointSystem) {
@@ -647,6 +922,16 @@ export class BattleFlowManager {
                         await bm.checkpointSystem.createBattleCheckpoint('turn_end');
                     } catch (error) {
                         // Error handled silently
+                    }
+                }
+
+                // ============================================  
+                // CHECK FOR CARRIS TIME LIMIT BEFORE BATTLE END
+                // ============================================
+                if (bm.currentTurn >= 3) {
+                    const carrisBattleEnd = CarrisHeroEffect.checkCarrisTimeLimit(bm);
+                    if (carrisBattleEnd) {
+                        break; // Exit the battle loop - Carris time limit reached
                     }
                 }
                 
@@ -668,6 +953,32 @@ export class BattleFlowManager {
         }
     }
 
+    /**
+     * Force battle to end as draw due to stalemate
+     */
+    forceDrawFromStalemate() {
+        const bm = this.battleManager;
+        
+        // Set all heroes as defeated to trigger draw condition
+        ['left', 'center', 'right'].forEach(position => {
+            if (bm.playerHeroes[position]) {
+                bm.playerHeroes[position].alive = false;
+            }
+            if (bm.opponentHeroes[position]) {
+                bm.opponentHeroes[position].alive = false;
+            }
+        });
+        
+        // Send stalemate notification to guest
+        if (bm.isAuthoritative) {
+            bm.sendBattleUpdate('stalemate_detected', {
+                turn: bm.currentTurn,
+                reason: 'No hero HP decreased for 20 turns',
+                timestamp: Date.now()
+            });
+        }
+    }
+
     // Process turn for a specific position with creatures
     async authoritative_processTurnForPosition(position) {
         const bm = this.battleManager;
@@ -682,11 +993,45 @@ export class BattleFlowManager {
         const playerCanAct = playerHero && playerHero.alive;
         const opponentCanAct = opponentHero && opponentHero.alive;
         
-        // Build complete actor lists for both sides to check if anyone can act
-        const playerActors = this.buildActorList(playerHero, playerCanAct);
-        const opponentActors = this.buildActorList(opponentHero, opponentCanAct);
+        // Build complete actor lists and store them for spell system access
+        this.currentPlayerActors = this.buildActorList(playerHero, playerCanAct);
+        this.currentOpponentActors = this.buildActorList(opponentHero, opponentCanAct);
+        this.currentPosition = position;
+        this.currentActorIndex = -1; // Will be updated in the loop
+
+        // FILTER OUT ACTORS REMOVED BY SLOW - ADD THIS SECTION:
+        if (this.roundInitiative) {
+            // Filter player actors
+            this.currentPlayerActors = this.currentPlayerActors.filter((actor, localIndex) => {
+                const globalActor = this.roundInitiative.allActors.find(global => 
+                    global.side === 'player' && 
+                    global.position === position && 
+                    global.type === actor.type && 
+                    global.name === actor.name &&
+                    global.localIndex === localIndex
+                );
+                
+                return !globalActor || !this.roundInitiative.removedActors.has(globalActor.globalId);
+            });
+            
+            // Filter opponent actors
+            this.currentOpponentActors = this.currentOpponentActors.filter((actor, localIndex) => {
+                const globalActor = this.roundInitiative.allActors.find(global => 
+                    global.side === 'opponent' && 
+                    global.position === position && 
+                    global.type === actor.type && 
+                    global.name === actor.name &&
+                    global.localIndex === localIndex
+                );
+                
+                return !globalActor || !this.roundInitiative.removedActors.has(globalActor.globalId);
+            });
+        }
+
+        const playerActors = this.currentPlayerActors;
+        const opponentActors = this.currentOpponentActors;
         
-        // NEW FIX: Check if ANY actors exist (heroes OR creatures) before returning early
+        // Check if ANY actors exist (heroes OR creatures) before returning early
         if (playerActors.length === 0 && opponentActors.length === 0) {
             bm.turnInProgress = false;
             return;
@@ -696,6 +1041,8 @@ export class BattleFlowManager {
         const maxActors = Math.max(playerActors.length, opponentActors.length);
         
         for (let i = 0; i < maxActors; i++) {
+            this.currentActorIndex = i;
+
             // Check if battle should end before processing more actors
             if (this.checkBattleEnd()) {
                 break;
@@ -723,6 +1070,9 @@ export class BattleFlowManager {
             if (opponentActor && !this.isActorAlive(opponentActor)) {
                 opponentActor = null;
             }
+
+            this.currentlyActingPlayer = playerActor;
+            this.currentlyActingOpponent = opponentActor;
             
             // Skip if both actors are dead/invalid
             if (!playerActor && !opponentActor) continue;
@@ -749,6 +1099,39 @@ export class BattleFlowManager {
             // Execute actor actions
             await this.executeActorActions(playerActor, opponentActor, position);
             
+            // Clear acting actors after they've acted
+            this.currentlyActingPlayer = null;
+            this.currentlyActingOpponent = null;
+            
+            // MARK ACTORS AS ACTED IN ROUND INITIATIVE - ADD THIS:
+            if (this.roundInitiative) {
+                if (playerActor) {
+                    const globalPlayerActor = this.roundInitiative.allActors.find(global => 
+                        global.side === 'player' && 
+                        global.position === position && 
+                        global.type === playerActor.type && 
+                        global.name === playerActor.name &&
+                        global.localIndex === i
+                    );
+                    if (globalPlayerActor) {
+                        this.markActorAsActed(globalPlayerActor);
+                    }
+                }
+                
+                if (opponentActor) {
+                    const globalOpponentActor = this.roundInitiative.allActors.find(global => 
+                        global.side === 'opponent' && 
+                        global.position === position && 
+                        global.type === opponentActor.type && 
+                        global.name === opponentActor.name &&
+                        global.localIndex === i
+                    );
+                    if (globalOpponentActor) {
+                        this.markActorAsActed(globalOpponentActor);
+                    }
+                }
+            }
+
             await bm.delay(300); // Brief pause between actor pairs (now speed-adjusted)
         }
         
@@ -777,7 +1160,26 @@ export class BattleFlowManager {
             await bm.delay(50); // Brief delay to ensure sync message is sent
         }
 
+        
+        // Clear actor processing state
+        this.currentPlayerActors = [];
+        this.currentOpponentActors = [];
+        this.currentActorIndex = -1;
+        this.currentPosition = null;
+        this.currentlyActingPlayer = null;
+        this.currentlyActingOpponent = null;
+
         bm.turnInProgress = false;
+    }
+
+    // Get currently acting enemy actor (for Slow spell exclusion)
+    getCurrentlyActingEnemy(casterSide) {
+        if (casterSide === 'player') {
+            return this.currentlyActingOpponent;
+        } else if (casterSide === 'opponent') {
+            return this.currentlyActingPlayer;
+        }
+        return null;
     }
 
     // Check if an actor is alive
@@ -856,7 +1258,51 @@ export class BattleFlowManager {
                 data: hero,
                 hero: hero
             });
+            
+            // Handle Divinity ability - add hero additional times
+            if (hero.hasAbility && hero.hasAbility('Divinity')) {
+                const divinityLevel = hero.getAbilityStackCount('Divinity');
+                
+                // Add hero X additional times where X is Divinity level
+                for (let i = 0; i < divinityLevel; i++) {
+                    actors.push({
+                        type: 'hero',
+                        name: hero.name,
+                        data: hero,
+                        hero: hero,
+                        isDivineAction: true  // Mark as divine action for potential future use
+                    });
+                }
+            }
         }
+
+        if (this.battleManager.bigGwenEffect && this.battleManager.bigGwenEffect.isActive) {
+        // Track which actors we've already added a BigGwen bonus for
+        const bigGwenBonusApplied = new Set();
+        
+        // Create a copy of current actors to iterate over (avoiding modification during iteration)
+        const originalActors = [...actors];
+        
+        for (const actor of originalActors) {
+            // Create a unique key for this actor to prevent duplicate bonuses
+            const actorKey = actor.type === 'hero' 
+                ? `hero_${actor.hero.position}` 
+                : `creature_${actor.hero.position}_${actor.index}`;
+            
+            // Only add BigGwen bonus once per unique actor, regardless of how many times it was already added
+            if (!bigGwenBonusApplied.has(actorKey) && 
+                this.battleManager.bigGwenEffect.shouldGetBigGwenBonus(actor, this.battleManager)) {
+                
+                // Add the actor one additional time with BigGwen marking
+                actors.push({
+                    ...actor,
+                    isBigGwenAction: true // Mark as BigGwen bonus action
+                });
+                
+                bigGwenBonusApplied.add(actorKey);
+            }
+        }
+    }
         
         return actors;
     }
@@ -875,7 +1321,7 @@ export class BattleFlowManager {
     }
 
     // Execute actor actions (with Ice Age support) - NOW USES CENTRALIZED ACTIVATION
-    async executeActorActions(playerActor, opponentActor, position) {
+    async executeActorActions(playerActor, opponentActor, position, isAdditionalAction = false) {
         const bm = this.battleManager;
         
         // Check for Ice Age pause before executing actions
@@ -889,7 +1335,64 @@ export class BattleFlowManager {
         }
         
         // ============================================
-        // REMEMBER ORIGINAL ACTORS FOR STATUS EFFECTS
+        // ADDITIONAL ACTION HANDLING
+        // ============================================
+        
+        if (isAdditionalAction) {
+            // For additional actions, we only process one actor
+            // Determine which actor is the additional action performer
+            const additionalActor = playerActor || opponentActor;
+            
+            if (!additionalActor) {
+                console.warn('Additional action called with no actor');
+                return;
+            }
+            
+            // Only heroes can perform additional actions currently
+            if (additionalActor.type !== 'hero') {
+                console.warn('Additional action attempted by non-hero actor');
+                return;
+            }
+            
+            // Check if the actor can take action (not stunned/frozen)
+            let canAct = true;
+            if (bm.statusEffectsManager && !bm.statusEffectsManager.canTakeAction(additionalActor.data)) {
+                const stunned = bm.statusEffectsManager.hasStatusEffect(additionalActor.data, 'stunned');
+                const frozen = bm.statusEffectsManager.hasStatusEffect(additionalActor.data, 'frozen');
+                
+                if (stunned) {
+                    bm.statusEffectsManager.processTurnSkip(additionalActor.data, 'stunned');
+                    bm.addCombatLog(`${additionalActor.data.name}'s additional action is prevented by stun!`, 'warning');
+                    canAct = false;
+                } else if (frozen) {
+                    bm.statusEffectsManager.processTurnSkip(additionalActor.data, 'frozen');
+                    bm.addCombatLog(`${additionalActor.data.name}'s additional action is prevented by freeze!`, 'warning');
+                    canAct = false;
+                }
+            }
+            
+            if (!canAct) {
+                return;
+            }
+            
+            // Execute the additional hero action
+            if (playerActor) {
+                await bm.combatManager.executeHeroActions(additionalActor, null, position, isAdditionalAction);
+            } else {
+                await bm.combatManager.executeHeroActions(null, additionalActor, position, isAdditionalAction);
+            }
+            
+            // Process status effects after the additional action
+            if (bm.statusEffectsManager && additionalActor.data && additionalActor.data.alive) {
+                await bm.statusEffectsManager.processStatusEffectsAfterTurn(additionalActor.data);
+                await bm.delay(200);
+            }
+            
+            return;
+        }
+        
+        // ============================================
+        // REMEMBER ORIGINAL ACTORS FOR STATUS EFFECTS (existing logic unchanged)
         // ============================================
         
         // Remember original actors before filtering for stun/freeze
@@ -898,7 +1401,7 @@ export class BattleFlowManager {
         const originalOpponentActor = opponentActor;
         
         // ============================================
-        // STATUS EFFECTS: Check action restrictions
+        // STATUS EFFECTS: Check action restrictions (existing logic unchanged)
         // ============================================
         
         // Check if player actor can take action (not stunned/frozen)
@@ -930,7 +1433,7 @@ export class BattleFlowManager {
         }
         
         // ============================================
-        // CREATURE ACTIONS - NOW USES CENTRALIZED LOGIC
+        // CREATURE ACTIONS - NOW USES CENTRALIZED LOGIC (existing logic unchanged)
         // ============================================
         
         const actions = [];
@@ -955,7 +1458,7 @@ export class BattleFlowManager {
             hasHeroActions = true;
 
             // ============================================
-            // HERO SPECIAL EFFECTS: Trigger at START of turn (before actions)
+            // HERO SPECIAL EFFECTS: Trigger at START of turn (before actions) (existing logic unchanged)
             // ============================================
 
             // Process Alice special actions BEFORE normal hero combat  
@@ -989,7 +1492,8 @@ export class BattleFlowManager {
             const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;
             const opponentHeroAction = opponentActor && opponentActor.type === 'hero' ? opponentActor : null;
             
-            const heroActionPromise = bm.executeHeroActions(playerHeroAction, opponentHeroAction, position);
+            // UPDATED: Pass isAdditionalAction flag
+            const heroActionPromise = bm.executeHeroActions(playerHeroAction, opponentHeroAction, position, isAdditionalAction);
             
             // Add hero actions to the actions array
             actions.push(heroActionPromise);
@@ -1022,15 +1526,24 @@ export class BattleFlowManager {
             const playerHeroAction = playerActor && playerActor.type === 'hero' ? playerActor : null;
             const opponentHeroAction = opponentActor && opponentActor.type === 'hero' ? opponentActor : null;
             
-            await bm.executeHeroActions(playerHeroAction, opponentHeroAction, position);
+            // UPDATED: Pass isAdditionalAction flag
+            await bm.executeHeroActions(playerHeroAction, opponentHeroAction, position, isAdditionalAction);
         }
         // If we only have regular creature actions, execute them
         else if (actions.length > 0) {
             await Promise.all(actions);
         }
+
+        // Mark actors as having acted in round initiative
+        if (originalPlayerActor && originalPlayerActor.globalId) {
+            this.markActorAsActed(originalPlayerActor);
+        }
+        if (originalOpponentActor && originalOpponentActor.globalId) {
+            this.markActorAsActed(originalOpponentActor);
+        }
         
         // ============================================
-        // STATUS EFFECTS: Post-turn processing
+        // STATUS EFFECTS: Post-turn processing (existing logic unchanged)
         // ============================================
         
         // Process status effects after actor actions complete
@@ -1065,7 +1578,7 @@ export class BattleFlowManager {
         }
         
         // ============================================
-        // FINAL BATTLE STATE CHECK
+        // FINAL BATTLE STATE CHECK (existing logic unchanged)
         // ============================================
         
         // Final check if battle ended due to status effect damage

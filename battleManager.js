@@ -22,14 +22,11 @@ import { applyResistancePatches } from './Abilities/resistance.js';
 import { CannibalismAbility } from './Abilities/cannibalism.js';
 import { applyFriendshipPatches } from './Abilities/friendship.js';
 
-import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js'
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 
 
-import { checkFuriousAngerReactions } from './Spells/furiousAnger.js';
 
 import RoyalCorgiCreature from './Creatures/royalCorgi.js';
-import GrinningCatCreature from './Creatures/grinningCat.js';
 
 import { MoniaHeroEffect } from './Heroes/monia.js';
 import { kazenaEffect } from './Heroes/kazena.js';
@@ -98,6 +95,7 @@ export class BattleManager {
         this.skeletonNecromancerManager = null;
         this.skeletonDeathKnightManager = null;
         this.skeletonReaperManager = null;
+        this.skeletonHealerManager = null;
         this.archerManager = null;
         this.royalCorgiManager = null;
         this.futureTechMechManager = null;
@@ -142,6 +140,10 @@ export class BattleManager {
         this.statusEffectsManager = null;
         this.animationManager = null;
         this.killTracker = killTracker;
+
+        // HP tracking for stalemate detection
+        this.hpHistory = [];
+        this.stalemateCheckTurns = 20;
         
         // Make globally accessible for reward calculations
         if (typeof window !== 'undefined') {
@@ -871,6 +873,7 @@ export class BattleManager {
         this.weatherEffects = null;
         this.terrainModifiers = [];
         this.specialRules = [];
+        this.hpHistory = [];
     }
 
     // Battle loop with connection awareness and persistence
@@ -1268,6 +1271,17 @@ export class BattleManager {
             
             // Execute the permanent skeleton spawn effect
             await this.skeletonKingSkullmaelManager.executeDeathSkeletonSpawn(creature, heroOwner, position, side);
+        }
+
+        // SKELETON HEALER DEATH HEALING
+        if (creature.name === 'SkeletonHealer' && this.skeletonHealerManager) {
+            
+            // Get the side and position for the death effect
+            const side = heroOwner.side;
+            const position = heroOwner.position;
+            
+            // Execute the death healing effect
+            await this.skeletonHealerManager.executeDeathHealing(creature, heroOwner, position, side);
         }
 
         // EXPLODING SKULL DEATH EXPLOSION
@@ -2315,8 +2329,8 @@ export class BattleManager {
             if (!gameState) return null;
             
             return {
-                host: gameState.hostDelayedArtifactEffects || [],
-                guest: gameState.guestDelayedArtifactEffects || []
+                host: gameState.hostdelayedEffects || [],
+                guest: gameState.guestdelayedEffects || []
             };
         } catch (error) {
             return null;
@@ -2760,9 +2774,10 @@ export class BattleManager {
             this.sendBattleUpdate('battle_end', battleEndData);
             
             const hostMessage = this.getResultMessage(hostResult);
-            this.addCombatLog(`🏆 ${hostMessage}`, hostResult === 'victory' ? 'success' : hostResult === 'defeat' ? 'error' : 'info');
+            this.addCombatLog(`${hostMessage}`, hostResult === 'victory' ? 'success' : hostResult === 'defeat' ? 'error' : 'info');
             await this.showBattleResult(hostMessage);
 
+            // UPDATE DECK MANAGER WITH MODIFIED DECK
             if (window.heroSelection && window.heroSelection.deckManager) {
                 const playerDeck = this.getPlayerDeck();
                 
@@ -2771,6 +2786,18 @@ export class BattleManager {
                     cards: playerDeck,
                     size: playerDeck.length,
                     uniqueCards: [...new Set(playerDeck)].length,
+                    timestamp: Date.now()
+                });
+            }
+
+            // UPDATE GRAVEYARD MANAGER WITH MODIFIED GRAVEYARD
+            if (window.heroSelection && window.heroSelection.graveyardManager) {
+                const playerGraveyard = this.getPlayerGraveyard();
+                
+                // Update the main graveyard manager with the modified player graveyard
+                window.heroSelection.graveyardManager.importGraveyard({
+                    cards: playerGraveyard,
+                    size: playerGraveyard.length,
                     timestamp: Date.now()
                 });
             }
@@ -3075,6 +3102,12 @@ export class BattleManager {
         } catch (error) {
             console.error('Error cleaning up captured creatures after battle:', error);
         }
+
+        // ===== CLEANUP HAT OF MADNESS AFTER BATTLE =====
+        if (this.hatOfMadnessArtifact) {
+            this.hatOfMadnessArtifact.cleanup();
+            this.hatOfMadnessArtifact = null;
+        }
         
         if (this.arrowSystem) {
             this.arrowSystem.cleanup();
@@ -3113,6 +3146,10 @@ export class BattleManager {
         if (this.skeletonMageManager) {
             this.skeletonMageManager.cleanup();
             this.skeletonMageManager = null;
+        }
+        if (this.skeletonHealerManager) {
+            this.skeletonHealerManager.cleanup();
+            this.skeletonHealerManager = null;
         }
         if (this.explodingSkullManager) {
             this.explodingSkullManager.cleanup();
@@ -3469,6 +3506,10 @@ export class BattleManager {
             playerCounters: this.playerCounters || { birthdayPresent: 0 },
             opponentCounters: this.opponentCounters || { birthdayPresent: 0 },
             
+            // Export HP tracking for stalemate detection
+            hpHistory: this.hpHistory || [],
+            stalemateCheckTurns: this.stalemateCheckTurns || 20,
+            
             // Export randomness state
             randomnessState: this.randomnessManager.exportState(),
             
@@ -3493,6 +3534,10 @@ export class BattleManager {
             this.currentTurn = stateData.currentTurn || 0;
             this.turnInProgress = stateData.turnInProgress || false;
             this.battleLog = stateData.battleLog || [];
+            
+            // Restore HP tracking for stalemate detection
+            this.hpHistory = stateData.hpHistory || [];
+            this.stalemateCheckTurns = stateData.stalemateCheckTurns || 20;
             
             const restoreHeroes = (savedHeroes) => {
                 const restored = {};
@@ -3801,6 +3846,80 @@ export class BattleManager {
         }
     }
 
+    /**
+     * Record current HP of all heroes for stalemate detection
+     */
+    recordCurrentHpSnapshot() {
+        const snapshot = {
+            turn: this.currentTurn,
+            playerHeroes: {},
+            opponentHeroes: {}
+        };
+        
+        // Record player heroes HP
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = this.playerHeroes[position];
+            snapshot.playerHeroes[position] = hero ? (hero.alive ? hero.currentHp : 0) : null;
+        });
+        
+        // Record opponent heroes HP
+        ['left', 'center', 'right'].forEach(position => {
+            const hero = this.opponentHeroes[position];
+            snapshot.opponentHeroes[position] = hero ? (hero.alive ? hero.currentHp : 0) : null;
+        });
+        
+        this.hpHistory.push(snapshot);
+        
+        // Keep only the last 20 turns + current turn
+        if (this.hpHistory.length > this.stalemateCheckTurns + 1) {
+            this.hpHistory.shift();
+        }
+    }
+
+    /**
+     * Check if battle is in stalemate (no HP decrease for 20 turns)
+     * @returns {boolean} True if stalemate detected
+     */
+    checkForStalemate() {
+        // Need at least 21 turns of data (current + 20 previous)
+        if (this.hpHistory.length < this.stalemateCheckTurns + 1) {
+            return false;
+        }
+        
+        const currentSnapshot = this.hpHistory[this.hpHistory.length - 1];
+        const pastSnapshot = this.hpHistory[this.hpHistory.length - 1 - this.stalemateCheckTurns];
+        
+        // Check all hero positions on both sides
+        const positions = ['left', 'center', 'right'];
+        
+        for (const position of positions) {
+            // Check player heroes
+            const currentPlayerHp = currentSnapshot.playerHeroes[position];
+            const pastPlayerHp = pastSnapshot.playerHeroes[position];
+            
+            // If hero exists in both snapshots, check if HP decreased
+            if (currentPlayerHp !== null && pastPlayerHp !== null) {
+                if (currentPlayerHp < pastPlayerHp) {
+                    return false; // HP decreased, not a stalemate
+                }
+            }
+            
+            // Check opponent heroes  
+            const currentOpponentHp = currentSnapshot.opponentHeroes[position];
+            const pastOpponentHp = pastSnapshot.opponentHeroes[position];
+            
+            // If hero exists in both snapshots, check if HP decreased
+            if (currentOpponentHp !== null && pastOpponentHp !== null) {
+                if (currentOpponentHp < pastOpponentHp) {
+                    return false; // HP decreased, not a stalemate
+                }
+            }
+        }
+        
+        // No hero HP decreased in the last 20 turns - stalemate detected
+        return true;
+    }
+
     // Reset battle manager
     reset() {
         this.battleActive = false;
@@ -3855,16 +3974,18 @@ export class BattleManager {
         if (this.aliceManager) {
             this.aliceManager.cleanup();
             this.aliceManager = null;
-        }
-        
+        }        
         if (this.moniaEffect) {
             this.moniaEffect.cleanup();
             this.moniaEffect = null;
         }
-
         if (this.ghuanjunManager) {
             this.ghuanjunManager.cleanup();
             this.ghuanjunManager = null;
+        }
+        if (this.lunaManager) {
+            this.lunaManager.cleanup();
+            this.lunaManager = null;
         }
 
 
@@ -3882,7 +4003,6 @@ export class BattleManager {
 
         
         // Area cleanups
-        
         if (this.gatheringStormEffect) {
             this.gatheringStormEffect.cleanup();
             this.gatheringStormEffect = null;
@@ -3930,6 +4050,10 @@ export class BattleManager {
         if (this.skeletonMageManager) {
             this.skeletonMageManager.cleanup();
             this.skeletonMageManager = null;
+        }
+        if (this.skeletonHealerManager) {
+            this.skeletonHealerManager.cleanup();
+            this.skeletonHealerManager = null;
         }
 
         if (this.frontSoldierManager) {
@@ -3983,17 +4107,20 @@ export class BattleManager {
 
 
 
-        if (this.lunaManager) {
-            this.lunaManager.cleanup();
-            this.lunaManager = null;
-        }
 
 
-
+        // Cleanup Artifacts
         if (this.crusaderArtifactsHandler) {
             this.crusaderArtifactsHandler.reset();
             this.crusaderArtifactsHandler = null;
         }
+        if (this.hatOfMadnessArtifact) {
+            this.hatOfMadnessArtifact.cleanup();
+            this.hatOfMadnessArtifact = null;
+        }
+
+
+
 
         // Cleanup fireshield visual effects
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Fireshield')) {

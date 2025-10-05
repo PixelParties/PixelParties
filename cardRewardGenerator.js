@@ -4,7 +4,12 @@ import { getAllAbilityCards } from './cardDatabase.js';
 
 export class CardRewardGenerator {
     constructor() {
-        // Initialize any needed state
+        // Cards that should NEVER be offered as rewards
+        // To exclude additional cards, simply add their names to this array
+        this.excludedCards = [
+            'Divinity'
+            // Add more card names here as needed
+        ];
     }
 
     /**
@@ -17,6 +22,9 @@ export class CardRewardGenerator {
     generateRewardCards(deckManager, playerCounters, count = 3) {
         const allCards = getAllAbilityCards();
         
+        // EXCLUDE FORBIDDEN CARDS - These cards can never be offered as rewards
+        const availableCards = allCards.filter(card => !this.excludedCards.includes(card.name));
+        
         // Get current deck contents
         const currentDeck = deckManager ? deckManager.getDeck() : [];
         const currentDeckCardNames = currentDeck.map(card => 
@@ -27,9 +35,9 @@ export class CardRewardGenerator {
         const goldenBananasCount = playerCounters?.goldenBananas || 0;
         
         // Filter out Monkee cards if goldenBananas is 0
-        let filteredCards = allCards;
+        let filteredCards = availableCards;
         if (goldenBananasCount === 0) {
-            filteredCards = allCards.filter(card => card.archetype !== 'Monkees');
+            filteredCards = availableCards.filter(card => card.archetype !== 'Monkees');
         }
 
         // Separate cards by type from filtered pool
@@ -88,7 +96,7 @@ export class CardRewardGenerator {
         // Second card: Spell (possibly forced Monkee)
         let secondCard = null;
         if (forceMonkeeSpell) {
-            secondCard = this.selectMonkeeOrGoldenBananas(allCards, 'Spell');
+            secondCard = this.selectMonkeeOrGoldenBananas(availableCards, 'Spell');
         }
         if (!secondCard) {
             secondCard = this.selectCardByType(spellCardsInDeck, spellCardsNotInDeck, 'Spell');
@@ -100,7 +108,7 @@ export class CardRewardGenerator {
         // Third card: Other (possibly forced Monkee)
         let thirdCard = null;
         if (forceMonkeeOther) {
-            thirdCard = this.selectMonkeeOrGoldenBananas(allCards, 'Other');
+            thirdCard = this.selectMonkeeOrGoldenBananas(availableCards, 'Other');
         }
         if (!thirdCard) {
             thirdCard = this.selectCardByType(otherCardsInDeck, otherCardsNotInDeck, 'Other');

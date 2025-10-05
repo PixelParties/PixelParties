@@ -15,6 +15,7 @@ export class TagsManager {
             // Support/Utility tags
             'Support': '#27ae60',
             'Defense': '#16a085',
+            'Shield Gain': '#3b51b3ff',
             'Setup': '#3498db',
             'Card Draw': '#2980b9',
             'Healing': '#1abc9c',
@@ -25,7 +26,6 @@ export class TagsManager {
             
             // Economic tags
             'Gold Generation': '#f1c40f',
-            'Gold Gain': '#f39c12',
             'Stealing': '#9b59b6',
             'Potions': '#e91e63',
             
@@ -39,9 +39,14 @@ export class TagsManager {
             'Disruption': '#e91e63',
             'Self-Damage': '#dc2626',
             
+            // Action/Turn tags
+            'Multiple Actions': '#ffd700',
+            'Extra Turns': '#e74c3c',
+            'High-Risk': '#8b0000',
+            
             // Timing/Power Curve tags
-            'Late Game Scaling': '#6b46c1',  // Deep purple for long-term growth
-            'Strong Early': '#f97316'       // Bright orange for immediate impact
+            'Late Game': '#6b46c1', 
+            'Strong Early': '#f97316'  
         };
         
         // Default color for unrecognized tags
@@ -123,26 +128,29 @@ export class TagsManager {
         const characterTagsMap = {
             'Alice': ['Summoner', 'Damage Dealer', 'Card Draw'],
             'Beato': ['High-Value', 'Random', 'Card Draw'],
+            'Carris': ['Multiple Actions', 'Extra Turns', 'High-Risk'],
             'Cecilia': ['Attacker', 'Gold Generation', 'Damage Dealer'],
             'Darge': ['Attacker', 'Sniper', 'Damage Dealer'],
             'Ghuanjun': ['Attacker', 'Defense', 'Setup'],
             'Gon': ['Support', 'Disruption', 'Status Effects'],
-            'Heinz': ['Setup', 'Summoner', 'Card Draw', 'Late Game Scaling'],
+            'Heinz': ['Setup', 'Summoner', 'Card Draw', 'Late Game'],
             'Ida': ['Damage Dealer', 'Area Damage', 'Status Effects'],
             'Kazena': ['Card Draw', 'Support', 'Setup'],
-            'Kyli': ['Summoner', 'Setup', 'Attacker', 'Potions', 'Late Game Scaling'],
+            'Kyli': ['Summoner', 'Setup', 'Attacker', 'Potions', 'Late Game'],
             'Luna': ['Status Effects', 'Area Damage', 'Self-Damage'],
-            'Mary': ['Summoner', 'Damage Dealer', 'Late Game Scaling'],
+            'Mary': ['Summoner', 'Damage Dealer', 'Late Game'],
             'Medea': ['Damage Dealer', 'Status Effects', 'Damage Over Time'],
             'Monia': ['Defense', 'Support', 'Attacker'],
+            'Nao': ['Defense', 'Shield Gain', 'Support'],
             'Nicolas': ['Support', 'Card Draw', 'Potions', 'Strong Early'],
             'Nomu': ['Support', 'Card Draw', 'Defense'],
             'Semi': ['Support', 'Gold Generation', 'Card Draw'],
             'Sid': ['Support', 'Disruption', 'Card Draw'],
             'Tharx': ['Defense', 'Summoner', 'Support'],
+            'Thep': ['Summoner', 'Support', 'Defense'],
             'Toras': ['Attacker', 'Burst Damage', 'Damage Dealer', 'Strong Early'],
             'Vacarn': ['Summoner', 'Creature Spam', 'Disruption'],
-            'Waflav': ['Attacker', 'Damage Dealer', 'Late Game Scaling']
+            'Waflav': ['Attacker', 'Damage Dealer', 'Late Game']
         };
         
         return characterTagsMap[cardName] || [];
@@ -197,12 +205,13 @@ export class TagsManager {
             'Damage Dealer': '💥',
             'Burst Damage': '🔥',
             'Area Damage': '💣',
-            'Damage Over Time': '🩸',
+            'Damage Over Time': '☠️',
             'Sniper': '🎯',
             
             // Support/Utility tags
-            'Support': '🛡️',
+            'Support': '✙',
             'Defense': '🏰',
+            'Shield Gain': '🛡️',
             'Setup': '🔧',
             'Card Draw': '📚',
             'Healing': '❤️',
@@ -213,7 +222,6 @@ export class TagsManager {
             
             // Economic tags
             'Gold Generation': '💰',
-            'Gold Gain': '🪙',
             'Stealing': '🔓',
             'Potions': '🧪',
             
@@ -224,16 +232,22 @@ export class TagsManager {
             // Status/Control tags
             'Status Effects': '✨',
             'Incapacitation': '😵',
-            'Disruption': '⚡',
+            'Disruption': '｡𖦹°‧',
             'Self-Damage': '🩸',
             
+            // Action/Turn tags
+            'Multiple Actions': '⚡',
+            'Extra Turns': '🔄',
+            'High-Risk': '⚠️',
+            
             // Timing/Power Curve tags
-            'Late Game Scaling': '📈',  // Chart showing growth over time
-            'Strong Early': '🌅'       // Sunrise representing early advantage
+            'Late Game': '📈',  
+            'Strong Early': '🌅'   
         };
         
         return emojiMap[tagText] || '';
     }
+
 
     /**
      * Get CSS class name for a tag

@@ -3,6 +3,8 @@
 
 import { getCardInfo } from './cardDatabase.js';
 import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
+import { checkShieldOfLifeEffects } from './Artifacts/shieldOfLife.js';
+import { checkShieldOfDeathEffects } from './Artifacts/shieldOfDeath.js';
 
 export class DamageSourceManager {
     constructor(battleManager) {
@@ -121,6 +123,67 @@ export class DamageSourceManager {
         // Get damage source analysis
         const sourceAnalysis = this.analyzeDamageSource(context);
         
+        // Apply Carris immunity FIRST (overrides all other reductions)
+        const carrisResult = this.applyCarrisImmunity(target, finalDamage, sourceAnalysis);
+        finalDamage = carrisResult.damage;
+        if (carrisResult.modified) {
+            modifications.push(carrisResult.modification);
+            // If Carris immunity applies, no other modifications matter
+            return {
+                finalDamage: finalDamage,
+                modifications: modifications,
+                sourceAnalysis: sourceAnalysis
+            };
+        }
+
+        // Apply Shield of Life block for physical attack damage
+        if (sourceAnalysis.isPhysical && sourceAnalysis.source === 'attack') {
+            const shieldOfLifeResult = this.applyShieldOfLifeBlock(target, finalDamage, { source: sourceAnalysis.source, attacker: sourceAnalysis.attacker });
+            if (shieldOfLifeResult.blocked) {
+                // Shield of Life completely blocks the damage
+                const originalDamage = finalDamage;
+                finalDamage = 0;
+                modifications.push({
+                    type: 'shield_of_life_block',
+                    originalDamage: originalDamage,
+                    finalDamage: 0,
+                    blocked: originalDamage,
+                    shieldGained: shieldOfLifeResult.shieldGained
+                });
+                
+                // If Shield of Life blocks, no other modifications matter
+                return {
+                    finalDamage: 0,
+                    modifications: modifications,
+                    sourceAnalysis: sourceAnalysis
+                };
+            }
+        }
+
+        // Apply Shield of Death block for physical attack damage
+        if (sourceAnalysis.isPhysical && sourceAnalysis.source === 'attack') {
+            const shieldOfDeathResult = this.applyShieldOfDeathBlock(target, finalDamage, { source: sourceAnalysis.source, attacker: sourceAnalysis.attacker });
+            if (shieldOfDeathResult.blocked) {
+                // Shield of Death completely blocks the damage
+                const originalDamage = finalDamage;
+                finalDamage = 0;
+                modifications.push({
+                    type: 'shield_of_death_block',
+                    originalDamage: originalDamage,
+                    finalDamage: 0,
+                    blocked: originalDamage,
+                    curseDamage: shieldOfDeathResult.curseDamage
+                });
+                
+                // If Shield of Death blocks, no other modifications matter
+                return {
+                    finalDamage: 0,
+                    modifications: modifications,
+                    sourceAnalysis: sourceAnalysis
+                };
+            }
+        }
+        
         // Apply stoneskin reduction for physical damage
         if (sourceAnalysis.isPhysical) {
             const stoneskinResult = this.applyStoneskinReduction(target, finalDamage, sourceAnalysis);
@@ -153,6 +216,132 @@ export class DamageSourceManager {
             modifications: modifications,
             sourceAnalysis: sourceAnalysis
         };
+    }
+
+    // ============================================
+    // CARRIS DIVINE IMMUNITY
+    // ============================================
+
+    /**
+     * Apply Carris divine immunity (nullifies ALL damage)
+     * @param {Object} target - The target with potential Carris immunity
+     * @param {number} damage - Original damage amount
+     * @param {Object} sourceAnalysis - Damage source analysis
+     * @returns {Object} - { damage, modified, modification }
+     */
+    applyCarrisImmunity(target, damage, sourceAnalysis) {
+        // Check if target is Carris
+        if (!target || target.name !== 'Carris') {
+            return { damage: damage, modified: false };
+        }
+        
+        // Carris is immune to ALL damage from ANY source
+        if (damage > 0) {
+            const originalDamage = damage;
+            
+            // Log the immunity
+            this.logCarrisImmunity(target, originalDamage, sourceAnalysis);
+            
+            // Send update to guest if host
+            if (this.battleManager.isAuthoritative) {
+                this.syncCarrisImmunity(target, originalDamage, sourceAnalysis);
+            }
+            
+            return {
+                damage: 0,
+                modified: true,
+                modification: {
+                    type: 'carris_immunity',
+                    originalDamage: originalDamage,
+                    finalDamage: 0,
+                    nullified: originalDamage,
+                    source: sourceAnalysis.source
+                }
+            };
+        }
+        
+        return { damage: damage, modified: false };
+    }
+
+    /**
+     * Log Carris divine immunity
+     */
+    logCarrisImmunity(target, originalDamage, sourceAnalysis) {
+        const sourceDescription = this.getSourceDescription(sourceAnalysis);
+        
+        this.battleManager.addCombatLog(
+            `✨ Carris's divine immunity nullifies ${originalDamage} damage from ${sourceDescription}!`,
+            target.side === 'player' ? 'success' : 'info'
+        );
+    }
+
+    // ============================================
+    // SHIELD BLOCKS
+    // ============================================
+
+    /**
+     * Apply Shield of Life block for physical attack damage
+     * @param {Object} target - The target with potential Shield of Life
+     * @param {number} damage - Original damage amount
+     * @param {Object} context - Damage context
+     * @returns {Object} - { blocked, shieldGained }
+     */
+    applyShieldOfLifeBlock(target, damage, context = {}) {
+        return checkShieldOfLifeEffects(this.battleManager, target, damage, context);
+    }
+
+    /**
+     * Apply Shield of Death block for physical attack damage
+     * @param {Object} target - The target with potential Shield of Death
+     * @param {number} damage - Original damage amount
+     * @param {Object} context - Damage context
+     * @returns {Object} - { blocked, curseDamage }
+     */
+    applyShieldOfDeathBlock(target, damage, context = {}) {
+        return checkShieldOfDeathEffects(this.battleManager, target, damage, context);
+    }
+
+    /**
+     * Get human-readable description of damage source
+     */
+    getSourceDescription(sourceAnalysis) {
+        const { source, attacker, isPhysical, isStatusEffect } = sourceAnalysis;
+        
+        if (attacker) {
+            if (isPhysical) {
+                return `${attacker.name}'s attack`;
+            } else {
+                return `${attacker.name}'s ability`;
+            }
+        }
+        
+        if (isStatusEffect) {
+            return `${source} status effect`;
+        }
+        
+        switch (source) {
+            case 'attack': return 'an attack';
+            case 'spell': return 'a spell';
+            case 'poison': return 'poison';
+            case 'burn': return 'burning';
+            case 'bleed': return 'bleeding';
+            default: return source || 'unknown source';
+        }
+    }
+
+    /**
+     * Send Carris immunity update to guest
+     */
+    syncCarrisImmunity(target, originalDamage, sourceAnalysis) {
+        this.battleManager.sendBattleUpdate('carris_immunity_triggered', {
+            targetAbsoluteSide: target.absoluteSide,
+            targetPosition: target.position,
+            targetName: target.name,
+            originalDamage: originalDamage,
+            source: sourceAnalysis.source,
+            sourceDescription: this.getSourceDescription(sourceAnalysis),
+            timestamp: Date.now()
+        });
     }
     
     /**
@@ -276,6 +465,25 @@ export class DamageSourceManager {
     // ============================================
     // GUEST-SIDE HANDLING
     // ============================================
+
+    /**
+     * Handle Carris immunity on guest side
+     * @param {Object} data - Immunity data from host
+     */
+    handleGuestCarrisImmunity(data) {
+        const { targetAbsoluteSide, targetPosition, targetName, originalDamage, source, sourceDescription } = data;
+        
+        // Determine log type based on target side
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetAbsoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const logType = targetLocalSide === 'player' ? 'success' : 'info';
+        
+        // Add to battle log
+        this.battleManager.addCombatLog(
+            `✨ ${targetName}'s divine immunity nullifies ${originalDamage} damage from ${sourceDescription}!`,
+            logType
+        );
+    }
 
     /**
      * Handle stoneskin damage reduction on guest side

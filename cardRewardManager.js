@@ -36,6 +36,7 @@ export class CardRewardManager {
         this.allHeroes = [
             { name: 'Alice', image: './Cards/Characters/Alice.png' },
             { name: 'Beato', image: './Cards/Characters/Beato.png' },
+            { name: 'Carris', image: './Cards/Characters/Carris.png' },
             { name: 'Cecilia', image: './Cards/Characters/Cecilia.png' },
             { name: 'Darge', image: './Cards/Characters/Darge.png' },
             { name: 'Gon', image: './Cards/Characters/Gon.png' },
@@ -47,11 +48,13 @@ export class CardRewardManager {
             { name: 'Mary', image: './Cards/Characters/Mary.png' },
             { name: 'Medea', image: './Cards/Characters/Medea.png' },
             { name: 'Monia', image: './Cards/Characters/Monia.png' },
+            { name: 'Nao', image: './Cards/Characters/Nao.png' },
             { name: 'Nicolas', image: './Cards/Characters/Nicolas.png' },
             { name: 'Nomu', image: './Cards/Characters/Nomu.png' },
             { name: 'Semi', image: './Cards/Characters/Semi.png' },
             { name: 'Sid', image: './Cards/Characters/Sid.png' },
             { name: 'Tharx', image: './Cards/Characters/Tharx.png' },
+            { name: 'Thep', image: './Cards/Characters/Thep.png' },
             { name: 'Toras', image: './Cards/Characters/Toras.png' },
             { name: 'Vacarn', image: './Cards/Characters/Vacarn.png' },
             { name: 'Waflav', image: './Cards/Characters/Waflav.png' }
@@ -60,6 +63,7 @@ export class CardRewardManager {
         this.heroCardSets = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
+            'Carris': ['Divinity', 'Premonition', 'BigGwen', 'TheHandsOfBigGwen', 'HatOfMadness', 'Haste', 'Slow', 'DivineGiftOfTime'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'Fighting', 'RainbowsArrow', 'RainOfArrows'],
             'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
@@ -72,11 +76,13 @@ export class CardRewardManager {
             'Mary': ['Charme',  'Leadership', 'CuteBird', 'CutePhoenix', 'PhoenixTackle', 'VictoryPhoenixCannon', 'CuteCrown', 'PinkSky'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
+            'Nao': ['Friendship', 'SupportMagic', 'Heal', 'HealingMelody', 'Cure', 'HealingPotion', 'HolyCheese', 'ShieldOfLife'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
             'Nomu': ['MagicArts', 'Training', 'Teleport', 'Teleportal', 'StaffOfTheTeleporter', 'TeleportationPowder', 'PlanetInABottle', 'SpatialCrevice'],
             'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
             'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
+            'Thep': ['SoulShardBa', 'SoulShardIb', 'SoulShardKa', 'SoulShardKhet', 'SoulShardRen', 'SoulShardSah', 'SoulShardSekhem', 'SoulShardShut'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
             'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet']
@@ -1637,7 +1643,13 @@ export class CardRewardManager {
             .filter(hero => hero !== null)
             .map(hero => hero.name);
         
-        // Get base hero names from any Ascended heroes currently in formation
+        // Get opponent's heroes to exclude them as well
+        const opponentFormation = this.heroSelection.formationManager.getOpponentBattleFormation();
+        const opponentHeroNames = Object.values(opponentFormation)
+            .filter(hero => hero !== null)
+            .map(hero => hero.name);
+        
+        // Get base hero names from any Ascended heroes currently in formation (player)
         const currentBaseHeroNames = Object.values(currentFormation)
             .filter(hero => hero !== null)
             .map(hero => {
@@ -1649,15 +1661,42 @@ export class CardRewardManager {
             })
             .filter(baseHero => baseHero !== null);
         
-        // Filter out already used heroes and their base forms
+        // Get base hero names from any Ascended heroes in opponent's formation
+        const opponentBaseHeroNames = Object.values(opponentFormation)
+            .filter(hero => hero !== null)
+            .map(hero => {
+                const heroInfo = this.heroSelection.getCardInfo(hero.name);
+                if (heroInfo && heroInfo.subtype === 'Ascended' && heroInfo.baseHero) {
+                    return heroInfo.baseHero;
+                }
+                return null;
+            })
+            .filter(baseHero => baseHero !== null);
+        
+        // Filter out already used heroes, opponent's heroes, their base forms, and Carris
         const availableHeroes = this.allHeroes.filter(hero => {
-            // Skip if hero is already in formation
+            // Skip Carris - cannot be offered as a reward
+            if (hero.name === 'Carris') {
+                return false;
+            }
+            
+            // Skip if hero is already in player's formation
             if (usedHeroNames.includes(hero.name)) {
                 return false;
             }
             
-            // Skip if hero's base form is already in play as an Ascended version
+            // Skip if hero is already in opponent's formation
+            if (opponentHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Skip if hero's base form is already in play as an Ascended version (player)
             if (currentBaseHeroNames.includes(hero.name)) {
+                return false;
+            }
+            
+            // Skip if hero's base form is already in play as an Ascended version (opponent)
+            if (opponentBaseHeroNames.includes(hero.name)) {
                 return false;
             }
             

@@ -159,6 +159,8 @@ export class WaflavEffectManager {
                     heroSelection.playerCounters = {};
                 }
                 heroSelection.playerCounters.evolutionCounters = (heroSelection.playerCounters.evolutionCounters || 0) + evolutionCountersAwarded;
+
+                heroSelection.updateHandDisplay();
                 
                 console.log(`🧬 Awarded ${evolutionCountersAwarded} Evolution Counters for descending from ${currentHeroName}`);
             }

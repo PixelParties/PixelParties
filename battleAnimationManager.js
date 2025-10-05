@@ -34,20 +34,17 @@ export class BattleAnimationManager {
     // ============================================
 
     // Animate hero attack (single)
-    async animateHeroAttack(hero, target) {
+    async animateHeroAttack(hero, target, options = {}) {        
         if (!hero || !target) {
             return;
         }
         
-        // Get the hero element and card
         const heroElement = this.getHeroElement(hero.side, hero.position);
-        
         if (!heroElement) {
             return;
         }
         
         const heroCard = heroElement.querySelector('.battle-hero-card');
-        
         if (!heroCard) {
             return;
         }
@@ -66,15 +63,28 @@ export class BattleAnimationManager {
             return;
         }
         
+        // Temporarily restore visibility for timeGifted animation
+        const isTimeGiftedAction = options.isTimeGiftedAction || hero._isTimeGiftedAction;
+        let originalOpacity = heroCard.style.opacity;
+        let originalFilter = heroCard.style.filter;
+        let hadDefeatedClass = heroCard.classList.contains('defeated');
+        
+        if (isTimeGiftedAction || !hero.alive) {
+            // Temporarily make the hero visible for the animation
+            heroCard.style.opacity = '1';
+            heroCard.style.filter = 'none';
+            heroCard.classList.remove('defeated');
+        }
+        
         // Calculate movement distance
         const heroRect = heroElement.getBoundingClientRect();
         const targetRect = targetElement.getBoundingClientRect();
         
         const deltaX = targetRect.left + targetRect.width/2 - (heroRect.left + heroRect.width/2);
-        const deltaY = targetRect.top + targetRect.height/2 - (heroRect.top + heroRect.height/2);
+        const deltaY = targetRect.top + targetRect.height/2 - (heroRect.top + targetRect.height/2);
         
         const duration = Math.max(this.getSpeedAdjustedDelay(120), 50);
-        
+                
         // Add attacking class and animate
         heroCard.classList.add('attacking');
         heroCard.style.transition = `transform ${duration}ms ease-out`;
@@ -85,6 +95,16 @@ export class BattleAnimationManager {
         
         // Create impact effect on target
         this.createImpactEffect(targetElement);
+                
+        // RESTORE ORIGINAL STATE if this was a dead hero
+        if (!hero.alive) {
+            // Restore defeated appearance
+            if (hadDefeatedClass) {
+                heroCard.classList.add('defeated');
+            }
+            heroCard.style.opacity = originalOpacity || '0.3';
+            heroCard.style.filter = originalFilter || 'grayscale(100%)';
+        }
     }
 
     // Animate simultaneous hero attacks

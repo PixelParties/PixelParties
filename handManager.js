@@ -35,6 +35,483 @@ export class HandManager {
         ];
     }
 
+    // ===== CENTRALIZED SPELL VALIDATION METHODS =====
+
+    /**
+     * Centralized method to check if a hero can use/learn a spell
+     * Consolidates all spell-specific logic from both handManager and heroSelection
+     */
+    canHeroUseSpell(heroPosition, spellCardName) {
+        if (!spellCardName || !window.heroSelection) return { canUse: false, reason: "Invalid parameters" };
+        
+        const cardInfo = window.heroSelection.getCardInfo ? window.heroSelection.getCardInfo(spellCardName) : null;
+        if (!cardInfo || cardInfo.cardType !== 'Spell') {
+            return { canUse: false, reason: "Not a valid spell card" };
+        }
+
+        const formation = window.heroSelection.formationManager?.getBattleFormation();
+        if (!formation) return { canUse: false, reason: "Formation not available" };
+
+        const hero = formation[heroPosition];
+        
+        // Check 1: Is there a hero in the slot?
+        if (!hero) {
+            return { canUse: false, reason: "You can't add Spells to an empty slot!" };
+        }
+
+        // Check 2: Spellbook restrictions (includes Area spell restriction)
+        const spellbookCheck = window.heroSelection.heroSpellbookManager?.canHeroLearnSpell(heroPosition, spellCardName);
+        if (spellbookCheck && !spellbookCheck.canLearn) {
+            return { canUse: false, reason: spellbookCheck.reason };
+        }
+
+        // Check 3: Special free-cast conditions (these bypass normal requirements)
+        
+        // FrontSoldier: Can summon for free if hero has no creatures
+        if (spellCardName === 'FrontSoldier') {
+            const heroCreatures = window.heroSelection.heroCreatureManager?.getHeroCreatures(heroPosition) || [];
+            if (heroCreatures.length === 0) {
+                return { canUse: true, isFree: true, heroName: hero.name };
+            }
+        }
+        
+        // FutureTechDrone: Can summon for free if 3+ in graveyard  
+        if (spellCardName === 'FutureTechDrone') {
+            if (window.heroSelection.graveyardManager) {
+                const graveyard = window.heroSelection.graveyardManager.getGraveyard();
+                const droneCount = graveyard.filter(card => card === 'FutureTechDrone').length;
+                if (droneCount >= 3) {
+                    return { canUse: true, isFree: true, heroName: hero.name };
+                }
+            }
+        }
+        
+        // Archer: Can summon for free with Leadership 3+
+        if (spellCardName === 'Archer') {
+            const heroAbilities = window.heroSelection.heroAbilitiesManager?.getHeroAbilities(heroPosition);
+            let leadershipLevel = 0;
+            
+            if (heroAbilities) {
+                ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                    if (heroAbilities[zone]) {
+                        heroAbilities[zone].forEach(ability => {
+                            if (ability && ability.name === 'Leadership') {
+                                leadershipLevel++;
+                            }
+                        });
+                    }
+                });
+            }
+            
+            if (leadershipLevel >= 3) {
+                return { canUse: true, isFree: true, heroName: hero.name };
+            }
+            
+            // Check for reduced level requirement (hero has 1+ creatures)
+            const heroCreatures = window.heroSelection.heroCreatureManager?.getHeroCreatures(heroPosition) || [];
+            if (heroCreatures.length >= 1) {
+                // Continue to normal spell learning check with reduced requirements
+            }
+        }
+
+        // Check 4: Special exception for Cavalry with 3 total heroes
+        if (spellCardName === 'Cavalry') {
+            const totalHeroes = Object.values(formation).filter(h => h !== null && h !== undefined).length;
+            if (totalHeroes >= 3) {
+                return { canUse: true, heroName: hero.name };
+            }
+        }
+
+        // Check 5: Get spell requirements for normal learning
+        const spellSchool = cardInfo.spellSchool;
+        const baseSpellLevel = cardInfo.level || 0;
+
+        // Count spell school abilities across all zones
+        const heroAbilities = window.heroSelection.heroAbilitiesManager?.getHeroAbilities(heroPosition);
+
+        let totalSpellSchoolLevel = 0;
+        let totalThievingLevel = 0;
+        let learningLevel = 0;
+
+        if (heroAbilities) {
+            ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                if (heroAbilities[zone]) {
+                    heroAbilities[zone].forEach(ability => {
+                        if (ability && ability.name === spellSchool) {
+                            totalSpellSchoolLevel++;
+                        }
+                        if (ability && ability.name === 'Thieving') {
+                            totalThievingLevel++;
+                        }
+                        if (ability && ability.name === 'Learning') {
+                            learningLevel++;
+                        }
+                    });
+                }
+            });
+        }
+
+        // Calculate effective spell level with Learning bonus
+        const effectiveSpellSchoolLevel = totalSpellSchoolLevel + learningLevel;
+        let effectiveSpellLevel = baseSpellLevel;
+        let thievingReduction = 0;
+        
+        if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
+            thievingReduction = totalThievingLevel;
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - thievingReduction);
+        }
+
+        if (spellCardName === 'FutureTechMech') {
+            const levelReduction = window.heroSelection.graveyardManager ? 
+                window.heroSelection.graveyardManager.getGraveyard().filter(card => card === 'FutureTechMech').length : 0;
+            
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - levelReduction);
+        }
+
+        if (spellCardName === 'TheRootOfAllEvil') {
+            // Count all creatures the player owns across all heroes
+            let totalCreatures = 0;
+            ['left', 'center', 'right'].forEach(pos => {
+                if (formation[pos]) {
+                    const heroCreatures = window.heroSelection.heroCreatureManager?.getHeroCreatures(pos) || [];
+                    totalCreatures += heroCreatures.length;
+                }
+            });
+            
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - totalCreatures);
+        }
+
+        // Check 6: Compare levels with the effective requirement
+        if (effectiveSpellSchoolLevel < effectiveSpellLevel) {
+            // Check if Semi can use gold learning
+            if (hero.name === 'Semi' && window.heroSelection.semiEffectManager) {
+                const semiCheck = window.heroSelection.semiEffectManager.canUseSemiGoldLearning(window.heroSelection, heroPosition, spellCardName);
+                if (semiCheck.canUse) {
+                    return { 
+                        canUse: false, 
+                        reason: `Semi can learn this for ${semiCheck.goldCost} Gold`,
+                        isSemiGoldLearning: true,
+                        semiData: semiCheck,
+                        heroName: hero.name
+                    };
+                } else if (semiCheck.goldCost && semiCheck.playerGold !== undefined) {
+                    return { 
+                        canUse: false, 
+                        reason: `Semi needs ${semiCheck.goldCost} Gold to learn this (have ${semiCheck.playerGold})`
+                    };
+                }
+            }
+
+            // Special exception for DarkDeal - any hero can learn it for 10 Gold
+            if (spellCardName === 'DarkDeal') {
+                const playerGold = window.heroSelection.goldManager?.getPlayerGold() || 0;
+                const darkDealCost = 10;
+                
+                if (playerGold >= darkDealCost) {
+                    return { 
+                        canUse: false, 
+                        reason: `Spend ${darkDealCost} Gold on a Dark Deal?`,
+                        isDarkDealGoldLearning: true,
+                        darkDealData: {
+                            goldCost: darkDealCost,
+                            playerGold: playerGold,
+                            heroName: hero.name
+                        },
+                        heroName: hero.name
+                    };
+                } else {
+                    return { 
+                        canUse: false, 
+                        reason: `You need ${darkDealCost} Gold for a Dark Deal (have ${playerGold})`
+                    };
+                }
+            }
+            
+            const formattedSpellSchool = this.formatCardName(spellSchool);
+            const formattedSpellName = this.formatCardName(spellCardName);
+            
+            // Enhanced error message for ThievingStrike
+            if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
+                const originalRequirement = baseSpellLevel;
+                const currentCombined = totalSpellSchoolLevel + totalThievingLevel;
+                
+                return { 
+                    canUse: false, 
+                    reason: `${hero.name} needs ${formattedSpellSchool} ${effectiveSpellLevel}+ to learn ${formattedSpellName}! (Has ${formattedSpellSchool} ${totalSpellSchoolLevel} + Thieving ${totalThievingLevel} = ${currentCombined}/${originalRequirement})`
+                };
+            } else {
+                // Enhanced error message with Learning level shown if present
+                let errorMessage = `${hero.name} needs ${formattedSpellSchool} at level ${effectiveSpellLevel} or higher to learn ${formattedSpellName}!`;
+                
+                if (learningLevel > 0) {
+                    errorMessage += ` (Has ${formattedSpellSchool} ${totalSpellSchoolLevel} + Learning ${learningLevel} = ${effectiveSpellSchoolLevel}/${effectiveSpellLevel})`;
+                }
+                
+                if (spellCardName === 'FutureTechMech' && effectiveSpellLevel < baseSpellLevel) {
+                    const levelReduction = baseSpellLevel - effectiveSpellLevel;
+                    errorMessage += ` (Level reduced from ${baseSpellLevel} to ${effectiveSpellLevel} due to ${levelReduction} in graveyard)`;
+                }
+                
+                return { 
+                    canUse: false, 
+                    reason: errorMessage
+                };
+            }
+        }
+
+        // Success case - include information about reductions if applicable
+        const result = { canUse: true, heroName: hero.name };
+
+        if (learningLevel > 0) {
+            result.hasLearning = true;
+            result.learningLevel = learningLevel;
+        }
+        
+        if (spellCardName === 'ThievingStrike' && thievingReduction > 0) {
+            result.isThievingReduced = true;
+            result.thievingReduction = thievingReduction;
+            result.originalLevel = baseSpellLevel;
+            result.effectiveLevel = effectiveSpellLevel;
+        }
+        
+        // Add FutureTechMech reduction info to success case
+        if (spellCardName === 'FutureTechMech' && effectiveSpellLevel < baseSpellLevel) {
+            const levelReduction = baseSpellLevel - effectiveSpellLevel;
+            result.isFutureTechMechReduced = true;
+            result.levelReduction = levelReduction;
+            result.originalLevel = baseSpellLevel;
+            result.effectiveLevel = effectiveSpellLevel;
+        }
+
+        // Special case for Archer with reduced level
+        if (spellCardName === 'Archer') {
+            const heroCreatures = window.heroSelection.heroCreatureManager?.getHeroCreatures(heroPosition) || [];
+            if (heroCreatures.length >= 1) {
+                result.isArcherReducedLevel = true;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Centralized method to check if a spell requires an action to use
+     * Considers free-cast conditions and action requirements
+     */
+    doesSpellNeedAction(spellCardName, heroPosition = null) {
+        if (!spellCardName || !window.heroSelection) return false;
+        
+        const cardInfo = window.heroSelection.getCardInfo ? window.heroSelection.getCardInfo(spellCardName) : null;
+        if (!cardInfo || cardInfo.cardType !== 'Spell') {
+            return false;
+        }
+
+        // If the card doesn't normally require an action, return false
+        if (!cardInfo.action) {
+            return false;
+        }
+
+        // If no hero position provided, return the base action requirement
+        if (heroPosition === null) {
+            return true;
+        }
+
+        // Check for free-cast conditions that bypass action requirements
+        
+        // FrontSoldier: free if hero has no creatures
+        if (spellCardName === 'FrontSoldier') {
+            const heroCreatures = window.heroSelection.heroCreatureManager?.getHeroCreatures(heroPosition) || [];
+            if (heroCreatures.length === 0) {
+                return false; // No action needed when free
+            }
+        }
+        
+        // FutureTechDrone: free if 3+ in graveyard  
+        if (spellCardName === 'FutureTechDrone') {
+            if (window.heroSelection.graveyardManager) {
+                const graveyard = window.heroSelection.graveyardManager.getGraveyard();
+                const droneCount = graveyard.filter(card => card === 'FutureTechDrone').length;
+                if (droneCount >= 3) {
+                    return false; // No action needed when free
+                }
+            }
+        }
+        
+        // Archer: free with Leadership 3+
+        if (spellCardName === 'Archer') {
+            const heroAbilities = window.heroSelection.heroAbilitiesManager?.getHeroAbilities(heroPosition);
+            let leadershipLevel = 0;
+            
+            if (heroAbilities) {
+                ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                    if (heroAbilities[zone]) {
+                        heroAbilities[zone].forEach(ability => {
+                            if (ability && ability.name === 'Leadership') {
+                                leadershipLevel++;
+                            }
+                        });
+                    }
+                });
+            }
+            
+            if (leadershipLevel >= 3) {
+                return false; // No action needed when free
+            }
+        }
+
+        // Default: spell requires action
+        return true;
+    }
+
+    // ===== CENTRALIZED CARD VALIDATION LOGIC =====
+    
+    // Check if a specific hero can use this card
+    canHeroUseCard(heroPosition, cardName) {
+        if (!cardName || !window.heroSelection) return false;
+        
+        const cardInfo = window.heroSelection.getCardInfo ? window.heroSelection.getCardInfo(cardName) : null;
+        if (!cardInfo) return true; // If we can't get card info, assume it's usable
+        
+        // Check if exclusive artifact is active (blocks everything)
+        if (window.artifactHandler && window.artifactHandler.isExclusiveArtifactActive()) {
+            return false;
+        }
+        
+        const formation = window.heroSelection.formationManager?.getBattleFormation();
+        if (!formation) return false;
+        
+        const hero = formation[heroPosition];
+        if (!hero) {
+            return false; // No hero in this position
+        }
+        
+        // Check affordability for artifacts
+        if (cardInfo.cardType === 'Artifact' && cardInfo.cost > 0) {
+            const playerGold = window.heroSelection.goldManager?.getPlayerGold() || 0;
+            if (playerGold < cardInfo.cost) {
+                return false; // Can't afford it
+            }
+        }
+        
+        const hasActions = window.heroSelection.actionManager?.hasActions() || false;
+        
+        // === SPELL CARDS ===
+        if (window.heroSelection.heroSpellbookManager?.isSpellCard(cardName)) {
+            // Use centralized spell validation
+            const spellCheck = this.canHeroUseSpell(heroPosition, cardName);
+            if (!spellCheck.canUse) {
+                return false;
+            }
+            
+            // Check if spell needs an action and we have actions
+            const needsAction = this.doesSpellNeedAction(cardName, heroPosition);
+            if (needsAction && !hasActions) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // === ABILITY CARDS ===
+        if (window.heroSelection.heroAbilitiesManager?.isAbilityCard(cardName)) {
+            // Check if hero can receive abilities this turn
+            if (!window.heroSelection.heroAbilitiesManager.canHeroReceiveAbilityThisTurn(heroPosition)) {
+                return false;
+            }
+            
+            // Check if hero can accept this specific ability
+            const canAccept = window.heroSelection.heroAbilitiesManager.canHeroAcceptAbility(heroPosition, cardName);
+            
+            // Special rule for Divinity: can only be learned by heroes that already have it
+            if (cardName === 'Divinity' && canAccept) {
+                return false;
+            }
+            
+            if (!canAccept) {
+                // Hero already has this ability - check if we can find the zone to stack it
+                const existingZone = window.heroSelection.heroAbilitiesManager.findAbilityZone(heroPosition, cardName);
+                return existingZone !== null;
+            } else {
+                // Hero doesn't have this ability - check if there's a free zone
+                const freeZone = window.heroSelection.heroAbilitiesManager.findLeftmostFreeZone(heroPosition);
+                return freeZone !== null;
+            }
+        }
+        
+        // === ASCENDED HERO CARDS (Waflav Evolution Counter Check) ===
+        if (window.ascendedManager?.isAscendedHero(cardName)) {
+            // Check if this is a Waflav ascended hero with evolution counter requirements
+            if (cardInfo.baseHero === 'Waflav' && window.ascendedManager.waflavEvolutionRequirements) {
+                const requiredCounters = window.ascendedManager.waflavEvolutionRequirements[cardName];
+                if (requiredCounters !== undefined) {
+                    const playerCounters = window.heroSelection.playerCounters?.evolutionCounters || 0;
+                    if (playerCounters < requiredCounters) {
+                        return false; // Not enough evolution counters
+                    }
+                }
+            }
+            
+            // Use regular ascension validation for other checks
+            const tooltipInfo = window.ascendedManager.getAscensionDropTooltipInfo(heroPosition, cardName);
+            return tooltipInfo && tooltipInfo.canDrop;
+        }
+        
+        // === NON-SPELL CARDS ===
+        
+        // Check if it's an equip artifact that can be equipped
+        if (window.heroSelection.heroEquipmentManager?.isEquipArtifactCard(cardName)) {
+            const equipCheck = window.heroSelection.heroEquipmentManager.canEquipArtifact(heroPosition, cardName);
+            return equipCheck && equipCheck.canEquip;
+        }
+        
+        // Check if it's an ascended hero that can be used for ascension
+        if (window.ascendedManager?.isAscendedHero(cardName)) {
+            const tooltipInfo = window.ascendedManager.getAscensionDropTooltipInfo(heroPosition, cardName);
+            return tooltipInfo && tooltipInfo.canDrop;
+        }
+        
+        // Check global spells (like Teleport)
+        if (window.globalSpellManager?.isGlobalSpell(cardName, window.heroSelection)) {
+            if (cardName === 'Teleport' && window.teleportSpell) {
+                const canActivateResult = window.teleportSpell.canActivateOnHero(window.heroSelection, heroPosition);
+                return canActivateResult && canActivateResult.canActivate;
+            }
+            return true; // Generally assume global spells can be used
+        }
+        
+        // Check potion cards (check if player has potion uses left for the turn)
+        if (window.potionHandler?.isPotionCard(cardName, window.heroSelection)) {
+            // Check if player has any potion uses remaining this turn
+            return window.potionHandler.canUsePotion();
+        }
+        
+        // Check if it's an artifact that can be activated
+        if (cardInfo.cardType === 'Artifact' && window.artifactHandler) {
+            return true; // Most artifacts can be activated if affordable (already checked above)
+        }
+        
+        // For other action cards, check if we have actions
+        if (cardInfo.action) {
+            return hasActions;
+        }
+        
+        // For non-action cards that aren't spells, they're generally usable
+        return true;
+    }
+
+    // Check if ANY hero can use this card (for hand graying logic)
+    canAnyHeroUseCard(cardName) {
+        const heroPositions = ['left', 'center', 'right'];
+        
+        for (const position of heroPositions) {
+            if (this.canHeroUseCard(position, cardName)) {
+                return true; // At least one hero can use it
+            }
+        }
+        
+        return false; // No hero can use this card
+    }
+
     // ===== TEST HELPER FUNCTION =====
     // This function adds test cards to the hand for testing purposes
     // Easy to remove - just delete this function and the call in drawInitialHand()
@@ -57,7 +534,7 @@ export class HandManager {
 
             // Check if we have room in hand
             if (this.hand.length >= this.maxHandSize) {
-                console.warn(`⏱️ TEST: Cannot add more test cards - hand is full (attempted to add "${cardName}")`);
+                console.warn(`⏰ TEST: Cannot add more test cards - hand is full (attempted to add "${cardName}")`);
                 break;
             }
 
@@ -75,7 +552,7 @@ export class HandManager {
             console.log(`🧪 TEST: Added ${addedCards.length} test card(s) to hand: [${addedCards.join(', ')}]`);
         }
         if (failedCards.length > 0) {
-            console.warn(`⏱️ TEST: Failed to add ${failedCards.length} test card(s): [${failedCards.join(', ')}]`);
+            console.warn(`⏰ TEST: Failed to add ${failedCards.length} test card(s): [${failedCards.join(', ')}]`);
         }
 
         return addedCards.length > 0;
@@ -152,6 +629,72 @@ export class HandManager {
                     } catch (nfmError) {
                         console.error('Error triggering NonFungibleMonkee disenchant effect:', nfmError);
                         // Don't let NonFungibleMonkee errors prevent the disenchant from completing
+                    }
+                }
+
+                // Check if a SoulShard creature can trigger lingering effect
+                if (cardName === 'SoulShardIb') {
+                    try {
+                        const { default: soulShardIbCreature } = await import('./Creatures/soulShardIb.js');
+                        soulShardIbCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardIb disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardKa') {
+                    try {
+                        const { default: soulShardKaCreature } = await import('./Creatures/soulShardKa.js');
+                        soulShardKaCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardKa disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardKhet') {
+                    try {
+                        const { default: soulShardKhetCreature } = await import('./Creatures/soulShardKhet.js');
+                        soulShardKhetCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardKhet disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardBa') {
+                    try {
+                        const { default: soulShardBaCreature } = await import('./Creatures/soulShardBa.js');
+                        soulShardBaCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardBa disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardRen') {
+                    try {
+                        const { default: soulShardRenCreature } = await import('./Creatures/soulShardRen.js');
+                        soulShardRenCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardRen disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardSekhem') {
+                    try {
+                        const { default: soulShardSekhemCreature } = await import('./Creatures/soulShardSekhem.js');
+                        soulShardSekhemCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardSekhem disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardShut') {
+                    try {
+                        const { default: soulShardShutCreature } = await import('./Creatures/soulShardShut.js');
+                        soulShardShutCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardShut disenchant:', error);
+                    }
+                }
+                if (cardName === 'SoulShardSah') {
+                    try {
+                        const { default: soulShardSahCreature } = await import('./Creatures/soulShardSah.js');
+                        soulShardSahCreature.handleDisenchant(window.heroSelection);
+                    } catch (error) {
+                        console.error('Error handling SoulShardSah disenchant:', error);
                     }
                 }
 
@@ -281,6 +824,184 @@ export class HandManager {
 
     // === ENHANCED DRAG & DROP EVENT HANDLERS ===
 
+    // Show phantom card at target position (like creature showDropIndicator)
+    showHandDropPreview(targetIndex, handZoneElement) {
+        // Prevent rapid updates that cause flicker
+        if (this.dragState.previewPosition === targetIndex) {
+            return;
+        }
+
+        // Store preview state
+        this.dragState.previewPosition = targetIndex;
+
+        if (!this.dragState.draggedElement || !this.dragState.isDragging) {
+            return;
+        }
+
+        const draggedElement = this.dragState.draggedElement;
+
+        // Get visible hand card elements (excluding the dragged one) BEFORE repositioning
+        const visibleCardsBefore = Array.from(handZoneElement.querySelectorAll('.hand-card'))
+            .filter(el => el !== draggedElement);
+
+        // Record initial positions for animation
+        const initialPositions = new Map();
+        visibleCardsBefore.forEach(card => {
+            const rect = card.getBoundingClientRect();
+            initialPositions.set(card, {
+                left: rect.left,
+                top: rect.top
+            });
+        });
+
+        // Remove dragged element from current position
+        if (draggedElement.parentNode) {
+            draggedElement.parentNode.removeChild(draggedElement);
+        }
+
+        // Apply phantom styling to the dragged element
+        draggedElement.classList.add('hand-card-phantom');
+        draggedElement.classList.remove('hand-card-dragging');
+
+        // Insert dragged element at the target position
+        if (targetIndex >= visibleCardsBefore.length) {
+            // Insert at end
+            handZoneElement.appendChild(draggedElement);
+        } else if (targetIndex === 0) {
+            // Insert at beginning
+            if (visibleCardsBefore.length > 0) {
+                handZoneElement.insertBefore(draggedElement, visibleCardsBefore[0]);
+            } else {
+                handZoneElement.appendChild(draggedElement);
+            }
+        } else {
+            // Insert in middle
+            handZoneElement.insertBefore(draggedElement, visibleCardsBefore[targetIndex]);
+        }
+
+        // Animate cards that moved due to phantom repositioning
+        this.animateDisplacedCards(handZoneElement, initialPositions, draggedElement);
+    }
+
+    // Animate cards that were displaced by phantom repositioning
+    animateDisplacedCards(handZoneElement, initialPositions, draggedElement) {
+        // Get all cards after repositioning (excluding dragged element)
+        const cardsAfter = Array.from(handZoneElement.querySelectorAll('.hand-card'))
+            .filter(el => el !== draggedElement);
+
+        cardsAfter.forEach(card => {
+            const initialPos = initialPositions.get(card);
+            if (!initialPos) return;
+
+            const currentRect = card.getBoundingClientRect();
+            const deltaX = initialPos.left - currentRect.left;
+            const deltaY = initialPos.top - currentRect.top;
+
+            // Only animate if the card actually moved
+            if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+                // Clear any existing animation classes
+                card.classList.remove('repositioning-left', 'repositioning-right', 'repositioning-complete');
+                
+                // Force reflow to ensure classes are cleared
+                card.offsetHeight;
+
+                // Determine movement direction for tilt
+                const movingRight = deltaX < 0;
+                const movingLeft = deltaX > 0;
+
+                // Set initial position (where it was before repositioning)
+                card.style.setProperty('--move-distance', `${deltaX}px`);
+                card.style.transform = `translateX(${deltaX}px) translateY(${deltaY}px)`;
+                card.style.transition = 'none';
+
+                // Force reflow to apply initial transform
+                card.offsetHeight;
+
+                // Apply animation class with directional tilt
+                if (movingLeft) {
+                    card.classList.add('repositioning-left');
+                } else if (movingRight) {
+                    card.classList.add('repositioning-right');
+                }
+
+                // Complete animation after 0.2s
+                setTimeout(() => {
+                    card.classList.remove('repositioning-left', 'repositioning-right');
+                    card.classList.add('repositioning-complete');
+                    
+                    // Clean up after transition completes
+                    setTimeout(() => {
+                        card.classList.remove('repositioning-complete');
+                        card.style.removeProperty('--move-distance');
+                        card.style.transform = '';
+                        card.style.transition = '';
+                    }, 200);
+                }, 10);
+            }
+        });
+    }
+
+    // Create phantom card element with same appearance as dragged card
+    createPhantomCard() {
+        if (!this.dragState.draggedElement) return null;
+
+        const phantom = this.dragState.draggedElement.cloneNode(true);
+        
+        // Style as phantom/preview
+        phantom.classList.add('hand-card-phantom');
+        phantom.classList.remove('hand-card-dragging');
+        
+        // Remove any event handlers and make it non-interactive
+        phantom.draggable = false;
+        phantom.onclick = null;
+        phantom.oncontextmenu = null;
+        phantom.onmouseenter = null;
+        phantom.onmouseleave = null;
+        
+        // Remove data attributes that might interfere
+        phantom.removeAttribute('data-card-index');
+        
+        // Style the phantom
+        phantom.style.cssText = `
+            opacity: 0.5 !important;
+            transform: scale(0.95) !important;
+            border: 2px dashed rgba(102, 126, 234, 0.8) !important;
+            border-radius: 8px !important;
+            background: rgba(102, 126, 234, 0.1) !important;
+            pointer-events: none !important;
+            position: relative !important;
+            z-index: 5 !important;
+            transition: all 0.2s ease !important;
+        `;
+
+        return phantom;
+    }
+
+    // Clear phantom card preview
+    clearHandDropPreview() {
+        if (this.dragState.draggedElement) {
+            // Remove phantom styling and restore dragging styling
+            this.dragState.draggedElement.classList.remove('hand-card-phantom');
+            this.dragState.draggedElement.classList.add('hand-card-dragging');
+        }
+        
+        // Clean up any ongoing card animations
+        this.cleanupCardAnimations();
+        
+        this.dragState.previewPosition = null;
+    }
+
+    // Clean up any ongoing repositioning animations
+    cleanupCardAnimations() {
+        const allHandCards = document.querySelectorAll('.hand-card');
+        allHandCards.forEach(card => {
+            card.classList.remove('repositioning-left', 'repositioning-right', 'repositioning-complete');
+            card.style.removeProperty('--move-distance');
+            card.style.transform = '';
+            card.style.transition = '';
+        });
+    }
+
     // Start dragging a hand card - now with entire hand disabling approach
     startHandCardDrag(cardIndex, cardName, draggedElement) {
         // NOTE: Exclusive artifact blocking is now handled at the global function level
@@ -292,17 +1013,15 @@ export class HandManager {
             draggedCardIndex: cardIndex,
             draggedCardName: cardName,
             draggedElement: draggedElement,
-            originalHand: [...this.hand]
+            originalHand: [...this.hand],
+            previewPosition: null,
+            originalParent: draggedElement.parentNode,
+            originalNextSibling: draggedElement.nextSibling
         };
 
-        // Apply visual feedback AFTER drag image is generated
+        // Apply initial drag styling (will be changed to phantom when over hand)
         if (draggedElement) {
             draggedElement.classList.add('hand-card-dragging');
-            
-            // Use CSS transitions instead of direct style manipulation
-            draggedElement.style.opacity = '0.6';
-            draggedElement.style.transform = 'scale(0.95) rotate(5deg)';
-            draggedElement.style.zIndex = '1000';
         }
         
         // Check if this is an ability card and add body class
@@ -349,14 +1068,12 @@ export class HandManager {
     // End drag operation
     endHandCardDrag() {
         if (this.dragState.draggedElement) {
-            // Remove visual feedback
-            this.dragState.draggedElement.style.opacity = '';
-            this.dragState.draggedElement.style.transform = '';
-            this.dragState.draggedElement.style.zIndex = '';
-            this.dragState.draggedElement.classList.remove('hand-card-dragging');
+            // Remove all drag-related styling
+            this.dragState.draggedElement.classList.remove('hand-card-dragging', 'hand-card-phantom');
+            this.dragState.draggedElement.style.cssText = ''; // Clear any inline styles
         }
 
-        // Clean up any visual states
+        // Clean up visual states
         const allHandCards = document.querySelectorAll('.hand-card');
         allHandCards.forEach(card => {
             card.classList.remove('hand-card-drag-over', 'touch-dragging');
@@ -382,7 +1099,7 @@ export class HandManager {
         this.endHandCardDrag();
     }
 
-    // === EXISTING HAND ZONE DRAG & DROP HANDLERS (unchanged) ===
+    // === EXISTING HAND ZONE DRAG & DROP HANDLERS ===
 
     onZoneDragEnter(event) {
         if (this.isHandDragging()) {
@@ -396,10 +1113,19 @@ export class HandManager {
         }
     }
 
+    // Enhanced zone drag over with phantom preview
     onZoneDragOver(event) {
         if (this.isHandDragging()) {
             event.preventDefault();
             event.stopPropagation();
+            
+            const handZone = event.currentTarget;
+            handZone.classList.add('hand-zone-drag-over');
+            
+            // Calculate target position and show phantom
+            const dropX = event.clientX;
+            const targetIndex = this.calculateInsertionPosition(dropX, handZone);
+            this.showHandDropPreview(targetIndex, handZone);
             
             event.dataTransfer.dropEffect = 'move';
             
@@ -415,9 +1141,11 @@ export class HandManager {
         
         if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
             handZone.classList.remove('hand-zone-drag-over');
+            this.clearHandDropPreview();
         }
     }
 
+    // Enhanced zone drop
     onZoneDrop(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -426,6 +1154,7 @@ export class HandManager {
             const handZone = event.currentTarget;
             
             handZone.classList.remove('hand-zone-drag-over');
+            this.clearHandDropPreview();
             
             const dropX = event.clientX;
             
@@ -438,8 +1167,9 @@ export class HandManager {
         return false;
     }
 
+    // Enhanced calculate insertion position (accounts for repositioned drag element)
     calculateInsertionPosition(dropX, handZoneElement) {
-        const handCards = handZoneElement.querySelectorAll('.hand-card');
+        const handCards = handZoneElement.querySelectorAll('.hand-card:not(.hand-card-phantom)');
         
         if (handCards.length === 0) {
             return 0;
@@ -453,8 +1183,8 @@ export class HandManager {
         let closestDistance = Infinity;
 
         handCards.forEach((card, index) => {
-            if (this.dragState.isDragging && index === this.dragState.draggedCardIndex) {
-                return;
+            if (this.dragState.isDragging && card === this.dragState.draggedElement) {
+                return; // Skip the dragged element
             }
 
             const cardRect = card.getBoundingClientRect();
@@ -472,8 +1202,22 @@ export class HandManager {
             }
         });
 
-        if (this.dragState.isDragging && this.dragState.draggedCardIndex < closestIndex) {
-            closestIndex--;
+        // Adjust for dragged element position if needed
+        if (this.dragState.isDragging) {
+            let adjustedIndex = closestIndex;
+            let visibleIndex = 0;
+            
+            for (let i = 0; i < handCards.length; i++) {
+                if (handCards[i] === this.dragState.draggedElement) {
+                    if (visibleIndex < closestIndex) {
+                        adjustedIndex--;
+                    }
+                    break;
+                }
+                visibleIndex++;
+            }
+            
+            closestIndex = adjustedIndex;
         }
 
         return Math.max(0, Math.min(closestIndex, this.hand.length - 1));
@@ -512,13 +1256,17 @@ export class HandManager {
         return { success: false, needsUIUpdate: false, needsSave: false };
     }
 
+    // Enhanced reset drag state
     resetDragState() {
         this.dragState = {
             isDragging: false,
             draggedCardIndex: -1,
             draggedCardName: null,
             draggedElement: null,
-            originalHand: []
+            originalHand: [],
+            previewPosition: null,
+            originalParent: null,
+            originalNextSibling: null
         };
     }
 
@@ -727,8 +1475,6 @@ export class HandManager {
             // Check if this is an ascended hero card
             const isAscendedHero = window.ascendedManager?.isAscendedHero(cardName) || false;
 
-            
-
             // Check if this is an artifact and if it's unaffordable
             let isUnaffordable = false;
             let dataCardType = 'other';
@@ -757,11 +1503,10 @@ export class HandManager {
                 dataCardType = 'equip-artifact';
             }
             
-            // If ANY exclusive artifact is active, ALL cards are disabled
+            // Use centralized validation logic
+            const canPlay = this.canAnyHeroUseCard(cardName);
             const canDrag = !isAnyExclusiveActive; // Always allow dragging unless exclusive artifact is active
-            const canPlay = !isAnyExclusiveActive && (!requiresAction || hasActions) && !isUnaffordable;
 
-            
             const cardData = {
                 imagePath: cardPath,
                 displayName: cardDisplayName,
@@ -778,7 +1523,6 @@ export class HandManager {
             if (!canPlay) cardClasses += ' no-actions-available';
             if (isAnyExclusiveActive) cardClasses += ' exclusive-hand-disabled';
             if (isAscendedHero) cardClasses += ' ascended-hero-card';
-
 
             // Add clickable class for special cards (only if they can be played)
             let clickableClass = '';
@@ -948,7 +1692,7 @@ function onHandCardDragStart(event, cardIndex, cardName) {
         const affordCheck = canPlayerAffordArtifact(cardName);
         if (!affordCheck.canAfford) {
             // Show warning but allow dragging to continue
-            showGoldError(`${affordCheck.reason} (dragging to discard pile still works)`, event);
+            //showGoldError(`${affordCheck.reason} (dragging to discard pile still works)`, event);
         }
         
         const cardInfo = window.heroSelection.getCardInfo ? 
@@ -959,7 +1703,7 @@ function onHandCardDragStart(event, cardIndex, cardName) {
             
             if (!actionCheck.canPlay) {
                 // Show warning but allow dragging to continue
-                showActionError(`${actionCheck.reason} (dragging to discard pile still works)`, event);
+               // showActionError(`${actionCheck.reason} (dragging to discard pile still works)`, event);
             }
         }
 
@@ -1969,7 +2713,7 @@ if (typeof window !== 'undefined') {
     window.onHandZoneDragLeave = onHandZoneDragLeave;
     window.onHandZoneDrop = onHandZoneDrop;
     window.onHandCardClick = onHandCardClick;
-    window.onHandCardRightClick = onHandCardRightClick; // NEW: Export right-click handler
+    window.onHandCardRightClick = onHandCardRightClick;
     window.canPlayerAffordArtifact = canPlayerAffordArtifact;
     window.showGoldError = showGoldError;
 }

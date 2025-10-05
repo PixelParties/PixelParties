@@ -6,6 +6,7 @@ import { UIManager } from './uiManager.js';
 import { RoomManager } from './roomManager.js';
 import { WebRTCManager } from './webRTCManager.js';
 import { GameManager } from './gameManager.js';
+import { showCardLibraryScreen } from './cardLibrary.js';
 
 class ProjectPixelParties {
     constructor() {
@@ -73,57 +74,69 @@ class ProjectPixelParties {
     setupEventListeners() {
         const { elements } = this.uiManager;
         
+        // Helper function to safely add event listener
+        const safeAddEventListener = (element, event, handler) => {
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Element not found for event listener: ${event}`);
+            }
+        };
+        
         // Main menu buttons
-        elements.startBtn.addEventListener('click', () => this.showPasswordSection());
-        elements.confirmCreateBtn.addEventListener('click', () => this.startGame());
-        elements.cancelCreateBtn.addEventListener('click', () => this.cancelRoomCreation());
-        elements.joinBtn.addEventListener('click', () => this.showRoomBrowser());
-        elements.howToPlayBtn.addEventListener('click', () => this.showHowToPlay());
-        elements.leaveBtn.addEventListener('click', () => this.leaveRoom());
+        safeAddEventListener(elements.startBtn, 'click', () => this.showPasswordSection());
+        safeAddEventListener(elements.confirmCreateBtn, 'click', () => this.startGame());
+        safeAddEventListener(elements.cancelCreateBtn, 'click', () => this.cancelRoomCreation());
+        safeAddEventListener(elements.joinBtn, 'click', () => this.showRoomBrowser());
+        safeAddEventListener(elements.howToPlayBtn, 'click', () => this.showHowToPlay());
+        safeAddEventListener(elements.cardLibraryBtn, 'click', () => this.showCardLibrary());
+        safeAddEventListener(elements.leaveBtn, 'click', () => this.leaveRoom());
         
         // Room browser
-        elements.backToMenuBtn.addEventListener('click', () => this.hideRoomBrowser());
-        elements.refreshRoomsBtn.addEventListener('click', () => this.refreshRoomsList());
+        safeAddEventListener(elements.backToMenuBtn, 'click', () => this.hideRoomBrowser());
+        safeAddEventListener(elements.refreshRoomsBtn, 'click', () => this.refreshRoomsList());
         
         // How to Play screen
-        elements.backFromHowToPlayBtn.addEventListener('click', () => this.hideHowToPlay());
+        safeAddEventListener(elements.backFromHowToPlayBtn, 'click', () => this.hideHowToPlay());
         
         // Password modal
-        elements.modalJoinBtn.addEventListener('click', () => this.handlePasswordSubmit());
-        elements.modalCancelBtn.addEventListener('click', () => this.hidePasswordModal());
-        elements.modalPasswordInput.addEventListener('keypress', (e) => {
+        safeAddEventListener(elements.modalJoinBtn, 'click', () => this.handlePasswordSubmit());
+        safeAddEventListener(elements.modalCancelBtn, 'click', () => this.hidePasswordModal());
+        safeAddEventListener(elements.modalPasswordInput, 'keypress', (e) => {
             if (e.key === 'Enter') this.handlePasswordSubmit();
         });
-        elements.modalPasswordInput.addEventListener('input', () => {
-            elements.passwordError.classList.add('hidden');
+        safeAddEventListener(elements.modalPasswordInput, 'input', () => {
+            if (elements.passwordError) {
+                elements.passwordError.classList.add('hidden');
+            }
         });
         
         // Username input
-        elements.usernameInput.addEventListener('input', () => {
+        safeAddEventListener(elements.usernameInput, 'input', () => {
             this.storageManager.saveUsername(this.uiManager.getCurrentUsername());
         });
-        elements.usernameInput.addEventListener('blur', () => {
+        safeAddEventListener(elements.usernameInput, 'blur', () => {
             this.storageManager.saveUsername(this.uiManager.getCurrentUsername());
             this.uiManager.showUsernameSaved();
         });
         
         // Password input enter key
-        elements.passwordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !elements.confirmCreateBtn.classList.contains('hidden')) {
+        safeAddEventListener(elements.passwordInput, 'keypress', (e) => {
+            if (e.key === 'Enter' && elements.confirmCreateBtn && !elements.confirmCreateBtn.classList.contains('hidden')) {
                 this.startGame();
             }
         });
         
         // Surrender functionality
-        elements.surrenderBtn.addEventListener('click', () => this.uiManager.showSurrenderModal());
-        elements.surrenderYesBtn.addEventListener('click', () => this.confirmSurrender());
-        elements.surrenderNoBtn.addEventListener('click', () => this.uiManager.hideSurrenderModal());
+        safeAddEventListener(elements.surrenderBtn, 'click', () => this.uiManager.showSurrenderModal());
+        safeAddEventListener(elements.surrenderYesBtn, 'click', () => this.confirmSurrender());
+        safeAddEventListener(elements.surrenderNoBtn, 'click', () => this.uiManager.hideSurrenderModal());
         
         // Click outside modals to close
-        elements.passwordModal.addEventListener('click', (e) => {
+        safeAddEventListener(elements.passwordModal, 'click', (e) => {
             if (e.target === elements.passwordModal) this.hidePasswordModal();
         });
-        elements.surrenderModal.addEventListener('click', (e) => {
+        safeAddEventListener(elements.surrenderModal, 'click', (e) => {
             if (e.target === elements.surrenderModal) this.uiManager.hideSurrenderModal();
         });
         
@@ -132,6 +145,17 @@ class ProjectPixelParties {
         
         // Visibility change
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
+        
+        // Alternative event listener for card library if UIManager doesn't have it
+        const cardLibraryBtn = document.getElementById('cardLibraryBtn');
+        if (cardLibraryBtn && !elements.cardLibraryBtn) {
+            cardLibraryBtn.addEventListener('click', () => this.showCardLibrary());
+        }
+    }
+
+    // Show Card Library screen
+    showCardLibrary() {
+        showCardLibraryScreen();
     }
 
     // Restore username
@@ -696,7 +720,7 @@ window.emergencyTooltipCleanup = function() {
 };
 
 // Call emergency cleanup on page visibility change (when user switches tabs)
-document.addEventListener('visibilitychange', function() {
+/*document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') {
         // Small delay to let any transitions complete
         setTimeout(() => {
@@ -705,4 +729,4 @@ document.addEventListener('visibilitychange', function() {
             }
         }, 100);
     }
-});
+});*/

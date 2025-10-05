@@ -276,6 +276,170 @@
         .guide-section-image[src=""] {
             display: none;
         }
+
+        /* Card Library Screen Styles */
+        .card-library-screen {
+            position: relative;
+            max-width: 1000px;
+            width: 95vw;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            color: #ffffff;
+            line-height: 1.6;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        .card-library-header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #00ffff;
+            padding-bottom: 15px;
+        }
+
+        .card-library-title {
+            font-size: 2.5rem;
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .card-library-subtitle {
+            font-size: 1.2rem;
+            color: #88ccff;
+            margin-bottom: 0;
+        }
+
+        .card-library-content {
+            margin-bottom: 40px;
+        }
+
+        .card-class-section {
+            margin-bottom: 40px;
+        }
+
+        .card-class-title {
+            font-size: 1.5rem;
+            color: #00ffff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 5px #00ffff;
+            border-left: 4px solid #00ffff;
+            padding-left: 15px;
+        }
+
+        .card-wall {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 30px;
+            padding: 0 2px; 
+        }
+
+        .card-wall-item {
+            aspect-ratio: 3/4;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(0, 255, 255, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: scale(0.95); 
+        }
+
+        .card-wall-item:hover {
+            border-color: #00ffff;
+            background: rgba(0, 255, 255, 0.1);
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+        }
+
+        .card-wall-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        .card-wall-placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .card-wall-name {
+            color: #00ffff;
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-shadow: 0 0 3px #00ffff;
+        }
+
+        /* Responsive adjustments for card library */
+        @media (max-width: 1024px) {
+            .card-wall {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 12px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .card-wall {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+            
+            .card-library-screen {
+                width: 98vw;
+                padding: 15px;
+            }
+            
+            .card-library-title {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .card-wall {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+        }
+
+        /* Card library scrollbar */
+        .card-library-screen::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .card-library-screen::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        .card-library-screen::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        .card-library-screen::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 255, 0.7);
+        }
     </style>
     
     <link rel="stylesheet" href="main.css">
@@ -302,6 +466,7 @@
             <button id="cancelCreateBtn" class="btn btn-secondary hidden">❌ Cancel</button>
             <button id="joinBtn" class="btn btn-secondary">⚔️ Browse Battles</button>
             <button id="howToPlayBtn" class="btn btn-info">📖 How to Play</button>
+            <button id="cardLibraryBtn" class="btn btn-info">📚 Card Library</button>
             <button id="leaveBtn" class="btn btn-danger hidden">🚪 Leave Party</button>
         </div>
 
@@ -322,6 +487,11 @@
         <!-- How to Play Screen - Content dynamically loaded -->
         <div id="howToPlayScreen" class="how-to-play-screen hidden">
             <!-- Content will be populated by howToPlayScreen.js module -->
+        </div>
+
+        <!-- Card Library Screen - Content dynamically loaded -->
+        <div id="cardLibraryScreen" class="card-library-screen hidden">
+            <!-- Content will be populated by cardLibrary.js module -->
         </div>
 
         <div id="status" class="status hidden"></div>
@@ -481,6 +651,19 @@
             const howToPlayBtn = document.getElementById('howToPlayBtn');
             if (howToPlayBtn) {
                 howToPlayBtn.addEventListener('click', showHowToPlayScreen);
+            }
+        });
+    </script>
+
+    <!-- Card Library Module -->
+    <script type="module">
+        import { showCardLibraryScreen } from './cardLibrary.js';
+        
+        // Set up Card Library button event listener
+        document.addEventListener('DOMContentLoaded', () => {
+            const cardLibraryBtn = document.getElementById('cardLibraryBtn');
+            if (cardLibraryBtn) {
+                cardLibraryBtn.addEventListener('click', showCardLibraryScreen);
             }
         });
     </script>

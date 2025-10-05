@@ -206,7 +206,7 @@ export class HeroSelectionUI {
         tooltip.id = 'formationSpellbookTooltip';
         
         // Update the title to show lock status
-        let tooltipTitle = `📋 ${hero.name}'s Arsenal`;
+        let tooltipTitle = `${hero.name}'s Arsenal`;
         if (isSpellbookLocked) {
             tooltipTitle += ' 🔒';
         }
@@ -232,12 +232,11 @@ export class HeroSelectionUI {
             });
             
             let currentSchool = null;
-            let spellIndexInOriginal = 0; // Track original index for click handling
+            let spellIndexInOriginal = 0;
             
             sortedSpells.forEach((spell, sortedIndex) => {
                 // Find the original index of this spell in the unsorted spellbook
                 spellIndexInOriginal = spellbook.findIndex((originalSpell, idx) => {
-                    // Find the first occurrence of this spell that hasn't been used yet
                     const usedIndices = sortedSpells.slice(0, sortedIndex)
                         .map(usedSpell => spellbook.findIndex((s, i) => s === usedSpell && i >= 0))
                         .filter(i => i !== -1);
@@ -289,7 +288,7 @@ export class HeroSelectionUI {
                 
                 const spellLevel = spell.level !== undefined ? spell.level : 0;
                 const spellName = this.formatCardName(spell.name);
-                const isEnabled = spell.enabled !== false; // Default to true for backward compatibility
+                const isEnabled = spell.enabled !== false;
                 
                 // Add disabled class and click handler based on lock status
                 const disabledClass = !isEnabled ? 'spell-disabled' : '';
@@ -347,7 +346,6 @@ export class HeroSelectionUI {
         const enabledSpells = spellbook ? spellbook.filter(spell => spell.enabled !== false).length : 0;
         const disabledSpells = spellbook ? spellbook.length - enabledSpells : 0;
         
-        // Enhanced summary with enabled/disabled count
         let summaryText = `Total Items: ${totalItems}`;
         if (spellbook && spellbook.length > 0) {
             if (disabledSpells > 0 && !isSpellbookLocked) {
@@ -368,11 +366,40 @@ export class HeroSelectionUI {
         
         tooltip.innerHTML = tooltipHTML;
         
-        // KEEP: Add wheel event listener to the tooltip for direct scrolling
+        // Add wheel event listener to the tooltip for direct scrolling
         tooltip.addEventListener('wheel', (event) => {
             this.handleTooltipScroll(event, tooltip);
         });
         
+        // Calculate position BEFORE appending to prevent any visual jump
+        if (!heroElement) return;
+        
+        const heroRect = heroElement.getBoundingClientRect();
+        
+        // Calculate position (to the left of the hero)
+        const tooltipWidth = 320; // Approximate width
+        let leftPos = heroRect.left - tooltipWidth - 55; // 20px gap
+        let topPos = heroRect.top;
+        
+        // Check if it would go off screen on the left
+        if (leftPos < 10) {
+            // Position to the right instead
+            leftPos = heroRect.right + 10;
+        }
+        
+        // Ensure it doesn't go off screen on top
+        if (topPos < 10) {
+            topPos = 10;
+        }
+        
+        // FIX: Set position INLINE before appending to DOM
+        tooltip.style.position = 'fixed';
+        tooltip.style.left = `${leftPos}px`;
+        tooltip.style.top = `${topPos}px`;
+        tooltip.style.opacity = '0';
+        tooltip.style.visibility = 'hidden';
+        
+        // Now append to DOM
         document.body.appendChild(tooltip);
 
         // Update tracking state - only track hero hover
@@ -384,8 +411,31 @@ export class HeroSelectionUI {
             window.heroTooltipManager.enhanceTooltipForLockedMode(tooltip, position);
         }
         
-        // Position tooltip to the left of the hero card
-        this.positionSpellbookTooltip(tooltip, heroElement);
+        // Check if card tooltip is visible and adjust position if needed
+        const cardTooltip = document.querySelector('.large-card-tooltip:not(.formation-spellbook-tooltip)');
+        if (cardTooltip) {
+            const cardRect = cardTooltip.getBoundingClientRect();
+            
+            // If overlapping with card tooltip, reposition
+            if (leftPos + tooltipWidth > cardRect.left && leftPos < cardRect.right) {
+                console.log("CHECK CHECK CHECK");
+                // Try to position further left
+                leftPos = cardRect.left - tooltipWidth - 20;
+                if (leftPos < 10) {
+                    // If still no room, stack vertically
+                    topPos = cardRect.bottom + 50;
+                    leftPos = heroRect.left;
+                }
+                tooltip.style.left = `${leftPos}px`;
+                tooltip.style.top = `${topPos}px`;
+            }
+        }
+        
+        // Now make tooltip visible after positioning is complete
+        requestAnimationFrame(() => {
+            tooltip.style.opacity = '';
+            tooltip.style.visibility = '';
+        });
 
         // Make tooltip not interfere with mouse events by default
         tooltip.style.pointerEvents = 'none';
@@ -398,6 +448,7 @@ export class HeroSelectionUI {
             this.updateScrollIndicators(tooltip);
         }, 50);
     }
+
 
     handleTooltipScroll(event, tooltip) {
         const spellbookList = tooltip.querySelector('.spellbook-list');
@@ -736,51 +787,6 @@ export class HeroSelectionUI {
             // Remove visual hints
             heroElement.classList.remove('tooltip-scrollable');
         });
-    }
-
-    // Position spellbook tooltip
-    positionSpellbookTooltip(tooltip, heroElement) {
-        if (!heroElement) return;
-        
-        const heroRect = heroElement.getBoundingClientRect();
-        
-        // Calculate position (to the left of the hero)
-        const tooltipWidth = 320; // Approximate width
-        let leftPos = heroRect.left - tooltipWidth - 20; // 20px gap
-        let topPos = heroRect.top;
-        
-        // Check if it would go off screen on the left
-        if (leftPos < 10) {
-            // Position to the right instead
-            leftPos = heroRect.right + 20;
-        }
-        
-        // Ensure it doesn't go off screen on top
-        if (topPos < 10) {
-            topPos = 10;
-        }
-        
-        tooltip.style.left = `${leftPos}px`;
-        tooltip.style.top = `${topPos}px`;
-        
-        // Check if card tooltip is visible and adjust position
-        const cardTooltip = document.querySelector('.large-card-tooltip:not(.formation-spellbook-tooltip)');
-        if (cardTooltip) {
-            const cardRect = cardTooltip.getBoundingClientRect();
-            
-            // If overlapping with card tooltip, reposition
-            if (leftPos + tooltipWidth > cardRect.left && leftPos < cardRect.right) {
-                // Try to position further left
-                leftPos = cardRect.left - tooltipWidth - 20;
-                if (leftPos < 10) {
-                    // If still no room, stack vertically
-                    topPos = cardRect.bottom + 20;
-                    leftPos = heroRect.left;
-                }
-                tooltip.style.left = `${leftPos}px`;
-                tooltip.style.top = `${topPos}px`;
-            }
-        }
     }
 
     // Check if Nicolas effect is currently usable
@@ -1332,7 +1338,7 @@ export class HeroSelectionUI {
                         </div>
                         <p class="drag-hint">💡 Drag and drop Heroes to rearrange your formation!</p>
                         <p class="drag-hint">🎯 Drag cards onto a Hero slot to attach them!</p>
-                        <p class="drag-hint">🐾 Drag and drop Creatures to reorder them within the same Hero!</p>
+                        <p class="drag-hint">⇄ Drag and drop Creatures to reorder them!</p>
                         <p class="drag-hint">🌍 Drag Area cards to the Area zone!</p>
                     </div>
                     
@@ -2073,10 +2079,6 @@ function onTeamSlotDragEnter(event) {
             return;
         }
     }
-    
-    if (window.heroSelection && window.heroSelection.formationManager.isDragging()) {
-        window.onHeroSlotDragEnter(event);
-    }
 }
 
 function onTeamSlotDragLeave(event) {
@@ -2223,79 +2225,26 @@ let creatureDragState = {
 };
 
 // Creature drag start handler
-function onCreatureDragStart(event, creatureDataJson) {
+function onCreatureDragStart(event, creatureDataJson) {    
     try {
         const creatureData = JSON.parse(creatureDataJson.replace(/&quot;/g, '"'));
         
-        // Create a custom drag image showing only the middle frame
-        const originalImg = event.target.closest('.creature-icon').querySelector('.creature-sprite');
-        if (originalImg && originalImg.complete && originalImg.naturalWidth > 0) {
-            try {
-                // Create a canvas to extract just the middle frame
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Set canvas size to match the sprite container
-                canvas.width = 32;
-                canvas.height = 32;
-                
-                // Calculate frame width (each frame is 1/3 of total width)
-                const frameWidth = originalImg.naturalWidth / 3;
-                const frameHeight = originalImg.naturalHeight;
-                
-                // Draw only the middle frame (frame index 1, which is the second frame)
-                ctx.drawImage(
-                    originalImg,
-                    frameWidth, 0, frameWidth, frameHeight, // Source: middle frame
-                    0, 0, canvas.width, canvas.height       // Destination: full canvas
-                );
-                
-                // Verify canvas has content
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const hasContent = imageData.data.some(pixel => pixel !== 0);
-                
-                if (hasContent) {
-                    // Create a temporary img element from the canvas
-                    const tempImg = document.createElement('img');
-                    tempImg.src = canvas.toDataURL('image/png');
-                    tempImg.width = 32;
-                    tempImg.height = 32;
-                    
-                    // Style the temp image (off-screen and with proper sizing)
-                    tempImg.style.cssText = `
-                        position: absolute;
-                        top: -1000px;
-                        left: -1000px;
-                        width: 32px;
-                        height: 32px;
-                        pointer-events: none;
-                    `;
-                    
-                    // Add to DOM temporarily (required for setDragImage to work in some browsers)
-                    document.body.appendChild(tempImg);
-                    
-                    // Set the custom drag image using the temp img element
-                    event.dataTransfer.setDragImage(tempImg, 16, 16);
-                    
-                    // Clean up the temporary element after drag completes
-                    setTimeout(() => {
-                        if (tempImg.parentNode) {
-                            document.body.removeChild(tempImg);
-                        }
-                    }, 100);
-                }
-                
-            } catch (canvasError) {
-                // Fallback will use the original element (showing full spritesheet)
-            }
-        }
-        
-        // Set up drag data
+        // Set drag data
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('application/x-creature-drag', creatureDataJson);
         event.dataTransfer.setData('text/plain', creatureData.name);
         
-        // Update creature manager drag state
+        // Use the creature sprite directly as drag image
+        let draggedElement = event.target.closest('.creature-icon');
+        if (draggedElement) {
+            const spriteImg = draggedElement.querySelector('.creature-sprite');
+            if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
+                // Use the full sprite image as drag image
+                event.dataTransfer.setDragImage(spriteImg, 16, 16);
+            }
+        }
+        
+        // Rest of existing drag logic...
         if (window.heroSelection && window.heroSelection.heroCreatureManager) {
             const success = window.heroSelection.heroCreatureManager.startCreatureDrag(
                 creatureData.heroPosition,
@@ -2309,7 +2258,7 @@ function onCreatureDragStart(event, creatureDataJson) {
             }
         }
         
-        // Update global drag state
+        // Update drag state
         creatureDragState = {
             isDragging: true,
             draggedCreature: creatureData,
@@ -2317,22 +2266,104 @@ function onCreatureDragStart(event, creatureDataJson) {
             draggedFromIndex: creatureData.index
         };
         
-        // Add visual feedback
-        event.target.closest('.creature-icon').classList.add('creature-dragging');
+        draggedElement = event.target.closest('.creature-icon');
+        if (draggedElement) {
+            window._currentDraggedCreatureElement = draggedElement;
+            
+            // Apply visual changes after delay
+            setTimeout(() => {
+                if (creatureDragState.isDragging && window._currentDraggedCreatureElement) {
+                    // Simple visual feedback - no frame manipulation
+                    window._currentDraggedCreatureElement.classList.add('creature-dragging-delayed');
+                }
+            }, 1);
+        }
+        
+        return true;
         
     } catch (error) {
+        console.error('[CREATURE DRAG] Error in creature drag start:', error);
         event.preventDefault();
         return false;
     }
 }
 
+function createMiddleFrameDragImageSync(creatureName) {
+    try {
+        // Try to find an already-loaded creature sprite in the DOM to use as source
+        const existingSpriteElements = document.querySelectorAll(`.creature-sprite[src*="${creatureName}.png"]`);
+        
+        for (let spriteElement of existingSpriteElements) {
+            if (spriteElement.complete && spriteElement.naturalWidth > 0) {
+                // Found a loaded sprite, use it to create middle frame
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size
+                canvas.width = 32;
+                canvas.height = 32;
+                
+                // Calculate frame dimensions (3 frames total)
+                const frameWidth = spriteElement.naturalWidth / 3;
+                const frameHeight = spriteElement.naturalHeight;
+                
+                // Draw only the middle frame (index 1)
+                ctx.drawImage(
+                    spriteElement,
+                    frameWidth, 0, frameWidth, frameHeight,  // Source: middle frame
+                    0, 0, canvas.width, canvas.height        // Destination: full canvas
+                );
+                return canvas;
+            }
+        }
+        
+        // If no existing sprite found, try creating a new image synchronously
+        // This will only work if the image is already in browser cache
+        const testImg = new Image();
+        testImg.src = `./Creatures/${creatureName}.png`;
+        
+        // Check if image loaded immediately (from cache)
+        if (testImg.complete && testImg.naturalWidth > 0) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 32;
+            canvas.height = 32;
+            
+            const frameWidth = testImg.naturalWidth / 3;
+            const frameHeight = testImg.naturalHeight;
+            
+            ctx.drawImage(
+                testImg,
+                frameWidth, 0, frameWidth, frameHeight,
+                0, 0, canvas.width, canvas.height
+            );
+            return canvas;
+        }
+        return null;
+        
+    } catch (error) {
+        console.error('[CREATURE DRAG] Error creating sync middle frame:', error);
+        return null;
+    }
+}
+
 // Creature drag end handler
 function onCreatureDragEnd(event) {
-    // Clean up drag state
+    // Clean up the delayed styling immediately
+    if (window._currentDraggedCreatureElement) {
+        const element = window._currentDraggedCreatureElement;
+        element.classList.remove('creature-dragging-delayed');
+        
+        window._currentDraggedCreatureElement = null;
+    }
+    
+    // Clean up drag state through manager
     if (window.heroSelection && window.heroSelection.heroCreatureManager) {
         window.heroSelection.heroCreatureManager.endCreatureDrag();
     }
     
+    // Reset global state
     creatureDragState = {
         isDragging: false,
         draggedCreature: null,
@@ -2340,11 +2371,12 @@ function onCreatureDragEnd(event) {
         draggedFromIndex: null
     };
     
-    // Clean up visual feedback
-    const draggingElements = document.querySelectorAll('.creature-dragging');
-    draggingElements.forEach(el => el.classList.remove('creature-dragging'));
+    // Clean up any remaining visual feedback
+    const allDraggingElements = document.querySelectorAll('.creature-dragging-delayed');
+    allDraggingElements.forEach(el => {
+        el.classList.remove('creature-dragging-delayed');
+    });
     
-    // Clean up drop zone visual feedback
     const creatureContainers = document.querySelectorAll('.hero-creatures');
     creatureContainers.forEach(container => {
         container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
@@ -2353,7 +2385,11 @@ function onCreatureDragEnd(event) {
 
 // Creature container drag over handler
 function onCreatureContainerDragOver(event, heroPosition) {
-    // Only handle creature drags
+    // Add Chrome drag validation
+    if (!event.dataTransfer.types.includes('application/x-creature-drag')) {
+        return;
+    }
+        
     if (!creatureDragState.isDragging) {
         return;
     }
@@ -2362,22 +2398,30 @@ function onCreatureContainerDragOver(event, heroPosition) {
     event.stopPropagation();
     
     const container = event.currentTarget;
-    
-    // Check if Guard Change mode is active
     const isGuardChangeActive = window.globalSpellManager?.isGuardChangeModeActive() || false;
     const isSameHero = heroPosition === creatureDragState.draggedFromHero;
     
-    // Allow drop if same hero OR Guard Change mode is active
     if (isSameHero || isGuardChangeActive) {
-        // Valid drop zone
         container.classList.add('creature-drop-ready');
         container.classList.remove('creature-drop-invalid');
         event.dataTransfer.dropEffect = 'move';
+        
+        if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+            const dropIndex = window.heroSelection.heroCreatureManager.getCreatureDropIndex(
+                heroPosition, 
+                event.clientX, 
+                container
+            );
+            window.heroSelection.heroCreatureManager.showDropIndicator(heroPosition, dropIndex);
+        }
     } else {
-        // Invalid drop zone - different hero and no Guard Change
         container.classList.add('creature-drop-invalid');
         container.classList.remove('creature-drop-ready');
         event.dataTransfer.dropEffect = 'none';
+        
+        if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+            window.heroSelection.heroCreatureManager.clearDropIndicators();
+        }
     }
 }
 
@@ -2388,41 +2432,45 @@ function onCreatureContainerDragLeave(event) {
     
     const x = event.clientX;
     const y = event.clientY;
-    const margin = 5; // Small margin for better UX
+    const margin = 5;
     
-    // Only remove classes if we're actually leaving the container
     if (x < rect.left - margin || x > rect.right + margin || 
         y < rect.top - margin || y > rect.bottom + margin) {
         
         container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
+        
+        if (window.heroSelection && window.heroSelection.heroCreatureManager) {
+            window.heroSelection.heroCreatureManager.clearDropIndicators();
+        }
     }
 }
 
 // Creature container drop handler
 async function onCreatureContainerDrop(event, heroPosition) {    
+    // Chrome validation - check for proper drag data
+    const dragData = event.dataTransfer.getData('application/x-creature-drag');
+    if (!dragData) {
+        console.error('[CREATURE DRAG] Chrome drop validation failed: No drag data');
+        return false;
+    }
+    
     event.preventDefault();
     event.stopPropagation();
     
     const container = event.currentTarget;
-    
-    // Clean up visual feedback
     container.classList.remove('creature-drop-ready', 'creature-drop-invalid');
     
-    // Only handle creature drags
     if (!creatureDragState.isDragging) {
         return false;
     }
     
-    // Check if Guard Change mode is active
     const isGuardChangeActive = window.globalSpellManager?.isGuardChangeModeActive() || false;
     const isSameHero = heroPosition === creatureDragState.draggedFromHero;
     
-    // Allow drops within same hero OR if Guard Change mode is active
     if (!isSameHero && !isGuardChangeActive) {
         return false;
     }
     
-    // Check if target hero exists (for cross-hero moves)
     if (!isSameHero && window.heroSelection?.heroCreatureManager) {
         const hasTargetHero = window.heroSelection.heroCreatureManager.hasHeroAtPosition(heroPosition);
         if (!hasTargetHero) {
@@ -2430,28 +2478,23 @@ async function onCreatureContainerDrop(event, heroPosition) {
         }
     }
     
-    // Handle the drop using the creature manager
     if (window.heroSelection && window.heroSelection.heroCreatureManager) {
         const success = window.heroSelection.heroCreatureManager.handleCreatureDrop(
             heroPosition,
             event.clientX,
             container
         );
-        
+                
         if (success) {
-            // Update the UI
             if (window.heroSelection.updateBattleFormationUI) {
                 window.heroSelection.updateBattleFormationUI();
             }
             
-            // Save game state
-            if (window.heroSelection.saveGameState) {
+            try {
                 await window.heroSelection.saveGameState();
-            }
-            
-            // Send formation update to opponent
-            if (window.heroSelection.sendFormationUpdate) {
                 await window.heroSelection.sendFormationUpdate();
+            } catch (error) {
+                console.error('[CREATURE DRAG] Failed to save/update:', error);
             }
         }
         
@@ -2568,6 +2611,16 @@ async function onAbilityClick(heroPosition, zoneNumber, abilityName, stackCount)
             try {
                 const { navigationAbility } = await import('./Abilities/navigation.js');
                 await navigationAbility.handleClick(heroPosition, stackCount);
+            } catch (error) {
+                // Handle error
+            }
+            break;
+            
+        case 'Premonition':
+            // Dynamically import the Premonition module
+            try {
+                const { premonitionAbility } = await import('./Abilities/premonition.js');
+                await premonitionAbility.handleClick(heroPosition, stackCount, window.heroSelection);
             } catch (error) {
                 // Handle error
             }
@@ -3724,6 +3777,43 @@ function onDiscardPileHoverLeave() {
         window.hideGraveyardTooltip();
     }
 }
+
+window.preparedDragImage = null;
+
+// Prepare middle frame on mousedown
+window.onCreatureMouseDown = function(event, creatureDataJson) {
+    // Only prepare for left mouse button
+    if (event.button !== 0) return;
+    
+    try {
+        const creatureData = JSON.parse(creatureDataJson.replace(/&quot;/g, '"'));
+        
+        // Find the sprite image in the clicked element
+        const spriteImg = event.currentTarget.querySelector('.creature-sprite');
+        if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
+            // Create middle frame immediately from the already-loaded sprite
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 32;
+            canvas.height = 32;
+            
+            const frameWidth = spriteImg.naturalWidth / 3;
+            const frameHeight = spriteImg.naturalHeight;
+            
+            ctx.drawImage(
+                spriteImg,
+                frameWidth, 0, frameWidth, frameHeight,  // Source: middle frame
+                0, 0, canvas.width, canvas.height        // Destination: full canvas
+            );
+            
+            // Store as prepared drag image on window object
+            window.preparedDragImage = canvas;
+        }
+    } catch (error) {
+        console.error('[CREATURE DRAG] Error preparing drag image:', error);
+    }
+};
 
 // Export the global functions
 if (typeof window !== 'undefined') {

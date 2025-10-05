@@ -49,6 +49,11 @@ export class HeroAbilitiesManager {
             center: false,
             right: false
         };
+        this.heroPremonitionUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
 
         // References to other managers (will be set by heroSelection)
         this.handManager = null;
@@ -129,6 +134,23 @@ export class HeroAbilitiesManager {
         return false;
     }
 
+    // Check if hero can use Premonition this turn
+    canUsePremonition(heroPosition) {
+        if (!this.heroPremonitionUsedThisTurn.hasOwnProperty(heroPosition)) {
+            return false;
+        }
+        return !this.heroPremonitionUsedThisTurn[heroPosition];
+    }
+
+    // Mark Premonition as used for this hero this turn
+    markPremonitionUsed(heroPosition) {
+        if (this.heroPremonitionUsedThisTurn.hasOwnProperty(heroPosition)) {
+            this.heroPremonitionUsedThisTurn[heroPosition] = true;
+            return true;
+        }
+        return false;
+    }
+
     // Reset turn-based tracking (called after battle)
     resetTurnBasedTracking() {
         this.heroAbilityAttachedThisTurn = {
@@ -144,6 +166,11 @@ export class HeroAbilitiesManager {
             right: false
         };
         this.heroNavigationUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+        this.heroPremonitionUsedThisTurn = {
             left: false,
             center: false,
             right: false
@@ -231,22 +258,33 @@ export class HeroAbilitiesManager {
             };
         }
         
+        // Get ability name from drag state and FORMAT it
+        let abilityName = 'Ability';
+        if (this.handManager) {
+            const dragState = this.handManager.getHandDragState();
+            if (dragState.draggedCardName) {
+                abilityName = dragState.draggedCardName;
+                
+                // Special rule for Divinity: can only be learned by heroes that already have it
+                if (abilityName === 'Divinity' && this.canHeroAcceptAbility(heroPosition, abilityName)) {
+                    return {
+                        type: 'divinity-restriction',
+                        message: "Divinity can only be learned by heroes that already possess it!",
+                        canDrop: false
+                    };
+                }
+                
+                // FORMAT the camelCase name to include spaces for display
+                abilityName = this.formatAbilityName(abilityName);
+            }
+        }
+        
         // Get hero name from formation
         let heroName = 'Hero';
         if (this.formationManager) {
             const formation = this.formationManager.getBattleFormation();
             if (formation[heroPosition]) {
                 heroName = formation[heroPosition].name;
-            }
-        }
-        
-        // Get ability name from drag state and FORMAT it
-        let abilityName = 'Ability';
-        if (this.handManager) {
-            const dragState = this.handManager.getHandDragState();
-            if (dragState.draggedCardName) {
-                // FORMAT the camelCase name to include spaces
-                abilityName = this.formatAbilityName(dragState.draggedCardName);
             }
         }
         
@@ -378,6 +416,14 @@ export class HeroAbilitiesManager {
             return { success: false, message: `Could not find ability info for ${cardName}` };
         }
         
+        // Special rule for Divinity: can only be learned by heroes that already have it
+        if (cardName === 'Divinity' && this.canHeroAcceptAbility(heroPosition, cardName)) {
+            return { 
+                success: false, 
+                message: `Divinity can only be learned by heroes that already possess it!` 
+            };
+        }
+        
         // Check if hero already has this ability
         if (!this.canHeroAcceptAbility(heroPosition, cardName)) {
             // Hero already has this ability - find and increment it
@@ -386,7 +432,7 @@ export class HeroAbilitiesManager {
                 // Increment the existing ability
                 this.addAbilityToZone(heroPosition, existingZone, abilityInfo, true);
                 
-                // NEW: Immediate stat update for increment
+                // Immediate stat update for increment
                 this.triggerStatUpdateForAbility(heroPosition, cardName, 'added');
                 
                 return { 
@@ -555,13 +601,13 @@ export class HeroAbilitiesManager {
         // Register ability for uniqueness tracking (only if not already registered)
         this.heroAbilityRegistry[heroPosition].add(ability.name);
         
-        // NEW: Trigger stat update if this is a stat-affecting ability
+        // Trigger stat update if this is a stat-affecting ability
         this.triggerStatUpdateForAbility(heroPosition, ability.name, 'added');
         
         return true;
     }
     
-    // MODIFIED: Enhanced removeAbilityFromZone to trigger stat updates
+    // Enhanced removeAbilityFromZone to trigger stat updates
     removeAbilityFromZone(heroPosition, zoneNumber, abilityIndex) {
         const zoneName = `zone${zoneNumber}`;
         
@@ -583,16 +629,19 @@ export class HeroAbilitiesManager {
             this.heroAbilityRegistry[heroPosition].delete(removedAbility.name);
         }
         
-        // NEW: Trigger stat update if this was a stat-affecting ability
+        // Trigger stat update if this was a stat-affecting ability
         this.triggerStatUpdateForAbility(heroPosition, removedAbility.name, 'removed');
         
         return removedAbility;
     }
     
-    // NEW: Trigger stat updates when stat-affecting abilities change
+    // Trigger stat updates when stat-affecting abilities change
     triggerStatUpdateForAbility(heroPosition, abilityName, action) {
         // Check if this is a stat-affecting ability
         const isStatAffecting = abilityName === 'Toughness' || abilityName === 'Fighting';
+        
+        // Check if this is a resource-affecting ability that impacts hand graying
+        const isResourceAffecting = abilityName === 'Alchemy' || abilityName === 'Divinity';
         
         if (isStatAffecting) {
             // Trigger UI update with delay to ensure DOM is ready
@@ -604,6 +653,20 @@ export class HeroAbilitiesManager {
                 // Also trigger a specific stat update for this position
                 if (window.updateHeroStats) {
                     window.updateHeroStats(heroPosition);
+                }
+            }, 50);
+        }
+        
+        if (isResourceAffecting) {
+            // Trigger hand display update to re-evaluate card availability
+            setTimeout(() => {
+                if (window.heroSelection && window.heroSelection.updateHandDisplay) {
+                    window.heroSelection.updateHandDisplay();
+                    
+                    // Also update resource displays that might be affected
+                    if (window.heroSelection.updateAllResourceDisplays) {
+                        window.heroSelection.updateAllResourceDisplays();
+                    }
                 }
             }, 50);
         }
@@ -755,7 +818,8 @@ export class HeroAbilitiesManager {
             heroAbilityAttachedThisTurn: JSON.parse(JSON.stringify(this.heroAbilityAttachedThisTurn)),
             // Include Leadership usage in save state
             heroLeadershipUsedThisTurn: JSON.parse(JSON.stringify(this.heroLeadershipUsedThisTurn)),
-            heroNavigationUsedThisTurn: JSON.parse(JSON.stringify(this.heroNavigationUsedThisTurn))
+            heroNavigationUsedThisTurn: JSON.parse(JSON.stringify(this.heroNavigationUsedThisTurn)),
+            heroPremonitionUsedThisTurn: JSON.parse(JSON.stringify(this.heroPremonitionUsedThisTurn))
         };
     }
     
@@ -807,6 +871,16 @@ export class HeroAbilitiesManager {
         } else {
             // Default to false if not in save state (backward compatibility)
             this.heroNavigationUsedThisTurn = {
+                left: false,
+                center: false,
+                right: false
+            };
+        }
+        if (state.heroPremonitionUsedThisTurn) {
+            this.heroPremonitionUsedThisTurn = JSON.parse(JSON.stringify(state.heroPremonitionUsedThisTurn));
+        } else {
+            // Default to false if not in save state (backward compatibility)
+            this.heroPremonitionUsedThisTurn = {
                 left: false,
                 center: false,
                 right: false
@@ -879,8 +953,12 @@ export class HeroAbilitiesManager {
             center: false,
             right: false
         };
-
         this.heroNavigationUsedThisTurn = {
+            left: false,
+            center: false,
+            right: false
+        };
+        this.heroPremonitionUsedThisTurn = {
             left: false,
             center: false,
             right: false

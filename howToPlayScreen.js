@@ -3,17 +3,33 @@
 export const HOW_TO_PLAY_CONTENT = {
     header: {
         title: "📖 How to Play",
-        subtitle: "Build the superior Hero Party over many rounds and battles!"
+        subtitle: "Build the superior Hero Party over multiple rounds and battles!"
     },
     sections: [
         {
             id: "victory-conditions",
             icon: "🏆",
             title: "How to Win",
-            content: "Be the first player to score 10 victories in battle.",
+            highlight: {
+                label: "Win Condition:",
+                text: "First to 10 victories wins the match!"
+            },
             items: [
                 { label: "Trophies:", text: "Show how many wins you have so far" },
                 { label: "Lives:", text: "Show how many wins your opponent still needs" }
+            ]
+        },
+        {
+            id: "controls-interface",
+            icon: "🎮",
+            title: "Controls",
+            items: [
+                { label: "Ready Button:", text: "Toggle ready status in lobby" },
+                { label: "Surrender:", text: "Forfeit the entire game" },
+                { label: "Tooltips:", text: "Hover over cards for details" },
+                { label: "Click on cards:", text: "Activate certain cards, like Potions or Artifacts/Spells that don't target a Hero" },
+                { label: "Drag & Drop:", text: "Play cards, recycle (drop on discard pile), equip (drop on Hero)" },
+                { label: "Right-click:", text: "Recycle cards for 2 Gold" }
             ]
         },
         {
@@ -26,12 +42,15 @@ export const HOW_TO_PLAY_CONTENT = {
                 { text: "Battles play out automatically." },
                 { text: "After each battle: gain Gold, draw a card, draft 1 from 3 options." },
                 { text: "Spend Gold to reroll draft options." },
-                { text: "Battle losers get +2 Gold." },
-                { text: "Maximum 10 cards in hand. Drafted cards still go to your deck." },
+                { text: "Battle losers earn +2 Gold." },
                 { text: "After battles 2 and 4: Draft new Heroes instead of single cards." },
                 { text: "New Heroes add their starting cards to your deck." },
-                { text: "Right-click cards or drag to discard pile to Recycle them for 2 Gold." }
+                { text: "Right-click cards or drag to discard pile to recycle them for 2 Gold." }
             ],
+            highlight: {
+                label: "Hand Limit:",
+                text: "Maximum 10 cards in hand. Can't draw any more cards while at cap! Drafted cards still go to your deck even when at max."
+            }
         },
         {
             id: "heroes-cards",
@@ -39,10 +58,14 @@ export const HOW_TO_PLAY_CONTENT = {
             title: "Heroes",
             content: "Your primary fighters. Each has HP, Attack, 8 starting cards, and 2 starting Abilities. Can be moved and swapped between zones.",
             image: "./Cards/Characters/Monia.png",
+            highlight: {
+                label: "Important:",
+                text: "Press 'T' to make Hero tooltips permanent while hovering over them."
+            },
             items: [
                 { text: "Heroes have 3 Ability slots for different Abilities." },
                 { text: "Can only attach 1 Ability per Hero per turn." },
-                { text: "You can press 'T' to make the Heroes' tooltips permanent while hovering over them." }
+                { text: "Each individual Ability can be leveled infinitely over the course of the game." }
             ]
         },
         {
@@ -62,12 +85,15 @@ export const HOW_TO_PLAY_CONTENT = {
             title: "Spells",
             content: "Actions Heroes can take. Most Spells cost 1 Action and are learned by dragging onto Heroes.",
             image: "./Cards/All/FlameAvalanche.png",
+            highlight: {
+                label: "Learning Requirement:",
+                text: "Heroes must have the matching Ability at the required level to learn or use Spells out of combat."
+            },
             items: [
                 { text: "Each Spell has a School and Level requirement." },
-                { text: "Heroes need matching Ability at required level to learn Spells." },
-                { text: "Heroes have a certain chance to use a learned Spell instead of a basic Attack on their turn in battle." },
+                { text: "Heroes have a certain chance to use a learned Spell instead of a basic Attack on their turn in battle (even if the Hero does not have the necessary Ability at the required level)." },
                 { text: "The chance is rolled individually per Spell, so more Spells (including copies of the same Spell) increase the overall chance to cast. Higher-level Spells roll first and are more likely." },
-                { text: "Learned Spells can be toggled to not be used/deactivated by clicking on them in the Hero's tooltip while hovering over it." },
+                { text: "Learned Spells can be toggled to not be used/deactivated by clicking on them in the Hero's tooltip while hovering over it. This requires the tooltip to have been make permanent with 'T'!" },
                 { text: "Magic Arts Spells: Activate directly, not added to Spellbooks." },
                 { text: "Summoning Magic: Creates permanent Creatures, not added to Spellbooks." }
             ]
@@ -76,8 +102,12 @@ export const HOW_TO_PLAY_CONTENT = {
             id: "creatures",
             icon: "🦋",
             title: "Creatures",
-            content: "Summoned by 'Summoning Magic' Spells. They remain with your Hero, even if the Hero is moved. In battle, all actors in a given slot (left, middle, right) act consecutively one by one before the next slot acts. Many, but not all Creatures trigger an effect on their turn in combat, their 'Action:'.",
-            image: "./Cards/All/MoonlightButterfly.png"
+            content: "Summoned by 'Summoning Magic' Spells. They remain with your Hero, even if the Hero is moved. Many, but not all Creatures trigger an effect on their turn in combat: Their 'Action:' effect.",
+            image: "./Cards/All/MoonlightButterfly.png",
+            highlight: {
+                label: "Turn Order:",
+                text: "All actors in a slot (left, middle, right) act consecutively before the next slot acts."
+            }
         },
         {
             id: "artifacts-cards",
@@ -92,6 +122,10 @@ export const HOW_TO_PLAY_CONTENT = {
             title: "Potions",
             content: "One-time use cards that cost no Gold and auto-draw a replacement card when used.",
             image: "./Cards/All/BottledLightning.png",
+            highlight: {
+                label: "Auto-Replace:",
+                text: "Using a Potion automatically draws a replacement card."
+            },
             items: [
                 { text: "Limited uses per turn (increase with Alchemy Ability)" }
             ]
@@ -118,8 +152,15 @@ export const HOW_TO_PLAY_CONTENT = {
             id: "areas-subtype",
             icon: "🗺️",
             title: "Areas",
-            content: "Play in Area Zone. Affects both players during battle. New Areas replace old ones.",
+            content: "Play in the Area Zone. Affects both players during battle. New Areas replace old ones.",
             image: "./Icons/IconArea.png"
+        },
+        {
+            id: "traps-subtype",
+            icon: "🪤",
+            title: "Traps",
+            content: "Set traps around the user that harm enemies attacking it.",
+            image: "./Icons/IconTrap.png"
         },
         {
             id: "quick-subtype",
@@ -132,6 +173,10 @@ export const HOW_TO_PLAY_CONTENT = {
             id: "resources",
             icon: "💰",
             title: "Resources",
+            highlight: {
+                label: "Loser Bonus:",
+                text: "Battle losers earn +2 Gold (6 total instead of 4)."
+            },
             items: [
                 { label: "Gold:", text: "Earned after every battle, spent on Artifacts and rerolls. Default 4 Gold per turn, +2 for losing a battle. Many effects generate Gold." },
                 { label: "Potions:", text: "Number of Potions you have left to use this turn. By default 1 Potion max per turn, increased with the Alchemy Ability." },
@@ -144,30 +189,6 @@ export const HOW_TO_PLAY_CONTENT = {
             title: "Permanents",
             content: "Some effects give you permanent boosts for all subsequent battles. A list of what 'Permanent effects' you have active can be seen by hovering over the 📜 icon next to your resources."
         },
-        {
-            id: "getting-started",
-            icon: "🚀",
-            title: "Getting Started",
-            items: [
-                { label: "Create Party:", text: "Start new room, wait for opponent" },
-                { label: "Browse Battles:", text: "Join existing rooms" },
-                { label: "Username:", text: "Set display name others see" },
-                { label: "Passwords:", text: "Create private rooms or join protected ones" }
-            ]
-        },
-        {
-            id: "controls-interface",
-            icon: "🎮",
-            title: "Controls",
-            items: [
-                { label: "Ready Button:", text: "Toggle ready status in lobby" },
-                { label: "Surrender:", text: "Forfeit current battle" },
-                { label: "Tooltips:", text: "Hover over cards for details" },
-                { label: "Click on cards:", text: "Activate certain cards, like Potions or Artifacts/Spells that don't target a Hero" },
-                { label: "Drag & Drop:", text: "Play cards, recycle (drop on discard pile), equip (drop on Hero)" },
-                { label: "Right-click:", text: "Recycle cards for 2 Gold" }
-            ]
-        }
     ]
 };
 

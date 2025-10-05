@@ -4,9 +4,12 @@
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js';
 
 import { MoniaHeroEffect } from './Heroes/monia.js';
+import { ThepHeroEffect } from './Heroes/thep.js';
 
 import { checkHeartOfIceEffects } from './Artifacts/heartOfIce.js';
 import { checkFuriousAngerReactions } from './Spells/furiousAnger.js';
+import { checkTheHandsOfBigGwenOnKill } from './Artifacts/theHandsOfBigGwen.js';
+import { checkHatOfMadnessOnHeroAction } from './Artifacts/hatOfMadness.js';
 
 export class BattleCombatManager {
     constructor(battleManager) {
@@ -261,7 +264,7 @@ export class BattleCombatManager {
                 null,
                 { 
                     isCreatureMessage: true,
-                    isCreatureDeathMessage: true  // Always show death messages!
+                    isCreatureDeathMessage: true
                 }
             );
         }
@@ -302,7 +305,16 @@ export class BattleCombatManager {
         
         // If creature died, handle death sequence
         if (willDie && wasAlive) {
-            // Set creature as dead
+            // Check for timeGifted death action WHILE CREATURE IS STILL ALIVE
+            if (!context.preventRevival && this.battleManager.statusEffectsManager) {
+                const timeGiftedProcessed = await this.battleManager.statusEffectsManager.checkAndProcessTimeGiftedDeathAction(creature, context);
+                if (timeGiftedProcessed) {
+                    // Small delay after timeGifted action completes
+                    await this.battleManager.delay(500);
+                }
+            }
+            
+            // NOW set creature as dead AFTER timeGifted action
             creature.alive = false;
             
             // 1. Trigger death effects
@@ -345,8 +357,12 @@ export class BattleCombatManager {
                     ); 
                 }
             }
+
+            setTimeout(async () => {
+                await checkTheHandsOfBigGwenOnKill(this.battleManager, attacker, creature, 'creature');
+            }, 200);
             
-            // 4. If not revived, attempt CaptureNet capturing (NEW)
+            // 4. If not revived, attempt CaptureNet capturing
             if (!revivedByNecromancy && attacker && attacker.type !== 'creature') {
                 // Only heroes can use CaptureNet (not creatures attacking)
                 try {
@@ -848,7 +864,7 @@ export class BattleCombatManager {
 
 
     // Execute hero actions
-    async executeHeroActions(playerHeroActor, opponentHeroActor, position) {
+    async executeHeroActions(playerHeroActor, opponentHeroActor, position, isAdditionalAction = false) {
         // ============================================
         // CHECK FOR HAND OF DEATH CHANNELING (overrides all actions)
         // ============================================
@@ -876,10 +892,216 @@ export class BattleCombatManager {
             return;
         }
         
-        // The battle end check was preventing final kills from being recorded
-        
         const playerCanAttack = playerHeroActor !== null;
         const opponentCanAttack = opponentHeroActor !== null;
+        
+        // ============================================
+        // ADDITIONAL ACTION SPECIAL HANDLING
+        // ============================================
+        
+        if (isAdditionalAction) {
+            // For additional actions, we only have one hero acting
+            const actingHero = playerHeroActor?.data || opponentHeroActor?.data;
+            const actingHeroActor = playerHeroActor || opponentHeroActor;
+            const actingSide = playerHeroActor ? 'player' : 'opponent';
+            
+            if (!actingHero || !actingHeroActor) {
+                console.warn('Additional action called without valid hero actor');
+                return;
+            }
+            
+            // ============================================
+            // HERO SPECIAL EFFECTS for additional actions
+            // ============================================
+
+            // Process Alice special actions for additional actions
+            if (actingHero.name === 'Alice' && actingHero.alive && this.battleManager.aliceManager) {
+                await this.battleManager.aliceManager.executeHeroAction(actingHeroActor, position);
+            }
+            
+            // Process Luna special actions for additional actions
+            if (actingHero.name === 'Luna' && this.battleManager.lunaManager) {
+                await this.battleManager.lunaManager.executeHeroAction(actingHeroActor, position);
+            }
+            
+            // ============================================
+            // SPELL CASTING for additional actions
+            // ============================================
+            
+            let spellToCast = null;
+            let willAttack = true;
+
+            // Check for _skipSpellcastingThisAction flag (used by Ghuanjun bonus attacks)
+            if (actingHero._skipSpellcastingThisAction) {
+                // Skip spell casting check
+            } else if (this.battleManager.spellSystem) {
+                // Create a version of the hero that only shows enabled spells for spell system
+                const heroForSpells = this.createHeroWithEnabledSpellsOnly(actingHero);
+                spellToCast = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
+                if (spellToCast) {
+                    willAttack = false; // Hero spent turn casting spell
+                }
+            }
+            
+            // Execute spell casting if applicable
+            if (spellToCast && this.battleManager.spellSystem) {
+                await this.battleManager.spellSystem.executeSpellCasting(actingHero, spellToCast);
+            }
+            
+            // ============================================
+            // ATTACK HANDLING for additional actions
+            // ============================================
+            
+            if (willAttack) {
+                const attackerSide = actingSide;
+                
+                // Determine if this is a ranged attacker
+                const isRanged = this.isRangedAttacker(actingHero);
+                
+                let target = null;
+                if (isRanged) {
+                    target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
+                    this.battleManager.addCombatLog(`🹠${actingHero.name} uses ranged attack!`, 'info');
+                } else {
+                    target = this.authoritative_findTargetWithCreatures(position, attackerSide);
+                }
+                
+                if (target) {
+                    // Calculate base damage
+                    let damage = this.calculateDamage(actingHero, true);
+                    
+                    // Apply weakened damage reduction if attacker is weakened
+                    if (this.battleManager.statusEffectsManager) {
+                        damage = this.battleManager.statusEffectsManager.applyWeakenedDamageReduction(actingHero, damage);
+                    }
+                    
+                    // Apply damage modifiers
+                    let effectsTriggered = [];
+                    if (this.battleManager.attackEffectsManager) {
+                        const modResult = this.battleManager.attackEffectsManager.calculateDamageModifiers(
+                            actingHero,
+                            target.type === 'creature' ? target.creature : target.hero,
+                            damage
+                        );
+                        damage = modResult.modifiedDamage;
+                        effectsTriggered = modResult.effectsTriggered;
+                    }
+
+                    // Check for CriticalStrike damage modifier
+                    let criticalStrikeData = null;
+                    const critResult = this.checkCriticalStrikeDamageModifier(
+                        actingHero,
+                        target.type === 'creature' ? target.creature : target.hero,
+                        damage
+                    );
+                    damage = critResult.modifiedDamage;
+                    if (critResult.criticalStrikeTriggered) {
+                        criticalStrikeData = critResult.effectData;
+                    }
+                    
+                    // Create attack object
+                    const attack = {
+                        hero: actingHero,
+                        target: target,
+                        damage: damage,
+                        effectsTriggered: effectsTriggered,
+                        isRanged: isRanged,
+                        criticalStrikeData: criticalStrikeData
+                    };
+                    
+                    // ============================================
+                    // ADDITIONAL ACTION NETWORK SYNC
+                    // Send a simplified network update for additional actions
+                    // ============================================
+                    
+                    if (this.battleManager.isAuthoritative) {
+                        const additionalActionData = {
+                            type: 'additional_action',
+                            actorData: {
+                                absoluteSide: actingHero.absoluteSide,
+                                position: actingHero.position,
+                                name: actingHero.name,
+                                abilities: actingHero.getAllAbilities()
+                            },
+                            targetData: this.createTargetData(target),
+                            damage: damage,
+                            effectsTriggered: effectsTriggered.map(e => ({
+                                name: e.name,
+                                multiplier: e.multiplier,
+                                swordCount: e.swordCount || 0
+                            })),
+                            criticalStrikeData: criticalStrikeData,
+                            isRanged: isRanged,
+                            timestamp: Date.now()
+                        };
+                        
+                        this.battleManager.sendBattleUpdate('additional_action_execution', additionalActionData);
+                    }
+                    
+                    // Log the attack
+                    if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
+                        this.battleManager.battleScreen.battleLog.logAttackMessage(attack);
+                    }
+                    
+                    // Execute attack animation
+                    await this.battleManager.animationManager.animateHeroAttack(actingHero, target);
+                    
+                    // Apply damage modifier visual effects if any
+                    if (this.battleManager.attackEffectsManager && effectsTriggered.length > 0) {
+                        await this.battleManager.delay(100);
+                        this.battleManager.attackEffectsManager.applyDamageModifierEffects(effectsTriggered);
+                        await this.battleManager.delay(400);
+                    }
+                    
+                    // Apply CriticalStrike visual effect if triggered
+                    if (criticalStrikeData && this.battleManager.spellSystem) {
+                        const criticalStrikeSpell = this.battleManager.spellSystem.spellImplementations.get('CriticalStrike');
+                        if (criticalStrikeSpell) {
+                            criticalStrikeSpell.createCriticalStrikeEffect(
+                                attack.target.type === 'creature' ? attack.target.creature : attack.target.hero
+                            );
+                            
+                            // Sync to guest
+                            this.battleManager.sendBattleUpdate('critical_strike_triggered', criticalStrikeData);
+                            
+                            await this.battleManager.delay(200);
+                        }
+                    }
+                    
+                    // ============================================
+                    // APPLY SPECIAL RULES FOR ADDITIONAL ACTIONS
+                    // ============================================
+                    
+                    // Handle non-lethal attacks (used by Ghuanjun bonus attacks)
+                    if (actingHero._nonLethalAttack) {
+                        // Apply non-lethal cap to damage
+                        const originalDamage = attack.damage;
+                        attack.damage = this.applyNonLethalCap(actingHero, target.type === 'creature' ? target.creature : target.hero, attack.damage);
+                        
+                        if (attack.damage < originalDamage) {
+                            this.battleManager.addCombatLog(
+                                `⚔️ ${actingHero.name}'s additional attack shows mercy!`,
+                                actingSide === 'player' ? 'info' : 'warning'
+                            );
+                        }
+                    }
+                    
+                    // Apply the damage
+                    this.applyAttackDamageToTarget(attack);
+                    
+                    // Return animation
+                    await this.battleManager.animationManager.animateReturn(actingHero, actingSide);
+                } else {
+                    this.battleManager.addCombatLog(`🔍 ${actingHero.name} finds no targets for additional attack!`, 'info');
+                }
+            }
+            
+            return; // Exit early for additional actions
+        }
+        
+        // ============================================
+        // NORMAL HERO ACTIONS (existing logic unchanged)
+        // ============================================
         
         // Check for spell casting before attacking
         let playerSpellToCast = null;
@@ -914,7 +1136,7 @@ export class BattleCombatManager {
             await this.battleManager.spellSystem.executeSpellCasting(opponentHeroActor.data, opponentSpellToCast);
         }
         
-        // UPDATED: Check for ranged attackers and use appropriate targeting
+        // Check for ranged attackers and use appropriate targeting
         let playerTarget = null;
         let playerIsRanged = false;
         let opponentTarget = null;
@@ -924,7 +1146,7 @@ export class BattleCombatManager {
             playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
             if (playerIsRanged) {
                 playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
-                this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🹠${playerHeroActor.data.name} uses ranged attack!`, 'info');
             } else {
                 playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
             }
@@ -934,7 +1156,7 @@ export class BattleCombatManager {
             opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
             if (opponentIsRanged) {
                 opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
-                this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+                this.battleManager.addCombatLog(`🹠${opponentHeroActor.data.name} uses ranged attack!`, 'info');
             } else {
                 opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
             }
@@ -1060,6 +1282,61 @@ export class BattleCombatManager {
             const ackPromise = this.battleManager.waitForGuestAcknowledgment('turn_complete', this.battleManager.getAdaptiveTimeout());
             
             await Promise.all([executionPromise, ackPromise]);
+        }
+
+        // ============================================ 
+        // CHECK HAT OF MADNESS TRIGGERS AFTER HERO ACTIONS
+        // ============================================
+        
+        // Check Hat of Madness triggers for heroes that performed actions
+        if (this.battleManager.isAuthoritative) {
+            const hatPromises = [];
+            
+            if (playerValidAttack && playerHeroActor) {
+                hatPromises.push(
+                    checkHatOfMadnessOnHeroAction(
+                        this.battleManager, 
+                        playerHeroActor.data, 
+                        position
+                    )
+                );
+            }
+            
+            if (opponentValidAttack && opponentHeroActor) {
+                hatPromises.push(
+                    checkHatOfMadnessOnHeroAction(
+                        this.battleManager, 
+                        opponentHeroActor.data, 
+                        position
+                    )
+                );
+            }
+            
+            // Also check for heroes that cast spells instead of attacking
+            if (playerSpellToCast && playerHeroActor && !playerValidAttack) {
+                hatPromises.push(
+                    checkHatOfMadnessOnHeroAction(
+                        this.battleManager, 
+                        playerHeroActor.data, 
+                        position
+                    )
+                );
+            }
+            
+            if (opponentSpellToCast && opponentHeroActor && !opponentValidAttack) {
+                hatPromises.push(
+                    checkHatOfMadnessOnHeroAction(
+                        this.battleManager, 
+                        opponentHeroActor.data, 
+                        position
+                    )
+                );
+            }
+            
+            // Execute Hat of Madness checks
+            if (hatPromises.length > 0) {
+                await Promise.all(hatPromises);
+            }
         }
     }
 
@@ -1377,7 +1654,7 @@ export class BattleCombatManager {
         }
     }
 
-    // Apply damage to target - UPDATED FOR SHIELDS
+    // Apply damage to target
     async authoritative_applyDamage(damageResult, context = {}) {
         if (!this.battleManager) {
             console.error('CRITICAL: Combat manager not initialized when applying damage!');
@@ -1490,6 +1767,83 @@ export class BattleCombatManager {
                 checkDichotomyOfLunaAndTempesteEffects(this.battleManager, target, finalDamage);
             }
 
+            // Check for Healing Potion auto-trigger
+            let healingTriggered = false;
+            let remainingHealingStacks = 0;
+            if (this.battleManager.isAuthoritative && target.alive && target.currentHp < 100) {
+                const { HealingPotion } = await import('./Potions/healingPotion.js');
+                healingTriggered = HealingPotion.checkAndTriggerHealingReserve(target, this.battleManager);
+                if (healingTriggered) {
+                    remainingHealingStacks = this.battleManager.statusEffectsManager.getStatusEffectStacks(target, 'healthPotionReady');
+                    await this.battleManager.delay(400);
+                }
+            }
+
+            // Send network update with healing info included
+            this.battleManager.sendBattleUpdate('damage_applied_with_shields', {
+                targetAbsoluteSide: target.absoluteSide,
+                targetPosition: target.position,
+                totalDamage: finalDamage,
+                shieldDamage: damageApplication.shieldDamage,
+                hpDamage: damageApplication.hpDamage,
+                oldHp: target.currentHp + (healingTriggered ? (target.maxHp - target.currentHp) : damageApplication.hpDamage),
+                newHp: target.currentHp,
+                maxHp: target.maxHp,
+                currentShield: this.getShield(target),
+                died: damageApplication.died,
+                targetName: target.name,
+                healingTriggered: healingTriggered,
+                remainingHealingStacks: remainingHealingStacks
+            });
+
+            if (damageApplication.died && this.battleManager.isAuthoritative) {
+                // Check for timeGifted death action WHILE TARGET IS STILL ALIVE
+                if (!context.preventRevival && this.battleManager.statusEffectsManager) {
+                    const timeGiftedProcessed = await this.battleManager.statusEffectsManager.checkAndProcessTimeGiftedDeathAction(target, context);
+                    if (timeGiftedProcessed) {
+                        // Small delay after timeGifted action completes
+                        await this.battleManager.delay(500);
+                    }
+                }
+                
+                // NOW handle death and revival - target dies AFTER timeGifted action
+                target.alive = false; // Mark as dead AFTER timeGifted action
+
+            
+                // Check for Thep revival before immortal
+                if (!context.preventRevival) {
+                    const { ThepHeroEffect } = await import('./Heroes/thep.js');
+                    const thepRevived = await ThepHeroEffect.checkThepRevival(target, this.battleManager);
+                    if (thepRevived) {
+                        // Revival successful, update damage result
+                        damageApplication.died = false;
+                        target.alive = true;
+                        
+                        // Update health bar after revival
+                        this.battleManager.updateHeroHealthBar(target.side, target.position, target.currentHp, target.maxHp);
+                        
+                        // Don't process normal death or immortal
+                        return damageApplication;
+                    }
+                }
+                
+                // Check for immortal revival before death (unless prevented by special effects)
+                if (!context.preventRevival) {
+                    const immortalRevived = await this.checkImmortalRevival(target);
+                    if (immortalRevived) {
+                        // Revival successful, update damage result
+                        damageApplication.died = false;
+                        target.alive = true;
+                        
+                        // Update health bar after revival
+                        this.battleManager.updateHeroHealthBar(target.side, target.position, target.currentHp, target.maxHp);
+                        
+                        // Don't process normal death
+                        return damageApplication;
+                    }
+                }
+            }
+
             if (damageApplication.died && this.battleManager.isAuthoritative) {
                 // Check for immortal revival before death (unless prevented by special effects)
                 if (!context.preventRevival) {
@@ -1515,10 +1869,8 @@ export class BattleCombatManager {
                 // Record kill if there's an attacker
                 if (context.attacker && this.battleManager.isAuthoritative) {
                     this.battleManager.killTracker.recordKill(context.attacker, target, 'hero');
-                    /*this.battleManager.addCombatLog(
-                        `💀 ${context.attacker.name} has slain ${target.name}!`, 
-                        context.attacker.side === 'player' ? 'success' : 'error'
-                    );*/
+                    
+                    await checkTheHandsOfBigGwenOnKill(this.battleManager, context.attacker, target, 'hero');
                 }
             }
             
@@ -1774,124 +2126,46 @@ export class BattleCombatManager {
     // Used by FuriousAnger, CrumTheClassPet, and other effects that grant extra actions
     async executeAdditionalAction(hero, position) {
         if (!this.battleManager.isAuthoritative) return;
+        
+        // Create actor object in the same format as the main system
+        const heroActor = {
+            type: 'hero',
+            name: hero.name,
+            data: hero,
+            hero: hero
+        };
+        
+        // Determine which side this hero is on and call the main system
+        const isPlayerSide = hero.side === 'player';
+        
+        if (isPlayerSide) {
+            // Player hero taking additional action
+            await this.battleManager.flowManager.executeActorActions(heroActor, null, position, true);
+        } else {
+            // Opponent hero taking additional action
+            await this.battleManager.flowManager.executeActorActions(null, heroActor, position, true);
+        }
+    }
 
-        // ============================================
-        // HERO SPECIAL EFFECTS: Trigger for additional actions too
-        // ============================================
-
-        // Check if Alice is taking an additional action and trigger her laser first
-        if (hero && hero.name === 'Alice' && hero.alive && this.battleManager.aliceManager) {
-            // Create actor object like the main battle flow does
-            const aliceActor = {
-                type: 'hero',
-                name: hero.name,
-                data: hero,
-                hero: hero
+    // Helper method to create target data for network sync
+    createTargetData(target) {
+        if (!target) return null;
+        
+        if (target.type === 'creature') {
+            return {
+                type: 'creature',
+                absoluteSide: target.hero.absoluteSide,
+                position: target.position,
+                creatureIndex: target.creatureIndex,
+                creatureName: target.creature.name
             };
-            await this.battleManager.aliceManager.executeHeroAction(aliceActor, position);
-        }
-        
-        // Check for spell casting before attacking
-        let spellToCast = null;
-        let willAttack = true;
-
-        // Skip spellcasting if this is a Ghuanjun bonus attack
-        if (hero._skipSpellcastingThisAction) {
-        } else if (this.battleManager.spellSystem) {
-            // Create a version of the hero that only shows enabled spells
-            const heroForSpells = this.createHeroWithEnabledSpellsOnly(hero);
-            spellToCast = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
-            if (spellToCast) {
-                willAttack = false; // Hero spent turn casting spell
-            }
-        }
-        
-        // Execute spell casting if applicable
-        if (spellToCast && this.battleManager.spellSystem) {
-            await this.battleManager.spellSystem.executeSpellCasting(hero, spellToCast);
-        }
-        
-        // Handle attack if hero didn't cast a spell
-        if (willAttack) {
-            const attackerSide = hero.side;
-            
-            // Determine if this is a ranged attacker
-            const isRanged = this.isRangedAttacker(hero);
-            
-            let target = null;
-            if (isRanged) {
-                target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
-                this.battleManager.addCombatLog(`🏹 ${hero.name} uses ranged attack!`, 'info');
-            } else {
-                target = this.authoritative_findTargetWithCreatures(position, attackerSide);
-            }
-            
-            if (target) {
-                // Calculate base damage
-                let damage = this.calculateDamage(hero, true);
-                
-                // Apply weakened damage reduction if attacker is weakened
-                if (this.battleManager.statusEffectsManager) {
-                    damage = this.battleManager.statusEffectsManager.applyWeakenedDamageReduction(hero, damage);
-                }
-                
-                // Apply damage modifiers if available
-                let effectsTriggered = [];
-                if (this.battleManager.attackEffectsManager) {
-                    const modResult = this.battleManager.attackEffectsManager.calculateDamageModifiers(
-                        hero,
-                        target.type === 'creature' ? target.creature : target.hero,
-                        damage
-                    );
-                    const finalDamage = modResult.modifiedDamage;
-                    effectsTriggered = modResult.effectsTriggered;
-                    
-                    // Create attack object
-                    const attack = {
-                        hero: hero,
-                        target: target,
-                        damage: finalDamage,
-                        effectsTriggered: effectsTriggered,
-                        isRanged: isRanged
-                    };
-                    
-                    // Log the attack
-                    if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
-                        this.battleManager.battleScreen.battleLog.logAttackMessage(attack);
-                    }
-                    
-                    // Execute attack animation
-                    await this.battleManager.animationManager.animateHeroAttack(hero, target);
-                    
-                    // Apply damage modifier visual effects if any
-                    if (this.battleManager.attackEffectsManager && effectsTriggered.length > 0) {
-                        await this.battleManager.delay(100);
-                        this.battleManager.attackEffectsManager.applyDamageModifierEffects(effectsTriggered);
-                        await this.battleManager.delay(400);
-                    }
-                    
-                    // Apply the damage
-                    this.applyAttackDamageToTarget(attack);
-                    
-                    // Return animation
-                    await this.battleManager.animationManager.animateReturn(hero, attackerSide);
-                } else {
-                    // Fallback without attack effects manager
-                    const attack = {
-                        hero: hero,
-                        target: target,
-                        damage: damage, // Use the weakened-adjusted damage
-                        effectsTriggered: [],
-                        isRanged: isRanged
-                    };
-                    
-                    await this.battleManager.animationManager.animateHeroAttack(hero, target);
-                    this.applyAttackDamageToTarget(attack);
-                    await this.battleManager.animationManager.animateReturn(hero, attackerSide);
-                }
-            } else {
-                this.battleManager.addCombatLog(`🔍 ${hero.name} finds no targets for attack!`, 'info');
-            }
+        } else {
+            return {
+                type: 'hero',
+                absoluteSide: target.hero.absoluteSide,
+                position: target.position,
+                name: target.hero.name
+            };
         }
     }
 

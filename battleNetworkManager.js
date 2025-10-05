@@ -579,6 +579,14 @@ export class BattleNetworkManager {
             case 'hero_turn_execution':
                 bm.guest_handleHeroTurnExecution(data);
                 break;
+
+            case 'additional_action_execution':
+                this.guest_handleAdditionalActionExecution(data);
+                break;
+
+            case 'stalemate_detected':
+                this.guest_handleStalemateDetected(data);
+                break;
                 
             case 'status_effect_change':
                 bm.guest_handleStatusEffectChange(data);
@@ -739,6 +747,18 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'skeleton_healer_turn_healing':
+                if (bm.skeletonHealerManager) {
+                    bm.skeletonHealerManager.handleGuestTurnHealing(data);
+                }
+                break;
+
+            case 'skeleton_healer_death_healing':
+                if (bm.skeletonHealerManager) {
+                    bm.skeletonHealerManager.handleGuestDeathHealing(data);
+                }
+                break;
+
             case 'exploding_skull_death_explosion':
                 if (bm.explodingSkullManager) {
                     await bm.explodingSkullManager.handleGuestDeathExplosion(data);
@@ -836,6 +856,16 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'carris_immunity_triggered':
+                if (this.battleManager.damageSourceManager) {
+                    this.battleManager.damageSourceManager.handleGuestCarrisImmunity(data);
+                }
+                break;
+
+            case 'carris_time_limit':
+                this.guest_handleCarrisTimeLimit(data);
+                break;
+
             case 'yuki_onna_blizzard_attack':
                 if (bm.coldHeartedYukiOnnaManager) {
                     bm.coldHeartedYukiOnnaManager.handleGuestBlizzardAttack(data);
@@ -926,6 +956,11 @@ export class BattleNetworkManager {
 
             case 'monia_protection_effect':
                 bm.guest_handleMoniaProtectionEffect(data);
+                break;
+
+            case 'thep_revival':
+                const { ThepHeroEffect } = await import('./Heroes/thep.js');
+                ThepHeroEffect.handleGuestThepRevival(data, bm);
                 break;
 
             case 'nomu_shield_applied':
@@ -1179,6 +1214,164 @@ export class BattleNetworkManager {
                 });
                 break;
 
+            case 'soul_shard_shield_applied':
+                import('./Creatures/soulShardIb.js').then(({ handleGuestSoulShardShield }) => {
+                    handleGuestSoulShardShield(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling Soul Shard Ib guest effects:', error);
+                });
+                break;
+
+            case 'soul_shard_combat_shield':
+                if (!this.battleManager.soulShardIbManager) {
+                    import('./Creatures/soulShardIb.js').then(({ default: SoulShardIbCreature }) => {
+                        this.battleManager.soulShardIbManager = new SoulShardIbCreature(this.battleManager);
+                        this.battleManager.soulShardIbManager.handleGuestCombatShield(data);
+                    });
+                } else {
+                    this.battleManager.soulShardIbManager.handleGuestCombatShield(data);
+                }
+                break;
+
+            case 'soul_shard_ka_combat_buff':
+                if (!this.battleManager.soulShardKaManager) {
+                    import('./Creatures/soulShardKa.js').then(({ default: SoulShardKaCreature }) => {
+                        this.battleManager.soulShardKaManager = new SoulShardKaCreature(this.battleManager);
+                        this.battleManager.soulShardKaManager.handleGuestCombatBuff(data);
+                    });
+                } else {
+                    this.battleManager.soulShardKaManager.handleGuestCombatBuff(data);
+                }
+                break;
+
+            case 'soul_shard_ka_attack_applied':
+                import('./Creatures/soulShardKa.js').then(({ handleGuestSoulShardKaAttack }) => {
+                    handleGuestSoulShardKaAttack(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling Soul Shard Ka guest effects:', error);
+                });
+                break;
+
+            case 'soul_shard_khet_graveyard_summon':
+                if (!this.battleManager.soulShardKhetManager) {
+                    import('./Creatures/soulShardKhet.js').then(({ default: SoulShardKhetCreature }) => {
+                        this.battleManager.soulShardKhetManager = new SoulShardKhetCreature(this.battleManager);
+                        this.battleManager.soulShardKhetManager.handleGuestGraveyardSummon(data);
+                    });
+                } else {
+                    this.battleManager.soulShardKhetManager.handleGuestGraveyardSummon(data);
+                }
+                break;
+
+            case 'soul_shard_khet_battle_start_summons':
+                import('./Creatures/soulShardKhet.js').then(({ handleGuestSoulShardKhetBattleStart }) => {
+                    handleGuestSoulShardKhetBattleStart(data, this.battleManager);
+                });
+                break;
+
+            case 'soul_shard_ba_combat_removal':
+                if (!this.battleManager.soulShardBaManager) {
+                    import('./Creatures/soulShardBa.js').then(({ default: SoulShardBaCreature }) => {
+                        this.battleManager.soulShardBaManager = new SoulShardBaCreature(this.battleManager);
+                        this.battleManager.soulShardBaManager.handleGuestCombatRemoval(data);
+                    });
+                } else {
+                    this.battleManager.soulShardBaManager.handleGuestCombatRemoval(data);
+                }
+                break;
+
+            case 'soul_shard_ba_removal_applied':
+                import('./Creatures/soulShardBa.js').then(({ handleGuestSoulShardBaRemoval }) => {
+                    handleGuestSoulShardBaRemoval(data, this.battleManager);
+                });
+                break;
+            
+            case 'soul_shard_ren_card_draw':
+                if (!bm.soulShardRenManager) {
+                    const { default: SoulShardRenCreature } = await import('./Creatures/soulShardRen.js');
+                    bm.soulShardRenManager = new SoulShardRenCreature(bm);
+                }
+                bm.soulShardRenManager.handleGuestCardDraw(data);
+                break;
+
+            case 'soul_shard_ren_redraw_applied':
+                import('./Creatures/soulShardRen.js').then(({ handleGuestSoulShardRenRedraw }) => {
+                    handleGuestSoulShardRenRedraw(data, this.battleManager);
+                });
+                break;
+
+            case 'soul_shard_sekhem_flame_attack':
+                if (!bm.soulShardSekhemManager) {
+                    const { default: SoulShardSekhemCreature } = await import('./Creatures/soulShardSekhem.js');
+                    bm.soulShardSekhemManager = new SoulShardSekhemCreature(bm);
+                }
+                bm.soulShardSekhemManager.handleGuestFlameAttack(data);
+                break;
+
+            case 'soul_shard_sekhem_damage_applied':
+                import('./Creatures/soulShardSekhem.js').then(({ handleGuestSekhemDamage }) => {
+                    handleGuestSekhemDamage(data, this.battleManager);
+                });
+                break;
+
+            case 'soul_shard_shut_mummy_attack':
+                if (!bm.soulShardShutManager) {
+                    const { default: SoulShardShutCreature } = await import('./Creatures/soulShardShut.js');
+                    bm.soulShardShutManager = new SoulShardShutCreature(bm);
+                }
+                bm.soulShardShutManager.handleGuestMummyAttack(data);
+                break;
+
+            case 'soul_shard_shut_graveyard_applied':
+                import('./Creatures/soulShardShut.js').then(({ handleGuestShutGraveyard }) => {
+                    handleGuestShutGraveyard(data, this.battleManager);
+                });
+                break;
+
+            case 'soul_shard_sah_mimic':
+                if (!bm.soulShardSahManager) {
+                    const { default: SoulShardSahCreature } = await import('./Creatures/soulShardSah.js');
+                    bm.soulShardSahManager = new SoulShardSahCreature(bm);
+                }
+                bm.soulShardSahManager.handleGuestMimic(data);
+                break;
+                
+            case 'soul_shard_sah_revert':
+                if (!bm.soulShardSahManager) {
+                    const { default: SoulShardSahCreature } = await import('./Creatures/soulShardSah.js');
+                    bm.soulShardSahManager = new SoulShardSahCreature(bm);
+                }
+                bm.soulShardSahManager.handleGuestRevert(data);
+                break;
+
+            case 'hat_of_madness_cards_added':
+                if (!bm.isAuthoritative) {
+                    const { handleGuestHatOfMadnessSync } = await import('./Artifacts/hatOfMadness.js');
+                    handleGuestHatOfMadnessSync(data, bm);
+                }
+                break;
+
+            case 'hat_of_madness_action_trigger':
+                if (!bm.isAuthoritative) {
+                    const { handleGuestHatOfMadnessActionSync } = await import('./Artifacts/hatOfMadness.js');
+                    handleGuestHatOfMadnessActionSync(data, bm);
+                }
+                break;
+
+            case 'shield_of_life_block':
+                if (!bm.isAuthoritative) {
+                    const { handleGuestShieldOfLifeBlock } = await import('./Artifacts/shieldOfLife.js');
+                    handleGuestShieldOfLifeBlock(data, bm);
+                }
+                break;
+
+            case 'shield_of_death_block':
+                if (!bm.isAuthoritative) {
+                    const { handleGuestShieldOfDeathBlock } = await import('./Artifacts/shieldOfDeath.js');
+                    handleGuestShieldOfDeathBlock(data, bm);
+                }
+                break;
+
             case 'flame_arrow_impact':
                 bm.guest_handleFlameArrowImpact(data);
                 break;
@@ -1224,6 +1417,21 @@ export class BattleNetworkManager {
             case 'immortal_revival':
                 if (bm.combatManager) {
                     bm.combatManager.guest_handleImmortalRevival(data);
+                }
+                break;
+
+            case 'healing_potion_triggered':
+                const { HealingPotion } = await import('./Potions/healingPotion.js');
+                HealingPotion.guest_handleHealingTrigger(data, this.battleManager);
+                break;
+
+            case 'hero_healed':
+                this.guest_handleHeroHealed(data);
+                break;
+
+            case 'time_gifted_death_action':
+                if (bm.statusEffectsManager) {
+                    bm.statusEffectsManager.guest_handleTimeGiftedDeathAction(data);
                 }
                 break;
 
@@ -1438,6 +1646,14 @@ export class BattleNetworkManager {
                 });
                 break;
 
+            case 'big_gwen_start':
+                import('./Spells/bigGwen.js').then(({ handleGuestBigGwenStart }) => {
+                    handleGuestBigGwenStart(data, this.battleManager);
+                }).catch(error => {
+                    // Error handling
+                });
+                break;
+
             case 'future_tech_fists_shield':
                 bm.guest_handleFutureTechFistsShield(data);
                 break;
@@ -1511,12 +1727,13 @@ export class BattleNetworkManager {
         }
     }
 
-    guest_handleDamageAppliedWithShields(data) {
+    async guest_handleDamageAppliedWithShields(data) {
         const bm = this.battleManager;
         const { 
             targetAbsoluteSide, targetPosition, 
             totalDamage, shieldDamage, hpDamage,
-            oldHp, newHp, maxHp, currentShield, died, targetName 
+            oldHp, newHp, maxHp, currentShield, died, targetName,
+            healingTriggered, remainingHealingStacks  // NEW: Healing info
         } = data;
         
         const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
@@ -1529,8 +1746,31 @@ export class BattleNetworkManager {
         if (localTarget) {
             // Update hero HP and shield - EXACT VALUES FROM HOST
             localTarget.currentHp = newHp;
-            localTarget.currentShield = currentShield; // Use exact value from host
+            localTarget.currentShield = currentShield;
             localTarget.alive = !died;
+            
+            // NEW: Handle healing if it was triggered on host side
+            if (healingTriggered) {
+                // Update healing potion stacks
+                if (bm.statusEffectsManager) {
+                    bm.statusEffectsManager.setStatusEffectStacks(localTarget, 'healthPotionReady', remainingHealingStacks);
+                }
+                
+                // Create healing visual effect
+                try {
+                    const { HealingPotion } = await import('./Potions/healingPotion.js');
+                    HealingPotion.createHealingVisual(localTarget, bm);
+                } catch (error) {
+                    console.error('Error creating healing visual:', error);
+                }
+                
+                // Add healing combat log
+                const logType = targetLocalSide === 'player' ? 'success' : 'info';
+                bm.addCombatLog(
+                    `💚 ${targetName}'s Healing Potion activates! (${oldHp} → ${newHp} HP)`,
+                    logType
+                );
+            }
             
             // Create damage numbers for shield and HP separately
             if (shieldDamage > 0) {
@@ -1553,7 +1793,7 @@ export class BattleNetworkManager {
                 );
             }
             
-            // Update health bar immediately after setting shield value
+            // Update health bar immediately after setting shield value and HP
             bm.updateHeroHealthBar(targetLocalSide, targetPosition, newHp, maxHp);
             
             if (bm.battleScreen && bm.battleScreen.battleLog) {
@@ -1579,16 +1819,19 @@ export class BattleNetworkManager {
                     );
                 }
             } else {
-                if (shieldDamage > 0) {
-                    bm.addCombatLog(
-                        `🩸 ${targetName} takes ${totalDamage} damage (${shieldDamage} to shield, ${hpDamage} to HP)!`,
-                        targetLocalSide === 'player' ? 'error' : 'success'
-                    );
-                } else {
-                    bm.addCombatLog(
-                        `🩸 ${targetName} takes ${totalDamage} damage! (${oldHp} → ${newHp} HP)`,
-                        targetLocalSide === 'player' ? 'error' : 'success'
-                    );
+                // Only show damage message if healing didn't trigger (to avoid redundant messages)
+                if (!healingTriggered) {
+                    if (shieldDamage > 0) {
+                        bm.addCombatLog(
+                            `🩸 ${targetName} takes ${totalDamage} damage (${shieldDamage} to shield, ${hpDamage} to HP)!`,
+                            targetLocalSide === 'player' ? 'error' : 'success'
+                        );
+                    } else {
+                        bm.addCombatLog(
+                            `🩸 ${targetName} takes ${totalDamage} damage! (${oldHp} → ${newHp} HP)`,
+                            targetLocalSide === 'player' ? 'error' : 'success'
+                        );
+                    }
                 }
             }
             
@@ -1606,7 +1849,7 @@ export class BattleNetworkManager {
         
         // Update the guest's local heroSelection state
         if (window.heroSelection) {
-            window.heroSelection.delayedArtifactEffects = newGuestEffects || [];
+            window.heroSelection.delayedEffects = newGuestEffects || [];
             
             if (clearedGuestEffects > 0) {
                 bm.addCombatLog(`🧹 Cleared ${clearedGuestEffects} processed artifact effects`, 'info');
@@ -1828,6 +2071,178 @@ export class BattleNetworkManager {
         this.hideBattlePauseUI();
     }
 
+    // Handle guest receiving additional action execution
+    async guest_handleAdditionalActionExecution(data) {
+        const bm = this.battleManager;
+    
+        console.log('🎯 GUEST: Received additional_action_execution', {
+            actorName: data.actorData?.name,
+            hasTarget: !!data.targetData,
+            damage: data.damage
+        });
+        
+        if (bm.isAuthoritative) {
+            console.warn('Host should not receive additional action execution messages');
+            return;
+        }
+
+        const { 
+            actorData, 
+            targetData, 
+            damage, 
+            effectsTriggered = [], 
+            criticalStrikeData,
+            isRanged = false,
+            timestamp 
+        } = data;
+
+        // Determine local side for guest
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const actorLocalSide = (actorData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        // Find the acting hero
+        const heroes = actorLocalSide === 'player' ? bm.playerHeroes : bm.opponentHeroes;
+        const actingHero = heroes[actorData.position];
+        
+        if (!actingHero) {
+            console.error(`Additional action: Hero not found: ${actorLocalSide} ${actorData.position}`);
+            return;
+        }
+
+        // Find the target
+        let target = null;
+        if (targetData) {
+            target = this.findTargetFromActionData(targetData);
+        }
+
+        if (!target) {
+            bm.addCombatLog(`🔍 ${actingHero.name} finds no targets for additional attack!`, 'info');
+            return;
+        }
+
+        // Create attack object for guest-side processing
+        const attack = {
+            hero: actingHero,
+            target: target,
+            damage: damage,
+            effectsTriggered: effectsTriggered,
+            isRanged: isRanged,
+            criticalStrikeData: criticalStrikeData
+        };
+
+        // Add to combat log
+        const logType = actorLocalSide === 'player' ? 'success' : 'error';
+        bm.addCombatLog(
+            `⚔️ ${actingHero.name} takes an additional action!`,
+            logType
+        );
+
+        // Log the attack
+        if (bm.battleScreen && bm.battleScreen.battleLog) {
+            bm.battleScreen.battleLog.logAttackMessage(attack);
+        }
+
+        // Execute attack animation
+        console.log('🎯 GUEST: About to animate additional action attack');
+        await bm.animationManager.animateHeroAttack(actingHero, target);
+        console.log('🎯 GUEST: Additional action attack animation complete');
+
+        // Apply damage modifier visual effects if any
+        if (bm.attackEffectsManager && effectsTriggered.length > 0) {
+            await bm.delay(100);
+            bm.attackEffectsManager.applyDamageModifierEffects(effectsTriggered);
+            await bm.delay(400);
+        }
+
+        // Apply CriticalStrike visual effect if triggered
+        if (criticalStrikeData && bm.spellSystem) {
+            const criticalStrikeSpell = bm.spellSystem.spellImplementations.get('CriticalStrike');
+            if (criticalStrikeSpell) {
+                criticalStrikeSpell.createCriticalStrikeEffect(
+                    attack.target.type === 'creature' ? attack.target.creature : attack.target.hero
+                );
+                await bm.delay(200);
+            }
+        }
+
+        // Note: We don't apply damage on guest side - that's handled by the host
+        // The host will send separate damage_applied messages
+
+        // Return animation
+        await bm.animationManager.animateReturn(actingHero, actorLocalSide);
+        
+        // Send acknowledgment that additional action animation completed
+        bm.sendAcknowledgment('additional_action_complete');
+    }
+
+    /**
+     * GUEST: Handle stalemate detection from host
+     */
+    guest_handleStalemateDetected(data) {
+        const bm = this.battleManager;
+        
+        if (bm.isAuthoritative) {
+            return; // Only process on guest side
+        }
+        
+        const { turn, reason } = data;
+        
+        bm.addCombatLog('⚠️ Stalemate detected! No hero has taken damage for 20 turns.', 'warning');
+        bm.addCombatLog('🤝 Battle ends in a draw!', 'info');
+        
+        // Set all heroes as defeated to trigger draw condition on guest side
+        ['left', 'center', 'right'].forEach(position => {
+            if (bm.playerHeroes[position]) {
+                bm.playerHeroes[position].alive = false;
+            }
+            if (bm.opponentHeroes[position]) {
+                bm.opponentHeroes[position].alive = false;
+            }
+        });
+        
+        // Battle will end as draw in the next checkBattleEnd() call
+    }
+
+    // Helper method to find target from action data (moved from battleCombatManager)
+    findTargetFromActionData(targetData) {
+        const bm = this.battleManager;
+        const myAbsoluteSide = bm.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        
+        if (targetData.type === 'hero') {
+            const heroes = targetLocalSide === 'player' ? bm.playerHeroes : bm.opponentHeroes;
+            const targetHero = heroes[targetData.position];
+            
+            if (!targetHero) return null;
+            
+            return {
+                type: 'hero',
+                hero: targetHero,
+                position: targetData.position,
+                side: targetLocalSide
+            };
+        } else if (targetData.type === 'creature') {
+            const heroes = targetLocalSide === 'player' ? bm.playerHeroes : bm.opponentHeroes;
+            const targetHero = heroes[targetData.position];
+            
+            if (!targetHero || !targetHero.creatures) return null;
+            
+            const creature = targetHero.creatures[targetData.creatureIndex];
+            if (!creature) return null;
+            
+            return {
+                type: 'creature',
+                hero: targetHero,
+                creature: creature,
+                creatureIndex: targetData.creatureIndex,
+                position: targetData.position,
+                side: targetLocalSide
+            };
+        }
+        
+        return null;
+    }
+
     guest_handleHandUpdate(data) {
         const bm = this.battleManager;
         const { absoluteSide, hand } = data;
@@ -1984,7 +2399,7 @@ export class BattleNetworkManager {
         // Use the appropriate Royal Corgi bonus sent from host
         const myRoyalCorgiBonusCards = bm.isHost ? hostRoyalCorgiBonusCards : guestRoyalCorgiBonusCards;
         
-        // FIXED: Actually draw the Royal Corgi bonus cards for guest
+        // Actually draw the Royal Corgi bonus cards for guest
         if (myRoyalCorgiBonusCards > 0 && window.heroSelection && window.heroSelection.handManager) {
             window.heroSelection.handManager.drawCards(myRoyalCorgiBonusCards);
             
@@ -2027,7 +2442,7 @@ export class BattleNetworkManager {
             }
         }
 
-        // Update guest's deck manager with modified deck
+        // UPDATE DECK MANAGER WITH MODIFIED DECK
         if (window.heroSelection && window.heroSelection.deckManager) {
             const playerDeck = bm.getPlayerDeck();
             
@@ -2036,6 +2451,18 @@ export class BattleNetworkManager {
                 cards: playerDeck,
                 size: playerDeck.length,
                 uniqueCards: [...new Set(playerDeck)].length,
+                timestamp: Date.now()
+            });
+        }
+
+        // UPDATE GRAVEYARD MANAGER WITH MODIFIED GRAVEYARD
+        if (window.heroSelection && window.heroSelection.graveyardManager) {
+            const playerGraveyard = bm.getPlayerGraveyard();
+            
+            // Update the main graveyard manager with the modified player graveyard
+            window.heroSelection.graveyardManager.importGraveyard({
+                cards: playerGraveyard,
+                size: playerGraveyard.length,
                 timestamp: Date.now()
             });
         }
@@ -2377,6 +2804,18 @@ export class BattleNetworkManager {
                 logType
             );
         }
+    }
+
+    guest_handleCarrisTimeLimit(data) {
+        const bm = this.battleManager;
+        if (bm.isAuthoritative) return; // Only process on guest side
+        
+        // Import and use the Carris handler
+        import('./Heroes/carris.js').then(({ CarrisHeroEffect }) => {
+            CarrisHeroEffect.handleGuestCarrisTimeLimit(data, bm);
+        }).catch(error => {
+            console.error('Error handling Carris time limit:', error);
+        });
     }
 
     guest_handleHeroHealed(data) {

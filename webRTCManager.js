@@ -250,6 +250,11 @@ export class WebRTCManager {
     // Send message through data channel
     sendMessage(message) {
         if (this.dataChannel && this.dataChannel.readyState === 'open') {
+            // Prevent buffer overflow - wait if buffer is too full
+            if (this.dataChannel.bufferedAmount > 65536) { // 64KB threshold
+                console.warn('Data channel buffer full, message dropped');
+                return false;
+            }
             try {
                 this.dataChannel.send(JSON.stringify(message));
                 return true;

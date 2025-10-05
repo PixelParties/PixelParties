@@ -289,6 +289,14 @@ export class AreaHandler {
                 console.error('Error initializing PinkSky:', error);
             });
         }
+        // Initialize BigGwen
+        if (cardName === 'BigGwen') {
+            import('../Spells/bigGwen.js').then(({ initializeBigGwenArea }) => {
+                initializeBigGwenArea(newAreaCard);
+            }).catch(error => {
+                console.error('Error initializing BigGwen:', error);
+            });
+        }
 
         // Reset CrystalWell when new area is placed
         if (cardName === 'CrystalWell') {
@@ -422,7 +430,7 @@ export class AreaHandler {
             requiredLevel = Math.max(0, requiredLevel - totalNecromancyLevel);
         }
         
-        // Check each hero position (rest of the method remains the same)
+        // Check each hero position
         for (const position of ['left', 'center', 'right']) {
             const hero = formation[position];
             if (!hero) continue;
@@ -430,6 +438,7 @@ export class AreaHandler {
             // Count spell school abilities for this hero
             const heroAbilities = this.heroSelection.heroAbilitiesManager.getHeroAbilities(position);
             let totalSpellSchoolLevel = 0;
+            let learningLevel = 0;
             
             ['zone1', 'zone2', 'zone3'].forEach(zone => {
                 if (heroAbilities && heroAbilities[zone]) {
@@ -437,21 +446,29 @@ export class AreaHandler {
                         if (ability && ability.name === spellSchool) {
                             totalSpellSchoolLevel++;
                         }
+                        if (ability && ability.name === 'Learning') {
+                            learningLevel++;
+                        }
                     });
                 }
             });
             
+            // Calculate effective level with Learning bonus
+            const effectiveSpellSchoolLevel = totalSpellSchoolLevel + learningLevel;
+            
             // If this hero meets the requirements, area spell can be used
-            if (totalSpellSchoolLevel >= requiredLevel) {
+            if (effectiveSpellSchoolLevel >= requiredLevel) {
                 return {
                     canUse: true,
                     heroName: hero.name,
                     heroPosition: position,
-                    hasLevel: totalSpellSchoolLevel,
-                    needsLevel: requiredLevel
+                    hasLevel: effectiveSpellSchoolLevel,
+                    needsLevel: requiredLevel,
+                    learningBonus: learningLevel
                 };
             }
         }
+
         
         // No hero can use this area spell
         return {

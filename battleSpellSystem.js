@@ -39,6 +39,10 @@ import FerociousTigerKickSpell from './Spells/ferociousTigerKick.js';
 import PhoenixTackleSpell from './Spells/phoenixTackle.js';
 import VictoryPhoenixCannonSpell from './Spells/victoryPhoenixCannon.js';
 import SupplyChainSpell from './Spells/supplyChain.js';
+import DivineGiftOfTimeSpell from './Spells/divineGiftOfTime.js';
+import SlowSpell from './Spells/slow.js';
+import HealSpell from './Spells/heal.js';
+import CureSpell from './Spells/cure.js';
 
 
 
@@ -212,6 +216,22 @@ export class BattleSpellSystem {
         // Register SupplyChain
         const supplyChain = new SupplyChainSpell(this.battleManager);
         this.spellImplementations.set('SupplyChain', supplyChain);
+
+        // Register DivineGiftOfTime
+        const divineGiftOfTime = new DivineGiftOfTimeSpell(this.battleManager);
+        this.spellImplementations.set('DivineGiftOfTime', divineGiftOfTime);
+
+        // Register Slow
+        const slow = new SlowSpell(this.battleManager);
+        this.spellImplementations.set('Slow', slow);
+
+        // Register Heal
+        const heal = new HealSpell(this.battleManager);
+        this.spellImplementations.set('Heal', heal);
+
+        // Register Cure
+        const cure = new CureSpell(this.battleManager);
+        this.spellImplementations.set('Cure', cure);
     }
 
     // ============================================
@@ -220,7 +240,7 @@ export class BattleSpellSystem {
 
     // Check if hero should cast a spell instead of attacking
     async checkSpellCasting(hero) {
-        if (!this.battleManager.isAuthoritative || !hero || !hero.alive) {
+        if (!this.battleManager.isAuthoritative || !hero) {
             return null;
         }
         
@@ -361,7 +381,7 @@ export class BattleSpellSystem {
         }
         
         // Invert the chance (0.9 becomes 0.1, 0.81 becomes 0.19, etc.)
-        const finalChance = 1 - chance;
+        const finalChance = 1 - chance + 1;
         
         return finalChance;
     }

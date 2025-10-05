@@ -326,6 +326,9 @@ export class CheckpointSystem {
         if (this.battleManager.pinkSkyEffect) {
             states.pinkSkyEffect = this.battleManager.pinkSkyEffect.exportState();
         }
+        if (this.battleManager.bigGwenEffect) {
+            states.bigGwenEffect = this.battleManager.bigGwenEffect.exportState();
+        }
         
         // Speed Manager State
         if (this.battleManager.speedManager) {
@@ -859,6 +862,20 @@ export class CheckpointSystem {
                 });
             } else {
                 this.battleManager.pinkSkyEffect.importState(managerStates.pinkSkyEffect);
+            }
+        }
+        // Restore BigGwen Effect
+        if (managerStates.bigGwenEffect) {
+            // Import the BigGwen effect class if needed
+            if (!this.battleManager.bigGwenEffect) {
+                import('./Spells/bigGwen.js').then(({ BigGwenEffect }) => {
+                    this.battleManager.bigGwenEffect = new BigGwenEffect();
+                    this.battleManager.bigGwenEffect.importState(managerStates.bigGwenEffect);
+                }).catch(error => {
+                    console.error('Error importing BigGwen effect:', error);
+                });
+            } else {
+                this.battleManager.bigGwenEffect.importState(managerStates.bigGwenEffect);
             }
         }
     }

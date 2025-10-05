@@ -42,6 +42,15 @@ export class StatusEffectsManager {
                 visual: 'stone_aura',
                 description: 'Stone-like protection'
             },
+            timeGifted: {
+                name: 'timeGifted',
+                displayName: 'Time Gifted',
+                type: 'buff',
+                targetTypes: ['hero', 'creature'], // Both heroes and creatures can be time gifted
+                persistent: true, // Lasts entire battle
+                visual: 'time_aura',
+                description: 'Blessed with the gift of time manipulation'
+            },
             immortal: {
                 name: 'immortal',
                 displayName: 'Immortal',
@@ -50,6 +59,15 @@ export class StatusEffectsManager {
                 persistent: true, // Lasts until consumed or battle ends
                 visual: 'immortal_halo',
                 description: 'When dying without heal-block, revive with 100 HP and consume 1 stack.'
+            },
+            healthPotionReady: {
+                name: 'healthPotionReady',
+                displayName: 'Healing Reserve',
+                type: 'buff',
+                targetTypes: ['hero'], // Only heroes
+                persistent: true, // Lasts entire battle
+                visual: null, // NO VISUAL - invisible to player
+                description: 'Auto-heals to full when HP drops below 100'
             },
             clouded: {
                 name: 'clouded',
@@ -651,7 +669,7 @@ export class StatusEffectsManager {
 
         const baseDamage = 10 * poisonStacks;
         
-        // NEW: Apply Medea poison multiplier
+        // Apply Medea poison multiplier
         const medeaResult = this.applyMedeaPoisonMultiplier(baseDamage, target);
         const finalDamage = medeaResult.damage;
         
@@ -675,7 +693,7 @@ export class StatusEffectsManager {
         // Create additional poison visual effect  
         this.createStatusVisualEffect(target, 'poisoned', 'damage');
 
-        // NEW: Enhanced logging with Medea interaction
+        // Enhanced logging with Medea interaction
         if (medeaResult.medeaCount > 0) {
             this.battleManager.addCombatLog(
                 `🐍 ${target.name} takes ${finalDamage} poison damage (${baseDamage} × ${medeaResult.multiplier} from ${medeaResult.medeaCount} enemy Medea)!`,
@@ -694,7 +712,7 @@ export class StatusEffectsManager {
         await this.battleManager.delay(300);
     }
 
-    // NEW: Create special visual effect for Medea-enhanced poison
+    // Create special visual effect for Medea-enhanced poison
     createMedeaPoisonEffect(target, medeaCount) {
         const targetElement = this.getTargetElement(target);
         if (!targetElement) return;
@@ -982,6 +1000,7 @@ export class StatusEffectsManager {
     createApplicationEffect(targetElement, target, effectName) {
         const effects = {
             stoneskin: { icon: '🗿', color: '#8B4513' },
+            timeGifted: { icon: '⏰', color: '#4a90e2' },
             immortal: { icon: '✨', color: 'rgba(255, 215, 0, 0.9)' },
             silenced: { icon: '🔇', color: 'rgba(128, 128, 128, 0.9)' },
             poisoned: { icon: '☠️', color: 'rgba(128, 0, 128, 0.9)' },
@@ -1043,6 +1062,7 @@ export class StatusEffectsManager {
             stoneskin: { icon: '🗿', color: '#8B4513' },
             immortal: { icon: '✨', color: '#ffd700' },
             clouded: { icon: '☁️', color: '#87ceeb' } ,
+            timeGifted: { icon: '⏰', color: '#4a90e2' },
             silenced: { icon: '🔇', color: '#808080' },
             poisoned: { icon: '☠️', color: '#800080' },
             stunned: { icon: '😵', color: '#ffff00' },
@@ -1051,7 +1071,7 @@ export class StatusEffectsManager {
             dazed: { icon: '😵‍💫', color: '#c896ff' },
             taunting: { icon: '📢', color: '#ff6b6b' },
             healblock: { icon: '🚫', color: '#dc3545' },
-            weakened: { icon: '↘', color: '#dc3545' }
+            weakened: { icon: '↘', color: '#dc3545' },
         };
 
         const indicator = indicators[effectName];
@@ -1390,6 +1410,29 @@ export class StatusEffectsManager {
                 animation: dazedSwirl 3s ease-in-out infinite !important;
                 background: #c896ff !important;
                 border-color: rgba(200, 150, 255, 0.8) !important;
+            }
+
+            @keyframes timeGiftedDeathAction {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5) rotate(0deg); 
+                }
+                30% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.3) rotate(180deg); 
+                }
+                70% { 
+                    opacity: 0.9; 
+                    transform: translate(-50%, -50%) scale(1.1) rotate(270deg); 
+                }
+                100% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(1) rotate(360deg); 
+                }
+            }
+
+            .time-gifted-death-action-effect {
+                will-change: transform, opacity;
             }
         `;
         
@@ -1749,6 +1792,168 @@ export class StatusEffectsManager {
         }
         
         return baseDamage;
+    }
+
+    /**
+     * Check if target has timeGifted and should take a final action before death
+     * @param {Object} target - The target that would die
+     * @param {Object} context - Damage context
+     * @returns {boolean} - True if timeGifted was processed
+     */
+    async checkAndProcessTimeGiftedDeathAction(target, context = {}) {
+        if (!this.battleManager.isAuthoritative) return false;
+        
+        // Check if target has timeGifted
+        const timeGiftedStacks = this.getStatusEffectStacks(target, 'timeGifted');
+        if (timeGiftedStacks === 0) return false;
+        
+        // Remove one stack of timeGifted
+        this.removeStatusEffect(target, 'timeGifted', 1);
+        
+        // Create visual effect
+        this.createTimeGiftedDeathActionEffect(target);
+        
+        // Log the effect
+        this.battleManager.addCombatLog(
+            `⏰ ${target.name}'s Time Gifted grants one final action before death!`,
+            target.side === 'player' ? 'info' : 'warning'
+        );
+        
+        // Sync to guest if host
+        if (this.battleManager.isAuthoritative) {
+            this.battleManager.sendBattleUpdate('time_gifted_death_action', {
+                targetInfo: this.getTargetSyncInfo(target),
+                remainingStacks: this.getStatusEffectStacks(target, 'timeGifted'),
+                timestamp: Date.now()
+            });
+        }
+        
+        // Add a brief delay to let the death register visually before the surprise action
+        await this.battleManager.delay(400);
+        
+        // Execute the additional action based on target type
+        try {
+            if (target.type === 'hero' || !target.type) {
+                // Hero additional action
+                if (this.battleManager.combatManager) {
+                    await this.battleManager.combatManager.executeAdditionalAction(target, target.position);
+                }
+            } else {
+                // Creature additional action - need to find the creature's hero and create actor
+                const creatureInfo = this.findCreatureInfo(target);
+                if (creatureInfo && this.battleManager.flowManager) {
+                    // Store original HP and temporarily set to 1 so creature can act
+                    const originalHp = target.currentHp;
+                    target.currentHp = 1;
+                    
+                    try {
+                        const actor = {
+                            type: 'creature',
+                            name: target.name,
+                            data: target,
+                            index: creatureInfo.creatureIndex,
+                            hero: creatureInfo.hero
+                        };
+                        this.battleManager.flowManager.activateCreatureSpecialAttack(actor, creatureInfo.position);
+                        await this.battleManager.delay(100);
+                    } finally {
+                        // Always restore original HP regardless of success/failure
+                        target.currentHp = originalHp;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error during timeGifted death action:', error);
+        }
+        
+        return true; // Indicates that timeGifted was processed
+    }
+
+    /**
+     * Create visual effect for timeGifted death action
+     * @param {Object} target - The target using timeGifted
+     */
+    createTimeGiftedDeathActionEffect(target) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+
+        const timeEffect = document.createElement('div');
+        timeEffect.className = 'time-gifted-death-action-effect';
+        timeEffect.innerHTML = '⏰💫';
+        
+        timeEffect.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            z-index: 500;
+            pointer-events: none;
+            animation: timeGiftedDeathAction ${this.battleManager.getSpeedAdjustedDelay(1500)}ms ease-out forwards;
+            text-shadow: 
+                0 0 20px rgba(74, 144, 226, 0.9),
+                0 0 40px rgba(74, 144, 226, 0.6);
+        `;
+        
+        targetElement.appendChild(timeEffect);
+        
+        setTimeout(() => {
+            if (timeEffect && timeEffect.parentNode) {
+                timeEffect.remove();
+            }
+        }, this.battleManager.getSpeedAdjustedDelay(1500));
+    }
+
+    /**
+     * Handle timeGifted death action on guest side
+     * @param {Object} data - Sync data from host
+     */
+    guest_handleTimeGiftedDeathAction(data) {
+        if (this.battleManager.isAuthoritative) return;
+
+        const { targetInfo, remainingStacks } = data;
+        
+        // Find the target
+        const target = this.findTargetFromSyncInfo(targetInfo);
+        if (!target) return;
+        
+        // Update timeGifted stacks
+        this.setStatusEffectStacks(target, 'timeGifted', remainingStacks);
+        
+        // Create visual effect
+        this.createTimeGiftedDeathActionEffect(target);
+        
+        // Add to battle log
+        const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
+        const targetLocalSide = (targetInfo.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
+        const logType = targetLocalSide === 'player' ? 'info' : 'warning';
+        
+        this.battleManager.addCombatLog(
+            `⏰ ${target.name}'s Time Gifted grants one final action before death!`,
+            logType
+        );
+    }
+
+    /**
+     * Helper method to find creature info (already exists but may need to be accessible)
+     */
+    findCreatureInfo(creature) {
+        // Search through all heroes and their creatures
+        for (const side of ['player', 'opponent']) {
+            const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
+            
+            for (const position of ['left', 'center', 'right']) {
+                const hero = heroes[position];
+                if (!hero || !hero.creatures) continue;
+                
+                const creatureIndex = hero.creatures.indexOf(creature);
+                if (creatureIndex !== -1) {
+                    return { hero, side, position, creatureIndex };
+                }
+            }
+        }
+        
+        return null;
     }
 
     // Clear all status effects from all targets (battle end)

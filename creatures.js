@@ -29,7 +29,9 @@ export class HeroCreatureManager {
             draggedCreature: null,
             draggedFromHero: null,
             draggedFromIndex: null,
-            draggedElement: null
+            draggedElement: null,
+            previewPosition: null,
+            previewHero: null
         };
     }
 
@@ -54,13 +56,13 @@ export class HeroCreatureManager {
     // Move creature between different heroes (only allowed in Guard Change mode)
     moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, toHeroPosition, toIndex) {        
         if (!this.guardChangeMode) {
-            console.error('❌ Cannot move creatures between heroes - Guard Change mode not active');
+            console.error('⚠️ Cannot move creatures between heroes - Guard Change mode not active');
             return false;
         }
         
         if (!this.heroCreatures.hasOwnProperty(fromHeroPosition) || 
             !this.heroCreatures.hasOwnProperty(toHeroPosition)) {
-            console.error(`❌ Invalid hero positions: ${fromHeroPosition} or ${toHeroPosition}`);
+            console.error(`⚠️ Invalid hero positions: ${fromHeroPosition} or ${toHeroPosition}`);
             return false;
         }
         
@@ -72,12 +74,12 @@ export class HeroCreatureManager {
         const toCreatures = this.heroCreatures[toHeroPosition];
         
         if (fromIndex < 0 || fromIndex >= fromCreatures.length) {
-            console.error(`❌ Invalid source creature index: ${fromIndex}`);
+            console.error(`⚠️ Invalid source creature index: ${fromIndex}`);
             return false;
         }
         
         if (toIndex < 0 || toIndex > toCreatures.length) {
-            console.error(`❌ Invalid target creature index: ${toIndex}`);
+            console.error(`⚠️ Invalid target creature index: ${toIndex}`);
             return false;
         }
                 
@@ -186,8 +188,8 @@ export class HeroCreatureManager {
         return removedCreature;
     }
 
-    // NEW: Reorder creatures within the same hero
-    reorderCreaturesWithinHero(heroPosition, fromIndex, toIndex) {
+    // Reorder creatures within the same hero
+    reorderCreaturesWithinHero(heroPosition, fromIndex, visualTargetIndex) {
         if (!this.heroCreatures.hasOwnProperty(heroPosition)) {
             console.error(`Invalid hero position: ${heroPosition}`);
             return false;
@@ -195,23 +197,31 @@ export class HeroCreatureManager {
 
         const creatures = this.heroCreatures[heroPosition];
         
-        // Validate indices
-        if (fromIndex < 0 || fromIndex >= creatures.length || 
-            toIndex < 0 || toIndex >= creatures.length) {
-            console.error(`Invalid creature indices: from ${fromIndex}, to ${toIndex}`);
+        // Validate source index
+        if (fromIndex < 0 || fromIndex >= creatures.length) {
+            console.error(`Invalid source index: ${fromIndex}`);
             return false;
         }
-
+        
+        // The visualTargetIndex is where the item should end up among visible elements
+        // Since we're removing one element first, we need to calculate the final position
+        let finalIndex = visualTargetIndex;
+        
+        
+        // Bounds check
+        if (finalIndex < 0 || finalIndex >= creatures.length) {
+            console.error(`Invalid target index: ${finalIndex}`);
+            return false;
+        }
+        
         // No change needed
-        if (fromIndex === toIndex) {
+        if (fromIndex === finalIndex) {
             return true;
         }
 
-        // Remove creature from original position
+        // Standard array reordering: remove, then insert
         const [draggedCreature] = creatures.splice(fromIndex, 1);
-        
-        // Insert at new position
-        creatures.splice(toIndex, 0, draggedCreature);
+        creatures.splice(finalIndex, 0, draggedCreature);
         
         // Notify state change
         if (this.onStateChange) {
@@ -221,33 +231,32 @@ export class HeroCreatureManager {
         return true;
     }
 
-    // NEW: Get target index for creature drop based on mouse position
+    // Get target index for creature drop based on mouse position
     getCreatureDropIndex(heroPosition, mouseX, heroContainer) {
-        const creatures = this.heroCreatures[heroPosition];
-        if (creatures.length === 0) {
-            return 0; // First position if no creatures exist
-        }
-
-        const creatureElements = heroContainer.querySelectorAll('.creature-icon');
-        if (creatureElements.length === 0) {
+        // Get visible creature elements (excluding the dragged one)
+        const visibleElements = Array.from(heroContainer.querySelectorAll('.creature-icon'))
+            .filter(el => !el.classList.contains('creature-dragging'));
+        
+        if (visibleElements.length === 0) {
             return 0;
         }
 
-        // Find the position based on mouse X coordinate
-        for (let i = 0; i < creatureElements.length; i++) {
-            const rect = creatureElements[i].getBoundingClientRect();
+        // Find insertion point based on mouse position
+        let insertIndex = 0;
+        
+        for (let i = 0; i < visibleElements.length; i++) {
+            const rect = visibleElements[i].getBoundingClientRect();
             const centerX = rect.left + (rect.width / 2);
             
-            if (mouseX < centerX) {
-                return i; // Insert before this creature
+            if (mouseX > centerX) {
+                insertIndex++;
             }
         }
         
-        // Insert at the end if mouse is past all creatures
-        return creatures.length;
+        return insertIndex;
     }
 
-    // NEW: Start creature drag operation
+    // Start creature drag operation
     startCreatureDrag(heroPosition, creatureIndex, draggedElement) {
         const creatures = this.heroCreatures[heroPosition];
         
@@ -261,30 +270,201 @@ export class HeroCreatureManager {
             draggedCreature: creatures[creatureIndex],
             draggedFromHero: heroPosition,
             draggedFromIndex: creatureIndex,
-            draggedElement: draggedElement
+            draggedElement: draggedElement,
+            originalParent: draggedElement.parentNode,
+            originalNextSibling: draggedElement.nextSibling,
+            previewPosition: null,
+            previewHero: null
         };
 
-        // Add visual class to dragged element
+        // Style the dragged element as a drag preview
         if (draggedElement) {
             draggedElement.classList.add('creature-dragging');
+            // Store original position info for potential restoration
+            draggedElement.dataset.originalHero = heroPosition;
+            draggedElement.dataset.originalIndex = creatureIndex;
         }
 
         return true;
     }
 
-    // NEW: End creature drag operation
+    // End creature drag operation
     endCreatureDrag() {
         if (this.dragState.isDragging && this.dragState.draggedElement) {
-            this.dragState.draggedElement.classList.remove('creature-dragging');
+            const draggedElement = this.dragState.draggedElement;
+            
+            // Clean up all drag-related classes and styles
+            draggedElement.classList.remove('creature-dragging', 'creature-drop-preview');
+            draggedElement.style.cssText = ''; // Clear any inline styles
+            
+            // Remove dataset attributes used for original position tracking
+            delete draggedElement.dataset.originalHero;
+            delete draggedElement.dataset.originalIndex;
         }
 
+        // Reset drag state
         this.dragState = {
             isDragging: false,
             draggedCreature: null,
             draggedFromHero: null,
             draggedFromIndex: null,
-            draggedElement: null
+            draggedElement: null,
+            originalParent: null,
+            originalNextSibling: null,
+            previewPosition: null,
+            previewHero: null
         };
+    }
+
+    showDropIndicator(heroPosition, insertIndex) {
+        // Prevent rapid updates
+        if (this.dragState.previewHero === heroPosition && 
+            this.dragState.previewPosition === insertIndex) {
+            return;
+        }
+        
+        // Store state
+        this.dragState.previewPosition = insertIndex;
+        this.dragState.previewHero = heroPosition;
+        
+        const heroContainer = document.querySelector(`.hero-creatures[data-hero-position="${heroPosition}"]`);
+        if (!heroContainer || !this.dragState.draggedElement) return;
+        
+        const draggedElement = this.dragState.draggedElement;
+        const visibleElements = Array.from(heroContainer.querySelectorAll('.creature-icon'))
+            .filter(el => el !== draggedElement); // Exclude the dragged element from calculations
+        
+        // Remove element from current position
+        if (draggedElement.parentNode) {
+            draggedElement.parentNode.removeChild(draggedElement);
+        }
+        
+        // Style element as drop indicator
+        draggedElement.classList.add('creature-drop-preview');
+        draggedElement.style.cssText = `
+            opacity: 0.5 !important;
+            border: 2px dashed rgba(102, 126, 234, 0.8) !important;
+            border-radius: 4px !important;
+            background: rgba(102, 126, 234, 0.1) !important;
+            animation: creatureDropPreview 1s ease-in-out infinite !important;
+        `;
+        
+        // Insert element at the drop position
+        if (insertIndex >= visibleElements.length) {
+            heroContainer.appendChild(draggedElement);
+        } else if (insertIndex === 0) {
+            if (visibleElements.length > 0) {
+                heroContainer.insertBefore(draggedElement, visibleElements[0]);
+            } else {
+                heroContainer.appendChild(draggedElement);
+            }
+        } else {
+            heroContainer.insertBefore(draggedElement, visibleElements[insertIndex]);
+        }
+    }
+
+    showDragPreview(heroPosition, insertIndex) {
+        // Prevent rapid updates that cause flicker
+        if (this.dragState.previewHero === heroPosition && 
+            this.dragState.previewPosition === insertIndex) {
+            return;
+        }
+        
+        // Clear any existing preview
+        this.clearDropIndicators();
+        
+        // Store preview state
+        this.dragState.previewPosition = insertIndex;
+        this.dragState.previewHero = heroPosition;
+        
+        // Update UI to show preview
+        const heroContainer = document.querySelector(`.hero-creatures[data-hero-position="${heroPosition}"]`);
+        if (!heroContainer) return;
+        
+        // Check if this would result in no change (creature returning to original position)
+        const isOriginalPosition = heroPosition === this.dragState.draggedFromHero && 
+                                insertIndex === this.dragState.draggedFromIndex;
+        
+        // Get visible creature elements
+        const visibleElements = Array.from(heroContainer.querySelectorAll('.creature-icon'))
+            .filter(el => !el.classList.contains('creature-dragging'));
+        
+        // Create placeholder with creature preview
+        const placeholder = document.createElement('div');
+        placeholder.className = isOriginalPosition ? 'creature-drop-placeholder original-position' : 'creature-drop-placeholder';
+        placeholder.dataset.dropIndex = insertIndex;
+        
+        // Add the actual creature sprite as a preview (simplified - no frame extraction)
+        if (this.dragState.draggedCreature) {
+            const previewSprite = document.createElement('img');
+            previewSprite.src = `./Creatures/${this.dragState.draggedCreature.name}.png`;
+            previewSprite.className = 'creature-preview-sprite';
+            previewSprite.alt = this.dragState.draggedCreature.name;
+            previewSprite.style.cssText = `
+                width: 32px;
+                height: 32px;
+                object-fit: cover;
+                opacity: 0.6;
+                filter: brightness(1.2);
+            `;
+            
+            previewSprite.onerror = function() {
+                // Fallback to placeholder if sprite fails to load
+                const fallback = document.createElement('div');
+                fallback.className = 'creature-preview-fallback';
+                fallback.textContent = '👾';
+                fallback.style.cssText = `
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                `;
+                placeholder.replaceChild(fallback, previewSprite);
+            };
+            
+            placeholder.appendChild(previewSprite);
+        }
+        
+        // Insert placeholder at the appropriate position
+        if (isOriginalPosition) {
+            // For original position, find the hidden dragged element and insert before/after it
+            const draggedElement = this.dragState.draggedElement;
+            if (draggedElement && draggedElement.parentNode) {
+                draggedElement.parentNode.insertBefore(placeholder, draggedElement);
+            }
+        } else {
+            // Normal insertion logic for other positions
+            if (insertIndex >= visibleElements.length) {
+                heroContainer.appendChild(placeholder);
+            } else if (insertIndex === 0) {
+                if (visibleElements.length > 0) {
+                    heroContainer.insertBefore(placeholder, visibleElements[0]);
+                } else {
+                    heroContainer.appendChild(placeholder);
+                }
+            } else {
+                heroContainer.insertBefore(placeholder, visibleElements[insertIndex]);
+            }
+        }
+    }
+
+    clearDropIndicators() {
+        // Instead of removing indicator elements, restore the dragged element to a neutral state
+        if (this.dragState.draggedElement) {
+            const draggedElement = this.dragState.draggedElement;
+            
+            // Remove drop preview styling
+            draggedElement.classList.remove('creature-drop-preview');
+            draggedElement.style.cssText = ''; // Clear inline styles
+            
+            // Restore original dragging state
+            draggedElement.classList.add('creature-dragging');
+        }
+        
+        this.dragState.previewPosition = null;
+        this.dragState.previewHero = null;
     }
 
     // Check if currently dragging a creature
@@ -298,7 +478,7 @@ export class HeroCreatureManager {
     }
 
     // Handle creature drop operation
-    handleCreatureDrop(targetHeroPosition, dropX, targetContainer) {        
+    handleCreatureDrop(targetHeroPosition, dropX, targetContainer) {
         if (!this.dragState.isDragging) {
             return false;
         }
@@ -306,17 +486,18 @@ export class HeroCreatureManager {
         const fromHeroPosition = this.dragState.draggedFromHero;
         const fromIndex = this.dragState.draggedFromIndex;
         
+        // Calculate the target drop index
+        const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
+        
         // Same hero - handle reordering within hero
         if (targetHeroPosition === fromHeroPosition) {
-            
-            const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
-            
             const success = this.reorderCreaturesWithinHero(targetHeroPosition, fromIndex, targetIndex);
             
             this.endCreatureDrag();
             return success;
         }
-                
+        
+        // Different hero - Guard Change mode required
         if (!this.guardChangeMode) {
             this.endCreatureDrag();
             return false;
@@ -330,8 +511,6 @@ export class HeroCreatureManager {
             return false;
         }
 
-        const targetIndex = this.getCreatureDropIndex(targetHeroPosition, dropX, targetContainer);
-        
         const success = this.moveCreatureBetweenHeroes(fromHeroPosition, fromIndex, targetHeroPosition, targetIndex);
 
         this.endCreatureDrag();
@@ -372,7 +551,6 @@ export class HeroCreatureManager {
         const temp = this.heroCreatures[fromPosition];
         this.heroCreatures[fromPosition] = this.heroCreatures[toPosition];
         this.heroCreatures[toPosition] = temp;
-        
     }
 
     // Update hero placement (called when formation changes)
@@ -461,14 +639,15 @@ export class HeroCreatureManager {
         
         this.guardChangeMode = false;
 
-
         // Reset drag state
         this.dragState = {
             isDragging: false,
             draggedCreature: null,
             draggedFromHero: null,
             draggedFromIndex: null,
-            draggedElement: null
+            draggedElement: null,
+            previewPosition: null,
+            previewHero: null
         };
     }
 

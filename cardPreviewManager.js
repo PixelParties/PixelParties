@@ -6,8 +6,44 @@ export class CardPreviewManager {
         this.currentlyPreviewedCharacter = null;
     }
 
+    // Helper function to convert spaced names to camelCase for file paths
+    normalizeCardName(cardName) {
+        if (!cardName) return cardName;
+        
+        // If it already looks like a file path or doesn't contain spaces, return as-is
+        if (cardName.includes('/') || cardName.includes('.') || !cardName.includes(' ')) {
+            return cardName;
+        }
+        
+        // Convert "Soul Shard Sah" to "SoulShardSah"
+        return cardName
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join('');
+    }
+
+    // Helper function to get the correct card image path
+    getCardImagePath(cardName, cardType = 'ability') {
+        const normalizedName = this.normalizeCardName(cardName);
+        
+        // Handle different card types
+        if (cardType === 'character') {
+            return `./Cards/Characters/${normalizedName}.png`;
+        } else {
+            return `./Cards/All/${normalizedName}.png`;
+        }
+    }
+
     // Enhanced showCardTooltip with reward screen detection and deck card positioning
     showCardTooltip(cardData, cardElement) {
+        // Normalize the image path if it's a card name
+        if (cardData.imagePath && !cardData.imagePath.includes('/')) {
+            cardData.imagePath = this.getCardImagePath(cardData.imagePath, cardData.cardType);
+        } else if (cardData.cardName) {
+            // If cardName is provided separately, use it to construct the path
+            cardData.imagePath = this.getCardImagePath(cardData.cardName, cardData.cardType);
+        }
+        
         // Check if we're in reward screen first
         const isRewardScreen = document.getElementById('cardRewardOverlay');
         
@@ -115,6 +151,12 @@ export class CardPreviewManager {
         tooltipContainer.innerHTML = cardHTML;
         tooltipContainer.style.display = 'block';
         tooltipContainer.style.position = 'fixed';
+
+        // Wait for next frame to ensure rendering
+        requestAnimationFrame(() => {
+            const tooltipContent = tooltipContainer.querySelector('.large-card-tooltip');
+            this.positionCardTooltipFixed(tooltipContainer, tooltipContent);
+        });
         
         // Get the tooltip content element
         const tooltipContent = tooltipContainer.querySelector('.large-card-tooltip');
@@ -139,7 +181,7 @@ export class CardPreviewManager {
         
         // Check if this is a character card with stats
         const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
-        const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats; // NEW
+        const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats;
 
         // Build the card HTML with sprite-positioned stats
         let cardHTML = `
@@ -303,7 +345,7 @@ export class CardPreviewManager {
         }
     }
 
-    // FIXED positioning logic that uses actual measurements
+    // Positioning logic that uses actual measurements
     positionCardTooltipFixed(tooltipContainer, tooltipContent) {
         // Get actual tooltip dimensions after rendering
         const tooltipRect = tooltipContent.getBoundingClientRect();
@@ -443,7 +485,7 @@ export class CardPreviewManager {
         const viewportHeight = window.innerHeight;
         
         const finalX = Math.max(20, (viewportWidth / 2) - (tooltipWidth / 2));
-        const finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2));
+        const finalY = Math.max(20, (viewportHeight / 2) - (tooltipHeight / 2.5));
 
         this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false);
     }
@@ -662,7 +704,9 @@ export class CardPreviewManager {
                     </div>
                 `;
             } else if (item) {
-                const cardPath = `./Cards/All/${item}.png`;
+                // Normalize the card name to camelCase for the file path
+                const normalizedCardName = this.normalizeCardName(item);
+                const cardPath = `./Cards/All/${normalizedCardName}.png`;
                 const cardDisplayName = formatCardNameFunction(item);
                 const cardData = {
                     imagePath: cardPath,

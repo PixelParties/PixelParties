@@ -31,6 +31,20 @@ const CARD_DATABASE = {
         ability2: 'MagicArts',
         tags: ["High-Value", "Random", "Card Draw"]
     },
+    'Carris': {
+        name: 'Carris',
+        image: './Cards/Characters/Carris.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 1,
+        atk: 60,
+        ability1: 'Divinity',
+        ability2: 'Premonition',
+        tags: ["Multiple Actions", "Extra Turns", "High-Risk"]
+    },
     'Cecilia': {
         name: 'Cecilia',
         image: './Cards/Characters/Cecilia.png',
@@ -199,6 +213,20 @@ const CARD_DATABASE = {
         ability2: 'Fighting',
         tags: ["Defense", "Support", "Attacker"]
     },
+    'Nao': {
+        name: 'Nao',
+        image: './Cards/Characters/Nao.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 30,
+        ability1: 'Friendship',
+        ability2: 'SupportMagic',
+        tags: ["Defense", "Shield", "Support"]
+    },
     'Nicolas': {
         name: 'Nicolas',
         image: './Cards/Characters/Nicolas.png',
@@ -268,6 +296,20 @@ const CARD_DATABASE = {
         ability1: 'Leadership',
         ability2: 'Leadership',
         tags: ["Defense", "Summoner", "Support"]
+    },
+    'Thep': {
+        name: 'Thep',
+        image: './Cards/Characters/Thep.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 300,
+        atk: 30,
+        ability1: 'Learning',
+        ability2: 'MagicArts',
+        tags: ["Summoner", "Utility", "Support"]
     },
     'Toras': {
         name: 'Toras',
@@ -580,7 +622,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: 'Equip'
+        subtype: 'Trap'
     },
     'HeartOfIce': {
         name: 'HeartOfIce',
@@ -647,7 +689,7 @@ const CARD_DATABASE = {
         name: 'BurningFinger',
         image: './Cards/All/BurningFinger.png',
         cardType: 'Spell',
-        level: 1,
+        level: 0,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -672,7 +714,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
-        subtype: 'Equip'
+        subtype: 'Trap'
     },
     'FlameAvalanche': {
         name: 'FlameAvalanche',
@@ -777,7 +819,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: 'Equip'
+        subtype: 'Trap'
     },
     'VenomInfusion': {
         name: 'VenomInfusion',
@@ -990,7 +1032,7 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',
-        subtype: 'Equip'
+        subtype: null
     },
     'TreasureHuntersBackpack': {
         name: 'TreasureHuntersBackpack',
@@ -1447,24 +1489,6 @@ const CARD_DATABASE = {
         spellSchool: 'DecayMagic',
         subtype: null
     },
-    'Juice': {
-        name: 'Juice',
-        image: './Cards/All/Juice.png',
-        cardType: 'Artifact',
-        cost: 0,
-        action: false,
-        spellSchool: null,
-        subtype: 'Permanent'
-    },
-    'DarkGear': {
-        name: 'DarkGear',
-        image: './Cards/All/DarkGear.png',
-        cardType: 'Artifact',
-        cost: 6,
-        action: false,
-        spellSchool: null,
-        subtype: "Permanent"
-    },
     'CrystalWell': {
         name: 'CrystalWell',
         image: './Cards/All/CrystalWell.png',
@@ -1515,11 +1539,104 @@ const CARD_DATABASE = {
         spellSchool: 'SupportMagic',
         subtype: null
     },
+    'Juice': {
+        name: 'Juice',
+        image: './Cards/All/Juice.png',
+        cardType: 'Artifact',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Permanent'
+    },
+    'DarkGear': {
+        name: 'DarkGear',
+        image: './Cards/All/DarkGear.png',
+        cardType: 'Artifact',
+        cost: 6,
+        action: false,
+        spellSchool: null,
+        subtype: "Permanent"
+    },
+    'AngryCheese': {
+        name: 'AngryCheese',
+        image: './Cards/All/AngryCheese.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'CuteCheese': {
+        name: 'CuteCheese',
+        image: './Cards/All/CuteCheese.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'HolyCheese': {
+        name: 'HolyCheese',
+        image: './Cards/All/HolyCheese.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'NerdyCheese': {
+        name: 'NerdyCheese',
+        image: './Cards/All/NerdyCheese.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'SicklyCheese': {
+        name: 'SicklyCheese',
+        image: './Cards/All/SicklyCheese.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'ShieldOfLife': {
+        name: 'ShieldOfLife',
+        image: './Cards/All/ShieldOfLife.png',
+        cardType: 'Artifact',
+        cost: 12,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
+    'ShieldOfDeath': {
+        name: 'ShieldOfDeath',
+        image: './Cards/All/ShieldOfDeath.png',
+        cardType: 'Artifact',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip"
+    },
     'SkeletonKingSkullmael': {
         name: 'SkeletonKingSkullmael',
         image: './Cards/All/SkeletonKingSkullmael.png',
         cardType: 'Spell',
-        level: 0,
+        level: 5,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: true
+    },
+    'SkeletonHealer': {
+        name: 'SkeletonHealer',
+        image: './Cards/All/SkeletonHealer.png',
+        cardType: 'Spell',
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'SummoningMagic',
@@ -2208,6 +2325,217 @@ const CARD_DATABASE = {
     },
 
 
+    // CARRIS
+    'Divinity': {
+        name: 'Divinity',
+        image: './Cards/All/Divinity.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'Premonition': {
+        name: 'Premonition',
+        image: './Cards/All/Premonition.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'DivineGiftOfTime': {
+        name: 'DivineGiftOfTime',
+        image: './Cards/All/DivineGiftOfTime.png',
+        cardType: 'Spell',
+        level: 5,
+        cost: 0,
+        action: false,
+        spellSchool: 'SupportMagic',
+        subtype: 'Quick'
+    },
+    'BigGwen': {
+        name: 'BigGwen',
+        image: './Cards/All/BigGwen.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: 'Area'
+    },
+    'TheHandsOfBigGwen': {
+        name: 'TheHandsOfBigGwen',
+        image: './Cards/All/TheHandsOfBigGwen.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: 'Equip'
+    },
+    'HatOfMadness': {
+        name: 'HatOfMadness',
+        image: './Cards/All/HatOfMadness.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: 'Equip'
+    },
+    'Slow': {
+        name: 'Slow',
+        image: './Cards/All/Slow.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'DecayMagic',
+        subtype: null
+    },
+
+
+
+    // NAO
+    'Heal': {
+        name: 'Heal',
+        image: './Cards/All/Heal.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: null
+    },
+    'Cure': {
+        name: 'Cure',
+        image: './Cards/All/Cure.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: null
+    },
+    'HealingPotion': {
+        name: 'HealingPotion',
+        image: './Cards/All/HealingPotion.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+
+
+
+    // THEP
+    'Learning': {
+        name: 'Learning',
+        image: './Cards/All/Learning.png',
+        cardType: 'Ability',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'SoulShardIb': {
+        name: 'SoulShardIb',
+        image: './Cards/All/SoulShardIb.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardKa': {
+        name: 'SoulShardKa',
+        image: './Cards/All/SoulShardKa.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardKhet': {
+        name: 'SoulShardKhet',
+        image: './Cards/All/SoulShardKhet.png',
+        cardType: 'Spell',
+        level: 2,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardBa': {
+        name: 'SoulShardBa',
+        image: './Cards/All/SoulShardBa.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardRen': {
+        name: 'SoulShardRen',
+        image: './Cards/All/SoulShardRen.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardSekhem': {
+        name: 'SoulShardSekhem',
+        image: './Cards/All/SoulShardSekhem.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardShut': {
+        name: 'SoulShardShut',
+        image: './Cards/All/SoulShardShut.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+    'SoulShardSah': {
+        name: 'SoulShardSah',
+        image: './Cards/All/SoulShardSah.png',
+        cardType: 'Spell',
+        level: 3,
+        cost: 0,
+        action: true,
+        spellSchool: 'SummoningMagic',
+        subtype: 'Creature',
+        hp: 50,
+        physicalAttack: false
+    },
+
+
 
 
     
@@ -2531,6 +2859,77 @@ export function getDatabaseStats() {
         nonActionCards: cards.filter(card => !card.action).length,
         heroNames: heroes.map(hero => hero.name)
     };
+}
+
+/**
+ * Get cards by multiple filter criteria
+ * @param {Object} filters - Object containing filter criteria
+ * @param {string} [filters.cardType] - Card type to filter by
+ * @param {string} [filters.spellSchool] - Spell school to filter by
+ * @param {string} [filters.subtype] - Subtype to filter by
+ * @param {number} [filters.level] - Spell level to filter by
+ * @param {boolean} [filters.action] - Whether card requires action
+ * @param {number} [filters.cost] - Cost to filter by
+ * @param {boolean} [filters.global] - Whether spell is global
+ * @param {boolean} [filters.aoe] - Whether spell is AoE
+ * @returns {Object[]} Array of card information objects matching all filters
+ */
+export function getCardsByFilters(filters = {}) {
+    return Object.values(CARD_DATABASE)
+        .filter(card => {
+            // Check each filter criterion
+            if (filters.cardType !== undefined && card.cardType !== filters.cardType) {
+                return false;
+            }
+            if (filters.spellSchool !== undefined && card.spellSchool !== filters.spellSchool) {
+                return false;
+            }
+            if (filters.subtype !== undefined && card.subtype !== filters.subtype) {
+                return false;
+            }
+            if (filters.level !== undefined && card.level !== filters.level) {
+                return false;
+            }
+            if (filters.action !== undefined && card.action !== filters.action) {
+                return false;
+            }
+            if (filters.cost !== undefined && card.cost !== filters.cost) {
+                return false;
+            }
+            if (filters.global !== undefined && card.global !== filters.global) {
+                return false;
+            }
+            if (filters.aoe !== undefined && card.aoe !== filters.aoe) {
+                return false;
+            }
+            
+            return true;
+        })
+        .map(card => ({ ...card })); // Return copies
+}
+
+/**
+ * Get all MagicArts spell cards
+ * Convenience function for getting all spells with spellSchool: 'MagicArts'
+ * @returns {Object[]} Array of MagicArts spell card information objects
+ */
+export function getMagicArtsSpells() {
+    return getCardsByFilters({
+        cardType: 'Spell',
+        spellSchool: 'MagicArts'
+    });
+}
+
+/**
+ * Get all spell cards of a specific school
+ * @param {string} spellSchool - The spell school to filter by
+ * @returns {Object[]} Array of spell card information objects
+ */
+export function getSpellsBySchool(spellSchool) {
+    return getCardsByFilters({
+        cardType: 'Spell',
+        spellSchool: spellSchool
+    });
 }
 
 // Log database initialization

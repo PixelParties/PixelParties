@@ -29,6 +29,8 @@ import { trainingAbility } from './Abilities/training.js';
 import { inventingAbility } from './Abilities/inventing.js';
 import { occultismAbility } from './Abilities/occultism.js';
 import { biomancyAbility } from './Abilities/biomancy.js';
+import { premonitionAbility } from './Abilities/premonition.js';
+import { learningAbility } from './Abilities/learning.js';
 
 import { NicolasEffectManager } from './Heroes/nicolas.js';
 import { VacarnEffectManager } from './Heroes/vacarn.js';
@@ -167,8 +169,11 @@ export class HeroSelection {
                 this.updateBattleFormationUI(); // This now includes stat updates
                 this.updateHandDisplay();
                 
-                // Update potion bonuses when abilities change
+                // Update Ability bonuses when abilities change
                 this.potionHandler.updateAlchemyBonuses(this);
+                if (this.actionManager) {
+                    this.actionManager.updateDivinityBonuses(this);
+                }
                 
                 // Explicitly refresh hero stats when abilities change
                 setTimeout(() => {
@@ -227,6 +232,7 @@ export class HeroSelection {
             window.leadershipAbility = leadershipAbility;
             window.occultismAbility = occultismAbility; 
             window.biomancyAbility = biomancyAbility;
+            window.premonitionAbility = premonitionAbility; 
         }
 
         this.initializeStatUpdateSystem();
@@ -239,6 +245,7 @@ export class HeroSelection {
         this.characterCards = {
             'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
             'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
+            'Carris': ['Divinity', 'Premonition', 'BigGwen', 'TheHandsOfBigGwen', 'HatOfMadness', 'Haste', 'Slow', 'DivineGiftOfTime'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['Fighting', 'AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RainbowsArrow', 'RainOfArrows'],
             'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
@@ -251,11 +258,13 @@ export class HeroSelection {
             'Mary': ['Charme',  'Leadership', 'CuteBird', 'CutePhoenix', 'PhoenixTackle', 'VictoryPhoenixCannon', 'CuteCrown', 'PinkSky'],
             'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
             'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
+            'Nao': ['Friendship', 'SupportMagic', 'Heal', 'HealingMelody', 'Cure', 'HealingPotion', 'HolyCheese', 'ShieldOfLife'],
             'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
             'Nomu': ['MagicArts', 'Training', 'Teleport', 'Teleportal', 'StaffOfTheTeleporter', 'TeleportationPowder', 'PlanetInABottle', 'SpatialCrevice'],
             'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
             'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
             'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
+            'Thep': ['SoulShardBa', 'SoulShardIb', 'SoulShardKa', 'SoulShardKhet', 'SoulShardRen', 'SoulShardSah', 'SoulShardSekhem', 'SoulShardShut'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
             'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet']
@@ -268,6 +277,8 @@ export class HeroSelection {
         this.trainingAbility = trainingAbility;
         this.inventingAbility = inventingAbility;
         this.occultismAbility = occultismAbility;
+        this.premonitionAbility = premonitionAbility; 
+        this.learningAbility = learningAbility;
 
 
         // Initialize individual systems
@@ -659,10 +670,13 @@ export class HeroSelection {
             if (this.occultismAbility) {
                 this.occultismAbility.resetTurnBasedTracking();
             }
-
             // Reset Navigation usage for new turn
             if (window.navigationAbility) {
                 window.navigationAbility.resetTurnBasedTracking();
+            }
+            // Reset Premonition usage for new turn
+            if (window.premonitionAbility) {
+                window.premonitionAbility.resetTurnBasedTracking();
             }
             
             // Reset Nicolas effect usage for new turn
@@ -721,10 +735,14 @@ export class HeroSelection {
             }
         }
         
-        // These operations are safe during reconnection and should always run
+        // Update Ability-dependent reesources
         if (this.potionHandler) {
             this.potionHandler.updateAlchemyBonuses(this);
+        }  
+        if (this.actionManager) {
+            this.actionManager.updateDivinityBonuses(this);
         }
+
         
         // Update UI to reflect new turn
         if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
@@ -740,7 +758,7 @@ export class HeroSelection {
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
                 'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
-                'Mary.png'
+                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -778,7 +796,7 @@ export class HeroSelection {
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
                 'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
-                'Mary.png'
+                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -1051,6 +1069,9 @@ export class HeroSelection {
                 if (window.futureTechCopyDeviceArtifact) {
                     gameState.hostFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
                 }
+                if (this.premonitionAbility) {
+                    gameState.hostPremonitionState = sanitizeForFirebase(this.premonitionAbility.exportPremonitionState(this));
+                }
                 
                 // Save teleport state for host
                 if (this.teleportState) {
@@ -1102,9 +1123,9 @@ export class HeroSelection {
                 gameState.hostMagicRubiesUsed = sanitizeForFirebase(this.magicRubiesUsed || 0); 
                 gameState.hostPlayerCounters = sanitizeForFirebase(this.playerCounters);
 
-                // Save delayed artifact effects for host
-                if (this.delayedArtifactEffects) {
-                    gameState.hostDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
+                // Save delayed effects for host
+                if (this.delayedEffects) {
+                    gameState.hostdelayedEffects = sanitizeForFirebase(this.delayedEffects);
                 }
             } else if (!this.isHost && this.selectedCharacter) {
                 gameState.guestSelected = this.selectedCharacter;
@@ -1191,6 +1212,9 @@ export class HeroSelection {
                 if (window.futureTechCopyDeviceArtifact) {
                     gameState.guestFutureTechCopyDeviceState = sanitizeForFirebase(window.futureTechCopyDeviceArtifact.exportCopyDeviceState(this));
                 }
+                if (this.premonitionAbility) {
+                    gameState.guestPremonitionState = sanitizeForFirebase(this.premonitionAbility.exportPremonitionState(this));
+                }
                 
                 // Save teleport state for guest  
                 if (this.teleportState) {
@@ -1268,8 +1292,8 @@ export class HeroSelection {
                 
                 
                 // Save delayed artifact effects for guest
-                if (this.delayedArtifactEffects) {
-                    gameState.guestDelayedArtifactEffects = sanitizeForFirebase(this.delayedArtifactEffects);
+                if (this.delayedEffects) {
+                    gameState.guestdelayedEffects = sanitizeForFirebase(this.delayedEffects);
                 }
             }
 
@@ -1314,7 +1338,7 @@ export class HeroSelection {
 
     // Helper method to restore player-specific data
     restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, 
-        nicolasData = null, vacarnData = null, delayedArtifactEffectsData = null, semiData = null, 
+        nicolasData = null, vacarnData = null, delayedEffectsData = null, semiData = null, 
         heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, 
         magicSapphiresUsedData = null, magicRubiesUsedData = null, playerCountersData = null, 
         areaCardData = null, graveyardData = null, inventingData = null, occultismData = null, 
@@ -1448,15 +1472,15 @@ export class HeroSelection {
 
 
         // ===== Restore delayed artifact effects =====
-        if (delayedArtifactEffectsData && Array.isArray(delayedArtifactEffectsData)) {
-            this.delayedArtifactEffects = [...delayedArtifactEffectsData];
+        if (delayedEffectsData && Array.isArray(delayedEffectsData)) {
+            this.delayedEffects = [...delayedEffectsData];
             
             // Log what effects were restored
-            this.delayedArtifactEffects.forEach((effect, index) => {
+            this.delayedEffects.forEach((effect, index) => {
             });
         } else {
             // Initialize empty array if no saved data
-            this.delayedArtifactEffects = [];
+            this.delayedEffects = [];
         }
 
         // ===== Restore permanent artifacts for LOCAL player =====
@@ -2240,6 +2264,8 @@ export class HeroSelection {
             if (this.maryEffectManager) {
                 await this.maryEffectManager.processPostBattleEmpowerment(this);
             }
+            
+            this.updateHandDisplay()
 
             // ===== PROCESS DEMON'S GATE DESTRUCTION MAGIC ENHANCEMENT =====
             if (this.demonsGateCreature) {
@@ -3109,7 +3135,7 @@ export class HeroSelection {
 
     // Process opponent draw effects at turn start
     processOpponentDrawEffects() {
-        if (!this.delayedArtifactEffects || this.delayedArtifactEffects.length === 0) {
+        if (!this.delayedEffects || this.delayedEffects.length === 0) {
             return 0;
         }
         
@@ -3117,7 +3143,7 @@ export class HeroSelection {
         let totalCardsToDrawForOpponent = 0;
         const effectsToRemove = [];
         
-        this.delayedArtifactEffects.forEach((effect, index) => {
+        this.delayedEffects.forEach((effect, index) => {
             if (effect.type === 'opponent_draw_cards' && 
                 effect.triggerCondition === 'at_turn_start') {
                 
@@ -3128,7 +3154,7 @@ export class HeroSelection {
         
         // Remove processed effects (in reverse order to maintain indices)
         effectsToRemove.reverse().forEach(index => {
-            this.delayedArtifactEffects.splice(index, 1);
+            this.delayedEffects.splice(index, 1);
         });
         
         // Draw the cards if any
@@ -3246,17 +3272,43 @@ export class HeroSelection {
         const spellCardName = dragState.draggedCardName;
         const cardIndex = dragState.draggedCardIndex;
         
-        // Get card info to check if it requires an action
-        const cardInfo = getCardInfo(spellCardName);
+        // Use centralized spell validation
+        const spellCheck = this.handManager.canHeroUseSpell(targetSlot, spellCardName);
         
-        // Check if this is a Creature being summoned for free
-        const isFrontSoldierFree = this.canSummonFrontSoldierForFree(targetSlot, spellCardName);
-        const isArcherFree = this.canSummonArcherForFree(targetSlot, spellCardName);
-        const isFutureTechDroneFree = this.canSummonFutureTechDroneForFree(targetSlot, spellCardName);
+        if (!spellCheck.canUse) {
+            // Handle special gold learning cases
+            if (spellCheck.isSemiGoldLearning) {
+                this.handManager.endHandCardDrag();
+                
+                const dialogShown = this.semiEffectManager.showSemiGoldLearningDialog(
+                    this, targetSlot, spellCardName, cardIndex
+                );
+                
+                if (!dialogShown) {
+                    this.showSpellDropResult(targetSlot, 'Failed to show Semi dialog', false);
+                }
+                
+                return dialogShown;
+            }
+            
+            if (spellCheck.isDarkDealGoldLearning) {
+                this.handManager.endHandCardDrag();
+                this.showDarkDealGoldLearningDialog(targetSlot, spellCardName, cardIndex);
+                return true;
+            }
+            
+            // Show error for normal failure
+            this.handManager.endHandCardDrag();
+            this.showSpellDropResult(targetSlot, spellCheck.reason, false);
+            return false;
+        }
 
+        // Use centralized action requirement check
+        const needsAction = this.handManager.doesSpellNeedAction(spellCardName, targetSlot);
         
-        // Check if player can play action card (skip for free creatures)
-        if (!isFrontSoldierFree && !isArcherFree && !isFutureTechDroneFree) {
+        // Check if player can play action card (skip for free spells)
+        if (needsAction && !spellCheck.isFree) {
+            const cardInfo = this.getCardInfo(spellCardName);
             const actionCheck = this.actionManager.canPlayActionCard(cardInfo);
             if (!actionCheck.canPlay) {
                 this.handManager.endHandCardDrag();
@@ -3267,21 +3319,12 @@ export class HeroSelection {
 
         // Check if it's a creature spell
         if (this.heroCreatureManager.isCreatureSpell(spellCardName)) {
-            // Check if hero can summon the creature
-            const learnCheck = this.canHeroLearnSpell(targetSlot, spellCardName);
-
-            if (!learnCheck.canLearn) {
-                this.handManager.endHandCardDrag();
-                this.showSpellDropResult(targetSlot, learnCheck.reason, false);
-                return false;
-            }
-
             // Hero can summon the creature!
             const success = this.heroCreatureManager.addCreatureToHero(targetSlot, spellCardName);
 
             if (success) {
-                // Consume action if required (skip for free creatures)
-                if (cardInfo.action && !isFrontSoldierFree && !isArcherFree && !isFutureTechDroneFree) {
+                // Consume action if required and not free
+                if (needsAction && !spellCheck.isFree) {
                     this.actionManager.consumeAction();
                 }
                 
@@ -3290,16 +3333,12 @@ export class HeroSelection {
                 
                 // Show success message with appropriate text
                 let successMessage;
-                if (isFrontSoldierFree) {
-                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free!`;
-                } else if (isArcherFree) {
-                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free with Leadership!`;
-                } else if (isFutureTechDroneFree) {
-                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free (3+ in graveyard)!`;
-                } else if (learnCheck.isArcherReducedLevel) {
-                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)} with reduced requirements!`;
+                if (spellCheck.isFree) {
+                    successMessage = `${spellCheck.heroName} summoned ${this.formatCardName(spellCardName)} for free!`;
+                } else if (spellCheck.isArcherReducedLevel) {
+                    successMessage = `${spellCheck.heroName} summoned ${this.formatCardName(spellCardName)} with reduced requirements!`;
                 } else {
-                    successMessage = `${learnCheck.heroName} summoned ${this.formatCardName(spellCardName)}!`;
+                    successMessage = `${spellCheck.heroName} summoned ${this.formatCardName(spellCardName)}!`;
                 }
                 
                 this.showSpellDropResult(targetSlot, successMessage, true);
@@ -3315,46 +3354,12 @@ export class HeroSelection {
             return success;
         }
 
-        const learnCheck = this.canHeroLearnSpell(targetSlot, spellCardName);
-
-        if (!learnCheck.canLearn) {
-            // Check if this is Semi's gold learning case
-            if (learnCheck.isSemiGoldLearning) {
-                this.handManager.endHandCardDrag();
-                
-                // Show Semi's gold learning dialog
-                const dialogShown = this.semiEffectManager.showSemiGoldLearningDialog(
-                    this, targetSlot, spellCardName, cardIndex
-                );
-                
-                if (!dialogShown) {
-                    this.showSpellDropResult(targetSlot, 'Failed to show Semi dialog', false);
-                }
-                
-                return dialogShown;
-            }
-            
-            // Check if this is DarkDeal gold learning case
-            if (learnCheck.isDarkDealGoldLearning) {
-                this.handManager.endHandCardDrag();
-                
-                // Dynamically import and show DarkDeal dialog
-                this.showDarkDealGoldLearningDialog(targetSlot, spellCardName, cardIndex);
-                return true;
-            }
-            
-            // Show error message for normal failure
-            this.handManager.endHandCardDrag();
-            this.showSpellDropResult(targetSlot, learnCheck.reason, false);
-            return false;
-        }
-
-        // Hero can learn the spell!
+        // Regular spell learning
         const success = this.heroSpellbookManager.addSpellToHero(targetSlot, spellCardName);
 
         if (success) {
-            // Consume action if required
-            if (cardInfo.action) {
+            // Consume action if required and not free
+            if (needsAction && !spellCheck.isFree) {
                 this.actionManager.consumeAction();
             }
             
@@ -3362,7 +3367,7 @@ export class HeroSelection {
             this.handManager.removeCardFromHandByIndex(cardIndex);
             
             // Show success message
-            const successMessage = `${learnCheck.heroName} added ${this.formatCardName(spellCardName)} to their Spellbook!`;
+            const successMessage = `${spellCheck.heroName} added ${this.formatCardName(spellCardName)} to their Spellbook!`;
             this.showSpellDropResult(targetSlot, successMessage, true);
 
             // Update UI and save
@@ -3403,6 +3408,13 @@ export class HeroSelection {
         if (actionDisplay) {
             actionDisplay.outerHTML = this.actionManager.createActionDisplay();
         }
+    }
+
+    updateAllResourceDisplays() {
+        // Update existing displays
+        this.updateGoldDisplay();
+        this.updateActionDisplay();
+        this.updatePotionDisplay();
     }
 
     // Update potion display
@@ -3624,6 +3636,9 @@ export class HeroSelection {
         if (this.occultismAbility) {
             this.occultismAbility.reset();
         }
+        if (this.premonitionAbility) {
+            this.premonitionAbility.reset();
+        }
         
         // Reset Artifact handlers
         if (this.crusaderArtifactsHandler) {
@@ -3731,236 +3746,52 @@ export class HeroSelection {
 
     // Check if hero can learn a spell
     canHeroLearnSpell(heroPosition, spellCardName) {
-        const formation = this.formationManager.getBattleFormation();
-        const hero = formation[heroPosition];
-        
-        // Check 1: Is there a hero in the slot?
-        if (!hero) {
-            return { canLearn: false, reason: "You can't add Spells to an empty slot!" };
-        }
-
-        // Check 2: Get spell info
-        const spellInfo = getCardInfo(spellCardName);
-        if (!spellInfo || spellInfo.cardType !== 'Spell') {
-            return { canLearn: false, reason: "Invalid spell card!" };
-        }
-
-        // First check heroSpellbookManager restrictions (includes Area spell restriction)
-        const spellbookCheck = this.heroSpellbookManager.canHeroLearnSpell(heroPosition, spellCardName);
-        if (!spellbookCheck.canLearn) {
-            return spellbookCheck; // Return the specific restriction (like Area spells)
-        }
-
-        // Special exception for Cavalry with 3 total heroes
-        if (spellCardName === 'Cavalry') {
-            const totalHeroes = Object.values(formation).filter(h => h !== null && h !== undefined).length;
-            if (totalHeroes >= 3) {
-                return { canLearn: true, heroName: hero.name };
-            }
-        }
-
-        // Special exception for FrontSoldier when hero has no creatures
-        if (spellCardName === 'FrontSoldier') {
-            const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
-            if (heroCreatures.length === 0) {
-                return { canLearn: true, heroName: hero.name };
-            }
-        }
-
-        // Special exception for Archer when hero has 1+ creatures (level becomes 0)
-        if (spellCardName === 'Archer') {
-            const canSummonWithReducedLevel = this.canSummonArcherWithReducedLevel(heroPosition, spellCardName);
-            if (canSummonWithReducedLevel) {
-                return { 
-                    canLearn: true, 
-                    heroName: hero.name,
-                    isArcherReducedLevel: true 
-                };
-            }
-        }
-
-        // Check 3: Get spell requirements
-        const spellSchool = spellInfo.spellSchool;
-        const baseSpellLevel = spellInfo.level || 0;
-
-        // Count spell school abilities across all zones
-        const heroAbilities = this.heroAbilitiesManager.getHeroAbilities(heroPosition);
-        
-        let totalSpellSchoolLevel = 0;
-        let totalThievingLevel = 0; // Track Thieving ability level
-
-        ['zone1', 'zone2', 'zone3'].forEach(zone => {
-            if (heroAbilities && heroAbilities[zone]) {
-                heroAbilities[zone].forEach(ability => {
-                    if (ability && ability.name === spellSchool) {
-                        totalSpellSchoolLevel++;
-                    }
-                    // Count Thieving abilities
-                    if (ability && ability.name === 'Thieving') {
-                        totalThievingLevel++;
-                    }
-                });
-            }
-        });
-
-        // Calculate effective spell level requirement for Spells with level reduction
-        let effectiveSpellLevel = baseSpellLevel;
-        let thievingReduction = 0;
-        
-        if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
-            thievingReduction = totalThievingLevel;
-            effectiveSpellLevel = Math.max(0, baseSpellLevel - thievingReduction);
-        }
-
-        if (spellCardName === 'FutureTechMech') {
-            const levelReduction = this.graveyardManager ? 
-                this.graveyardManager.getGraveyard().filter(card => card === 'FutureTechMech').length : 0;
-            
-            effectiveSpellLevel = Math.max(0, baseSpellLevel - levelReduction);
-        }
-        if (spellCardName === 'TheRootOfAllEvil') {
-            // Count all creatures the player owns across all heroes
-            const formation = this.formationManager.getBattleFormation();
-            let totalCreatures = 0;
-            ['left', 'center', 'right'].forEach(pos => {
-                if (formation[pos]) {
-                    const heroCreatures = this.heroCreatureManager.getHeroCreatures(pos);
-                    totalCreatures += heroCreatures.length;
-                }
-            });
-            
-            effectiveSpellLevel = Math.max(0, baseSpellLevel - totalCreatures);
-        }
-
-
-        // Check 4: Compare levels with the effective requirement
-        if (totalSpellSchoolLevel < effectiveSpellLevel) {
-            // Check if Semi can use gold learning
-            if (hero.name === 'Semi') {
-                const semiCheck = this.semiEffectManager.canUseSemiGoldLearning(this, heroPosition, spellCardName);
-                if (semiCheck.canUse) {
-                    return { 
-                        canLearn: false, 
-                        reason: `Semi can learn this for ${semiCheck.goldCost} Gold`,
-                        isSemiGoldLearning: true,
-                        semiData: semiCheck,
-                        heroName: hero.name
-                    };
-                } else if (semiCheck.goldCost && semiCheck.playerGold !== undefined) {
-                    return { 
-                        canLearn: false, 
-                        reason: `Semi needs ${semiCheck.goldCost} Gold to learn this (have ${semiCheck.playerGold})`
-                    };
-                }
-            }
-
-            // Special exception for DarkDeal - any hero can learn it for 10 Gold
-            if (spellCardName === 'DarkDeal') {
-                const playerGold = this.goldManager.getPlayerGold();
-                const darkDealCost = 10;
-                
-                if (playerGold >= darkDealCost) {
-                    return { 
-                        canLearn: false, 
-                        reason: `Spend ${darkDealCost} Gold on a Dark Deal?`,
-                        isDarkDealGoldLearning: true,
-                        darkDealData: {
-                            goldCost: darkDealCost,
-                            playerGold: playerGold,
-                            heroName: hero.name
-                        },
-                        heroName: hero.name
-                    };
-                } else {
-                    return { 
-                        canLearn: false, 
-                        reason: `You need ${darkDealCost} Gold for a Dark Deal (have ${playerGold})`
-                    };
-                }
-            }
-            
-            const formattedSpellSchool = this.formatCardName(spellSchool);
-            const formattedSpellName = this.formatCardName(spellCardName);
-            
-            // Enhanced error message for ThievingStrike
-            if (spellCardName === 'ThievingStrike' && totalThievingLevel > 0) {
-                const originalRequirement = baseSpellLevel;
-                const currentCombined = totalSpellSchoolLevel + totalThievingLevel;
-                
-                return { 
-                    canLearn: false, 
-                    reason: `${hero.name} needs ${formattedSpellSchool} ${effectiveSpellLevel}+ to learn ${formattedSpellName}! (Has ${formattedSpellSchool} ${totalSpellSchoolLevel} + Thieving ${totalThievingLevel} = ${currentCombined}/${originalRequirement})`
-                };
-            } else {
-                // For FutureTechMech, show the reduced level requirement in the error message
-                let errorMessage = `${hero.name} needs ${formattedSpellSchool} at level ${effectiveSpellLevel} or higher to learn ${formattedSpellName}!`;
-                
-                if (spellCardName === 'FutureTechMech' && effectiveSpellLevel < baseSpellLevel) {
-                    const levelReduction = baseSpellLevel - effectiveSpellLevel;
-                    errorMessage += ` (Level reduced from ${baseSpellLevel} to ${effectiveSpellLevel} due to ${levelReduction} in graveyard)`;
-                }
-                
-                return { 
-                    canLearn: false, 
-                    reason: errorMessage
-                };
-            }
-        }
-
-        // Success case - include information about reductions if applicable
-        const result = { canLearn: true, heroName: hero.name };
-        
-        if (spellCardName === 'ThievingStrike' && thievingReduction > 0) {
-            result.isThievingReduced = true;
-            result.thievingReduction = thievingReduction;
-            result.originalLevel = baseSpellLevel;
-            result.effectiveLevel = effectiveSpellLevel;
+        if (!this.handManager) {
+            return { canLearn: false, reason: "Hand manager not available" };
         }
         
-        // Add FutureTechMech reduction info to success case
-        if (spellCardName === 'FutureTechMech' && effectiveSpellLevel < baseSpellLevel) {
-            const levelReduction = baseSpellLevel - effectiveSpellLevel;
-            result.isFutureTechMechReduced = true;
-            result.levelReduction = levelReduction;
-            result.originalLevel = baseSpellLevel;
-            result.effectiveLevel = effectiveSpellLevel;
-        }
+        // Use centralized spell validation from handManager
+        const spellCheck = this.handManager.canHeroUseSpell(heroPosition, spellCardName);
         
-        return result;
+        // Convert the response format to maintain compatibility
+        return {
+            canLearn: spellCheck.canUse,
+            reason: spellCheck.reason,
+            heroName: spellCheck.heroName,
+            isSemiGoldLearning: spellCheck.isSemiGoldLearning,
+            semiData: spellCheck.semiData,
+            isDarkDealGoldLearning: spellCheck.isDarkDealGoldLearning,
+            darkDealData: spellCheck.darkDealData,
+            isArcherReducedLevel: spellCheck.isArcherReducedLevel,
+            isThievingReduced: spellCheck.isThievingReduced,
+            isFutureTechMechReduced: spellCheck.isFutureTechMechReduced,
+            thievingReduction: spellCheck.thievingReduction,
+            levelReduction: spellCheck.levelReduction,
+            originalLevel: spellCheck.originalLevel,
+            effectiveLevel: spellCheck.effectiveLevel,
+            isFree: spellCheck.isFree
+        };
     }
 
     canSummonFrontSoldierForFree(heroPosition, spellCardName) {
-        if (spellCardName !== 'FrontSoldier') {
-            return false;
-        }
-        
-        // Check if hero has no creatures yet
-        const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
-        return heroCreatures.length === 0;
+        // Delegate to centralized function
+        if (spellCardName !== 'FrontSoldier') return false;
+        const spellCheck = this.handManager.canHeroUseSpell(heroPosition, spellCardName);
+        return spellCheck.canUse && spellCheck.isFree;
     }
 
     canSummonArcherForFree(heroPosition, spellCardName) {
-        if (spellCardName !== 'Archer') {
-            return false;
-        }
-        
-        // Check if hero has Leadership 3 or higher
-        return this.canSummonArcherForFree(heroPosition, spellCardName);
+        // Delegate to centralized function
+        if (spellCardName !== 'Archer') return false;
+        const spellCheck = this.handManager.canHeroUseSpell(heroPosition, spellCardName);
+        return spellCheck.canUse && spellCheck.isFree;
     }
 
     canSummonFutureTechDroneForFree(heroPosition, spellCardName) {
-        if (spellCardName !== 'FutureTechDrone') {
-            return false;
-        }
-        
-        // Check if graveyard has 3+ Future Tech Drones
-        if (this.graveyardManager) {
-            const graveyard = this.graveyardManager.getGraveyard();
-            const droneCount = graveyard.filter(card => card === 'FutureTechDrone').length;
-            return droneCount >= 3;
-        }
-        
-        return false;
+        // Delegate to centralized function
+        if (spellCardName !== 'FutureTechDrone') return false;
+        const spellCheck = this.handManager.canHeroUseSpell(heroPosition, spellCardName);
+        return spellCheck.canUse && spellCheck.isFree;
     }
 
     // Add helper method to check if dragging an equip artifact card
@@ -4083,13 +3914,10 @@ export class HeroSelection {
 
     // Check if Archer can be summoned with level 0 (when hero has 1+ creatures)
     canSummonArcherWithReducedLevel(heroPosition, spellCardName) {
-        if (spellCardName !== 'Archer') {
-            return false;
-        }
-        
-        // Check if hero has 1 or more creatures already
-        const heroCreatures = this.heroCreatureManager.getHeroCreatures(heroPosition);
-        return heroCreatures.length >= 1;
+        // Delegate to centralized function
+        if (spellCardName !== 'Archer') return false;
+        const spellCheck = this.handManager.canHeroUseSpell(heroPosition, spellCardName);
+        return spellCheck.canUse && spellCheck.isArcherReducedLevel;
     }
 
     // Check if Archer can be summoned for free (when hero has Leadership 3+)

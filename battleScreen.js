@@ -2425,7 +2425,7 @@ if (!document.getElementById('battleScreenStyles')) {
 
         /* Sprite animation container and styles */
         .creature-sprite {
-            width: 300%; /* 3 frames side by side */
+            width: 100%;
             height: 100%;
             image-rendering: pixelated; /* Crisp pixel art */
             image-rendering: -moz-crisp-edges;
@@ -2433,8 +2433,6 @@ if (!document.getElementById('battleScreenStyles')) {
             position: absolute;
             left: 0;
             top: 0;
-            /* Animation: 2-1-2-3-2-1-2-3 pattern */
-            animation: creatureLoop 1.6s steps(1) infinite;
         }
 
         /* Different animation speeds for variety */
@@ -2552,55 +2550,6 @@ if (!document.getElementById('battleScreenStyles')) {
         CREATURE ANIMATIONS & EFFECTS
         ============================================ */
 
-        /* Keyframes for the 2-1-2-3 loop pattern */
-        @keyframes creatureLoop {
-            0% {
-                /* Frame 2 (middle) */
-                transform: translateX(-33.333%);
-            }
-            12.5% {
-                /* Frame 1 (left) */
-                transform: translateX(0%);
-            }
-            25% {
-                /* Frame 2 (middle) */
-                transform: translateX(-33.333%);
-            }
-            37.5% {
-                /* Frame 3 (right) */
-                transform: translateX(-66.666%);
-            }
-            50% {
-                /* Frame 2 (middle) */
-                transform: translateX(-33.333%);
-            }
-            62.5% {
-                /* Frame 1 (left) */
-                transform: translateX(0%);
-            }
-            75% {
-                /* Frame 2 (middle) */
-                transform: translateX(-33.333%);
-            }
-            87.5% {
-                /* Frame 3 (right) */
-                transform: translateX(-66.666%);
-            }
-            100% {
-                /* Back to Frame 2 to loop smoothly */
-                transform: translateX(-33.333%);
-            }
-        }
-
-        /* Alternative smoother animation timing */
-        @keyframes creatureSmoothLoop {
-            0%, 100% { transform: translateX(-33.333%); } /* Frame 2 */
-            16.66% { transform: translateX(0%); } /* Frame 1 */
-            33.33% { transform: translateX(-33.333%); } /* Frame 2 */
-            50% { transform: translateX(-66.666%); } /* Frame 3 */
-            66.66% { transform: translateX(-33.333%); } /* Frame 2 */
-            83.33% { transform: translateX(0%); } /* Frame 1 */
-        }
 
         /* Damage number animation for creatures */
         .creature-icon .damage-number {

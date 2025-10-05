@@ -28,6 +28,7 @@ export class PotionHandler {
             'ExperimentalPotion',
             'ElixirOfStrength', 
             'ElixirOfImmortality',
+            'HealingPotion',
             'elixirOfCold',
             'LifeSerum',
             'PoisonVial',
@@ -947,6 +948,9 @@ export class PotionHandler {
             case 'ElixirOfImmortality':
                 return await this.handleElixirOfImmortality(effects, playerRole, battleManager);
 
+            case 'HealingPotion':
+                return await this.handleHealingPotionEffects(effects, playerRole, battleManager);
+
             case 'MonsterInABottle':
                 return await this.handleMonsterInABottleEffects(effects, playerRole, battleManager);
 
@@ -1218,6 +1222,24 @@ export class PotionHandler {
             
             battleManager.addCombatLog(`🎲 MonsterInABottle summoned creatures (fallback mode)`, 'info');
             return effectCount;
+        }
+    }
+
+    async handleHealingPotionEffects(effects, playerRole, battleManager) {
+        try {
+            const { HealingPotion } = await import('./Potions/healingPotion.js');
+            const healingPotion = new HealingPotion();
+            
+            const effectsProcessed = await healingPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
         }
     }
 

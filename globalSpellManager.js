@@ -526,23 +526,6 @@ if (typeof document !== 'undefined' && !document.getElementById('globalSpellMana
             box-shadow: 0 8px 16px rgba(0, 123, 255, 0.3);
         }
         
-        .hand-card[data-card-type="global-spell"]:hover::after {
-            content: "Global Spell - Click to activate!";
-            position: absolute;
-            bottom: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 123, 255, 0.9);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            white-space: nowrap;
-            z-index: 100;
-            animation: fadeInTooltip 0.2s ease-out;
-        }
-        
         @keyframes fadeInTooltip {
             from {
                 opacity: 0;

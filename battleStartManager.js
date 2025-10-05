@@ -42,7 +42,7 @@ export class BattleStartManager {
             await this.applyHeroStartEffects();
 
             // Phase 5: Delayed artifact effects 
-            await this.applyDelayedArtifactEffects();
+            await this.applyDelayedEffects();
 
             // Phase 6: Equipment-based start effects
             await this.applyEquipmentStartEffects();
@@ -128,6 +128,16 @@ export class BattleStartManager {
                 await applyGraveyardOfLimitedPowerBattleEffects(bm);
             } catch (error) {
                 console.error('Error applying Graveyard of Limited Power effects:', error);
+            }
+
+            // ============================================
+            // Apply BigGwen effects
+            // ============================================
+            try {
+                const { applyBigGwenBattleEffects } = await import('./Spells/bigGwen.js');
+                await applyBigGwenBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying BigGwen effects:', error);
             }
 
         } catch (error) {
@@ -267,46 +277,119 @@ export class BattleStartManager {
     }
 
     // Phase 5: Apply delayed artifact effects (BloodSoakedCoin, PoisonedMeat, etc.)
-    async applyDelayedArtifactEffects() {
+    async applyDelayedEffects() {
         const bm = this.battleManager;
         
         try {
             const delayedEffects = await bm.getBothPlayersDelayedEffects();
             
             if (delayedEffects) {
-                // Apply BloodSoakedCoin effects (blood toll damage) - NO CLEARING
+                // Apply BloodSoakedCoin effects (blood toll damage)
                 try {
-                    const { applyBothPlayersBloodTollEffectsNoClear } = await import('./Artifacts/bloodSoakedCoin.js');
-                    if (applyBothPlayersBloodTollEffectsNoClear) {
-                        // Use new no-clear version if available
-                        await applyBothPlayersBloodTollEffectsNoClear(delayedEffects.host, delayedEffects.guest, bm);
-                    } else {
-                        // Fallback to original function (which includes clearing)
-                        const { applyBothPlayersBloodTollEffects } = await import('./Artifacts/bloodSoakedCoin.js');
-                        await applyBothPlayersBloodTollEffects(delayedEffects.host, delayedEffects.guest, bm);
-                    }
-                    //bm.addCombatLog('🩸 Blood toll effects applied from both players', 'info');
+                    const { applyBothPlayersBloodTollEffects } = await import('./Artifacts/bloodSoakedCoin.js');
+                    await applyBothPlayersBloodTollEffects(delayedEffects.host, delayedEffects.guest, bm);
                 } catch (error) {
                     console.error('Error applying BloodSoakedCoin effects:', error);
                 }
 
-                // Apply PoisonedMeat effects (poison application) - NO CLEARING
+                // Apply PoisonedMeat effects (poison application)
                 try {
-                    const { applyBothPlayersDelayedEffectsNoClear } = await import('./Artifacts/poisonedMeat.js');
-                    if (applyBothPlayersDelayedEffectsNoClear) {
-                        // Use new no-clear version if available
-                        await applyBothPlayersDelayedEffectsNoClear(delayedEffects.host, delayedEffects.guest, bm);
-                    } else {
-                        // Fallback to original function (which includes clearing)
-                        const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
-                        await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, bm);
-                    }
-                    //bm.addCombatLog('🥩 Poison curse effects applied from both players', 'info');
+                    const { applyBothPlayersDelayedEffects } = await import('./Artifacts/poisonedMeat.js');
+                    await applyBothPlayersDelayedEffects(delayedEffects.host, delayedEffects.guest, bm);
                 } catch (error) {
                     console.error('Error applying PoisonedMeat effects:', error);
                 }
 
-                // This prevents the race condition where individual clearing functions overwrite each other
+                // Apply SoulShardSah multiplication effects FIRST (before all others)
+                try {
+                    const { applyBothPlayersDelayedMultiplicationEffects } = await import('./Creatures/soulShardSah.js');
+                    await applyBothPlayersDelayedMultiplicationEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardSah multiplication effects:', error);
+                }
+                // Apply SoulShardRen redraw effects
+                try {
+                    const { applyBothPlayersDelayedRedrawEffects } = await import('./Creatures/soulShardRen.js');
+                    await applyBothPlayersDelayedRedrawEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardRen redraw effects:', error);
+                }
+                // Apply SoulShardShut graveyard manipulation
+                try {
+                    const { applyBothPlayersDelayedGraveyardEffects } = await import('./Creatures/soulShardShut.js');
+                    await applyBothPlayersDelayedGraveyardEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardShut graveyard effects:', error);
+                }
+                // Apply SoulShardIb shield effects
+                try {
+                    const { applyBothPlayersDelayedEffectsNoClear } = await import('./Creatures/soulShardIb.js');
+                    await applyBothPlayersDelayedEffectsNoClear(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardIb shield effects:', error);
+                }
+                // Apply SoulShardKa attack effects
+                try {
+                    const { applyBothPlayersDelayedAttackEffectsNoClear } = await import('./Creatures/soulShardKa.js');
+                    await applyBothPlayersDelayedAttackEffectsNoClear(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardKa attack effects:', error);
+                }
+                // Apply SoulShardBa removal effects
+                try {
+                    const { applyBothPlayersDelayedRemovalEffects } = await import('./Creatures/soulShardBa.js');
+                    await applyBothPlayersDelayedRemovalEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardBa removal effects:', error);
+                }
+                // Apply SoulShardSekhem damage effects
+                try {
+                    const { applyBothPlayersDelayedDamageEffects } = await import('./Creatures/soulShardSekhem.js');
+                    await applyBothPlayersDelayedDamageEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardSekhem damage effects:', error);
+                }
+
+                // Apply SoulShardKhet graveyard summons
+                try {
+                    const { applyBothPlayersDelayedGraveyardSummons } = await import('./Creatures/soulShardKhet.js');
+                    await applyBothPlayersDelayedGraveyardSummons(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying SoulShardKhet graveyard summons:', error);
+                }
+
+                // Re-render creatures after SoulShardKhet summons (HOST SIDE)
+                if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
+                    bm.battleScreen.renderCreaturesAfterInit();
+                }
+
+                // Update necromancy displays if creatures were summoned (HOST SIDE)
+                if (bm.necromancyManager) {
+                    bm.necromancyManager.initializeNecromancyStackDisplays();
+                }
+
+                // Small delay to ensure all summons are complete
+                await bm.delay(100);
+
+                // Sync creature state to guest after SoulShardKhet summons
+                if (bm.isAuthoritative && bm.sendBattleUpdate) {
+                    bm.sendBattleUpdate('creature_state_sync', {
+                        hostHeroes: this.exportHeroesCreatureState(bm.playerHeroes),
+                        guestHeroes: this.exportHeroesCreatureState(bm.opponentHeroes),
+                        timestamp: Date.now(),
+                        reason: 'post_khet_summons'
+                    });
+                }
+
+                // Clear all processed delayed effects in one pass
                 await this.clearAllProcessedDelayedEffects(delayedEffects.host, delayedEffects.guest);
             }
         } catch (error) {
@@ -331,7 +414,16 @@ export class BattleStartManager {
                     // BloodSoakedCoin effects
                     (effect.type === 'damage_all_player_heroes' && effect.source === 'BloodSoakedCoin') ||
                     // PoisonedMeat effects
-                    (effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+                    (effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat') ||
+                    // SoulShard effects
+                    (effect.source === 'SoulShardIb') ||
+                    (effect.source === 'SoulShardRen') ||
+                    (effect.source === 'SoulShardKa') ||
+                    (effect.source === 'SoulShardKhet') ||
+                    (effect.source === 'SoulShardSekhem') ||
+                    (effect.source === 'SoulShardSah') ||
+                    (effect.source === 'SoulShardBa')
+
                     // Add more delayed effect types here as needed
                 )
             ) : [];
@@ -341,17 +433,25 @@ export class BattleStartManager {
                     // BloodSoakedCoin effects
                     (effect.type === 'damage_all_player_heroes' && effect.source === 'BloodSoakedCoin') ||
                     // PoisonedMeat effects
-                    (effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat')
+                    (effect.type === 'poison_all_player_targets' && effect.source === 'PoisonedMeat') ||
+                    // SoulShard effects
+                    (effect.source === 'SoulShardIb') ||
+                    (effect.source === 'SoulShardRen') ||
+                    (effect.source === 'SoulShardKa') ||
+                    (effect.source === 'SoulShardKhet') ||
+                    (effect.source === 'SoulShardSekhem') ||
+                    (effect.source === 'SoulShardSah') ||
+                    (effect.source === 'SoulShardBa')
                     // Add more delayed effect types here as needed
                 )
             ) : [];
             
-            // CRITICAL FIX: Update local heroSelection state for the HOST
+            // Update local heroSelection state for the HOST
             if (window.heroSelection && bm.isHost) {
-                window.heroSelection.delayedArtifactEffects = filteredHostEffects || [];
+                window.heroSelection.delayedEffects = filteredHostEffects || [];
             }
             
-            // NEW: Send message to GUEST to clear their local state too
+            // Send message to GUEST to clear their local state too
             if (bm.sendBattleUpdate) {
                 bm.sendBattleUpdate('delayed_effects_cleared', {
                     clearedHostEffects: (hostEffects || []).length - filteredHostEffects.length,
@@ -363,8 +463,8 @@ export class BattleStartManager {
             
             // Single Firebase write removes all processed delayed effect types
             await roomRef.child('gameState').update({
-                hostDelayedArtifactEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
-                guestDelayedArtifactEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
+                hostdelayedEffects: filteredHostEffects.length > 0 ? filteredHostEffects : null,
+                guestdelayedEffects: filteredGuestEffects.length > 0 ? filteredGuestEffects : null,
                 allDelayedEffectsProcessedAt: Date.now()
             });
                         

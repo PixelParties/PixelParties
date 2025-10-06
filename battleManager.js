@@ -1955,8 +1955,6 @@ export class BattleManager {
         }
     }
 
-
-
     // GUEST: Handle combined turn execution
     async guest_handleCombinedTurnExecution(data) {
         const { playerAction, opponentAction, position, damageModifiers, animationTiming } = data;
@@ -2099,9 +2097,7 @@ export class BattleManager {
 
     // GUEST: Execute simultaneous attacks
     async guest_executeSimultaneousAttacks(playerAction, opponentAction, animationTiming = null) {
-
         const heroes = this.getGuestHeroesForActions(playerAction, opponentAction);
-        
         
         if (heroes.playerHero && heroes.opponentHero) {
             const playerAttack = this.reconstructAttackObject(playerAction, heroes.playerHero, heroes.playerLocalSide);

@@ -224,6 +224,10 @@ export class BattleCombatManager {
         
         const oldHp = creature.currentHp;
         const wasAlive = creature.alive;
+
+        if (!creature.type) {
+            creature.type = 'creature';
+        }
         
         // Check for Monia protection before applying damage (SYNCHRONOUS)
         let finalDamage = damage;
@@ -937,13 +941,31 @@ export class BattleCombatManager {
             } else if (this.battleManager.spellSystem) {
                 // Create a version of the hero that only shows enabled spells for spell system
                 const heroForSpells = this.createHeroWithEnabledSpellsOnly(actingHero);
-                spellToCast = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
-                if (spellToCast) {
-                    willAttack = false; // Hero spent turn casting spell
+                
+                // SPECIAL CASE: EternalBeato casts 2 spells per turn
+                if (actingHero.name === 'EternalBeato') {
+                    const firstSpell = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
+                    if (firstSpell) {
+                        await this.battleManager.spellSystem.executeSpellCasting(actingHero, firstSpell);
+                        await this.battleManager.delay(200); // 0.2 second delay
+                        
+                        // Cast second spell
+                        const secondSpell = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
+                        if (secondSpell) {
+                            await this.battleManager.spellSystem.executeSpellCasting(actingHero, secondSpell);
+                        }
+                        willAttack = false; // Spent turn casting spells
+                    }
+                } else {
+                    // Normal single-cast logic for all other heroes (including regular Beato)
+                    spellToCast = await this.battleManager.spellSystem.checkSpellCasting(heroForSpells);
+                    if (spellToCast) {
+                        willAttack = false; // Hero spent turn casting spell
+                    }
                 }
             }
             
-            // Execute spell casting if applicable
+            // Execute spell casting if applicable (for non-EternalBeato heroes)
             if (spellToCast && this.battleManager.spellSystem) {
                 await this.battleManager.spellSystem.executeSpellCasting(actingHero, spellToCast);
             }
@@ -1110,24 +1132,56 @@ export class BattleCombatManager {
         let opponentWillAttack = opponentCanAttack;
 
         if (playerCanAttack && this.battleManager.spellSystem) {
-            // Create a version of the hero that only shows enabled spells for spell system
             const playerHeroForSpells = this.createHeroWithEnabledSpellsOnly(playerHeroActor.data);
-            playerSpellToCast = await this.battleManager.spellSystem.checkSpellCasting(playerHeroForSpells);
-            if (playerSpellToCast) {
-                playerWillAttack = false; // Hero spent turn casting spell
+            
+            // SPECIAL CASE: EternalBeato casts 2 spells per turn
+            if (playerHeroActor.data.name === 'EternalBeato') {
+                const firstSpell = await this.battleManager.spellSystem.checkSpellCasting(playerHeroForSpells);
+                if (firstSpell) {
+                    await this.battleManager.spellSystem.executeSpellCasting(playerHeroActor.data, firstSpell);
+                    await this.battleManager.delay(200); // 0.2 second delay
+                    
+                    const secondSpell = await this.battleManager.spellSystem.checkSpellCasting(playerHeroForSpells);
+                    if (secondSpell) {
+                        await this.battleManager.spellSystem.executeSpellCasting(playerHeroActor.data, secondSpell);
+                    }
+                    playerWillAttack = false; // Spent turn casting spells
+                }
+            } else {
+                // Normal single-cast logic for all other heroes (including regular Beato)
+                playerSpellToCast = await this.battleManager.spellSystem.checkSpellCasting(playerHeroForSpells);
+                if (playerSpellToCast) {
+                    playerWillAttack = false;
+                }
             }
         }
 
         if (opponentCanAttack && this.battleManager.spellSystem) {
-            // Create a version of the hero that only shows enabled spells for spell system
             const opponentHeroForSpells = this.createHeroWithEnabledSpellsOnly(opponentHeroActor.data);
-            opponentSpellToCast = await this.battleManager.spellSystem.checkSpellCasting(opponentHeroForSpells);
-            if (opponentSpellToCast) {
-                opponentWillAttack = false; // Hero spent turn casting spell
+            
+            // SPECIAL CASE: EternalBeato casts 2 spells per turn
+            if (opponentHeroActor.data.name === 'EternalBeato') {
+                const firstSpell = await this.battleManager.spellSystem.checkSpellCasting(opponentHeroForSpells);
+                if (firstSpell) {
+                    await this.battleManager.spellSystem.executeSpellCasting(opponentHeroActor.data, firstSpell);
+                    await this.battleManager.delay(200); // 0.2 second delay
+                    
+                    const secondSpell = await this.battleManager.spellSystem.checkSpellCasting(opponentHeroForSpells);
+                    if (secondSpell) {
+                        await this.battleManager.spellSystem.executeSpellCasting(opponentHeroActor.data, secondSpell);
+                    }
+                    opponentWillAttack = false; // Spent turn casting spells
+                }
+            } else {
+                // Normal single-cast logic for all other heroes (including regular Beato)
+                opponentSpellToCast = await this.battleManager.spellSystem.checkSpellCasting(opponentHeroForSpells);
+                if (opponentSpellToCast) {
+                    opponentWillAttack = false;
+                }
             }
         }
         
-        // Execute spell casting if applicable
+        // Execute spell casting if applicable (for non-EternalBeato heroes)
         if (playerSpellToCast && this.battleManager.spellSystem) {
             await this.battleManager.spellSystem.executeSpellCasting(playerHeroActor.data, playerSpellToCast);
         }
@@ -1167,7 +1221,8 @@ export class BattleCombatManager {
         const opponentValidAttack = opponentWillAttack && opponentTarget;
         
         // If no valid attacks can be made and no spells were cast, skip animation
-        if (!playerValidAttack && !opponentValidAttack && !playerSpellToCast && !opponentSpellToCast) {
+        if (!playerValidAttack && !opponentValidAttack && !playerSpellToCast && !opponentSpellToCast && 
+            playerHeroActor?.data.name !== 'EternalBeato' && opponentHeroActor?.data.name !== 'EternalBeato') {
             this.battleManager.addCombatLog('💤 No actions taken this turn!', 'info');
             return;
         }
@@ -1313,7 +1368,7 @@ export class BattleCombatManager {
             }
             
             // Also check for heroes that cast spells instead of attacking
-            if (playerSpellToCast && playerHeroActor && !playerValidAttack) {
+            if ((playerSpellToCast || playerHeroActor?.data.name === 'EternalBeato') && playerHeroActor && !playerValidAttack) {
                 hatPromises.push(
                     checkHatOfMadnessOnHeroAction(
                         this.battleManager, 
@@ -1323,7 +1378,7 @@ export class BattleCombatManager {
                 );
             }
             
-            if (opponentSpellToCast && opponentHeroActor && !opponentValidAttack) {
+            if ((opponentSpellToCast || opponentHeroActor?.data.name === 'EternalBeato') && opponentHeroActor && !opponentValidAttack) {
                 hatPromises.push(
                     checkHatOfMadnessOnHeroAction(
                         this.battleManager, 
@@ -1440,6 +1495,7 @@ export class BattleCombatManager {
             } finally {
                 // Re-enable battle end checking
                 this.battleManager._processingSimultaneousAttack = wasSimultaneousAttack;
+                this.battleManager._processingSimultaneousAttack = false;
             }
             
             await Promise.all([
@@ -2029,9 +2085,11 @@ export class BattleCombatManager {
 
     // Create turn data object with creatures
     createTurnDataWithCreatures(position, playerHero, playerTarget, playerDamage, 
-                                opponentHero, opponentTarget, opponentDamage) {
+                            opponentHero, opponentTarget, opponentDamage) {
         const createActionData = (hero, target, damage) => {
-            if (!hero || !hero.alive) return null;
+            if (!hero || !hero.alive) {
+                return null;
+            }
             
             const actionData = {
                 attacker: position,
@@ -2041,25 +2099,11 @@ export class BattleCombatManager {
                     absoluteSide: hero.absoluteSide,
                     position: hero.position,
                     name: hero.name,
-                    abilities: hero.getAllAbilities(),
-                    // Equipment count for synchronization (but stats are already calculated)
-                    uniqueEquipmentCount: 0
+                    abilities: hero.getAllAbilities()
                 }
             };
             
-            // Calculate unique equipment count if hero is Toras (for display sync only)
-            if (hero.name === 'Toras' && hero.equipment && hero.equipment.length > 0) {
-                const uniqueEquipmentNames = new Set();
-                hero.equipment.forEach(item => {
-                    const itemName = item.name || item.cardName;
-                    if (itemName) {
-                        uniqueEquipmentNames.add(itemName);
-                    }
-                });
-                actionData.attackerData.uniqueEquipmentCount = uniqueEquipmentNames.size;
-            }
-            
-            if (target) {
+            if (target) {                
                 if (target.type === 'creature') {
                     actionData.targetData = {
                         type: 'creature',
@@ -2076,12 +2120,14 @@ export class BattleCombatManager {
                         name: target.hero.name
                     };
                 }
+            } else {
+                console.warn('⚠️ [HOST] No target found for attack action');
             }
             
             return actionData;
         };
 
-        return {
+        const turnData = {
             turn: this.battleManager.currentTurn,
             position: position,
             playerAction: createActionData(playerHero, playerTarget, playerDamage),
@@ -2090,8 +2136,11 @@ export class BattleCombatManager {
                 attackDuration: Math.max(this.battleManager.getSpeedAdjustedDelay(120), 50),
                 returnDuration: Math.max(this.battleManager.getSpeedAdjustedDelay(80), 40),
                 effectsDelay: Math.max(this.battleManager.getSpeedAdjustedDelay(100), 50)
-            }
+            },
+            debugId: `turn_${this.battleManager.currentTurn}_${position}_${Date.now()}`
         };
+
+        return turnData;
     }
 
     // Create a hero proxy that only exposes enabled spells to the spell system

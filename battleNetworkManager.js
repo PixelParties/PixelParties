@@ -635,6 +635,12 @@ export class BattleNetworkManager {
             case 'potion_specific_visual':
                 await window.potionHandler.handlePotionSpecificVisual(data);
                 break;
+
+            case 'potion_card_display':
+                if (window.potionHandler) {
+                    await window.potionHandler.guest_handlePotionCardDisplay(data);
+                }
+                break;
                 
 
             case 'necromancy_revival':
@@ -2074,12 +2080,6 @@ export class BattleNetworkManager {
     // Handle guest receiving additional action execution
     async guest_handleAdditionalActionExecution(data) {
         const bm = this.battleManager;
-    
-        console.log('🎯 GUEST: Received additional_action_execution', {
-            actorName: data.actorData?.name,
-            hasTarget: !!data.targetData,
-            damage: data.damage
-        });
         
         if (bm.isAuthoritative) {
             console.warn('Host should not receive additional action execution messages');
@@ -2143,9 +2143,7 @@ export class BattleNetworkManager {
         }
 
         // Execute attack animation
-        console.log('🎯 GUEST: About to animate additional action attack');
         await bm.animationManager.animateHeroAttack(actingHero, target);
-        console.log('🎯 GUEST: Additional action attack animation complete');
 
         // Apply damage modifier visual effects if any
         if (bm.attackEffectsManager && effectsTriggered.length > 0) {

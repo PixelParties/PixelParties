@@ -1,5 +1,5 @@
 // potionHandler.js - Enhanced Potion Management System with Persistent Battle Effects and Multi-Player Support
-// UPDATED: Fixed formation phase visual sync issue and removed all console logging
+// UPDATED: Added potion card display at battle start using same system as spell cards
 
 export class PotionHandler {
     constructor() {
@@ -343,6 +343,31 @@ export class PotionHandler {
         
         let totalEffectsApplied = 0;
         
+        // Display cards for host potions first
+        if (hostPotionState && hostPotionState.activePotionEffects && hostPotionState.activePotionEffects.length > 0) {
+            const hostEffectGroups = {};
+            hostPotionState.activePotionEffects.forEach(effect => {
+                if (!hostEffectGroups[effect.name]) {
+                    hostEffectGroups[effect.name] = [];
+                }
+                hostEffectGroups[effect.name].push(effect);
+            });
+            await this.displayPotionCardsAtBattleStart(hostEffectGroups, 'host', battleManager);
+        }
+        
+        // Small delay before showing guest potions
+        if (guestPotionState && guestPotionState.activePotionEffects && guestPotionState.activePotionEffects.length > 0) {
+            await battleManager.delay(500);
+            const guestEffectGroups = {};
+            guestPotionState.activePotionEffects.forEach(effect => {
+                if (!guestEffectGroups[effect.name]) {
+                    guestEffectGroups[effect.name] = [];
+                }
+                guestEffectGroups[effect.name].push(effect);
+            });
+            await this.displayPotionCardsAtBattleStart(guestEffectGroups, 'guest', battleManager);
+        }
+        
         // ===== SPECIAL HANDLING FOR SWORD IN A BOTTLE =====
         // Extract SwordInABottle effects for simultaneous processing
         const hostSwordEffects = hostPotionState?.activePotionEffects?.filter(effect => effect.name === 'SwordInABottle') || [];
@@ -455,6 +480,14 @@ export class PotionHandler {
             effectGroups[effect.name].push(effect);
         });
         
+        // Display potion cards before applying effects (but not for SwordInABottle since it's handled separately)
+        const displayGroups = Object.fromEntries(
+            Object.entries(effectGroups).filter(([name]) => name !== 'SwordInABottle')
+        );
+        if (Object.keys(displayGroups).length > 0) {
+            await this.displayPotionCardsAtBattleStart(displayGroups, playerRole, battleManager);
+        }
+        
         let effectsApplied = 0;
         
         // Apply each type of potion effect using the specific potion modules
@@ -473,6 +506,295 @@ export class PotionHandler {
         }
         
         return effectsApplied;
+    }
+
+    async applyDelegatedPotionEffects(effects, playerRole, battleManager, options = {}) {
+        if (!effects || effects.length === 0) return 0;
+        
+        const {
+            showCards = true,
+            source = 'delegated',
+            selectedPotionName = null
+        } = options;
+        
+        // Group effects by potion type
+        const effectGroups = {};
+        effects.forEach(effect => {
+            if (!effectGroups[effect.name]) {
+                effectGroups[effect.name] = [];
+            }
+            effectGroups[effect.name].push(effect);
+        });
+        
+        // Display cards if requested
+        if (showCards && Object.keys(effectGroups).length > 0) {
+            await this.displayPotionCardsAtBattleStart(effectGroups, playerRole, battleManager);
+        }
+        
+        let effectsApplied = 0;
+        
+        // Apply each type of potion effect using the standard delegation
+        for (const [potionName, potionEffects] of Object.entries(effectGroups)) {
+            try {
+                const appliedCount = await this.delegatePotionEffectToModule(
+                    potionName,
+                    potionEffects,
+                    playerRole,
+                    battleManager
+                );
+                effectsApplied += appliedCount;
+                
+                // Small delay between different potion types
+                if (Object.keys(effectGroups).length > 1) {
+                    await battleManager.delay(400);
+                }
+            } catch (error) {
+                console.error(`Error applying delegated ${potionName}:`, error);
+            }
+        }
+        
+        return effectsApplied;
+    }
+
+    /**
+     * Display potion cards for visual feedback during battle start
+     * @param {Object} effectGroups - Grouped potion effects by name
+     * @param {string} playerRole - 'host' or 'guest'
+     * @param {Object} battleManager - The battle manager instance
+     */
+    async displayPotionCardsAtBattleStart(effectGroups, playerRole, battleManager) {
+        if (!effectGroups || Object.keys(effectGroups).length === 0) {
+            return;
+        }
+        
+        // Determine which side to display the cards on
+        const isHost = battleManager.isHost;
+        const displaySide = (playerRole === 'host' && isHost) || (playerRole === 'guest' && !isHost) ? 'player' : 'opponent';
+        
+        // Get the middle hero element
+        const heroElement = battleManager.getHeroElement(displaySide, 'center');
+        if (!heroElement) {
+            return;
+        }
+        
+        // Ensure the spell card CSS exists (reuse from battleSpellSystem)
+        this.ensurePotionCardEffectCSS();
+        
+        // Display each potion type with stacking
+        let cardIndex = 0;
+        for (const [potionName, effects] of Object.entries(effectGroups)) {
+            // Create card for this potion type
+            await this.createPotionCardEffect(heroElement, potionName, effects.length, cardIndex);
+            
+            // NEW: Send visual sync to guest for card animation
+            this.sendPotionVisualSync('potion_card_display', {
+                potionName: potionName,
+                count: effects.length,
+                cardIndex: cardIndex,
+                playerRole: playerRole,
+                visualType: 'card_display'
+            }, battleManager);
+            
+            cardIndex++;
+            
+            // Small delay between different potion types for visual clarity
+            if (cardIndex < Object.keys(effectGroups).length) {
+                await battleManager.delay(300);
+            }
+        }
+    }
+
+    async guest_handlePotionCardDisplay(data) {
+        const { potionName, count, cardIndex, playerRole, visualType } = data;
+        
+        if (visualType !== 'card_display') {
+            return;
+        }
+        
+        // Get battle manager
+        let battleManager = null;
+        if (window.battleManager) {
+            battleManager = window.battleManager;
+        } else if (typeof window !== 'undefined' && window.heroSelection && window.heroSelection.battleManager) {
+            battleManager = window.heroSelection.battleManager;
+        }
+        
+        if (!battleManager) {
+            return;
+        }
+        
+        // Only process on guest side
+        if (battleManager.isAuthoritative) {
+            return;
+        }
+        
+        // Determine which side to display from guest's perspective
+        const isHost = battleManager.isHost; // Guest is always false here
+        const displaySide = (playerRole === 'host' && !isHost) ? 'opponent' : 
+                        (playerRole === 'guest' && !isHost) ? 'player' : 
+                        'opponent';
+        
+        // Get the middle hero element
+        const heroElement = battleManager.getHeroElement(displaySide, 'center');
+        if (!heroElement) {
+            return;
+        }
+        
+        // Ensure CSS exists
+        this.ensurePotionCardEffectCSS();
+        
+        // Display the card
+        await this.createPotionCardEffect(heroElement, potionName, count, cardIndex);
+    }
+
+    /**
+     * Create a potion card visual effect (mimics spell card effect)
+     * @param {HTMLElement} heroElement - The hero element to attach the card to
+     * @param {string} potionName - Name of the potion
+     * @param {number} count - Number of this potion type
+     * @param {number} stackIndex - Index for stacking multiple cards
+     */
+    async createPotionCardEffect(heroElement, potionName, count, stackIndex) {
+        // Create the spell card effect container (using same class as spells)
+        const spellCardContainer = document.createElement('div');
+        spellCardContainer.className = 'spell-card-container';
+        
+        // Create spell card display
+        const cardDisplay = document.createElement('div');
+        cardDisplay.className = 'spell-card-display';
+        
+        // Get card image path (potions use same card path structure)
+        const cardImagePath = `./Cards/All/${potionName}.png`;
+        
+        cardDisplay.innerHTML = `
+            <img src="${cardImagePath}" alt="${potionName}" class="spell-card-image" 
+                 onerror="this.src='./Cards/placeholder.png'">
+            ${count > 1 ? `<div class="potion-count-badge">x${count}</div>` : ''}
+        `;
+        
+        spellCardContainer.appendChild(cardDisplay);
+        
+        // Position with offset for multiple cards
+        const offsetX = stackIndex * 30 - ((stackIndex > 0) ? 15 : 0);
+        const offsetY = stackIndex * -20;
+        
+        spellCardContainer.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px));
+            z-index: ${600 + stackIndex};
+            pointer-events: none;
+            animation: spellCardEffect 2000ms ease-out forwards;
+        `;
+        
+        heroElement.appendChild(spellCardContainer);
+        
+        // Clean up after animation
+        setTimeout(() => {
+            if (spellCardContainer && spellCardContainer.parentNode) {
+                spellCardContainer.remove();
+            }
+        }, 2000);
+    }
+
+    /**
+     * Ensure CSS for potion card effect exists (reuses spell card CSS)
+     */
+    ensurePotionCardEffectCSS() {
+        // Check if the spell card CSS already exists from battleSpellSystem
+        if (document.getElementById('spellCardEffectCSS')) {
+            // Add additional CSS for potion count badge if not already added
+            if (!document.getElementById('potionCardBadgeCSS')) {
+                const badgeStyle = document.createElement('style');
+                badgeStyle.id = 'potionCardBadgeCSS';
+                badgeStyle.textContent = `
+                    .potion-count-badge {
+                        position: absolute;
+                        bottom: 8px;
+                        right: 8px;
+                        background: rgba(255, 0, 0, 0.9);
+                        color: white;
+                        border-radius: 50%;
+                        width: 24px;
+                        height: 24px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 12px;
+                        font-weight: bold;
+                        border: 2px solid white;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                    }
+                `;
+                document.head.appendChild(badgeStyle);
+            }
+            return;
+        }
+        
+        // Create the spell card CSS if it doesn't exist
+        const style = document.createElement('style');
+        style.id = 'spellCardEffectCSS';
+        style.textContent = `
+            @keyframes spellCardEffect {
+                0% {
+                    opacity: 0;
+                    transform: translateX(-50%) scale(0.3) translateY(20px);
+                }
+                25% {
+                    opacity: 1;
+                    transform: translateX(-50%) scale(1.1) translateY(-10px);
+                }
+                75% {
+                    opacity: 1;
+                    transform: translateX(-50%) scale(1.0) translateY(-5px);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translateX(-50%) scale(0.8) translateY(-30px);
+                }
+            }
+            
+            .spell-card-container {
+                will-change: transform, opacity;
+            }
+            
+            .spell-card-display {
+                position: relative;
+                width: 120px;
+                height: 168px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+                overflow: hidden;
+            }
+            
+            .spell-card-image {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 6px;
+            }
+            
+            .potion-count-badge {
+                position: absolute;
+                bottom: 8px;
+                right: 8px;
+                background: rgba(255, 0, 0, 0.9);
+                color: white;
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: bold;
+                border: 2px solid white;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            }
+        `;
+        
+        document.head.appendChild(style);
     }
 
     // ===== NEW: POTION-SPECIFIC VISUAL EFFECTS HANDLER =====
@@ -617,6 +939,516 @@ export class PotionHandler {
             // Handle error silently
         }
     }
+
+
+    // INDIVIDUAL POTION GUEST HANDLERS
+    async handleMonsterInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the MonsterInABottle module
+            const { MonsterInABottlePotion } = await import('./Potions/monsterInABottle.js');
+            const monsterInABottlePotion = new MonsterInABottlePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'MonsterInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the MonsterInABottle module
+            const effectsProcessed = await monsterInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: add generic creatures to player heroes
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive) {
+                    // Add a basic level 0 creature as fallback
+                    const fallbackCreature = {
+                        name: 'SkeletonMage',
+                        currentHp: 50,
+                        maxHp: 50,
+                        atk: 0,
+                        alive: true,
+                        type: 'creature',
+                        addedAt: Date.now(),
+                        statusEffects: [],
+                        temporaryModifiers: {},
+                        isMonsterInABottle: true,
+                        createdFromPotion: true
+                    };
+                    
+                    hero.creatures.unshift(fallbackCreature);
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`🎲 MonsterInABottle summoned creatures (fallback mode)`, 'info');
+            return effectCount;
+        }
+    }
+
+    async handleHealingPotionEffects(effects, playerRole, battleManager) {
+        try {
+            const { HealingPotion } = await import('./Potions/healingPotion.js');
+            const healingPotion = new HealingPotion();
+            
+            const effectsProcessed = await healingPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    async handleElixirOfImmortality(effects, playerRole, battleManager) {
+        try {
+            const { ElixirOfImmortality } = await import('./Potions/elixirOfImmortality.js');
+            const elixirOfImmortality = new ElixirOfImmortality();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ElixirOfImmortality',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            const effectsProcessed = await elixirOfImmortality.handlePotionEffectsForPlayer(
+                effects, playerRole, battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    async handleExperimentalPotionEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the ExperimentalPotion module
+            const { ExperimentalPotionPotion } = await import('./Potions/experimentalPotion.js');
+            const experimentalPotionPotion = new ExperimentalPotionPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ExperimentalPotion',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the ExperimentalPotion module
+            const effectsProcessed = await experimentalPotionPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: add a generic log message
+            const playerName = playerRole === 'host' ? 'Host' : 'Guest';
+            battleManager.addCombatLog(
+                `🧪 ${playerName}'s Experimental Potion failed to activate properly`, 
+                'warning'
+            );
+            
+            return effects.length;
+        }
+    }
+
+    async handleAcidVialEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the AcidVial module
+            const { AcidVialPotion } = await import('./Potions/acidVial.js');
+            const acidVialPotion = new AcidVialPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'AcidVial',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the AcidVial module
+            const effectsProcessed = await acidVialPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: try basic damage and heal-block application
+            const enemyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.opponentHeroes) : 
+                Object.values(battleManager.playerHeroes);
+                
+            const effectCount = effects.length;
+            const damagePerVial = 100;
+            const healBlockPerVial = 3;
+            const totalDamage = damagePerVial * effectCount;
+            const totalHealBlock = healBlockPerVial * effectCount;
+            let fallbackTargets = 0;
+            
+            for (const hero of enemyHeroes) {
+                if (hero && hero.alive) {
+                    // Apply damage
+                    if (battleManager.isAuthoritative) {
+                        await battleManager.authoritative_applyDamage({
+                            target: hero,
+                            damage: totalDamage,
+                            newHp: Math.max(0, hero.currentHp - totalDamage),
+                            died: (hero.currentHp - totalDamage) <= 0
+                        }, { source: 'acid' });
+                    }
+                    
+                    // Apply heal-block
+                    if (battleManager.statusEffectsManager) {
+                        battleManager.statusEffectsManager.applyStatusEffect(hero, 'healblock', totalHealBlock);
+                    }
+                    
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`🧪 Acid Vial effects applied (+${totalDamage} damage, +${totalHealBlock} heal-block to ${fallbackTargets} heroes)`, 'info');
+            return effectCount;
+        }
+    }
+
+    async handleElixirOfStrengthEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the ElixirOfStrength module
+            const { ElixirOfStrengthPotion } = await import('./Potions/elixirOfStrength.js');
+            const elixirOfStrengthPotion = new ElixirOfStrengthPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ElixirOfStrength',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the ElixirOfStrength module
+            const effectsProcessed = await elixirOfStrengthPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: try basic strength application
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            const attackBonus = 50 * effectCount; // 50 per potion
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive && hero.addBattleAttackBonus) {
+                    hero.addBattleAttackBonus(attackBonus);
+                    
+                    // Update display
+                    if (battleManager.updateHeroAttackDisplay) {
+                        battleManager.updateHeroAttackDisplay(hero.side, hero.position, hero);
+                    }
+                    
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`⚔️ Elixir of Strength effects applied (+${attackBonus} attack to ${fallbackTargets} heroes)`, 'info');
+            return effectCount;
+        }
+    }
+
+    async handleElixirOfColdEffects(effects, playerRole, battleManager) {
+        try {
+            const { ElixirOfColdPotion } = await import('./Potions/elixirOfCold.js');
+            const elixirOfColdPotion = new ElixirOfColdPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'ElixirOfCold',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            const effectsProcessed = await elixirOfColdPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    async handleLifeSerumEffects(effects, playerRole, battleManager) {
+        try {
+            const { LifeSerumPotion } = await import('./Potions/lifeSerum.js');
+            const lifeSerumPotion = new LifeSerumPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'LifeSerum',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            const effectsProcessed = await lifeSerumPotion.handlePotionEffectsForPlayer(
+                effects, playerRole, battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: basic HP application
+            const allyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.playerHeroes) : 
+                Object.values(battleManager.opponentHeroes);
+                
+            const effectCount = effects.length;
+            const hpBonus = 200 * effectCount;
+            let fallbackTargets = 0;
+            
+            for (const hero of allyHeroes) {
+                if (hero && hero.alive && hero.addBattleHpBonus) {
+                    hero.addBattleHpBonus(hpBonus);
+                    
+                    if (battleManager.updateHeroHealthBar) {
+                        battleManager.updateHeroHealthBar(hero.side, hero.position, hero.currentHp, hero.maxHp);
+                    }
+                    
+                    fallbackTargets++;
+                }
+            }
+            
+            battleManager.addCombatLog(`❤️ Life Serum effects applied (+${hpBonus} HP to ${fallbackTargets} heroes)`, 'info');
+            return effectCount;
+        }
+    }
+
+    async handleSwordInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the SwordInABottle module
+            const { SwordInABottlePotion } = await import('./Potions/swordInABottle.js');
+            const swordInABottlePotion = new SwordInABottlePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'SwordInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Use the individual player method (fallback)
+            const effectsProcessed = await swordInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: minimal effect logging
+            battleManager.addCombatLog(`⚔️ Sword in a Bottle effects failed to activate properly`, 'error');
+            return effects.length; // Still count as processed to avoid errors
+        }
+    }
+
+    async handleBoulderInABottleEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the BoulderInABottle module
+            const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
+            const boulderInABottlePotion = new BoulderInABottlePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'BoulderInABottle',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the BoulderInABottle module
+            const effectsProcessed = await boulderInABottlePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    async handleBottledFlameEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the enhanced BottledFlame module
+            const { BottledFlamePotion } = await import('./Potions/bottledFlame.js');
+            const bottledFlamePotion = new BottledFlamePotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'BottledFlame',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the BottledFlame module
+            const effectsProcessed = await bottledFlamePotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: try basic burn application using status effects manager
+            const enemyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.opponentHeroes) : 
+                Object.values(battleManager.playerHeroes);
+                
+            const effectCount = effects.length;
+            let fallbackTargets = 0;
+            
+            for (const hero of enemyHeroes) {
+                if (hero && hero.alive && battleManager.statusEffectsManager) {
+                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'burned', effectCount);
+                    fallbackTargets++;
+                }
+            }
+                        
+            return effectCount;
+        }
+    }
+
+    async handleBottledLightningEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the BottledLightning module
+            const { BottledLightningPotion } = await import('./Potions/bottledLightning.js');
+            const bottledLightningPotion = new BottledLightningPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'BottledLightning',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the BottledLightning module
+            const effectsProcessed = await bottledLightningPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    async handlePoisonVialEffects(effects, playerRole, battleManager) {
+        try {
+            // Import and use the PoisonVial module
+            const { PoisonVialPotion } = await import('./Potions/poisonVial.js');
+            const poisonVialPotion = new PoisonVialPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'PoisonVial',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            // Delegate everything to the PoisonVial module
+            const effectsProcessed = await poisonVialPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            // Fallback: try basic poison application using status effects manager
+            const enemyHeroes = playerRole === 'host' ? 
+                Object.values(battleManager.opponentHeroes) : 
+                Object.values(battleManager.playerHeroes);
+                
+            const effectCount = effects.length;
+            let fallbackTargets = 0;
+            
+            for (const hero of enemyHeroes) {
+                if (hero && hero.alive && battleManager.statusEffectsManager) {
+                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'poisoned', effectCount);
+                    fallbackTargets++;
+                }
+            }
+                        
+            return effectCount;
+        }
+    }
+
+
+
 
     // Apply guest visual effects using the potion's visual methods
     async applyGuestVisualEffects(potionInstance, data, battleManager) {
@@ -1161,511 +1993,6 @@ export class PotionHandler {
             }
             
             battleManager.addCombatLog(`☁️ Cloud in a Bottle effects applied (+${cloudedStacks} clouded stacks to ${fallbackTargets} targets)`, 'info');
-            return effectCount;
-        }
-    }
-
-    async handleMonsterInABottleEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the MonsterInABottle module
-            const { MonsterInABottlePotion } = await import('./Potions/monsterInABottle.js');
-            const monsterInABottlePotion = new MonsterInABottlePotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'MonsterInABottle',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the MonsterInABottle module
-            const effectsProcessed = await monsterInABottlePotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: add generic creatures to player heroes
-            const allyHeroes = playerRole === 'host' ? 
-                Object.values(battleManager.playerHeroes) : 
-                Object.values(battleManager.opponentHeroes);
-                
-            const effectCount = effects.length;
-            let fallbackTargets = 0;
-            
-            for (const hero of allyHeroes) {
-                if (hero && hero.alive) {
-                    // Add a basic level 0 creature as fallback
-                    const fallbackCreature = {
-                        name: 'SkeletonMage',
-                        currentHp: 50,
-                        maxHp: 50,
-                        atk: 0,
-                        alive: true,
-                        type: 'creature',
-                        addedAt: Date.now(),
-                        statusEffects: [],
-                        temporaryModifiers: {},
-                        isMonsterInABottle: true,
-                        createdFromPotion: true
-                    };
-                    
-                    hero.creatures.unshift(fallbackCreature);
-                    fallbackTargets++;
-                }
-            }
-            
-            battleManager.addCombatLog(`🎲 MonsterInABottle summoned creatures (fallback mode)`, 'info');
-            return effectCount;
-        }
-    }
-
-    async handleHealingPotionEffects(effects, playerRole, battleManager) {
-        try {
-            const { HealingPotion } = await import('./Potions/healingPotion.js');
-            const healingPotion = new HealingPotion();
-            
-            const effectsProcessed = await healingPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    async handleElixirOfImmortality(effects, playerRole, battleManager) {
-        try {
-            const { ElixirOfImmortality } = await import('./Potions/elixirOfImmortality.js');
-            const elixirOfImmortality = new ElixirOfImmortality();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'ElixirOfImmortality',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            const effectsProcessed = await elixirOfImmortality.handlePotionEffectsForPlayer(
-                effects, playerRole, battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    async handleExperimentalPotionEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the ExperimentalPotion module
-            const { ExperimentalPotionPotion } = await import('./Potions/experimentalPotion.js');
-            const experimentalPotionPotion = new ExperimentalPotionPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'ExperimentalPotion',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the ExperimentalPotion module
-            const effectsProcessed = await experimentalPotionPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: add a generic log message
-            const playerName = playerRole === 'host' ? 'Host' : 'Guest';
-            battleManager.addCombatLog(
-                `🧪 ${playerName}'s Experimental Potion failed to activate properly`, 
-                'warning'
-            );
-            
-            return effects.length;
-        }
-    }
-
-    async handleAcidVialEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the AcidVial module
-            const { AcidVialPotion } = await import('./Potions/acidVial.js');
-            const acidVialPotion = new AcidVialPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'AcidVial',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the AcidVial module
-            const effectsProcessed = await acidVialPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: try basic damage and heal-block application
-            const enemyHeroes = playerRole === 'host' ? 
-                Object.values(battleManager.opponentHeroes) : 
-                Object.values(battleManager.playerHeroes);
-                
-            const effectCount = effects.length;
-            const damagePerVial = 100;
-            const healBlockPerVial = 3;
-            const totalDamage = damagePerVial * effectCount;
-            const totalHealBlock = healBlockPerVial * effectCount;
-            let fallbackTargets = 0;
-            
-            for (const hero of enemyHeroes) {
-                if (hero && hero.alive) {
-                    // Apply damage
-                    if (battleManager.isAuthoritative) {
-                        await battleManager.authoritative_applyDamage({
-                            target: hero,
-                            damage: totalDamage,
-                            newHp: Math.max(0, hero.currentHp - totalDamage),
-                            died: (hero.currentHp - totalDamage) <= 0
-                        }, { source: 'acid' });
-                    }
-                    
-                    // Apply heal-block
-                    if (battleManager.statusEffectsManager) {
-                        battleManager.statusEffectsManager.applyStatusEffect(hero, 'healblock', totalHealBlock);
-                    }
-                    
-                    fallbackTargets++;
-                }
-            }
-            
-            battleManager.addCombatLog(`🧪 Acid Vial effects applied (+${totalDamage} damage, +${totalHealBlock} heal-block to ${fallbackTargets} heroes)`, 'info');
-            return effectCount;
-        }
-    }
-
-    async handleElixirOfStrengthEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the ElixirOfStrength module
-            const { ElixirOfStrengthPotion } = await import('./Potions/elixirOfStrength.js');
-            const elixirOfStrengthPotion = new ElixirOfStrengthPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'ElixirOfStrength',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the ElixirOfStrength module
-            const effectsProcessed = await elixirOfStrengthPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: try basic strength application
-            const allyHeroes = playerRole === 'host' ? 
-                Object.values(battleManager.playerHeroes) : 
-                Object.values(battleManager.opponentHeroes);
-                
-            const effectCount = effects.length;
-            const attackBonus = 50 * effectCount; // 50 per potion
-            let fallbackTargets = 0;
-            
-            for (const hero of allyHeroes) {
-                if (hero && hero.alive && hero.addBattleAttackBonus) {
-                    hero.addBattleAttackBonus(attackBonus);
-                    
-                    // Update display
-                    if (battleManager.updateHeroAttackDisplay) {
-                        battleManager.updateHeroAttackDisplay(hero.side, hero.position, hero);
-                    }
-                    
-                    fallbackTargets++;
-                }
-            }
-            
-            battleManager.addCombatLog(`⚔️ Elixir of Strength effects applied (+${attackBonus} attack to ${fallbackTargets} heroes)`, 'info');
-            return effectCount;
-        }
-    }
-
-    async handleElixirOfColdEffects(effects, playerRole, battleManager) {
-        try {
-            const { ElixirOfColdPotion } = await import('./Potions/elixirOfCold.js');
-            const elixirOfColdPotion = new ElixirOfColdPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'ElixirOfCold',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            const effectsProcessed = await elixirOfColdPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    async handleLifeSerumEffects(effects, playerRole, battleManager) {
-        try {
-            const { LifeSerumPotion } = await import('./Potions/lifeSerum.js');
-            const lifeSerumPotion = new LifeSerumPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'LifeSerum',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            const effectsProcessed = await lifeSerumPotion.handlePotionEffectsForPlayer(
-                effects, playerRole, battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: basic HP application
-            const allyHeroes = playerRole === 'host' ? 
-                Object.values(battleManager.playerHeroes) : 
-                Object.values(battleManager.opponentHeroes);
-                
-            const effectCount = effects.length;
-            const hpBonus = 200 * effectCount;
-            let fallbackTargets = 0;
-            
-            for (const hero of allyHeroes) {
-                if (hero && hero.alive && hero.addBattleHpBonus) {
-                    hero.addBattleHpBonus(hpBonus);
-                    
-                    if (battleManager.updateHeroHealthBar) {
-                        battleManager.updateHeroHealthBar(hero.side, hero.position, hero.currentHp, hero.maxHp);
-                    }
-                    
-                    fallbackTargets++;
-                }
-            }
-            
-            battleManager.addCombatLog(`❤️ Life Serum effects applied (+${hpBonus} HP to ${fallbackTargets} heroes)`, 'info');
-            return effectCount;
-        }
-    }
-
-    async handleSwordInABottleEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the SwordInABottle module
-            const { SwordInABottlePotion } = await import('./Potions/swordInABottle.js');
-            const swordInABottlePotion = new SwordInABottlePotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'SwordInABottle',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Use the individual player method (fallback)
-            const effectsProcessed = await swordInABottlePotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: minimal effect logging
-            battleManager.addCombatLog(`⚔️ Sword in a Bottle effects failed to activate properly`, 'error');
-            return effects.length; // Still count as processed to avoid errors
-        }
-    }
-
-    async handleBoulderInABottleEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the BoulderInABottle module
-            const { BoulderInABottlePotion } = await import('./Potions/boulderInABottle.js');
-            const boulderInABottlePotion = new BoulderInABottlePotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'BoulderInABottle',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the BoulderInABottle module
-            const effectsProcessed = await boulderInABottlePotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    async handleBottledFlameEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the enhanced BottledFlame module
-            const { BottledFlamePotion } = await import('./Potions/bottledFlame.js');
-            const bottledFlamePotion = new BottledFlamePotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'BottledFlame',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the BottledFlame module
-            const effectsProcessed = await bottledFlamePotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: try basic burn application using status effects manager
-            const enemyHeroes = playerRole === 'host' ? 
-                Object.values(battleManager.opponentHeroes) : 
-                Object.values(battleManager.playerHeroes);
-                
-            const effectCount = effects.length;
-            let fallbackTargets = 0;
-            
-            for (const hero of enemyHeroes) {
-                if (hero && hero.alive && battleManager.statusEffectsManager) {
-                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'burned', effectCount);
-                    fallbackTargets++;
-                }
-            }
-                        
-            return effectCount;
-        }
-    }
-
-    async handleBottledLightningEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the BottledLightning module
-            const { BottledLightningPotion } = await import('./Potions/bottledLightning.js');
-            const bottledLightningPotion = new BottledLightningPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'BottledLightning',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the BottledLightning module
-            const effectsProcessed = await bottledLightningPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    async handlePoisonVialEffects(effects, playerRole, battleManager) {
-        try {
-            // Import and use the PoisonVial module
-            const { PoisonVialPotion } = await import('./Potions/poisonVial.js');
-            const poisonVialPotion = new PoisonVialPotion();
-            
-            // Send visual sync to guest BEFORE applying effects
-            this.sendPotionVisualSync('potion_specific_visual', {
-                potionName: 'PoisonVial',
-                visualType: 'potion_effects',
-                effectCount: effects.length,
-                playerSide: playerRole,
-                battleManager: battleManager 
-            });
-            
-            // Delegate everything to the PoisonVial module
-            const effectsProcessed = await poisonVialPotion.handlePotionEffectsForPlayer(
-                effects, 
-                playerRole, 
-                battleManager
-            );
-            
-            return effectsProcessed;
-            
-        } catch (error) {
-            // Fallback: try basic poison application using status effects manager
-            const enemyHeroes = playerRole === 'host' ? 
-                Object.values(battleManager.opponentHeroes) : 
-                Object.values(battleManager.playerHeroes);
-                
-            const effectCount = effects.length;
-            let fallbackTargets = 0;
-            
-            for (const hero of enemyHeroes) {
-                if (hero && hero.alive && battleManager.statusEffectsManager) {
-                    battleManager.statusEffectsManager.applyStatusEffect(hero, 'poisoned', effectCount);
-                    fallbackTargets++;
-                }
-            }
-                        
             return effectCount;
         }
     }

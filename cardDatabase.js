@@ -1387,6 +1387,35 @@ const CARD_DATABASE = {
 
 
     // NEUTRAL CARDS
+    'MoniaBot': {
+        name: 'MoniaBot',
+        image: './Cards/Characters/MoniaBot.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 800,
+        atk: 120,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Monia'
+    },
+    'EternalBeato': {
+        name: 'EternalBeato',
+        image: './Cards/Characters/EternalBeato.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: 'Ascended',
+        hp: 600,
+        atk: 10,
+        ability1: null,
+        ability2: null,
+        baseHero: 'Beato'
+    },
+
     'Charme': {
         name: 'Charme',
         image: './Cards/All/Charme.png',

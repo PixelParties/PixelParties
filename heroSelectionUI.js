@@ -378,7 +378,7 @@ export class HeroSelectionUI {
         
         // Calculate position (to the left of the hero)
         const tooltipWidth = 320; // Approximate width
-        let leftPos = heroRect.left - tooltipWidth - 55; // 20px gap
+        let leftPos = heroRect.right + 10;
         let topPos = heroRect.top;
         
         // Check if it would go off screen on the left
@@ -392,7 +392,7 @@ export class HeroSelectionUI {
             topPos = 10;
         }
         
-        // FIX: Set position INLINE before appending to DOM
+        // Set position INLINE before appending to DOM
         tooltip.style.position = 'fixed';
         tooltip.style.left = `${leftPos}px`;
         tooltip.style.top = `${topPos}px`;
@@ -401,6 +401,7 @@ export class HeroSelectionUI {
         
         // Now append to DOM
         document.body.appendChild(tooltip);
+        tooltip.style.pointerEvents = 'none';
 
         // Update tracking state - only track hero hover
         this.currentTooltipPosition = position;
@@ -3387,7 +3388,7 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
 
         /* Ensure tooltips are interactive in locked mode */
         .formation-spellbook-tooltip {
-            pointer-events: auto;
+            pointer-events: none !important; 
         }
 
         .formation-spellbook-tooltip:not(.locked-mode) {
@@ -3575,7 +3576,7 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
         }
 
         .formation-spellbook-tooltip.locked-mode {
-            pointer-events: auto; /* In locked mode: allow interaction */
+            pointer-events: auto !important; /* In locked mode: allow interaction */
         }
 
 

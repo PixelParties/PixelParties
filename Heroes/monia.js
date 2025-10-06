@@ -1,72 +1,65 @@
-// ./Heroes/monia.js - Monia Hero Effect Implementation (FIXED)
+// ./Heroes/monia.js - Monia Hero Effect Implementation (with MoniaBot support)
 
 export class MoniaHeroEffect {
     constructor(battleManager) {
         this.battleManager = battleManager;
         this.heroName = 'Monia';
-        this.activeShields = new Set(); // Track active shield effects for cleanup
+        this.activeShields = new Set();
+        this.activeFlameTrails = new Set(); // Track MoniaBot flame trails
         
-        // Monia protection stats
-        this.DAMAGE_REDUCTION_PERCENT = 33; // 33% damage reduction
-        this.SHIELD_DURATION = 800; // 800ms shield duration
+        // Monia protection stats - varies by hero type
+        this.MONIA_DAMAGE_REDUCTION = 33; // 33% for regular Monia
+        this.MONIABOT_DAMAGE_REDUCTION = 66; // 66% for MoniaBot
+        this.SHIELD_DURATION = 800;
         
-        // Inject CSS styles
         this.injectMoniaShieldStyles();
+        this.injectMoniaBotFlameStyles();
     }
 
     // ============================================
-    // CORE MONIA EFFECT - FIXED: Now synchronous for damage calculation
+    // CORE EFFECT - FIXED: Now synchronous
     // ============================================
 
-    // Check and apply Monia's protection when any target takes damage
     static checkMoniaProtection(target, damage, battleManager) {        
-        // Validate input
         if (typeof damage !== 'number' || isNaN(damage) || damage < 0) {
             console.warn(`⚠️ Invalid damage value: ${damage}, returning original`);
             return damage;
         }
         
-        // Initialize Monia effect instance if needed
         if (!battleManager.moniaEffect) {
             battleManager.moniaEffect = new MoniaHeroEffect(battleManager);
         }
         
-        // Find protecting Monia and calculate reduced damage (SYNCHRONOUS)
         const protectionResult = battleManager.moniaEffect.findProtectingMonia(target, damage);
         
         if (protectionResult) {
             const { protectingMonia, reducedDamage } = protectionResult;
             
-            // Validate reduced damage
             if (typeof reducedDamage !== 'number' || isNaN(reducedDamage) || reducedDamage < 0) {
                 console.error(`❌ Invalid reduced damage: ${reducedDamage}, using original damage`);
                 return damage;
             }
             
-            // Trigger visual effects asynchronously (non-blocking)
             battleManager.moniaEffect.executeProtectionEffectAsync(protectingMonia, target, damage, reducedDamage);
             
-            return reducedDamage; // Return the reduced damage immediately
+            return reducedDamage;
         }
         
-        return damage; // No protection, return original damage
+        return damage;
     }
 
     // ============================================
     // PROTECTION LOGIC (SYNCHRONOUS)
     // ============================================
 
-    // Find a protecting Monia in neighboring zones
     findProtectingMonia(target, damage) {
         if (!this.battleManager.isAuthoritative) return null;
 
-        // Validate damage input
         if (typeof damage !== 'number' || isNaN(damage) || damage < 0) {
             console.warn(`⚠️ Invalid damage for protection check: ${damage}`);
             return null;
         }
 
-        // Determine target's position and side
         const targetPosition = this.getTargetPosition(target);
         const targetSide = this.getTargetSide(target);
         
@@ -74,20 +67,17 @@ export class MoniaHeroEffect {
             return null;
         }
 
-        // Get neighboring positions
         const neighboringPositions = this.getNeighboringPositions(targetPosition);
 
-        // Check each neighboring position for a protecting Monia
         for (const neighborPosition of neighboringPositions) {
             const protectingMonia = this.getMoniaAtPosition(targetSide, neighborPosition);
             
             if (protectingMonia && this.canMoniaProtect(protectingMonia)) {
-                const reducedDamage = this.calculateReducedDamage(damage);
+                const reducedDamage = this.calculateReducedDamage(damage, protectingMonia);
                 
-                // Validate reduced damage before returning
                 if (typeof reducedDamage !== 'number' || isNaN(reducedDamage)) {
                     console.error(`❌ Invalid reduced damage calculated: ${reducedDamage}`);
-                    continue; // Try next Monia if this calculation failed
+                    continue;
                 }
                                 
                 return {
@@ -99,22 +89,25 @@ export class MoniaHeroEffect {
         return null;
     }
 
-    // Calculate reduced damage (33% reduction, final damage rounded up)
-    calculateReducedDamage(originalDamage) {
-        // Validate input
+    // Calculate reduced damage - NEW: checks hero type for reduction %
+    calculateReducedDamage(originalDamage, protectingHero) {
         if (typeof originalDamage !== 'number' || isNaN(originalDamage) || originalDamage < 0) {
             console.error(`❌ Invalid original damage for reduction: ${originalDamage}`);
             return originalDamage;
         }
         
         try {
-            const reductionPercent = this.DAMAGE_REDUCTION_PERCENT / 100; // 0.33
-            const reducedDamage = originalDamage * (1 - reductionPercent); // damage * 0.67
-            const finalDamage = Math.ceil(reducedDamage); // Round up
+            // Determine reduction based on hero type
+            const isMoniaBot = protectingHero.name === 'MoniaBot';
+            const reductionPercent = isMoniaBot ? 
+                this.MONIABOT_DAMAGE_REDUCTION / 100 : 
+                this.MONIA_DAMAGE_REDUCTION / 100;
             
-            const result = Math.max(1, finalDamage); // Ensure minimum 1 damage
+            const reducedDamage = originalDamage * (1 - reductionPercent);
+            const finalDamage = Math.ceil(reducedDamage);
             
-            // Validate result
+            const result = Math.max(1, finalDamage);
+            
             if (typeof result !== 'number' || isNaN(result) || result < 1) {
                 console.error(`❌ Invalid damage calculation result: ${result}, returning minimum damage`);
                 return 1;
@@ -123,7 +116,7 @@ export class MoniaHeroEffect {
             
         } catch (error) {
             console.error('❌ Error calculating reduced damage:', error);
-            return Math.max(1, originalDamage); // Fallback to original or minimum
+            return Math.max(1, originalDamage);
         }
     }
 
@@ -131,38 +124,97 @@ export class MoniaHeroEffect {
     // VISUAL EFFECTS (ASYNCHRONOUS, NON-BLOCKING)
     // ============================================
 
-    // Execute protection effect with shield animations (async, non-blocking)
     async executeProtectionEffectAsync(protectingMonia, target, originalDamage, reducedDamage) {
         try {
             const damageReduced = originalDamage - reducedDamage;
+            const isMoniaBot = protectingMonia.name === 'MoniaBot';
+
+            if (!target.type) {
+                if (target.alive !== undefined && target.maxHp !== undefined && !target.position) {
+                    target.type = 'creature';
+                } else if (target.position) {
+                    target.type = 'hero';
+                }
+            }
             
-            // Log the protection
+            if (target.type === 'creature' && !target.side) {
+                const creatureInfo = this.findCreatureInfo(target);
+                if (creatureInfo) {
+                    target.side = creatureInfo.side;
+                    target.position = creatureInfo.position;
+                    target.creatureIndex = creatureInfo.creatureIndex;
+                }
+            }
+            
+            // Log with appropriate hero name
+            const heroDisplayName = isMoniaBot ? 'MoniaBot' : protectingMonia.name;
             this.battleManager.addCombatLog(
-                `🛡️ ${protectingMonia.name} protects ${target.name}! Damage reduced by ${damageReduced} (${originalDamage} → ${reducedDamage})`,
+                `🛡️ ${heroDisplayName} protects ${target.name}! Damage reduced by ${damageReduced} (${originalDamage} → ${reducedDamage})`,
                 protectingMonia.side === 'player' ? 'success' : 'info'
             );
 
-            // Send synchronization data to guest
             this.sendProtectionEffectUpdate(protectingMonia, target, originalDamage, reducedDamage);
 
-            // Short delay to ensure guest receives the message
             await this.battleManager.delay(50);
 
-            // ⭐ NEW: Animate Monia dashing to protect the target
+            // Start flame trail for MoniaBot BEFORE dash animation
+            let flameTrail = null;
+            if (isMoniaBot) {
+                flameTrail = this.createMoniaBotFlameTrail(protectingMonia);
+            }
+
             const dashPromise = this.animateMoniaProtectionDash(protectingMonia, target);
-            
-            // Create shield animations on both Monia and the target (parallel with dash)
             const shieldPromise = this.createShieldAnimations(protectingMonia, target);
             
-            // Wait for both animations to complete
             await Promise.all([dashPromise, shieldPromise]);
+
+            // Clean up flame trail after dash completes
+            if (flameTrail) {
+                this.removeFlameTrail(flameTrail);
+            }
             
         } catch (error) {
             console.error('❌ Error in protection effect animation:', error);
         }
     }
 
-    // Animate Monia dashing to protect target
+    // NEW: Create flame trail for MoniaBot during dash
+    createMoniaBotFlameTrail(moniaBot) {
+        const moniaElement = this.getHeroElement(moniaBot);
+        if (!moniaElement) return null;
+
+        const flameTrail = document.createElement('div');
+        flameTrail.className = 'moniabot-flame-trail';
+        
+        // Create multiple flame particles for the trail
+        for (let i = 0; i < 8; i++) {
+            const flame = document.createElement('div');
+            flame.className = 'flame-particle';
+            flame.style.animationDelay = `${i * 50}ms`;
+            flame.innerHTML = '🔥';
+            flameTrail.appendChild(flame);
+        }
+        
+        moniaElement.appendChild(flameTrail);
+        this.activeFlameTrails.add(flameTrail);
+        
+        return flameTrail;
+    }
+
+    // NEW: Remove flame trail with fade effect
+    async removeFlameTrail(flameTrail) {
+        if (!flameTrail || !flameTrail.parentNode) return;
+        
+        flameTrail.classList.add('flame-trail-fadeout');
+        this.activeFlameTrails.delete(flameTrail);
+        
+        await this.battleManager.delay(300);
+        
+        if (flameTrail && flameTrail.parentNode) {
+            flameTrail.remove();
+        }
+    }
+
     async animateMoniaProtectionDash(protectingMonia, target) {
         if (!this.battleManager.animationManager) {
             console.warn('Animation manager not available for Monia protection dash');
@@ -176,14 +228,11 @@ export class MoniaHeroEffect {
         }
     }
 
-    // Get target's position (left, center, right)
     getTargetPosition(target) {
-        // For heroes, position is directly available
         if (target.position) {
             return target.position;
         }
         
-        // For creatures, find their hero's position
         const creatureInfo = this.findCreatureInfo(target);
         if (creatureInfo) {
             return creatureInfo.position;
@@ -192,14 +241,11 @@ export class MoniaHeroEffect {
         return null;
     }
 
-    // Get target's side (player or opponent)
     getTargetSide(target) {
-        // For heroes, side is directly available
         if (target.side) {
             return target.side;
         }
         
-        // For creatures, find their hero's side
         const creatureInfo = this.findCreatureInfo(target);
         if (creatureInfo) {
             return creatureInfo.side;
@@ -208,9 +254,7 @@ export class MoniaHeroEffect {
         return null;
     }
 
-    // Find creature information (hero, position, side)
     findCreatureInfo(creature) {
-        // Search through all heroes and their creatures
         for (const side of ['player', 'opponent']) {
             const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
             
@@ -228,56 +272,50 @@ export class MoniaHeroEffect {
         return null;
     }
 
-    // Get neighboring positions for a given position
     getNeighboringPositions(position) {
         switch (position) {
             case 'left':
-                return ['center']; // Left neighbors center
+                return ['center'];
             case 'center':
-                return ['left', 'right']; // Center neighbors both left and right
+                return ['left', 'right'];
             case 'right':
-                return ['center']; // Right neighbors center
+                return ['center'];
             default:
                 return [];
         }
     }
 
-    // Get Monia hero at specific position and side
+    // Updated to check for both Monia and MoniaBot
     getMoniaAtPosition(side, position) {
         const heroes = side === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
         const hero = heroes[position];
         
-        if (hero && hero.alive && hero.name === 'Monia') {
+        if (hero && hero.alive && (hero.name === 'Monia' || hero.name === 'MoniaBot')) {
             return hero;
         }
         
         return null;
     }
 
-    // Check if Monia can protect (alive, not stunned, not frozen)
     canMoniaProtect(monia) {
         if (!monia || !monia.alive) {
             return false;
         }
         
-        // Use existing status effects system to check if Monia can take action
         if (this.battleManager.statusEffectsManager) {
             const canAct = this.battleManager.statusEffectsManager.canTakeAction(monia);
             return canAct;
         }
         
-        // Fallback if status effects manager not available
         return true;
     }
 
-    // Create shield animations on both protector and target
     async createShieldAnimations(protectingMonia, target) {
         const moniaElement = this.getHeroElement(protectingMonia);
         const targetElement = this.getTargetElement(target);
         
         const shieldPromises = [];
         
-        // Create shield on Monia
         if (moniaElement) {
             const moniaShield = this.createProtectionShield(moniaElement, 'protector');
             if (moniaShield) {
@@ -286,7 +324,6 @@ export class MoniaHeroEffect {
             }
         }
         
-        // Create shield on target
         if (targetElement) {
             const targetShield = this.createProtectionShield(targetElement, 'protected');
             if (targetShield) {
@@ -295,32 +332,27 @@ export class MoniaHeroEffect {
             }
         }
         
-        // Wait for all shield animations to complete
         await Promise.all(shieldPromises);
     }
 
-    // Create protection shield visual effect
     createProtectionShield(targetElement, shieldType) {
         if (!targetElement) {
             console.warn('Cannot create protection shield: target element not found');
             return null;
         }
 
-        // Additional validation: ensure element is still in DOM
         if (!document.body.contains(targetElement)) {
             console.warn('Cannot create protection shield: element not in DOM');
             return null;
         }
 
         try {
-            // Create the main shield element
             const shield = document.createElement('div');
             shield.className = `monia-protection-shield ${shieldType}-shield`;
             
-            // Different colors for protector vs protected
             const shieldColor = shieldType === 'protector' ? 
-                'rgba(135, 206, 250, 0.9)' : // Light blue for Monia
-                'rgba(255, 215, 0, 0.9)';     // Gold for protected target
+                'rgba(135, 206, 250, 0.9)' :
+                'rgba(255, 215, 0, 0.9)';
             
             shield.style.cssText = `
                 position: absolute;
@@ -341,7 +373,6 @@ export class MoniaHeroEffect {
                     inset 0 0 20px ${shieldColor.replace('0.9', '0.4')};
             `;
 
-            // Add shield core effect
             const core = document.createElement('div');
             core.className = 'monia-shield-core';
             core.innerHTML = '🛡️';
@@ -369,7 +400,6 @@ export class MoniaHeroEffect {
         }
     }
 
-    // Remove shield with fade effect after duration
     async removeShieldAfterDuration(shield) {
         await this.battleManager.delay(this.SHIELD_DURATION);
         
@@ -395,18 +425,14 @@ export class MoniaHeroEffect {
         }
     }
 
-    // Get hero element by hero object
     getHeroElement(hero) {
         return this.battleManager.getHeroElement(hero.side, hero.position);
     }
 
-    // Get target element (hero or creature)
     getTargetElement(target) {
         if (target.type === 'hero' || !target.type) {
-            // Hero element
             return this.battleManager.getHeroElement(target.side, target.position);
         } else {
-            // Creature element
             const creatureInfo = this.findCreatureInfo(target);
             if (!creatureInfo) return null;
 
@@ -421,7 +447,6 @@ export class MoniaHeroEffect {
     // NETWORK SYNCHRONIZATION
     // ============================================
 
-    // Send protection effect data to guest for synchronization
     sendProtectionEffectUpdate(protectingMonia, target, originalDamage, reducedDamage) {
         this.battleManager.sendBattleUpdate('monia_protection_effect', {
             protectorData: {
@@ -438,7 +463,6 @@ export class MoniaHeroEffect {
         });
     }
 
-    // Get target sync data for network synchronization
     getTargetSyncData(target) {
         if (target.type === 'hero' || !target.type) {
             return {
@@ -463,23 +487,19 @@ export class MoniaHeroEffect {
         }
     }
 
-    // Handle protection effect on guest side
     handleGuestProtectionEffect(data) {
         const { protectorData, target, originalDamage, reducedDamage, damageReduced, shieldDuration } = data;
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';
         const protectorLocalSide = (protectorData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         
-        // Add to combat log
         this.battleManager.addCombatLog(
             `🛡️ ${protectorData.name} protects ${target.name}! Damage reduced by ${damageReduced} (${originalDamage} → ${reducedDamage})`,
             protectorLocalSide === 'player' ? 'success' : 'info'
         );
 
-        // Start guest animation immediately
         this.createGuestShieldAnimations(protectorData, target, myAbsoluteSide);
     }
 
-    // Create shield animations on guest side
     async createGuestShieldAnimations(protectorData, targetData, myAbsoluteSide) {
         const protectorLocalSide = (protectorData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         const protectorElement = this.battleManager.getHeroElement(protectorLocalSide, protectorData.position);
@@ -489,7 +509,6 @@ export class MoniaHeroEffect {
             return;
         }
 
-        // Find target element
         const targetLocalSide = (targetData.absoluteSide === myAbsoluteSide) ? 'player' : 'opponent';
         let targetElement = null;
         
@@ -506,40 +525,40 @@ export class MoniaHeroEffect {
             return;
         }
 
-        // ⭐ NEW: Recreate Monia and target objects for animation
         const protectorHero = protectorLocalSide === 'player' ? 
             this.battleManager.playerHeroes[protectorData.position] : 
             this.battleManager.opponentHeroes[protectorData.position];
             
-        // Create target object for animation
         let targetForAnimation = null;
         if (targetData.type === 'hero') {
             targetForAnimation = targetLocalSide === 'player' ? 
                 this.battleManager.playerHeroes[targetData.position] : 
                 this.battleManager.opponentHeroes[targetData.position];
         } else {
-            // For creatures, we need to reconstruct a target object
             const heroes = targetLocalSide === 'player' ? this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
             const hero = heroes[targetData.position];
             if (hero && hero.creatures && hero.creatures[targetData.creatureIndex]) {
                 targetForAnimation = hero.creatures[targetData.creatureIndex];
-                // Add required properties for animation
                 targetForAnimation.type = 'creature';
                 targetForAnimation.side = targetLocalSide;
                 targetForAnimation.position = targetData.position;
-                targetForAnimation.creatureIndex = targetData.creatureIndex; // ← CRITICAL: Add this line
+                targetForAnimation.creatureIndex = targetData.creatureIndex; 
             }
         }
 
-        // Run dash animation and shield animations in parallel
         const animations = [];
 
-        // Add Monia dash animation on guest side
+        // NEW: Add flame trail for MoniaBot on guest side
+        const isMoniaBot = protectorData.name === 'MoniaBot';
+        let flameTrail = null;
+        if (isMoniaBot) {
+            flameTrail = this.createMoniaBotFlameTrail(protectorHero);
+        }
+
         if (protectorHero && targetForAnimation && this.battleManager.animationManager) {
             animations.push(this.battleManager.animationManager.animateMoniaProtectionDash(protectorHero, targetForAnimation));
         }
 
-        // Create shields on both protector and target
         const protectorShield = this.createProtectionShield(protectorElement, 'protector');
         if (protectorShield) {
             this.activeShields.add(protectorShield);
@@ -552,8 +571,12 @@ export class MoniaHeroEffect {
             animations.push(this.removeShieldAfterDuration(targetShield));
         }
 
-        // Wait for all animations to complete
         await Promise.all(animations);
+
+        // Clean up flame trail
+        if (flameTrail) {
+            this.removeFlameTrail(flameTrail);
+        }
         
         this.battleManager.addCombatLog(`🛡️ ${protectorData.name}'s protection fades`, 'info');
     }
@@ -562,16 +585,14 @@ export class MoniaHeroEffect {
     // CSS STYLES
     // ============================================
 
-    // Inject CSS styles for Monia's protection effects
     injectMoniaShieldStyles() {
         if (document.getElementById('moniaShieldStyles')) {
-            return; // Already injected
+            return;
         }
 
         const style = document.createElement('style');
         style.id = 'moniaShieldStyles';
         style.textContent = `
-            /* Monia Protection Shield Styles */
             .monia-protection-shield {
                 border-radius: 50%;
                 position: relative;
@@ -635,7 +656,6 @@ export class MoniaHeroEffect {
                 }
             }
 
-            /* Different shield styles for protector vs protected */
             .protector-shield {
                 border-color: rgba(135, 206, 250, 0.9) !important;
                 box-shadow: 
@@ -656,11 +676,73 @@ export class MoniaHeroEffect {
         document.head.appendChild(style);
     }
 
+    // NEW: Inject flame trail styles for MoniaBot
+    injectMoniaBotFlameStyles() {
+        if (document.getElementById('moniaBotFlameStyles')) {
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.id = 'moniaBotFlameStyles';
+        style.textContent = `
+            .moniabot-flame-trail {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 1400;
+            }
+
+            .flame-particle {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 24px;
+                opacity: 0;
+                animation: flameTrail 0.6s ease-out infinite;
+            }
+
+            @keyframes flameTrail {
+                0% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) scale(0.5);
+                }
+                20% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%) scale(1);
+                }
+                100% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) translateX(-30px) scale(0.3);
+                    filter: blur(2px);
+                }
+            }
+
+            .flame-trail-fadeout {
+                animation: flameTrailFadeOut 0.3s ease-out forwards !important;
+            }
+
+            @keyframes flameTrailFadeOut {
+                0% {
+                    opacity: 1;
+                }
+                100% {
+                    opacity: 0;
+                }
+            }
+        `;
+        
+        document.head.appendChild(style);
+    }
+
     // ============================================
     // CLEANUP
     // ============================================
 
-    // Clean up all active shields
     cleanup() {
         this.activeShields.forEach(shield => {
             try {
@@ -674,7 +756,19 @@ export class MoniaHeroEffect {
         
         this.activeShields.clear();
 
-        // Remove any orphaned shield elements
+        // NEW: Clean up flame trails
+        this.activeFlameTrails.forEach(trail => {
+            try {
+                if (trail && trail.parentNode) {
+                    trail.remove();
+                }
+            } catch (error) {
+                console.warn('Error removing flame trail during cleanup:', error);
+            }
+        });
+        
+        this.activeFlameTrails.clear();
+
         try {
             const orphanedShields = document.querySelectorAll('.monia-protection-shield');
             orphanedShields.forEach(shield => {
@@ -682,8 +776,15 @@ export class MoniaHeroEffect {
                     shield.remove();
                 }
             });
+
+            const orphanedTrails = document.querySelectorAll('.moniabot-flame-trail');
+            orphanedTrails.forEach(trail => {
+                if (trail.parentNode) {
+                    trail.remove();
+                }
+            });
         } catch (error) {
-            console.warn('Error cleaning up orphaned shields:', error);
+            console.warn('Error cleaning up orphaned elements:', error);
         }
     }
 }

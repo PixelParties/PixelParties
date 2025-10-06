@@ -38,11 +38,9 @@ export class BattleFlowManager {
     // Remove actor from processing queue (for Slow spell)
     removeActorFromQueue(side, index) {
         if (side === 'player' && index >= 0 && index < this.currentPlayerActors.length) {
-            console.log(`🕰️ Removing actor at index ${index} from player queue`);
             this.currentPlayerActors.splice(index, 1);
             return true;
         } else if (side === 'opponent' && index >= 0 && index < this.currentOpponentActors.length) {
-            console.log(`🕰️ Removing actor at index ${index} from opponent queue`);
             this.currentOpponentActors.splice(index, 1);
             return true;
         }
@@ -98,8 +96,6 @@ export class BattleFlowManager {
                 this.roundInitiative.allActors.push(globalActor);
             });
         });
-        
-        console.log(`🎯 Round ${this.battleManager.currentTurn} initiative initialized with ${this.roundInitiative.allActors.length} actors`);
     }
 
     // Get all actors that haven't acted yet for given side
@@ -126,7 +122,6 @@ export class BattleFlowManager {
         if (!this.roundInitiative || !actor.globalId) return;
         
         this.roundInitiative.actedActors.add(actor.globalId);
-        console.log(`✅ Marked ${actor.name} (${actor.globalId}) as acted`);
     }
 
     // Remove actor from initiative (for Slow spell)
@@ -134,7 +129,6 @@ export class BattleFlowManager {
         if (!this.roundInitiative) return false;
         
         this.roundInitiative.removedActors.add(globalId);
-        console.log(`🕰️ Removed actor ${globalId} from initiative`);
         return true;
     }
 
@@ -152,7 +146,6 @@ export class BattleFlowManager {
     // Clean up round initiative
     clearRoundInitiative() {
         this.roundInitiative = null;
-        console.log(`🎯 Round initiative cleared`);
     }
 
 

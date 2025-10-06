@@ -79,13 +79,15 @@ export class BeatoEffectManager {
         
         for (const position of positions) {
             const hero = formation[position];
-            if (hero && hero.name === 'Beato') {
+            // Check for both Beato and EternalBeato
+            if (hero && (hero.name === 'Beato' || hero.name === 'EternalBeato')) {
                 return position;
             }
         }
         
         return null;
     }
+
 
     // Get list of spells that Beato can learn (using ButterflyCloud rules)
     getAvailableSpellsForBeato(heroSelection) {
@@ -95,11 +97,15 @@ export class BeatoEffectManager {
         // SPECIAL EXCLUSIONS: Spells that cannot be learned by Beato
         const excludedSpells = ['PhoenixTackle', 'VictoryPhoenixCannon'];
         
+        // NEW: Determine if this is EternalBeato (Ascended form)
+        const formation = heroSelection.formationManager.getBattleFormation();
+        const beatoPosition = this.findBeatoPosition(formation);
+        const isEternalBeato = beatoPosition && formation[beatoPosition]?.name === 'EternalBeato';
+        
         // Get all card names using the same logic as ButterflyCloud
         let allCardNames = [];
         
         try {
-            // Get card names from character cards
             const characterCards = heroSelection.characterCards;
             if (characterCards) {
                 const cardSet = new Set();
@@ -109,7 +115,6 @@ export class BeatoEffectManager {
                 allCardNames = Array.from(cardSet);
             }
             
-            // Also try to access the global cardDatabase if available
             if (typeof window !== 'undefined' && window.cardDatabase) {
                 allCardNames = allCardNames.concat(Object.keys(window.cardDatabase));
             }
@@ -145,10 +150,17 @@ export class BeatoEffectManager {
                 return;
             }
             
-            // SPECIAL EXCLUSION: Exclude Phoenix spells that cannot be learned by Beato
+            // SPECIAL EXCLUSION: Exclude Phoenix spells
             if (excludedSpells.includes(cardName)) {
-                console.log(`🔥 Beato cannot learn spell: ${cardName} - excluding from random selection`);
                 return;
+            }
+            
+            // NEW: For EternalBeato, only include spells with level 3+
+            if (isEternalBeato) {
+                const spellLevel = cardInfo.level !== undefined ? cardInfo.level : 0;
+                if (spellLevel < 3) {
+                    return; // Skip spells below level 3 for EternalBeato
+                }
             }
             
             // Add to eligible list
@@ -160,7 +172,7 @@ export class BeatoEffectManager {
             });
         });
         
-        console.log(`📚 Beato eligible spells: ${eligibleSpells.length} (Phoenix spells excluded)`);
+        console.log(`📚 ${isEternalBeato ? 'EternalBeato' : 'Beato'} eligible spells: ${eligibleSpells.length}${isEternalBeato ? ' (level 3+)' : ''}`);
         return eligibleSpells;
     }
 

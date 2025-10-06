@@ -88,7 +88,7 @@ export class HeroTooltipManager {
         this.activeHeroPosition = heroPosition;
         this.tooltipHoverState = false;
         
-        // NEW: Check if hero is "Beato" and auto-lock spellbook
+        // Check if hero is "Beato" and auto-lock spellbook
         this.checkAndLockBeatoSpellbook(heroPosition);
         
         if (this.lockedMode) {
@@ -96,7 +96,7 @@ export class HeroTooltipManager {
         }
     }
 
-    // NEW METHOD: Check if hero is "Beato" and automatically lock their spellbook
+    // Check if hero is "Beato" and automatically lock their spellbook
     checkAndLockBeatoSpellbook(heroPosition) {
         try {
             // Get hero data from formation

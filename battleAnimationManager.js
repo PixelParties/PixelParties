@@ -34,18 +34,25 @@ export class BattleAnimationManager {
     // ============================================
 
     // Animate hero attack (single)
-    async animateHeroAttack(hero, target, options = {}) {        
+    async animateHeroAttack(hero, target, options = {}) {
+        const animationId = `anim_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        
         if (!hero || !target) {
+            console.error('❌ [ANIMATION] Missing hero or target', { hero, target });
             return;
         }
         
         const heroElement = this.getHeroElement(hero.side, hero.position);
         if (!heroElement) {
+            console.error('❌ [ANIMATION] Hero element not found', {
+                selector: `.${hero.side}-slot.${hero.position}-slot`
+            });
             return;
         }
         
         const heroCard = heroElement.querySelector('.battle-hero-card');
         if (!heroCard) {
+            console.error('❌ [ANIMATION] Hero card not found in element');
             return;
         }
         
@@ -60,6 +67,7 @@ export class BattleAnimationManager {
         }
         
         if (!targetElement) {
+            console.error('❌ [ANIMATION] Target element not found');
             return;
         }
         

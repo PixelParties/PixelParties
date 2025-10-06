@@ -148,15 +148,34 @@ export class WebRTCManager {
         }
     }
 
-    // Setup data channel with battle sync support
+    // Setup data channel with battle sync support and browser-specific optimizations
     setupDataChannel(channel) {
+        // Detect browser type for optimizations
+        const isFirefox = navigator.userAgent.includes('Firefox');
+        const isChrome = navigator.userAgent.includes('Chrome');
+        
+        // Configure channel based on browser
+        if (isFirefox) {
+            // Firefox-specific optimizations
+            channel.bufferedAmountLowThreshold = 16384; // 16KB - lower threshold for Firefox
+            
+            // Monitor buffer status for Firefox
+            channel.onbufferedamountlow = () => {
+                this.processBattleMessageQueue();
+            };
+        } else {
+            // Chrome/Edge optimizations
+            channel.bufferedAmountLowThreshold = 32768; // 32KB for Chromium browsers
+        }
+        
         channel.onopen = () => {            
             // Test connection with ping
             const pingStart = Date.now();
             this.sendMessage({
                 type: 'ping',
                 timestamp: pingStart,
-                from: this.roomManager.getIsHost() ? 'host' : 'guest'
+                from: this.roomManager.getIsHost() ? 'host' : 'guest',
+                browserType: isFirefox ? 'firefox' : (isChrome ? 'chrome' : 'other')
             });
             
             const isHost = this.roomManager.getIsHost();
@@ -164,82 +183,226 @@ export class WebRTCManager {
             
             if (isHost) {
                 this.uiManager.showStatus('🎉 Battle Arena Ready! Direct P2P with sync enabled!', 'connected');
-                this.uiManager.showConnectionDetails('✅ Ultra-fast direct connection established!<br>🎮 Real-time battle data ready!<br>⚡ Latency: Testing...<br>🔗 No server needed - pure P2P!<br>⚔️ Battle synchronization active!');
+                this.uiManager.showConnectionDetails(
+                    '✅ Ultra-fast direct connection established!<br>' +
+                    '🎮 Real-time battle data ready!<br>' +
+                    '⚡ Latency: Testing...<br>' +
+                    '🔗 No server needed - pure P2P!<br>' +
+                    '⚔️ Battle synchronization active!' +
+                    (isFirefox ? '<br>🦊 Firefox mode: Optimized buffering' : '')
+                );
                 
                 this.sendMessage({
                     type: 'welcome',
                     message: `Welcome to the synchronized battle arena, ${username}!`,
                     from: 'host',
-                    playerName: username
+                    playerName: username,
+                    browserType: isFirefox ? 'firefox' : (isChrome ? 'chrome' : 'other')
                 });
             } else {
                 this.uiManager.showStatus('🎉 Battle Arena Ready! Connected directly to host with sync!', 'connected');
-                this.uiManager.showConnectionDetails('✅ Ultra-fast direct connection established!<br>🎮 Real-time battle data ready!<br>⚡ Latency: Testing...<br>🔗 No server needed - pure P2P!<br>⚔️ Battle synchronization active!');
+                this.uiManager.showConnectionDetails(
+                    '✅ Ultra-fast direct connection established!<br>' +
+                    '🎮 Real-time battle data ready!<br>' +
+                    '⚡ Latency: Testing...<br>' +
+                    '🔗 No server needed - pure P2P!<br>' +
+                    '⚔️ Battle synchronization active!' +
+                    (isFirefox ? '<br>🦊 Firefox mode: Optimized buffering' : '')
+                );
                 
                 this.sendMessage({
                     type: 'joined',
                     message: `${username} has entered the synchronized battle arena!`,
                     from: 'guest',
-                    playerName: username
+                    playerName: username,
+                    browserType: isFirefox ? 'firefox' : (isChrome ? 'chrome' : 'other')
                 });
             }
             
             // Enable battle synchronization
             this.battleSyncEnabled = true;
             this.processBattleMessageQueue();
+            
+            // Set up periodic keep-alive for Firefox
+            if (isFirefox) {
+                this.keepAliveInterval = setInterval(() => {
+                    if (channel.readyState === 'open') {
+                        this.sendMessage({
+                            type: 'keepalive',
+                            timestamp: Date.now()
+                        });
+                    }
+                }, 5000); // Every 5 seconds
+            }
         };
 
         channel.onclose = () => {
             this.battleSyncEnabled = false;
+            
+            // Clear Firefox keep-alive if exists
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+                this.keepAliveInterval = null;
+            }
+            
             if (this.roomManager.getRoomRef()) {
                 this.uiManager.showStatus('🔄 Direct connection lost, using Firebase relay...', 'waiting', true);
-                this.uiManager.showConnectionDetails('⚡ P2P connection closed<br>📡 Switched to Firebase relay mode<br>🔄 Game sync still active...<br>⚔️ Battle sync via Firebase (higher latency)');
+                this.uiManager.showConnectionDetails(
+                    '⚡ P2P connection closed<br>' +
+                    '📡 Switched to Firebase relay mode<br>' +
+                    '🔄 Game sync still active...<br>' +
+                    '⚔️ Battle sync via Firebase (higher latency)'
+                );
             }
         };
         
         channel.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            
-            // Handle system messages
-            if (data.type === 'ping') {
-                this.sendMessage({
-                    type: 'pong',
-                    originalTimestamp: data.timestamp,
-                    timestamp: Date.now(),
-                    from: this.roomManager.getIsHost() ? 'host' : 'guest'
-                });
-            } else if (data.type === 'pong') {
-                const latency = Date.now() - data.originalTimestamp;
+            try {
+                const data = JSON.parse(event.data);
                 
-                const currentDetails = this.uiManager.elements.connectionDetails.innerHTML;
-                const updatedDetails = currentDetails.replace('Latency: Testing...', `Latency: ${latency}ms ⚡`);
-                this.uiManager.showConnectionDetails(updatedDetails);
-                
-                // Update battle sync status based on latency
-                if (latency < 50) {
-                    // Excellent latency for battle synchronization
-                } else if (latency < 100) {
-                    // Good latency for battle synchronization
-                } else {
-                    // Higher latency - battle sync may use Firebase fallback
+                // Track message statistics for debugging
+                if (!this.messageStats) {
+                    this.messageStats = {
+                        received: 0,
+                        processed: 0,
+                        errors: 0
+                    };
                 }
-            } else if (data.type === 'welcome' && !this.roomManager.getIsHost()) {
-                this.uiManager.showConnectionDetails(`🎉 Host says: ${data.message}<br>✅ P2P connection confirmed!<br>🔗 Direct communication established!<br>⚔️ Battle synchronization ready!`);
-            } else if (data.type === 'joined' && this.roomManager.getIsHost()) {
-                this.uiManager.showConnectionDetails(`🎉 ${data.message}<br>✅ P2P connection confirmed!<br>🔗 Direct communication established!<br>⚔️ Battle synchronization ready!`);
-            }
-            
-            // Delegate to registered message handlers
-            if (this.messageHandlers[data.type]) {
-                this.messageHandlers[data.type](data);
+                this.messageStats.received++;
+                
+                // Handle keep-alive messages silently
+                if (data.type === 'keepalive') {
+                    return; // Don't process further
+                }
+                
+                // Handle system messages
+                if (data.type === 'ping') {
+                    this.sendMessage({
+                        type: 'pong',
+                        originalTimestamp: data.timestamp,
+                        timestamp: Date.now(),
+                        from: this.roomManager.getIsHost() ? 'host' : 'guest',
+                        browserType: isFirefox ? 'firefox' : (isChrome ? 'chrome' : 'other')
+                    });
+                    
+                    // Note peer's browser type if provided
+                    if (data.browserType) {
+                        this.peerBrowserType = data.browserType;
+                    }
+                } else if (data.type === 'pong') {
+                    const latency = Date.now() - data.originalTimestamp;
+                    
+                    const currentDetails = this.uiManager.elements.connectionDetails.innerHTML;
+                    const updatedDetails = currentDetails.replace('Latency: Testing...', `Latency: ${latency}ms ⚡`);
+                    this.uiManager.showConnectionDetails(updatedDetails);
+                    
+                    // Store peer browser info
+                    if (data.browserType) {
+                        this.peerBrowserType = data.browserType;
+                    }
+                    
+                    // Update battle sync status based on latency
+                    if (latency < 50) {
+                        console.log('🟢 Excellent latency for battle synchronization');
+                    } else if (latency < 100) {
+                        console.log('🟡 Good latency for battle synchronization');
+                    } else if (latency < 200) {
+                        console.log('🟠 Moderate latency - may experience minor sync delays');
+                    } else {
+                        console.log('🔴 High latency - battle sync may use Firebase fallback');
+                        // Consider switching to Firebase for battle messages if latency is too high
+                        if (latency > 300) {
+                            this.highLatencyMode = true;
+                        }
+                    }
+                } else if (data.type === 'welcome' && !this.roomManager.getIsHost()) {
+                    this.uiManager.showConnectionDetails(
+                        `🎉 Host says: ${data.message}<br>` +
+                        `✅ P2P connection confirmed!<br>` +
+                        `🔗 Direct communication established!<br>` +
+                        `⚔️ Battle synchronization ready!` +
+                        (data.browserType ? `<br>🌐 Host browser: ${data.browserType}` : '')
+                    );
+                    if (data.browserType) {
+                        this.peerBrowserType = data.browserType;
+                    }
+                } else if (data.type === 'joined' && this.roomManager.getIsHost()) {
+                    this.uiManager.showConnectionDetails(
+                        `🎉 ${data.message}<br>` +
+                        `✅ P2P connection confirmed!<br>` +
+                        `🔗 Direct communication established!<br>` +
+                        `⚔️ Battle synchronization ready!` +
+                        (data.browserType ? `<br>🌐 Guest browser: ${data.browserType}` : '')
+                    );
+                    if (data.browserType) {
+                        this.peerBrowserType = data.browserType;
+                    }
+                }
+                
+                // Delegate to registered message handlers
+                if (this.messageHandlers[data.type]) {
+                    try {
+                        this.messageHandlers[data.type](data);
+                        this.messageStats.processed++;
+                    } catch (handlerError) {
+                        console.error(`Error in handler for ${data.type}:`, handlerError);
+                        this.messageStats.errors++;
+                        
+                        // For critical battle messages, request resync
+                        if (data.type === 'battle_data' || data.type === 'hero_turn_execution') {
+                            console.log('🔄 Requesting state resync after handler error');
+                            this.sendMessage({
+                                type: 'request_state_sync',
+                                reason: 'handler_error',
+                                errorType: data.type
+                            });
+                        }
+                    }
+                }
+            } catch (parseError) {
+                console.error('Failed to parse data channel message:', parseError);
+                this.messageStats.errors++;
             }
         };
         
         channel.onerror = (error) => {
+            console.error('❌ Data channel error:', error);
             this.battleSyncEnabled = false;
+            
+            // Clear Firefox keep-alive if exists
+            if (this.keepAliveInterval) {
+                clearInterval(this.keepAliveInterval);
+                this.keepAliveInterval = null;
+            }
+            
             this.uiManager.showStatus('⚠️ P2P connection error - using Firebase backup...', 'waiting', true);
-            this.uiManager.showConnectionDetails('❌ Direct P2P error occurred<br>📡 Switching to Firebase relay mode<br>🔄 Game functionality maintained...<br>⚔️ Battle sync via Firebase');
+            this.uiManager.showConnectionDetails(
+                '❌ Direct P2P error occurred<br>' +
+                '📡 Switching to Firebase relay mode<br>' +
+                '🔄 Game functionality maintained...<br>' +
+                '⚔️ Battle sync via Firebase' +
+                (isFirefox ? '<br>🦊 Firefox fallback mode active' : '')
+            );
+            
+            // Process any queued messages through Firebase
+            this.processBattleMessageQueue();
         };
+        
+        // Log statistics periodically for debugging
+        if (!this.statsInterval) {
+            this.statsInterval = setInterval(() => {
+                if (this.messageStats && this.messageStats.received > 0) {
+                    console.log('📊 Message stats:', {
+                        received: this.messageStats.received,
+                        processed: this.messageStats.processed,
+                        errors: this.messageStats.errors,
+                        errorRate: ((this.messageStats.errors / this.messageStats.received) * 100).toFixed(1) + '%',
+                        bufferAmount: channel.bufferedAmount,
+                        readyState: channel.readyState
+                    });
+                }
+            }, 30000); // Every 30 seconds
+        }
     }
 
     // Register message handler

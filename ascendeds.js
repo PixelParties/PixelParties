@@ -56,6 +56,48 @@ export class AscendedManager {
             }
         }
 
+        // Check HP requirement for MoniaBot
+        if (ascendedCardName === 'MoniaBot') {
+            const targetStats = window.heroSelection.calculateEffectiveHeroStats(targetPosition);
+            if (!targetStats) {
+                return { 
+                    canAscend: false, 
+                    reason: 'Unable to calculate hero stats!' 
+                };
+            }
+            
+            if (targetStats.maxHp < 600) {
+                return { 
+                    canAscend: false, 
+                    reason: `${this.formatCardName(ascendedCardName)} requires a hero with 600+ Max HP! (Current: ${targetStats.maxHp})`
+                };
+            }
+        }
+
+        // Check spellbook requirement for EternalBeato
+        if (ascendedCardName === 'EternalBeato') {
+            const spellbookManager = window.heroSelection?.heroSpellbookManager;
+            if (!spellbookManager) {
+                return { 
+                    canAscend: false, 
+                    reason: 'Unable to check spellbook!' 
+                };
+            }
+            
+            const spellbook = spellbookManager.getHeroSpellbook(targetPosition);
+            
+            // Count unique spell names
+            const uniqueSpells = new Set(spellbook.map(spell => spell.name));
+            const uniqueSpellCount = uniqueSpells.size;
+            
+            if (uniqueSpellCount < 8) {
+                return { 
+                    canAscend: false, 
+                    reason: `${this.formatCardName(ascendedCardName)} requires Beato to know 8+ unique Spells! (Current: ${uniqueSpellCount})`
+                };
+            }
+        }
+
         // Check if target hero matches the baseHero
         if (targetHero.name === ascendedInfo.baseHero) {
             return { 
@@ -79,9 +121,14 @@ export class AscendedManager {
             };
         }
 
+        // Build error message based on whether this is a Waflav form
+        const errorMessage = ascendedInfo.baseHero === 'Waflav' 
+            ? `${this.formatCardName(ascendedCardName)} can only transform ${ascendedInfo.baseHero} or other ${ascendedInfo.baseHero} forms!`
+            : `${this.formatCardName(ascendedCardName)} can only transform ${ascendedInfo.baseHero}!`;
+
         return { 
             canAscend: false, 
-            reason: `${this.formatCardName(ascendedCardName)} can only transform ${ascendedInfo.baseHero} or other ${ascendedInfo.baseHero} forms!` 
+            reason: errorMessage
         };
     }
 
@@ -394,10 +441,22 @@ export class AscendedManager {
                     counterCostInfo = ` (Cost: ${requiredCounters} Evolution Counters, Have: ${playerCounters})`;
                 }
             }
+
+            // Add spellbook info for EternalBeato
+            let spellbookInfo = '';
+            if (ascendedCardName === 'EternalBeato') {
+                const spellbookManager = window.heroSelection?.heroSpellbookManager;
+                if (spellbookManager) {
+                    const spellbook = spellbookManager.getHeroSpellbook(targetPosition);
+                    const uniqueSpells = new Set(spellbook.map(spell => spell.name));
+                    const uniqueSpellCount = uniqueSpells.size;
+                    spellbookInfo = ` (Requires: 2 unique Spells, Have: ${uniqueSpellCount})`;
+                }
+            }
             
             return {
                 canDrop: true,
-                message: `Transform ${validation.heroName} into ${this.formatCardName(ascendedCardName)}!${evolutionPreview}${counterCostInfo}`,
+                message: `Transform ${validation.heroName} into ${this.formatCardName(ascendedCardName)}!${evolutionPreview}${counterCostInfo}${spellbookInfo}`,
                 type: 'can-ascend'
             };
         }

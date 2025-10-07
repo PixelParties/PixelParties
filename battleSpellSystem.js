@@ -381,7 +381,7 @@ export class BattleSpellSystem {
         }
         
         // Invert the chance (0.9 becomes 0.1, 0.81 becomes 0.19, etc.)
-        const finalChance = 1 - chance + 1;
+        const finalChance = 1 - chance;
         
         return finalChance;
     }

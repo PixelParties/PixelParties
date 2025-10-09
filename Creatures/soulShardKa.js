@@ -137,6 +137,8 @@ export class SoulShardKaCreature {
                 totalKaCopies += hero.creatures.filter(c => c.name === 'SoulShardKa' && c.alive).length;
             }
         });
+
+        totalKaCopies = Math.max(totalKaCopies, 1);
         
         // Calculate attack bonus
         const attackBonus = totalKaCopies * this.ATTACK_BONUS_PER_COPY;

@@ -120,6 +120,8 @@ export class SoulShardBaCreature {
                 });
             }
         });
+
+        otherBaCopies = Math.max(otherBaCopies, 1);
         
         // Calculate removal chance
         const removalChance = Math.min(1.0, this.BASE_CHANCE + (otherBaCopies * this.CHANCE_PER_COPY));

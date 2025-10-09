@@ -119,6 +119,8 @@ export class SoulShardSekhemCreature {
                 totalSekhemCopies += hero.creatures.filter(c => c.name === 'SoulShardSekhem' && c.alive).length;
             }
         });
+
+        totalSekhemCopies = Math.max(totalSekhemCopies, 1);
         
         // Calculate damage amount
         const damageAmount = totalSekhemCopies * this.DAMAGE_AMOUNT_PER_COPY;

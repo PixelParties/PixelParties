@@ -136,6 +136,8 @@ export class SoulShardIbCreature {
                 totalIbCopies += hero.creatures.filter(c => c.name === 'SoulShardIb' && c.alive).length;
             }
         });
+
+        totalIbCopies = Math.max(totalIbCopies, 1);
         
         // Calculate shield amount
         const shieldAmount = totalIbCopies * this.SHIELD_AMOUNT_PER_COPY;

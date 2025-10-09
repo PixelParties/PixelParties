@@ -123,6 +123,8 @@ export class SoulShardRenCreature {
                 totalRenCopies += hero.creatures.filter(c => c.name === 'SoulShardRen' && c.alive).length;
             }
         });
+
+        totalRenCopies = Math.max(totalRenCopies, 1);
         
         // Calculate draw chance: 25% base + 10% per additional Ren
         const baseChance = 25;

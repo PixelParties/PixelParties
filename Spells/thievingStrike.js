@@ -7,6 +7,15 @@ export class ThievingStrikeSpell {
     }
 
     /**
+     * Calculate trigger chance for ThievingStrike
+     * @returns {number} - Trigger chance (0-1)
+     */
+    getTriggerChance(attacker, target, damage) {
+        // 20% base chance to trigger
+        return 0.2;
+    }
+
+    /**
      * Execute Thieving Strike effect after a successful attack
      * @param {Object} attacker - The hero who attacked
      * @param {Object} target - The target that was attacked (hero or creature)

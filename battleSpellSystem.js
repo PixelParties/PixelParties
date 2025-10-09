@@ -691,7 +691,7 @@ export class BattleSpellSystem {
             
             try {
                 // Determine trigger chance
-                let triggerChance = 1.0; // Default: always trigger
+                let triggerChance = 0.2; // Default chance
                 
                 if (spellImpl.getTriggerChance && typeof spellImpl.getTriggerChance === 'function') {
                     triggerChance = spellImpl.getTriggerChance(attacker, target, damage);

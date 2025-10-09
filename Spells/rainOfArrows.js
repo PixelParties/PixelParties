@@ -7,6 +7,11 @@ export class RainOfArrowsSpell {
         this.damage = 40; // Fixed damage amount
     }
 
+    getTriggerChance(attacker, target, damage) {
+        // 20% base chance to trigger
+        return 0.2;
+    }
+
     /**
      * Execute Rain of Arrows effect after a successful attack
      * @param {Object} attacker - The hero who attacked

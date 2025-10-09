@@ -6,6 +6,11 @@ export class CoolnessOverchargeSpell {
         this.spellName = 'CoolnessOvercharge';
     }
 
+    getTriggerChance(attacker, target, damage) {
+        // 20% base chance to trigger
+        return 0.2;
+    }
+
     /**
      * Execute Coolness Overcharge effect after a successful attack
      * @param {Object} attacker - The hero who attacked

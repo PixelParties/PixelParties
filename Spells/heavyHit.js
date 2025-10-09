@@ -6,6 +6,11 @@ export class HeavyHitSpell {
         this.spellName = 'HeavyHit';
     }
 
+    getTriggerChance(attacker, target, damage) {
+        // 20% base chance to trigger
+        return 0.2;
+    }
+
     /**
      * Execute Heavy Hit effect after a successful attack
      * @param {Object} attacker - The hero who attacked

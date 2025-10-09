@@ -718,7 +718,7 @@ const CARD_DATABASE = {
         name: 'BurningFinger',
         image: './Cards/All/BurningFinger.png',
         cardType: 'Spell',
-        level: 0,
+        level: 1,
         cost: 0,
         action: true,
         spellSchool: 'DestructionMagic',
@@ -2860,6 +2860,7 @@ export function getAllCardNames() {
     return Object.keys(CARD_DATABASE);
 }
 
+
 /**
  * Check if a card exists in the database
  * @param {string} cardName - The name of the card to check
@@ -2932,7 +2933,15 @@ export function getAllHeroes() {
  */
 export function getAllAbilityCards() {
     return Object.values(CARD_DATABASE)
-        .filter(card => card.cardType !== 'hero' && card.cardType !== 'Token')
+        .filter(card => {
+            // Exclude tokens
+            if (card.cardType === 'Token') return false;
+            
+            // Exclude regular heroes, but ALLOW Ascended heroes
+            if (card.cardType === 'hero' && card.subtype !== 'Ascended') return false;
+            
+            return true;
+        })
         .map(card => ({ ...card })); // Return copies
 }
 

@@ -1678,16 +1678,8 @@ export class CardRewardManager {
             })
             .filter(baseHero => baseHero !== null);
         
-        // Filter out already used heroes, opponent's heroes, their base forms, Carris, and unobtainable heroes
+        // Filter out already used heroes, opponent's heroes, their base forms, and Carris
         const availableHeroes = this.allHeroes.filter(hero => {
-            // Get hero info to check for unobtainable status
-            const heroInfo = this.heroSelection.getCardInfo(hero.name);
-            
-            // Skip if hero is unobtainable
-            if (heroInfo && heroInfo.unobtainable) {
-                return false;
-            }
-            
             // Skip Carris - cannot be offered as a reward
             if (hero.name === 'Carris') {
                 return false;
@@ -1714,6 +1706,7 @@ export class CardRewardManager {
             }
             
             // Check if hero has "Ascended" subtype and exclude it
+            const heroInfo = this.heroSelection.getCardInfo(hero.name);
             if (heroInfo && heroInfo.subtype === 'Ascended') {
                 return false;
             }
@@ -1747,7 +1740,7 @@ export class CardRewardManager {
     generateRewardCards(count = 3) {
         // Use the card reward generator with player counters for Monkee support
         const playerCounters = this.heroSelection?.playerCounters || { goldenBananas: 0 };
-        return this.cardRewardGenerator.generateRewardCards(this.deckManager, playerCounters, count);
+        return this.cardRewardGenerator.generateRewardCards(this.deckManager, playerCounters, count, this.heroSelection);
     }
 
     createHeroRewardHTML(hero, index) {

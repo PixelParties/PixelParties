@@ -1,6 +1,6 @@
-// cardRewardGenerator.js - Card Reward Generation Logic with Monkee Support
+// cardRewardGenerator.js - Card Reward Generation Logic with Monkee Support and Ascended Heroes
 
-import { getAllAbilityCards } from './cardDatabase.js';
+import { getAllAbilityCards, getCardInfo } from './cardDatabase.js';
 
 export class CardRewardGenerator {
     constructor() {
@@ -13,13 +13,14 @@ export class CardRewardGenerator {
     }
 
     /**
-     * Generate reward cards with Monkee archetype support
+     * Generate reward cards with Monkee archetype support and Ascended Heroes
      * @param {Object} deckManager - The deck manager instance
      * @param {Object} playerCounters - Player counters including goldenBananas
      * @param {number} count - Number of cards to generate (default 3)
+     * @param {Object} heroSelection - Hero selection manager for checking owned heroes
      * @returns {Array} Array of selected reward cards
      */
-    generateRewardCards(deckManager, playerCounters, count = 3) {
+    generateRewardCards(deckManager, playerCounters, count = 3, heroSelection = null) {
         const allCards = getAllAbilityCards();
         
         // EXCLUDE FORBIDDEN CARDS - These cards can never be offered as rewards
@@ -40,6 +41,9 @@ export class CardRewardGenerator {
             filteredCards = availableCards.filter(card => card.archetype !== 'Monkees');
         }
 
+        // Get eligible Ascended Heroes for this player
+        const eligibleAscendedHeroes = this.getEligibleAscendedHeroes(heroSelection);
+
         // Separate cards by type from filtered pool
         const abilityCards = filteredCards.filter(card => card.cardType === 'Ability');
         const spellCards = filteredCards.filter(card => card.cardType === 'Spell');
@@ -49,6 +53,9 @@ export class CardRewardGenerator {
             card.cardType !== 'hero'
         ); // Artifacts, Potions, etc.
 
+        // Add eligible Ascended Heroes to the "other" pool
+        const otherCardsWithAscended = [...otherCards, ...eligibleAscendedHeroes];
+
         // Separate by whether they're in deck
         const abilityCardsInDeck = abilityCards.filter(card => currentDeckCardNames.includes(card.name));
         const abilityCardsNotInDeck = abilityCards.filter(card => !currentDeckCardNames.includes(card.name));
@@ -56,8 +63,8 @@ export class CardRewardGenerator {
         const spellCardsInDeck = spellCards.filter(card => currentDeckCardNames.includes(card.name));
         const spellCardsNotInDeck = spellCards.filter(card => !currentDeckCardNames.includes(card.name));
         
-        const otherCardsInDeck = otherCards.filter(card => currentDeckCardNames.includes(card.name));
-        const otherCardsNotInDeck = otherCards.filter(card => !currentDeckCardNames.includes(card.name));
+        const otherCardsInDeck = otherCardsWithAscended.filter(card => currentDeckCardNames.includes(card.name));
+        const otherCardsNotInDeck = otherCardsWithAscended.filter(card => !currentDeckCardNames.includes(card.name));
 
         const rewardCards = [];
 
@@ -105,7 +112,7 @@ export class CardRewardGenerator {
             rewardCards.push(secondCard);
         }
 
-        // Third card: Other (possibly forced Monkee)
+        // Third card: Other (possibly forced Monkee, can include Ascended Heroes)
         let thirdCard = null;
         if (forceMonkeeOther) {
             thirdCard = this.selectMonkeeOrGoldenBananas(availableCards, 'Other');
@@ -126,6 +133,39 @@ export class CardRewardGenerator {
         }
 
         return rewardCards;
+    }
+
+    /**
+     * Get Ascended Heroes that the player is eligible for based on owned base heroes
+     * @param {Object} heroSelection - Hero selection manager
+     * @returns {Array} Array of eligible Ascended Hero cards
+     */
+    getEligibleAscendedHeroes(heroSelection) {
+        if (!heroSelection || !heroSelection.formationManager) {
+            return [];
+        }
+
+        // Get all heroes in player's formation
+        const formation = heroSelection.formationManager.getBattleFormation();
+        const ownedHeroNames = ['left', 'center', 'right']
+            .map(position => formation[position])
+            .filter(hero => hero !== null)
+            .map(hero => hero.name);
+
+        // Get all Ascended Heroes from the database
+        const allCards = getAllAbilityCards();
+        const ascendedHeroes = allCards.filter(card => 
+            card.cardType === 'hero' && 
+            card.subtype === 'Ascended' &&
+            card.baseHero !== undefined
+        );
+
+        // Filter to only those whose baseHero is owned
+        const eligibleAscended = ascendedHeroes.filter(ascendedHero => 
+            ownedHeroNames.includes(ascendedHero.baseHero)
+        );
+
+        return eligibleAscended;
     }
 
     /**

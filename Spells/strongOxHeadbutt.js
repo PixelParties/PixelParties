@@ -57,6 +57,11 @@ export class StrongOxHeadbuttSpell {
      * @returns {Promise} - Animation completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'StrongOxHeadbutt');
+        }
+
         // Log the effect
         this.battleManager.addCombatLog(
             `🐂 ${attacker.name}'s Strong Ox Headbutt charges forth!`,
@@ -84,8 +89,6 @@ export class StrongOxHeadbuttSpell {
                 timestamp: Date.now()
             });
         }
-
-        // Don't await the visual effect - return immediately so battle flow continues
     }
 
     /**

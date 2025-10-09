@@ -14,6 +14,11 @@ export class ThievingStrikeSpell {
      * @returns {Promise} - Animation completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'ThievingStrike');
+        }
+
         // Determine opponent's deck relative to attacker
         const attackerSide = attacker.side; // 'player' or 'opponent'
         const opponentSide = attackerSide === 'player' ? 'opponent' : 'player';

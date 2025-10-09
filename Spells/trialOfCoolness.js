@@ -43,6 +43,11 @@ export class TrialOfCoolnessSpell {
      * Execute Trial of Coolness effect after trigger
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'TrialOfCoolness');
+        }
+
         // Record target's HP before the trial for attacker damage
         const targetHpBeforeTrial = target.currentHp;
         

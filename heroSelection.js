@@ -248,6 +248,7 @@ export class HeroSelection {
             'Carris': ['Divinity', 'Premonition', 'BigGwen', 'TheHandsOfBigGwen', 'HatOfMadness', 'Haste', 'Slow', 'DivineGiftOfTime'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['Fighting', 'AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RainbowsArrow', 'RainOfArrows'],
+            'Gabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
             'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
             'Gon': ['DecayMagic', 'BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechCopyDevice', 'FutureTechFists', 'FutureTechLamp'],
@@ -267,7 +268,8 @@ export class HeroSelection {
             'Thep': ['SoulShardBa', 'SoulShardIb', 'SoulShardKa', 'SoulShardKhet', 'SoulShardRen', 'SoulShardSah', 'SoulShardSekhem', 'SoulShardShut'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
-            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet']
+            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet'],
+            'ZombieGabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
         };
 
         
@@ -407,6 +409,11 @@ export class HeroSelection {
         if (this.skullNecklaceEffect) {
             skullNecklaceAttackBonus = this.skullNecklaceEffect.calculateAttackBonus(heroPosition);
         }
+    
+        // Get TRULY permanent bonuses (ForcefulRevival, etc.)
+        const formationHero = formation[heroPosition];
+        let trulyPermanentAttackBonus = formationHero?.permanentAttackBonusses || 0;
+        let trulyPermanentHpBonus = formationHero?.permanentHpBonusses || 0;
         
         // Get permanent bonuses from LegendarySwordOfABarbarianKing
         let permanentAttackBonus = 0;
@@ -423,12 +430,17 @@ export class HeroSelection {
         // Calculate final stats with all bonuses
         const hpBonus = toughnessStacks * 200;
         const fightingAttackBonus = fightingStacks * 20;
-        const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + energyCoreAttackBonus + skullNecklaceAttackBonus + permanentAttackBonus;
-        const totalHpBonus = hpBonus + permanentHpBonus;
+        const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + energyCoreAttackBonus 
+            + skullNecklaceAttackBonus + permanentAttackBonus + trulyPermanentAttackBonus;
+        const totalHpBonus = hpBonus + permanentHpBonus + trulyPermanentHpBonus;
+
+        // ENFORCE MINIMUM OF 1 MAX HP
+        const calculatedMaxHp = heroInfo.hp + totalHpBonus;
+        const finalMaxHp = Math.max(1, calculatedMaxHp);
         
         return {
-            maxHp: heroInfo.hp + totalHpBonus,
-            currentHp: heroInfo.hp + totalHpBonus,
+            maxHp: finalMaxHp,
+            currentHp: finalMaxHp,
             attack: heroInfo.atk + totalAttackBonus,
             bonuses: {
                 toughnessStacks,
@@ -441,9 +453,11 @@ export class HeroSelection {
                 energyCoreAttackBonus,
                 skullNecklaceAttackBonus, 
                 permanentAttackBonus,  
-                permanentHpBonus,      
+                permanentHpBonus,
+                trulyPermanentAttackBonus,
+                trulyPermanentHpBonus,
                 totalAttackBonus,
-                totalHpBonus           
+                totalHpBonus  
             }
         };
     }
@@ -758,7 +772,7 @@ export class HeroSelection {
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
                 'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
-                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png'
+                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png', 'Gabby.png', 'ZombieGabby.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -796,7 +810,7 @@ export class HeroSelection {
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
                 'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
-                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png'
+                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png', 'Gabby.png', 'ZombieGabby.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -974,6 +988,19 @@ export class HeroSelection {
                 gameState.hostSelected = this.selectedCharacter;
                 gameState.hostBattleFormation = sanitizeForFirebase(this.formationManager.getBattleFormation());
 
+                // Save TRULY permanent bonuses explicitly
+                const formation = this.formationManager.getBattleFormation();
+                const trulyPermanentBonuses = {};
+                ['left', 'center', 'right'].forEach(position => {
+                    if (formation[position]) {
+                        trulyPermanentBonuses[position] = {
+                            permanentAttackBonusses: formation[position].permanentAttackBonusses || 0,
+                            permanentHpBonusses: formation[position].permanentHpBonusses || 0
+                        };
+                    }
+                });
+                gameState.hostTrulyPermanentBonuses = sanitizeForFirebase(trulyPermanentBonuses);
+
                 // Save other host data including gold
                 if (this.deckManager) {
                     gameState.hostDeck = sanitizeForFirebase(this.deckManager.exportDeck());
@@ -1130,6 +1157,19 @@ export class HeroSelection {
             } else if (!this.isHost && this.selectedCharacter) {
                 gameState.guestSelected = this.selectedCharacter;
                 gameState.guestBattleFormation = sanitizeForFirebase(this.formationManager.getBattleFormation());
+
+                // Save TRULY permanent bonuses explicitly
+                const formation = this.formationManager.getBattleFormation();
+                const trulyPermanentBonuses = {};
+                ['left', 'center', 'right'].forEach(position => {
+                    if (formation[position]) {
+                        trulyPermanentBonuses[position] = {
+                            permanentAttackBonusses: formation[position].permanentAttackBonusses || 0,
+                            permanentHpBonusses: formation[position].permanentHpBonusses || 0
+                        };
+                    }
+                });
+                gameState.guestTrulyPermanentBonuses = sanitizeForFirebase(trulyPermanentBonuses);
 
                 // Save other guest data including gold
                 if (this.deckManager) {
@@ -1342,7 +1382,8 @@ export class HeroSelection {
         heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, 
         magicSapphiresUsedData = null, magicRubiesUsedData = null, playerCountersData = null, 
         areaCardData = null, graveyardData = null, inventingData = null, occultismData = null, 
-        graveWormData = null, crystalWellData = null, teleportData = null, opponentCountersData = null)  {
+        graveWormData = null, crystalWellData = null, teleportData = null, opponentCountersData = null,
+        trulyPermanentBonusesData = null)  {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1412,7 +1453,6 @@ export class HeroSelection {
         }
 
         // ===== Restore teleport state =====
-
         if (teleportData) {
             this.teleportState = teleportData;
         } else {
@@ -1456,9 +1496,7 @@ export class HeroSelection {
                 this.heinzEffectManager.reset();
             }
         }
-
-
-            
+                
         // Restore GraveWorm state
         if (graveWormData && this.graveWormCreature) {
             const graveWormRestored = this.graveWormCreature.importState(graveWormData);
@@ -1468,8 +1506,6 @@ export class HeroSelection {
                 this.graveWormCreature.reset();
             }
         }
-
-
 
         // ===== Restore delayed artifact effects =====
         if (delayedEffectsData && Array.isArray(delayedEffectsData)) {
@@ -1576,6 +1612,17 @@ export class HeroSelection {
             this.playerCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0, supplyChain: 0 };
         }
         
+        // ===== NEW: Restore TRULY permanent bonuses (ForcefulRevival, etc.) =====
+        if (trulyPermanentBonusesData) {
+            const formation = this.formationManager.getBattleFormation();
+            ['left', 'center', 'right'].forEach(position => {
+                if (formation[position] && trulyPermanentBonusesData[position]) {
+                    formation[position].permanentAttackBonusses = trulyPermanentBonusesData[position].permanentAttackBonusses || 0;
+                    formation[position].permanentHpBonusses = trulyPermanentBonusesData[position].permanentHpBonusses || 0;
+                }
+            });
+        }
+        
         // Initialize life manager with turn tracker after restoration
         this.initializeLifeManagerWithTurnTracker();
 
@@ -1596,7 +1643,7 @@ export class HeroSelection {
     // Enhanced start character selection process  TEST HEROES HERE!!!
     async startSelection() {
         window._debugHostHeroes = ['', '', '']; // '' = random
-        window._debugGuestHeroes = ['', ''];             // Missing slots = random
+        window._debugGuestHeroes = ['', '', ''];             // Missing slots = random
 
         if (this.allPreviewCharacters.length < 6) { 
             return false;
@@ -1658,20 +1705,26 @@ export class HeroSelection {
             this.initializeLifeManagerWithTurnTracker();
         }
         
-        // Generate new character selection using PREVIEW characters with debug support
+        // Filter out unobtainable heroes before selection
+        const obtainableHeroes = this.allPreviewCharacters.filter(hero => {
+            const heroInfo = getHeroInfo(hero.name);
+            return !heroInfo || !heroInfo.unobtainable;
+        });
+
+        // Generate new character selection using OBTAINABLE PREVIEW characters with debug support
         // Check for debug hero arrays
         const debugHost = (window._debugHostHeroes || []).filter(h => h && h.trim() !== '');
         const debugGuest = (window._debugGuestHeroes || []).filter(h => h && h.trim() !== '');
 
         if (debugHost.length > 0 || debugGuest.length > 0) {
-            // Get specified heroes
-            const getHeroByName = (name) => this.allPreviewCharacters.find(char => char.name === name);
+            // Get specified heroes (only from obtainable heroes)
+            const getHeroByName = (name) => obtainableHeroes.find(char => char.name === name);
             const hostChars = debugHost.map(getHeroByName).filter(Boolean);
             const guestChars = debugGuest.map(getHeroByName).filter(Boolean);
             
-            // Get remaining heroes for random selection
+            // Get remaining heroes for random selection (only obtainable)
             const usedNames = [...debugHost, ...debugGuest];
-            const remaining = this.allPreviewCharacters.filter(char => !usedNames.includes(char.name));
+            const remaining = obtainableHeroes.filter(char => !usedNames.includes(char.name));
             
             // Fill remaining slots randomly
             const needRandom = 6 - hostChars.length - guestChars.length;
@@ -1683,9 +1736,9 @@ export class HeroSelection {
             this.opponentCharacters = [...guestChars, ...randomChars.slice(3 - hostChars.length)];
             
         } else {
-            // Normal random selection
-            const selectedIndices = this.getRandomUniqueIndices(this.allPreviewCharacters.length, 6);
-            const allSelectedCharacters = selectedIndices.map(index => this.allPreviewCharacters[index]);
+            // Normal random selection (only from obtainable heroes)
+            const selectedIndices = this.getRandomUniqueIndices(obtainableHeroes.length, 6);
+            const allSelectedCharacters = selectedIndices.map(index => obtainableHeroes[index]);
             
             // Split into two groups of 3 (host gets first 3, guest gets last 3)
             this.playerCharacters = allSelectedCharacters.slice(0, 3);

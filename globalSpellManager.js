@@ -160,8 +160,46 @@ export class GlobalSpellManager {
         if (cardName === 'AuroraBorealis') {
             return await this.handleAuroraBorealisClick(cardIndex, cardName, heroSelection);
         }
+        if (cardName === 'Expedition') {
+            return await this.handleExpeditionClick(cardIndex, cardName, heroSelection);
+        }
+        if (cardName === 'Shipwrecked') {
+            return await this.handleShipwreckedClick(cardIndex, cardName, heroSelection);
+        }
         
         return false;
+    }
+
+    async handleShipwreckedClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('shipwrecked');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('Shipwrecked spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load Shipwrecked spell:', error);
+            return false;
+        }
+    }
+
+    async handleExpeditionClick(cardIndex, cardName, heroSelection) {
+        try {
+            const spell = await this.loadSpell('expedition');
+            if (spell && spell.handleClick) {
+                const result = await spell.handleClick(cardIndex, cardName, heroSelection, this);
+                return result;
+            } else {
+                console.error('Expedition spell missing handleClick method');
+                return false;
+            }
+        } catch (error) {
+            console.error('Failed to load Expedition spell:', error);
+            return false;
+        }
     }
 
     async handleAuroraBorealisClick(cardIndex, cardName, heroSelection) {

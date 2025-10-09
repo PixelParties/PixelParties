@@ -38,6 +38,11 @@ export class FerociousTigerKickSpell {
      * @returns {Promise} - Animation completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'FerociousTigerKick');
+        }
+
         // Calculate healing: half of actual damage dealt, rounded up
         const healingAmount = Math.ceil(attackDamage / 2);
         
@@ -91,8 +96,6 @@ export class FerociousTigerKickSpell {
                 timestamp: Date.now()
             });
         }
-
-        // Don't await the visual effect - return immediately so battle flow continues
     }
 
     /**

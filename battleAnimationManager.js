@@ -243,6 +243,130 @@ export class BattleAnimationManager {
         this.createImpactEffect(creatureElement);
     }
 
+    /**
+     * Animate infighting attack (hero attacking ally on same side)
+     * @param {Object} attackerHero - The infighting hero
+     * @param {Object} target - The ally target
+     * @param {string} attackerSide - Side of the attacker (player/opponent)
+     */
+    async animateInfightingAttack(attackerHero, target, attackerSide) {
+        const attackerElement = this.getHeroElement(attackerSide, attackerHero.position);
+        
+        let targetElement = null;
+        if (target.type === 'creature') {
+            const targetSelector = `.${attackerSide}-slot.${target.position}-slot .creature-icon[data-creature-index="${target.creatureIndex}"]`;
+            targetElement = document.querySelector(targetSelector);
+        } else {
+            targetElement = this.getHeroElement(attackerSide, target.position);
+        }
+        
+        if (!attackerElement || !targetElement) {
+            console.error('Infighting animation: Missing elements');
+            return;
+        }
+        
+        const attackerCard = attackerElement.querySelector('.battle-hero-card');
+        if (!attackerCard) return;
+        
+        // Calculate movement to ally target
+        const attackerRect = attackerElement.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        
+        const deltaX = targetRect.left + targetRect.width/2 - (attackerRect.left + attackerRect.width/2);
+        const deltaY = targetRect.top + targetRect.height/2 - (attackerRect.top + attackerRect.height/2);
+        
+        const duration = Math.max(this.getSpeedAdjustedDelay(120), 50);
+        
+        // Add red rage aura for infighting
+        attackerCard.style.filter = 'brightness(1.2) drop-shadow(0 0 15px rgba(255, 0, 0, 0.8))';
+        
+        attackerCard.classList.add('attacking');
+        attackerCard.style.transition = `transform ${duration}ms ease-out`;
+        attackerCard.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.2)`;
+        
+        await new Promise(resolve => setTimeout(resolve, duration));
+        
+        // Create impact effect
+        this.createImpactEffect(targetElement);
+        
+        // Remove rage aura
+        attackerCard.style.filter = '';
+    }
+
+    /**
+     * Animate simultaneous attacks where one or both heroes are infighting
+     * @param {Object} playerAttack - Player attack data (may be infighting)
+     * @param {Object} opponentAttack - Opponent attack data (may be infighting)
+     */
+    async animateSimultaneousWithInfighting(playerAttack, opponentAttack) {
+        const animations = [];
+        
+        // Player attack - check if infighting (same side target)
+        if (playerAttack) {
+            const isPlayerInfighting = playerAttack.target.side === 'player';
+            
+            if (isPlayerInfighting) {
+                // Player attacking own ally - special animation
+                animations.push(
+                    this.animateInfightingAttack(
+                        playerAttack.hero, 
+                        playerAttack.target, 
+                        'player'
+                    )
+                );
+            } else {
+                // Normal attack to opponent
+                if (playerAttack.target.type === 'creature') {
+                    animations.push(
+                        this.animateHeroToCreatureAttack(playerAttack.hero, playerAttack.target, 'player')
+                    );
+                } else {
+                    animations.push(
+                        this.animateCollisionAttackTowards(
+                            playerAttack.hero, 
+                            this.getHeroElement(playerAttack.target.side, playerAttack.target.position), 
+                            'player'
+                        )
+                    );
+                }
+            }
+        }
+        
+        // Opponent attack - check if infighting
+        if (opponentAttack) {
+            const isOpponentInfighting = opponentAttack.target.side === 'opponent';
+            
+            if (isOpponentInfighting) {
+                // Opponent attacking own ally - special animation
+                animations.push(
+                    this.animateInfightingAttack(
+                        opponentAttack.hero, 
+                        opponentAttack.target, 
+                        'opponent'
+                    )
+                );
+            } else {
+                // Normal attack to player
+                if (opponentAttack.target.type === 'creature') {
+                    animations.push(
+                        this.animateHeroToCreatureAttack(opponentAttack.hero, opponentAttack.target, 'opponent')
+                    );
+                } else {
+                    animations.push(
+                        this.animateCollisionAttackTowards(
+                            opponentAttack.hero, 
+                            this.getHeroElement(opponentAttack.target.side, opponentAttack.target.position), 
+                            'opponent'
+                        )
+                    );
+                }
+            }
+        }
+        
+        await Promise.all(animations);
+    }
+
+
     // GUEST: Animate hero to creature attack
     async guest_animateHeroToCreatureAttack(hero, targetData, heroSide) {
         const myAbsoluteSide = this.battleManager.isHost ? 'host' : 'guest';

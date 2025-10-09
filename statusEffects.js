@@ -149,6 +149,15 @@ export class StatusEffectsManager {
                 persistent: false,
                 visual: 'weakness_arrow',
                 description: 'Deals half damage on attacks. Reduces by 1 stack each turn.'
+            },
+            infighting: {
+                name: 'infighting',
+                displayName: 'Infighting',
+                type: 'debuff',
+                targetTypes: ['hero'], // Only heroes can have infighting
+                persistent: false, // Decreases each turn
+                visual: 'rage_aura',
+                description: 'Overcome with rage. Reduces by 1 stack each turn.'
             }
         };
     }
@@ -619,6 +628,7 @@ export class StatusEffectsManager {
         this.processTauntingDuration(target);
         this.processHealBlockDuration(target);
         this.processWeakenedDuration(target);
+        this.processInfightingDuration(target);
 
         // Clean up expired effects
         this.cleanupExpiredEffects(target);
@@ -938,6 +948,20 @@ export class StatusEffectsManager {
         }
     }
 
+    // Process infighting duration (decreases each turn)
+    processInfightingDuration(target) {
+        if (this.hasStatusEffect(target, 'infighting')) {
+            this.removeStatusEffect(target, 'infighting', 1);
+            
+            if (!this.hasStatusEffect(target, 'infighting')) {
+                this.battleManager.addCombatLog(
+                    `😤 ${target.name} is no longer infighting!`,
+                    target.side === 'player' ? 'success' : 'error'
+                );
+            }
+        }
+    }
+
     // ============================================
     // STATUS EFFECT INTERACTIONS
     // ============================================
@@ -1010,7 +1034,8 @@ export class StatusEffectsManager {
             dazed: { icon: '😵‍💫', color: 'rgba(200, 150, 255, 0.9)' },
             taunting: { icon: '📢', color: 'rgba(255, 107, 107, 0.9)' },
             healblock: { icon: '🚫', color: 'rgba(220, 53, 69, 0.9)' },
-            weakened: { icon: '↓', color: 'rgba(220, 53, 69, 0.9)' }
+            weakened: { icon: '↓', color: 'rgba(220, 53, 69, 0.9)' },
+            infighting: { icon: '😡', color: 'rgba(139, 0, 0, 0.9)' },
         };
 
         const effect = effects[effectName];
@@ -1072,6 +1097,8 @@ export class StatusEffectsManager {
             taunting: { icon: '📢', color: '#ff6b6b' },
             healblock: { icon: '🚫', color: '#dc3545' },
             weakened: { icon: '↘', color: '#dc3545' },
+            infighting: { icon: '😡', color: '#8B0000' },
+
         };
 
         const indicator = indicators[effectName];
@@ -1792,6 +1819,97 @@ export class StatusEffectsManager {
         }
         
         return baseDamage;
+    }
+
+    /**
+     * Check if hero should attack allies due to infighting
+     * @param {Object} hero - Hero with potential infighting
+     * @param {string} position - Hero's position
+     * @returns {Object|null} - { shouldInfight: boolean, target: Object|null, skipSpellcasting: boolean }
+     */
+    checkInfightingEffect(hero, position) {
+        if (!this.hasStatusEffect(hero, 'infighting')) {
+            return { shouldInfight: false, target: null, skipSpellcasting: false };
+        }
+        
+        const heroSide = hero.side;
+        const allies = heroSide === 'player' ? 
+            this.battleManager.playerHeroes : 
+            this.battleManager.opponentHeroes;
+        
+        // Check for living ally heroes (excluding self)
+        const livingAllyHeroes = [];
+        ['left', 'center', 'right'].forEach(pos => {
+            const allyHero = allies[pos];
+            if (allyHero && allyHero.alive && pos !== position) {
+                livingAllyHeroes.push({ hero: allyHero, position: pos });
+            }
+        });
+        
+        if (livingAllyHeroes.length > 0) {
+            // Random ally hero
+            const randomAlly = this.battleManager.getRandomChoice(livingAllyHeroes);
+            
+            this.battleManager.addCombatLog(
+                `💢 ${hero.name} is overcome with rage and attacks ally ${randomAlly.hero.name}!`,
+                heroSide === 'player' ? 'error' : 'warning'
+            );
+            
+            return {
+                shouldInfight: true,
+                skipSpellcasting: true,
+                target: {
+                    type: 'hero',
+                    hero: randomAlly.hero,
+                    position: randomAlly.position,
+                    side: heroSide // Same side as attacker!
+                }
+            };
+        }
+        
+        // Check for living ally creatures
+        const livingAllyCreatures = [];
+        ['left', 'center', 'right'].forEach(pos => {
+            const allyHero = allies[pos];
+            if (allyHero && allyHero.creatures) {
+                allyHero.creatures.forEach((creature, index) => {
+                    if (creature.alive) {
+                        livingAllyCreatures.push({
+                            hero: allyHero,
+                            creature: creature,
+                            creatureIndex: index,
+                            position: pos
+                        });
+                    }
+                });
+            }
+        });
+        
+        if (livingAllyCreatures.length > 0) {
+            // Random ally creature
+            const randomCreature = this.battleManager.getRandomChoice(livingAllyCreatures);
+            
+            this.battleManager.addCombatLog(
+                `💢 ${hero.name} is overcome with rage and attacks ally ${randomCreature.creature.name}!`,
+                heroSide === 'player' ? 'error' : 'warning'
+            );
+            
+            return {
+                shouldInfight: true,
+                skipSpellcasting: true,
+                target: {
+                    type: 'creature',
+                    hero: randomCreature.hero,
+                    creature: randomCreature.creature,
+                    creatureIndex: randomCreature.creatureIndex,
+                    position: randomCreature.position,
+                    side: heroSide // Same side as attacker!
+                }
+            };
+        }
+        
+        // No allies to attack - proceed normally
+        return { shouldInfight: false, target: null, skipSpellcasting: false };
     }
 
     /**

@@ -969,6 +969,18 @@ export class BattleNetworkManager {
                 ThepHeroEffect.handleGuestThepRevival(data, bm);
                 break;
 
+            case 'gabby_transformation':
+                const { GabbyHeroEffect } = await import('./Heroes/gabby.js');
+                await GabbyHeroEffect.handleGuestTransformation(data, bm);
+                break;
+
+            case 'check_gabby_revival':
+                if (!bm.isAuthoritative) {
+                    const { GabbyHeroEffect } = await import('./Heroes/gabby.js');
+                    await GabbyHeroEffect.checkGabbyRevivalAtTurnStart(bm);
+                }
+                break;
+
             case 'nomu_shield_applied':
                 bm.guest_handleNomuShieldApplied(data);
                 break;
@@ -1044,6 +1056,27 @@ export class BattleNetworkManager {
                 bm.guest_handleFuriousAngerAction(data);
                 break;
 
+            case 'rescue_mission_activated':
+                if (!bm.isAuthoritative) {
+                    const { handleGuestRescueMission } = await import('./Spells/rescueMission.js');
+                    await handleGuestRescueMission(data, bm);
+                }
+                break;
+
+            case 'shipwrecked_hp_halved':
+                import('./Spells/shipwrecked.js').then(({ handleGuestShipwreckedHPHalved }) => {
+                    handleGuestShipwreckedHPHalved(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling Shipwrecked HP halving:', error);
+                });
+                break;
+
+            case 'shipwrecked_battle_start':
+                if (!bm.isAuthoritative && window.handleGuestShipwreckedBattleStart) {
+                    await window.handleGuestShipwreckedBattleStart(data, bm);
+                }
+                break;
+
             case 'blade_frost_triggered':
                 bm.guest_handleBladeFrostTriggered(data);
                 break;
@@ -1073,6 +1106,12 @@ export class BattleNetworkManager {
                 
             case 'spell_effect':
                 bm.guest_handleSpellEffect(data);
+                break;
+
+            case 'fighting_spell_trigger':
+                if (bm.spellSystem) {
+                    bm.spellSystem.handleGuestFightingSpellTrigger(data);
+                }
                 break;
                 
             case 'fireshield_applied':
@@ -1175,6 +1214,16 @@ export class BattleNetworkManager {
                 import('./Artifacts/snowCannon.js').then(({ handleGuestSnowCannonFreeze }) => {
                     handleGuestSnowCannonFreeze(data, this.battleManager);
                 });
+                break;
+
+            case 'anti_intruder_effects_complete':
+                const { handleGuestAntiIntruderEffects } = await import('./Artifacts/antiIntruderSystem.js');
+                handleGuestAntiIntruderEffects(data, this);
+                break;
+
+            case 'anti_intruder_strike':
+                const { handleGuestAntiIntruderStrike } = await import('./Artifacts/antiIntruderSystem.js');
+                await handleGuestAntiIntruderStrike(data, this);
                 break;
 
             case 'heart_mountain_effects_complete':
@@ -1515,6 +1564,14 @@ export class BattleNetworkManager {
                     this.battleManager.spellSystem.spellImplementations.has('UltimateDestroyerPunch')) {
                     const ultimateDestroyerPunchSpell = this.battleManager.spellSystem.spellImplementations.get('UltimateDestroyerPunch');
                     ultimateDestroyerPunchSpell.handleGuestEffect(data);
+                }
+                break;
+
+            case 'forceful_revival_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('ForcefulRevival')) {
+                    const forcefulRevivalSpell = this.battleManager.spellSystem.spellImplementations.get('ForcefulRevival');
+                    forcefulRevivalSpell.handleGuestEffect(data);
                 }
                 break;
 
@@ -2379,6 +2436,21 @@ export class BattleNetworkManager {
         
         // Apply battle results first
         bm.applyBattleResults(hostResult, guestResult, hostLives, guestLives, hostGold, guestGold);
+
+        // Apply truly permanent stat bonuses to guest's formation
+        if (window.heroSelection) {
+            const formation = window.heroSelection.formationManager.getBattleFormation();
+            const myBonuses = bm.isHost ? data.hostTrulyPermanentBonuses : data.guestTrulyPermanentBonuses;
+            
+            if (myBonuses) {
+                ['left', 'center', 'right'].forEach(position => {
+                    if (formation[position] && myBonuses[position]) {
+                        formation[position].permanentAttackBonusses = myBonuses[position].permanentAttackBonusses || 0;
+                        formation[position].permanentHpBonusses = myBonuses[position].permanentHpBonusses || 0;
+                    }
+                });
+            }
+        }
         
         // Calculate and apply wealth bonuses for guest
         if (!bm.isHost) {

@@ -39,6 +39,8 @@ export class CardRewardManager {
             { name: 'Carris', image: './Cards/Characters/Carris.png' },
             { name: 'Cecilia', image: './Cards/Characters/Cecilia.png' },
             { name: 'Darge', image: './Cards/Characters/Darge.png' },
+            { name: 'Ghuanjun', image: './Cards/Characters/Ghuanjun.png' },
+            { name: 'Gabby', image: './Cards/Characters/Gabby.png' },
             { name: 'Gon', image: './Cards/Characters/Gon.png' },
             { name: 'Heinz', image: './Cards/Characters/Heinz.png' },
             { name: 'Ida', image: './Cards/Characters/Ida.png' },
@@ -57,7 +59,8 @@ export class CardRewardManager {
             { name: 'Thep', image: './Cards/Characters/Thep.png' },
             { name: 'Toras', image: './Cards/Characters/Toras.png' },
             { name: 'Vacarn', image: './Cards/Characters/Vacarn.png' },
-            { name: 'Waflav', image: './Cards/Characters/Waflav.png' }
+            { name: 'Waflav', image: './Cards/Characters/Waflav.png' },
+            { name: 'ZombieGabby', image: './Cards/Characters/ZombieGabby.png' }
         ];
         
         this.heroCardSets = {
@@ -66,6 +69,7 @@ export class CardRewardManager {
             'Carris': ['Divinity', 'Premonition', 'BigGwen', 'TheHandsOfBigGwen', 'HatOfMadness', 'Haste', 'Slow', 'DivineGiftOfTime'],
             'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
             'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'Fighting', 'RainbowsArrow', 'RainOfArrows'],
+            'Gabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
             'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
             'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
             'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechFists', 'FutureTechLamp', 'FutureTechCopyDevice'],
@@ -85,7 +89,8 @@ export class CardRewardManager {
             'Thep': ['SoulShardBa', 'SoulShardIb', 'SoulShardKa', 'SoulShardKhet', 'SoulShardRen', 'SoulShardSah', 'SoulShardSekhem', 'SoulShardShut'],
             'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
             'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
-            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet']
+            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet'],
+            'ZombieGabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
         };
 
         // Redraw system
@@ -1673,8 +1678,16 @@ export class CardRewardManager {
             })
             .filter(baseHero => baseHero !== null);
         
-        // Filter out already used heroes, opponent's heroes, their base forms, and Carris
+        // Filter out already used heroes, opponent's heroes, their base forms, Carris, and unobtainable heroes
         const availableHeroes = this.allHeroes.filter(hero => {
+            // Get hero info to check for unobtainable status
+            const heroInfo = this.heroSelection.getCardInfo(hero.name);
+            
+            // Skip if hero is unobtainable
+            if (heroInfo && heroInfo.unobtainable) {
+                return false;
+            }
+            
             // Skip Carris - cannot be offered as a reward
             if (hero.name === 'Carris') {
                 return false;
@@ -1701,7 +1714,6 @@ export class CardRewardManager {
             }
             
             // Check if hero has "Ascended" subtype and exclude it
-            const heroInfo = this.heroSelection.getCardInfo(hero.name);
             if (heroInfo && heroInfo.subtype === 'Ascended') {
                 return false;
             }

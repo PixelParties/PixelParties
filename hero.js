@@ -63,9 +63,13 @@ export class Hero {
         this.creatures = [];
         this.equipment = [];
         
-        // Permanent stat bonuses from LegendarySwordOfABarbarianKing
+        // Stat bonuses from LegendarySwordOfABarbarianKing
         this.attackBonusses = 0;  // Permanent attack bonuses
         this.hpBonusses = 0;      // Permanent HP bonuses
+
+        // Truly permanent bonuses (persist across all game states)
+        this.permanentAttackBonusses = 0;
+        this.permanentHpBonusses = 0;  
         
         // Battle-duration temporary bonuses (persist until battle ends)
         this.battleAttackBonus = 0;  // Temporary attack bonus for this battle only
@@ -75,10 +79,11 @@ export class Hero {
         this.necromancyStacks = 0;
         this.maxNecromancyStacks = 0;
 
-        // Other stacks
+        // Other stacks/counters
         this.burningFingerStack = 0;
         this.deathCounters = 0;
         this.spellShields = 0;
+        this.turnsSinceDeath = 0;
 
         
         // Extensible state for future features
@@ -427,23 +432,35 @@ export class Hero {
         
         const oldMaxHp = this.maxHp;
         
-        // Set the pre-calculated values directly
-        this.maxHp = effectiveStats.maxHp;
+        // Set the pre-calculated values directly with minimum enforcement
+        this.maxHp = Math.max(1, effectiveStats.maxHp);
         this.atk = effectiveStats.attack;
+        
+        // **Restore the permanent bonuses from the bonuses object**
+        if (effectiveStats.bonuses) {
+            if (effectiveStats.bonuses.trulyPermanentAttackBonus !== undefined) {
+                this.permanentAttackBonusses = effectiveStats.bonuses.trulyPermanentAttackBonus;
+            }
+            if (effectiveStats.bonuses.trulyPermanentHpBonus !== undefined) {
+                this.permanentHpBonusses = effectiveStats.bonuses.trulyPermanentHpBonus;
+            }
+        }
         
         // Adjust current HP proportionally if max HP changed
         if (oldMaxHp !== this.maxHp && oldMaxHp > 0) {
             const hpRatio = this.currentHp / oldMaxHp;
             this.currentHp = Math.floor(this.maxHp * hpRatio);
             this.currentHp = Math.min(this.currentHp, this.maxHp);
+            this.currentHp = Math.max(1, this.currentHp);
         } else if (oldMaxHp === this.maxHp) {
-            // If max HP didn't change, keep current HP as is
             this.currentHp = Math.min(this.currentHp, this.maxHp);
+            this.currentHp = Math.max(1, this.currentHp);
         } else {
-            // First time setting stats
             this.currentHp = this.maxHp;
         }
     }
+
+
     
     // Get ability stack counts (no stat calculation)
     getToughnessStackCount() {
@@ -851,9 +868,13 @@ export class Hero {
             // SHIELD SYSTEM - Include shield in export
             currentShield: this.currentShield || 0,
             
-            // Permanent stat bonuses
+            // LegendarySword stat bonuses
             attackBonusses: this.attackBonusses,
             hpBonusses: this.hpBonusses,
+
+            // Truly permanent bonuses (ForcefulRevival, etc.)
+            permanentAttackBonusses: this.permanentAttackBonusses || 0,
+            permanentHpBonusses: this.permanentHpBonusses || 0,
             
             // Battle-duration bonuses
             battleAttackBonus: this.battleAttackBonus,
@@ -875,6 +896,7 @@ export class Hero {
             burningFingerStack: this.burningFingerStack || 0,
             deathCounters: this.deathCounters || 0,
             spellShields: this.spellShields || 0,
+            turnsSinceDeath: this.turnsSinceDeath || 0, 
 
             
             // Battle state
@@ -933,9 +955,13 @@ export class Hero {
         // ASCENSION TRACKING - Restore ascended stack
         hero.setAscendedStack(savedState.ascendedStack || []);
         
-        // Restore permanent stat bonuses
+        // Restore LegendarySword stat bonuses
         hero.attackBonusses = savedState.attackBonusses || 0;
         hero.hpBonusses = savedState.hpBonusses || 0;
+
+        // Restore truly permanent bonuses
+        hero.permanentAttackBonusses = savedState.permanentAttackBonusses || 0;
+        hero.permanentHpBonusses = savedState.permanentHpBonusses || 0;
         
         // Restore battle bonuses
         hero.battleAttackBonus = savedState.battleAttackBonus || 0;
@@ -959,6 +985,7 @@ export class Hero {
         hero.burningFingerStack = savedState.burningFingerStack || 0;
         hero.deathCounters = savedState.deathCounters || 0;
         hero.spellShields = savedState.spellShields || 0;
+        hero.turnsSinceDeath = savedState.turnsSinceDeath || 0; 
 
         
         // Restore battle state

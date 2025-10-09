@@ -38,6 +38,11 @@ export class BlowOfTheVenomSnakeSpell {
      * @returns {Promise} - Animation completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'BlowOfTheVenomSnake');
+        }
+
         // Check if target survived the attack
         const targetAlive = target.alive;
         
@@ -72,8 +77,6 @@ export class BlowOfTheVenomSnakeSpell {
                 timestamp: Date.now()
             });
         }
-
-        // Don't await the visual effect - return immediately so battle flow continues
     }
 
     /**

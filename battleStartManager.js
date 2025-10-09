@@ -366,6 +366,24 @@ export class BattleStartManager {
                     console.error('Error applying SoulShardKhet graveyard summons:', error);
                 }
 
+                // Apply Expedition randomization effects
+                try {
+                    const { applyBothPlayersExpeditionEffects } = await import('./Spells/expedition.js');
+                    await applyBothPlayersExpeditionEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying Expedition randomization effects:', error);
+                }
+
+                // Apply Shipwrecked HP halving effects
+                try {
+                    const { applyBothPlayersShipwreckedEffects } = await import('./Spells/shipwrecked.js');
+                    await applyBothPlayersShipwreckedEffects(delayedEffects.host, delayedEffects.guest, bm);
+                    await bm.delay(100);
+                } catch (error) {
+                    console.error('Error applying Shipwrecked effects:', error);
+                }
+
                 // Re-render creatures after SoulShardKhet summons (HOST SIDE)
                 if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
                     bm.battleScreen.renderCreaturesAfterInit();
@@ -422,9 +440,10 @@ export class BattleStartManager {
                     (effect.source === 'SoulShardKhet') ||
                     (effect.source === 'SoulShardSekhem') ||
                     (effect.source === 'SoulShardSah') ||
-                    (effect.source === 'SoulShardBa')
-
-                    // Add more delayed effect types here as needed
+                    (effect.source === 'SoulShardBa') ||
+                    // Expedition effects
+                    (effect.source === 'Shipwrecked') ||
+                    (effect.source === 'Expedition')
                 )
             ) : [];
             
@@ -441,8 +460,10 @@ export class BattleStartManager {
                     (effect.source === 'SoulShardKhet') ||
                     (effect.source === 'SoulShardSekhem') ||
                     (effect.source === 'SoulShardSah') ||
-                    (effect.source === 'SoulShardBa')
-                    // Add more delayed effect types here as needed
+                    (effect.source === 'SoulShardBa') ||
+                    // Expedition effects
+                    (effect.source === 'Shipwrecked') ||
+                    (effect.source === 'Expedition')
                 )
             ) : [];
             
@@ -491,6 +512,14 @@ export class BattleStartManager {
         const bm = this.battleManager;
         
         try {
+            // Anti-Intruder System effects (FIRST - before all other permanent effects)
+            try {
+                const { applyAntiIntruderBattleEffects } = await import('./Artifacts/antiIntruderSystem.js');
+                await applyAntiIntruderBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying Anti-Intruder System effects:', error);
+            }
+            
             // Snow Cannon effects
             try {
                 const { applySnowCannonBattleEffects } = await import('./Artifacts/snowCannon.js');

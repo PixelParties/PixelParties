@@ -181,6 +181,28 @@ export class HandManager {
             effectiveSpellLevel = Math.max(0, baseSpellLevel - totalCreatures);
         }
 
+        if (spellCardName === 'Shipwrecked') {
+        // Count Navigation level
+        let navigationLevel = 0;
+        
+        if (heroAbilities) {
+            ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                if (heroAbilities[zone]) {
+                    heroAbilities[zone].forEach(ability => {
+                        if (ability && ability.name === 'Navigation') {
+                            navigationLevel++;
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Reduce effective spell level by Navigation level
+        if (navigationLevel > 0) {
+            effectiveSpellLevel = Math.max(0, baseSpellLevel - navigationLevel);
+        }
+    }
+
         // Check 6: Compare levels with the effective requirement
         if (effectiveSpellSchoolLevel < effectiveSpellLevel) {
             // Check if Semi can use gold learning

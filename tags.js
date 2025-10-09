@@ -19,6 +19,7 @@ export class TagsManager {
             'Setup': '#3498db',
             'Card Draw': '#2980b9',
             'Healing': '#1abc9c',
+            'Revival': '#FFD700',
             
             // Summoning/Creatures tags
             'Summoner': '#f39c12',
@@ -131,6 +132,7 @@ export class TagsManager {
             'Carris': ['Multiple Actions', 'Extra Turns', 'High-Risk'],
             'Cecilia': ['Attacker', 'Gold Generation', 'Damage Dealer'],
             'Darge': ['Attacker', 'Sniper', 'Damage Dealer'],
+            'Gabby': ['Defense', 'Card Draw', 'Revival'],
             'Ghuanjun': ['Attacker', 'Defense', 'Setup'],
             'Gon': ['Support', 'Disruption', 'Status Effects'],
             'Heinz': ['Setup', 'Summoner', 'Card Draw', 'Late Game'],
@@ -147,7 +149,7 @@ export class TagsManager {
             'Semi': ['Support', 'Gold Generation', 'Card Draw'],
             'Sid': ['Support', 'Disruption', 'Card Draw'],
             'Tharx': ['Defense', 'Summoner', 'Support'],
-            'Thep': ['Summoner', 'Support', 'Defense'],
+            'Thep': ['Summoner', 'Support', 'Defense', 'Revival'],
             'Toras': ['Attacker', 'Burst Damage', 'Damage Dealer', 'Strong Early'],
             'Vacarn': ['Summoner', 'Creature Spam', 'Disruption'],
             'Waflav': ['Attacker', 'Damage Dealer', 'Late Game']
@@ -215,6 +217,7 @@ export class TagsManager {
             'Setup': '🔧',
             'Card Draw': '📚',
             'Healing': '❤️',
+            'Revival': '👼',
             
             // Summoning/Creatures tags
             'Summoner': '🌟',

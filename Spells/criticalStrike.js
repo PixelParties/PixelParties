@@ -48,7 +48,10 @@ export class CriticalStrikeSpell {
         const shouldTrigger = this.battleManager.getRandom() <= totalChance;
 
         if (shouldTrigger) {
-            const modifiedDamage = baseDamage * 2; // Double the damage
+            if (this.battleManager.spellSystem) {
+                this.battleManager.spellSystem.showFightingSpellCard(attacker, 'CriticalStrike');
+            }
+            const modifiedDamage = baseDamage * 2; 
             
             this.battleManager.addCombatLog(
                 `⚡ ${attacker.name}'s Critical Strike doubles attack damage!`,

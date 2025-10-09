@@ -14,6 +14,11 @@ export class HeavyHitSpell {
      * @returns {Promise} - Animation completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'HeavyHit');
+        }
+
         // Check if target survived the attack
         const targetAlive = target.alive;
         
@@ -48,8 +53,6 @@ export class HeavyHitSpell {
                 timestamp: Date.now()
             });
         }
-
-        // Don't await the visual effect - return immediately so battle flow continues
     }
 
     /**

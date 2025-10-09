@@ -1,4 +1,4 @@
-// battleCombatManager.js - Combat Management Module with Shield System
+// battleCombatManager.js - Combat Management Module with Shield System and Infighting
 // Handles damage calculation, targeting, combat execution, and shield mechanics
 
 import { recordKillWithVisualFeedback } from './Artifacts/wantedPoster.js';
@@ -510,10 +510,10 @@ export class BattleCombatManager {
         const aliveTargets = Object.values(targets).filter(hero => hero && hero.alive);
         if (aliveTargets.length === 0) return null;
 
-        // Check for taunting zones first
-        const tauntingZones = this.findTauntingZones(attackerSide);
+        const targetSide = attackerSide === 'player' ? 'opponent' : 'player';
+        const tauntingZones = this.findTauntingZones(targetSide);
         
-        if (tauntingZones.length > 0) {           
+        if (tauntingZones.length > 0) {    
             // Prioritize taunting zones - try to find closest taunting zone to attacker
             let preferredTauntingZone = null;
             
@@ -638,9 +638,11 @@ export class BattleCombatManager {
         if (aliveTargets.length === 0) return null;
 
         // Check for taunting zones first (even for ranged attacks)
-        const tauntingZones = this.findTauntingZones(attackerSide);
+        const targetSide = attackerSide === 'player' ? 'opponent' : 'player';
+        const tauntingZones = this.findTauntingZones(targetSide);
+
         
-        if (tauntingZones.length > 0) {           
+        if (tauntingZones.length > 0) {
             // For ranged attacks, still prioritize taunting zones
             let preferredTauntingZone = null;
             
@@ -776,23 +778,24 @@ export class BattleCombatManager {
         return allTargets[randomIndex];
     }
 
-    findTauntingZones(attackerSide) {
+    findTauntingZones(targetSide) {
         if (!this.battleManager.isAuthoritative) return [];
 
-        const targets = attackerSide === 'player' ? 
-            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+        const heroes = targetSide === 'player' ? 
+            this.battleManager.playerHeroes : this.battleManager.opponentHeroes;
         
         const tauntingZones = [];
         
-        Object.keys(targets).forEach(position => {
-            const hero = targets[position];
+        Object.keys(heroes).forEach(position => {
+            const hero = heroes[position];
             if (hero && hero.alive && this.battleManager.statusEffectsManager) {
-                if (this.battleManager.statusEffectsManager.hasStatusEffect(hero, 'taunting')) {
+                const hasTaunting = this.battleManager.statusEffectsManager.hasStatusEffect(hero, 'taunting');
+                if (hasTaunting) {
+                    const stacks = this.battleManager.statusEffectsManager.getStatusEffectStacks(hero, 'taunting');
                     tauntingZones.push(position);
                 }
             }
         });
-        
         return tauntingZones;
     }
 
@@ -983,7 +986,7 @@ export class BattleCombatManager {
                 let target = null;
                 if (isRanged) {
                     target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
-                    this.battleManager.addCombatLog(`🹠${actingHero.name} uses ranged attack!`, 'info');
+                    this.battleManager.addCombatLog(`🏹 ${actingHero.name} uses ranged attack!`, 'info');
                 } else {
                     target = this.authoritative_findTargetWithCreatures(position, attackerSide);
                 }
@@ -1125,13 +1128,45 @@ export class BattleCombatManager {
         // NORMAL HERO ACTIONS (existing logic unchanged)
         // ============================================
         
+        // ============================================
+        // INFIGHTING CHECK - Must occur BEFORE spell casting
+        // ============================================
+
+        let playerInfightingData = null;
+        let opponentInfightingData = null;
+
+        if (playerCanAttack && this.battleManager.statusEffectsManager) {
+            playerInfightingData = this.battleManager.statusEffectsManager.checkInfightingEffect(
+                playerHeroActor.data, 
+                position
+            );
+            
+            if (playerInfightingData.shouldInfight) {
+                // Override: skip spell casting and use infighting target
+                // We don't set playerWillAttack yet - that happens after EternalBeato check
+            }
+        }
+
+        if (opponentCanAttack && this.battleManager.statusEffectsManager) {
+            opponentInfightingData = this.battleManager.statusEffectsManager.checkInfightingEffect(
+                opponentHeroActor.data, 
+                position
+            );
+            
+            if (opponentInfightingData.shouldInfight) {
+                // Override: skip spell casting and use infighting target
+                // We don't set opponentWillAttack yet - that happens after EternalBeato check
+            }
+        }
+        
         // Check for spell casting before attacking
         let playerSpellToCast = null;
         let opponentSpellToCast = null;
         let playerWillAttack = playerCanAttack;
         let opponentWillAttack = opponentCanAttack;
 
-        if (playerCanAttack && this.battleManager.spellSystem) {
+        // MODIFIED: Skip spell casting if infighting
+        if (playerCanAttack && !playerInfightingData?.skipSpellcasting && this.battleManager.spellSystem) {
             const playerHeroForSpells = this.createHeroWithEnabledSpellsOnly(playerHeroActor.data);
             
             // SPECIAL CASE: EternalBeato casts 2 spells per turn
@@ -1156,7 +1191,8 @@ export class BattleCombatManager {
             }
         }
 
-        if (opponentCanAttack && this.battleManager.spellSystem) {
+        // MODIFIED: Skip spell casting if infighting
+        if (opponentCanAttack && !opponentInfightingData?.skipSpellcasting && this.battleManager.spellSystem) {
             const opponentHeroForSpells = this.createHeroWithEnabledSpellsOnly(opponentHeroActor.data);
             
             // SPECIAL CASE: EternalBeato casts 2 spells per turn
@@ -1197,22 +1233,34 @@ export class BattleCombatManager {
         let opponentIsRanged = false;
         
         if (playerWillAttack) {
-            playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
-            if (playerIsRanged) {
-                playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
-                this.battleManager.addCombatLog(`🹠${playerHeroActor.data.name} uses ranged attack!`, 'info');
+            // MODIFIED: Use infighting target if available
+            if (playerInfightingData?.shouldInfight) {
+                playerTarget = playerInfightingData.target;
+                playerIsRanged = false; // Infighting is always melee
             } else {
-                playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
+                playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
+                if (playerIsRanged) {
+                    playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
+                    this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+                } else {
+                    playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
+                }
             }
         }
         
         if (opponentWillAttack) {
-            opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
-            if (opponentIsRanged) {
-                opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
-                this.battleManager.addCombatLog(`🹠${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+            // MODIFIED: Use infighting target if available
+            if (opponentInfightingData?.shouldInfight) {
+                opponentTarget = opponentInfightingData.target;
+                opponentIsRanged = false; // Infighting is always melee
             } else {
-                opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
+                opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
+                if (opponentIsRanged) {
+                    opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
+                    this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+                } else {
+                    opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
+                }
             }
         }
         
@@ -1420,8 +1468,27 @@ export class BattleCombatManager {
                 this.battleManager.battleScreen.battleLog.logAttackMessage(guestAttack);
             }
             
-            // Both heroes attack - collision animation (meet in middle)
-            await this.battleManager.animationManager.animateSimultaneousHeroAttacks(playerAttack, opponentAttack);
+            // ============================================
+            // INFIGHTING-AWARE ANIMATION
+            // ============================================
+            
+            // Check if either attack is infighting
+            const playerInfighting = playerAttack.target.side === playerAttack.hero.side;
+            const opponentInfighting = opponentAttack.target.side === opponentAttack.hero.side;
+            
+            if (playerInfighting || opponentInfighting) {
+                // Use infighting-aware animation
+                await this.battleManager.animationManager.animateSimultaneousWithInfighting(
+                    playerAttack, 
+                    opponentAttack
+                );
+            } else {
+                // Normal collision animation
+                await this.battleManager.animationManager.animateSimultaneousHeroAttacks(
+                    playerAttack, 
+                    opponentAttack
+                );
+            }
             
             // ============================================
             // Apply damage modifier visual effects BEFORE damage
@@ -1504,16 +1571,31 @@ export class BattleCombatManager {
             ]);
             
         } else if (playerAttack || opponentAttack) {
-            // Only one hero attacks - existing logic unchanged
+            // Only one hero attacks
             const attack = playerAttack || opponentAttack;
             const side = playerAttack ? 'player' : 'opponent';
+            const isInfighting = attack.target.side === attack.hero.side;
             
             // Log the single attack
             if (this.battleManager.battleScreen && this.battleManager.battleScreen.battleLog) {
                 this.battleManager.battleScreen.battleLog.logAttackMessage(attack);
             }
             
-            await this.battleManager.animationManager.animateHeroAttack(attack.hero, attack.target);
+            // ============================================
+            // INFIGHTING-AWARE ANIMATION
+            // ============================================
+            
+            if (isInfighting) {
+                // Infighting attack - use special animation
+                await this.battleManager.animationManager.animateInfightingAttack(
+                    attack.hero,
+                    attack.target,
+                    side
+                );
+            } else {
+                // Normal attack
+                await this.battleManager.animationManager.animateHeroAttack(attack.hero, attack.target);
+            }
             
             // ============================================
             // Apply damage modifier visual effects BEFORE damage
@@ -1736,6 +1818,24 @@ export class BattleCombatManager {
         if (this.battleManager.isAuthoritative && (target.type === 'hero' || !target.type)) {
             finalDamage = MoniaHeroEffect.checkMoniaProtection(target, damage, this.battleManager);
 
+            // Check for Rescue Mission interception (for heroes only, not during rescue damage)
+            if (!context.isRescueMissionDamage) {
+                const { checkRescueMissionInterception } = await import('./Spells/rescueMission.js');
+                const rescueResult = await checkRescueMissionInterception(target, finalDamage, context, this.battleManager);
+                
+                if (rescueResult && rescueResult.intercepted) {
+                    // Damage was intercepted by Rescue Mission!
+                    // The rescuer already took the damage, so return without damaging the original target
+                    console.log(`✅ Rescue Mission intercepted damage for ${target.name}`);
+                    return {
+                        shieldDamage: 0,
+                        hpDamage: 0,
+                        died: false,
+                        rescueMissionIntercepted: true
+                    };
+                }
+            }
+
             // Apply damage source modifications (stoneskin, etc.)
             if (this.battleManager.damageSourceManager) {
                 const modificationResult = this.battleManager.damageSourceManager.applyDamageModifications(
@@ -1866,7 +1966,8 @@ export class BattleCombatManager {
                 target.alive = false; // Mark as dead AFTER timeGifted action
 
             
-                // Check for Thep revival before immortal
+                // Check for Thep revival before immortal                
+                // Check for immortal revival before death (unless prevented by special effects)
                 if (!context.preventRevival) {
                     const { ThepHeroEffect } = await import('./Heroes/thep.js');
                     const thepRevived = await ThepHeroEffect.checkThepRevival(target, this.battleManager);
@@ -1877,14 +1978,19 @@ export class BattleCombatManager {
                         
                         // Update health bar after revival
                         this.battleManager.updateHeroHealthBar(target.side, target.position, target.currentHp, target.maxHp);
+
+                        // Check for Gabby transformation on external revival
+                        try {
+                            const { GabbyHeroEffect } = await import('./Heroes/gabby.js');
+                            GabbyHeroEffect.handleExternalRevival(target, this.battleManager);
+                        } catch (error) {
+                            console.error('Error handling Gabby external revival:', error);
+                        }
                         
                         // Don't process normal death or immortal
                         return damageApplication;
                     }
-                }
-                
-                // Check for immortal revival before death (unless prevented by special effects)
-                if (!context.preventRevival) {
+
                     const immortalRevived = await this.checkImmortalRevival(target);
                     if (immortalRevived) {
                         // Revival successful, update damage result
@@ -1893,6 +1999,14 @@ export class BattleCombatManager {
                         
                         // Update health bar after revival
                         this.battleManager.updateHeroHealthBar(target.side, target.position, target.currentHp, target.maxHp);
+
+                        // Check for Gabby transformation on external revival
+                        try {
+                            const { GabbyHeroEffect } = await import('./Heroes/gabby.js');
+                            GabbyHeroEffect.handleExternalRevival(target, this.battleManager);
+                        } catch (error) {
+                            console.error('Error handling Gabby external revival:', error);
+                        }
                         
                         // Don't process normal death
                         return damageApplication;

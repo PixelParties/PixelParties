@@ -43,6 +43,8 @@ import DivineGiftOfTimeSpell from './Spells/divineGiftOfTime.js';
 import SlowSpell from './Spells/slow.js';
 import HealSpell from './Spells/heal.js';
 import CureSpell from './Spells/cure.js';
+import ForcefulRevivalSpell from './Spells/forcefulRevival.js';
+import InfightingSpell from './Spells/infighting.js';
 
 
 
@@ -232,6 +234,14 @@ export class BattleSpellSystem {
         // Register Cure
         const cure = new CureSpell(this.battleManager);
         this.spellImplementations.set('Cure', cure);
+
+        // Register ForcefulRevival (Fighting spell)
+        const forcefulRevival = new ForcefulRevivalSpell(this.battleManager);
+        this.spellImplementations.set('ForcefulRevival', forcefulRevival);
+
+        // Register Infighting
+        const infighting = new InfightingSpell(this.battleManager);
+        this.spellImplementations.set('Infighting', infighting);
     }
 
     // ============================================
@@ -635,63 +645,126 @@ export class BattleSpellSystem {
             return;
         }
         
-        // Filter for Fighting spells only
-        const fightingSpells = allSpells.filter(spell => spell.spellSchool === 'Fighting' && spell.name !== 'CrashLanding');
+        // Fighting spells that should be EXCLUDED from on-attack triggers
+        // These have their own independent trigger conditions:
+        const excludedSpells = [
+            'CrashLanding',      // Triggers when creatures attack heroes (not hero attacks)
+            'RescueMission',     // Triggers when ally heroes take damage
+            'FuriousAnger',      // Triggers when ally creatures/heroes are defeated
+            'ForcefulRevival',   // Triggers only when defeating a hero/creature
+            'UltimateDestroyerPunch' // Triggers only when defeating a hero/creature
+        ];
+        
+        // Filter for Fighting spells only, excluding special-case spells
+        const fightingSpells = allSpells.filter(spell => 
+            spell.spellSchool === 'Fighting' && 
+            !excludedSpells.includes(spell.name)
+        );
+        
         if (fightingSpells.length === 0) {
             return;
         }
         
+        // Group spells by name to process each type once
+        const spellsByName = new Map();
+        fightingSpells.forEach(spell => {
+            if (!spellsByName.has(spell.name)) {
+                spellsByName.set(spell.name, {
+                    spell: spell,
+                    count: 0
+                });
+            }
+            spellsByName.get(spell.name).count++;
+        });
+        
         // Track triggered spells for Ghuanjun bonus attacks
         const triggeredSpells = [];
         
-        // Check each Fighting spell for triggers and execute immediately
-        for (const spell of fightingSpells) {
-            let triggerChance;
+        // Process each unique Fighting spell type
+        for (const [spellName, { spell, count }] of spellsByName) {
+            const spellImpl = this.spellImplementations.get(spellName);
             
-            // Check if spell implementation has custom trigger logic
-            const spellImpl = this.spellImplementations.get(spell.name);
-            if (spellImpl && spellImpl.getTriggerChance && typeof spellImpl.getTriggerChance === 'function') {
-                // Use custom trigger chance from spell implementation
-                triggerChance = spellImpl.getTriggerChance(attacker, target, damage);
-            } else {
-                // Use default trigger chance calculation
-                triggerChance = this.calculateSpellCastingChance(attacker, spell);
-            }
-            
-            // Skip if no chance to trigger
-            if (triggerChance <= 0) {
+            // Skip if no implementation found
+            if (!spellImpl || !spellImpl.executeEffect) {
                 continue;
             }
             
-            // Roll for trigger (unless it's 100% chance)
-            const shouldTrigger = triggerChance >= 1.0 || this.battleManager.getRandom() <= triggerChance;
-            
-            if (shouldTrigger) {
-                // Add to triggered spells list for Ghuanjun
-                triggeredSpells.push(spell);
+            try {
+                // Determine trigger chance
+                let triggerChance = 1.0; // Default: always trigger
                 
-                // Find the spell implementation and execute its effect
-                if (spellImpl && spellImpl.executeEffect) {
-                    try {
-                        await spellImpl.executeEffect(attacker, target, damage);
-                    } catch (error) {
-                        // Error handled silently
+                if (spellImpl.getTriggerChance && typeof spellImpl.getTriggerChance === 'function') {
+                    triggerChance = spellImpl.getTriggerChance(attacker, target, damage);
+                }
+                
+                // Skip if no chance to trigger
+                if (triggerChance <= 0) {
+                    continue;
+                }
+                
+                // Decide whether to execute the spell:
+                // - If triggerChance >= 1.0: Always execute (spell handles rolling internally)
+                // - If triggerChance < 1.0: Roll once for the spell type
+                let shouldExecute = false;
+                
+                if (triggerChance >= 1.0) {
+                    // Spell handles its own rolling internally (like Challenge)
+                    // Don't show card effect here - let the spell show it when it actually triggers
+                    shouldExecute = true;
+                } else {
+                    // Battle system rolls once for this spell type
+                    shouldExecute = this.battleManager.getRandom() <= triggerChance;
+                    
+                    // If we rolled successfully, show the card effect NOW
+                    // (because we know the spell will trigger)
+                    if (shouldExecute) {
+                        this.createSpellCardEffect(attacker, spell);
+                        
+                        // Send Fighting spell trigger update to guest
+                        this.battleManager.sendBattleUpdate('fighting_spell_trigger', {
+                            attackerAbsoluteSide: attacker.absoluteSide,
+                            attackerPosition: attacker.position,
+                            attackerName: attacker.name,
+                            spellName: spell.name,
+                            spellLevel: spell.level || 0,
+                            spellCount: count,
+                            timestamp: Date.now()
+                        });
                     }
                 }
                 
-                // Track statistics
-                this.spellsCastThisBattle++;
-                this.spellCastHistory.push({
-                    hero: attacker.name,
-                    heroPosition: attacker.position,
-                    heroSide: attacker.absoluteSide,
-                    spell: spell.name,
-                    spellLevel: spell.level || 0,
-                    spellSchool: 'Fighting',
-                    turn: this.battleManager.currentTurn,
-                    timestamp: Date.now(),
-                    isFightingSpell: true
-                });
+                if (shouldExecute) {
+                    // Add to triggered spells list for Ghuanjun (add all copies)
+                    // Note: For spells that roll internally, this might add spells that don't actually trigger
+                    // But that's okay - Ghuanjun bonus is based on spell *attempts*, not successes
+                    for (let i = 0; i < count; i++) {
+                        triggeredSpells.push(spell);
+                    }
+                    
+                    // Execute the spell's effect
+                    // For spells with triggerChance >= 1.0, the spell will:
+                    // - Roll internally for each copy
+                    // - Show card effect if it actually triggers
+                    // - Send its own network updates
+                    await spellImpl.executeEffect(attacker, target, damage);
+                    
+                    // Track statistics
+                    this.spellsCastThisBattle++;
+                    this.spellCastHistory.push({
+                        hero: attacker.name,
+                        heroPosition: attacker.position,
+                        heroSide: attacker.absoluteSide,
+                        spell: spell.name,
+                        spellLevel: spell.level || 0,
+                        spellSchool: 'Fighting',
+                        turn: this.battleManager.currentTurn,
+                        timestamp: Date.now(),
+                        isFightingSpell: true,
+                        copyCount: count
+                    });
+                }
+            } catch (error) {
+                console.error(`Error executing Fighting spell ${spell.name}:`, error);
             }
         }
 
@@ -699,6 +772,36 @@ export class BattleSpellSystem {
         if (triggeredSpells.length > 0 && this.battleManager.ghuanjunManager) {
             await this.battleManager.ghuanjunManager.checkGhuanjunFightingSpellBonus(attacker, target, damage, triggeredSpells);
         }
+    }
+
+    /**
+     * Helper method for Fighting spell implementations to show their card effect
+     * Call this from within executeEffect when the spell actually triggers
+     * @param {Object} attacker - The hero casting the spell
+     * @param {string} spellName - Name of the spell
+     */
+    showFightingSpellCard(attacker, spellName) {
+        // Find the spell object
+        const allSpells = attacker.getAllSpells();
+        const spell = allSpells.find(s => s.name === spellName);
+        
+        if (!spell) {
+            console.warn(`Could not find spell ${spellName} for card display`);
+            return;
+        }
+        
+        // Show the card effect
+        this.createSpellCardEffect(attacker, spell);
+        
+        // Send Fighting spell trigger update to guest
+        this.battleManager.sendBattleUpdate('fighting_spell_trigger', {
+            attackerAbsoluteSide: attacker.absoluteSide,
+            attackerPosition: attacker.position,
+            attackerName: attacker.name,
+            spellName: spell.name,
+            spellLevel: spell.level || 0,
+            timestamp: Date.now()
+        });
     }
 
     // ============================================
@@ -774,9 +877,9 @@ export class BattleSpellSystem {
         // Position above hero
         spellCardContainer.style.cssText = `
             position: absolute;
-            top: -80px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
             z-index: 600;
             pointer-events: none;
             animation: spellCardEffect ${this.battleManager.getSpeedAdjustedDelay(2000)}ms ease-out forwards;

@@ -18,7 +18,7 @@ export class ChallengeSpell {
         const challengeCount = this.countChallengeSpells(attacker);
         
         if (challengeCount === 0) {
-            return; // No Challenge spells, nothing to do
+            return;
         }
 
         let totalSuccesses = 0;
@@ -27,22 +27,30 @@ export class ChallengeSpell {
         // Roll for each Challenge spell independently
         for (let i = 0; i < challengeCount; i++) {
             const roll = this.battleManager.getRandom();
-            const triggerChance = 0.20; // 20% chance
+            const triggerChance = 0.20;
             
             if (roll < triggerChance) {
                 totalSuccesses++;
-                totalStacksToAdd += 2; // Each success adds 2 stacks
+                totalStacksToAdd += 2;
             }
         }
 
         if (totalSuccesses === 0) {
-            return; // No successes, no effect
+            return; // No triggers, don't show card
+        }
+
+        // NOW show the spell card, because we know it actually triggered!
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'Challenge');
         }
 
         // Apply taunting stacks to the attacker
         if (this.battleManager.statusEffectsManager) {
-            this.battleManager.statusEffectsManager.applyStatusEffect(attacker, 'taunting', totalStacksToAdd);
-        }
+            const result = this.battleManager.statusEffectsManager.applyStatusEffect(attacker, 'taunting', totalStacksToAdd);
+            
+            // Check if it was actually applied
+            const currentStacks = this.battleManager.statusEffectsManager.getStatusEffectStacks(attacker, 'taunting');
+        } 
 
         // Log the effect
         const stackText = totalStacksToAdd === 2 ? '2 stacks' : `${totalStacksToAdd} stacks`;

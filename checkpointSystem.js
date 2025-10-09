@@ -946,6 +946,9 @@ export class CheckpointSystem {
         
         // Now update all hero visuals (they should exist in DOM now)
         this.battleManager.updateAllHeroVisuals();
+    
+        // Fix Gabby/ZombieGabby images after restoration**
+        this.updateGabbyTransformationVisuals();
         
         // Explicitly update attack displays to show battle bonuses
         this.updateHeroAttackDisplaysWithBonuses();
@@ -985,6 +988,42 @@ export class CheckpointSystem {
         setTimeout(() => {
             this.battleManager.verifyAndFixShieldDisplays();
         }, 200);
+    }
+
+    updateGabbyTransformationVisuals() {
+        const bm = this.battleManager;
+        
+        ['left', 'center', 'right'].forEach(position => {
+            // Check player heroes
+            const playerHero = bm.playerHeroes[position];
+            if (playerHero && this.isGabbyVariant(playerHero.name)) {
+                this.updateGabbyHeroImage('player', position, playerHero);
+            }
+            
+            // Check opponent heroes
+            const opponentHero = bm.opponentHeroes[position];
+            if (opponentHero && this.isGabbyVariant(opponentHero.name)) {
+                this.updateGabbyHeroImage('opponent', position, opponentHero);
+            }
+        });
+    }
+
+    isGabbyVariant(heroName) {
+        return heroName === 'Gabby' || heroName === 'ZombieGabby';
+    }
+
+    updateGabbyHeroImage(side, position, hero) {
+        const heroElement = this.battleManager.getHeroElement(side, position);
+        if (!heroElement) return;
+        
+        const heroImage = heroElement.querySelector('.battle-hero-image');
+        if (heroImage) {
+            // Ensure the image matches the current hero state
+            const correctImage = `./Cards/All/${hero.name}.png`;
+            if (heroImage.src !== correctImage && !heroImage.src.endsWith(correctImage)) {
+                heroImage.src = correctImage;
+            }
+        }
     }
 
     // Update hero attack displays to show current totals including battle bonuses

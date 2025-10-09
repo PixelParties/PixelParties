@@ -816,6 +816,23 @@ export class BattleFlowManager {
 
                 bm.currentTurn++;
                 bm.addCombatLog(`⚔️ Turn ${bm.currentTurn} begins`, 'info');
+
+                // Check for Gabby/ZombieGabby revival at turn start
+                try {
+                    const { GabbyHeroEffect } = await import('./Heroes/gabby.js');
+                    
+                    // Send message to guest to also check for Gabby revival
+                    if (bm.isAuthoritative) {
+                        bm.sendBattleUpdate('check_gabby_revival', {
+                            turn: bm.currentTurn,
+                            timestamp: Date.now()
+                        });
+                    }
+                    
+                    await GabbyHeroEffect.checkGabbyRevivalAtTurnStart(bm);
+                } catch (error) {
+                    console.error('Error checking Gabby revival:', error);
+                }
                 
                 // Reset Ghuanjun's Fighting spell tracking for new round
                 if (bm.ghuanjunManager && bm.currentTurn > 1) {

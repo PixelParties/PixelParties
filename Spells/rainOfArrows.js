@@ -15,6 +15,11 @@ export class RainOfArrowsSpell {
      * @returns {Promise} - Effect completion promise
      */
     async executeEffect(attacker, target, attackDamage) {
+        // Show spell card since this always triggers when called
+        if (this.battleManager.spellSystem) {
+            this.battleManager.spellSystem.showFightingSpellCard(attacker, 'RainOfArrows');
+        }
+
         // ============================================
         // STORM RING NEGATION CHECK
         // ============================================
@@ -38,7 +43,7 @@ export class RainOfArrowsSpell {
         // ============================================
 
         this.battleManager.addCombatLog(
-            `� ${attacker.name}'s Rain of Arrows darkens the sky!`,
+            `🹠${attacker.name}'s Rain of Arrows darkens the sky!`,
             attacker.side === 'player' ? 'success' : 'error'
         );
 
@@ -47,7 +52,7 @@ export class RainOfArrowsSpell {
         
         if (enemyTargets.length === 0) {
             this.battleManager.addCombatLog(
-                `🏹 But there are no enemies to target!`,
+                `🹠But there are no enemies to target!`,
                 'info'
             );
             return;

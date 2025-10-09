@@ -2550,6 +2550,9 @@ export class BattleManager {
         if (this.isAuthoritative && this.checkpointSystem) {
             await this.checkpointSystem.createBattleCheckpoint('battle_end');
         }
+
+        // Transfer TRULY permanent stat bonuses back to formation (ForcefulRevival, etc.)
+        this.transferTrulyPermanentBonusesToFormation();
         
         // Transfer burning finger stacks from battle heroes to permanent heroes
         this.battleScreen.transferBurningFingerStacksToPermanent();
@@ -2732,6 +2735,30 @@ export class BattleManager {
                 syncDoomCountersAfterBattle(this);
             }
             
+            // ===== CAPTURE TRULY PERMANENT BONUSES FOR BOTH HOST AND GUEST =====
+            const hostTrulyPermanentBonuses = {};
+            const guestTrulyPermanentBonuses = {};
+            
+            // Capture host's permanent bonuses from playerHeroes
+            ['left', 'center', 'right'].forEach(position => {
+                if (this.playerHeroes[position]) {
+                    hostTrulyPermanentBonuses[position] = {
+                        permanentAttackBonusses: this.playerHeroes[position].permanentAttackBonusses || 0,
+                        permanentHpBonusses: this.playerHeroes[position].permanentHpBonusses || 0
+                    };
+                }
+            });
+            
+            // Capture guest's permanent bonuses from opponentHeroes
+            ['left', 'center', 'right'].forEach(position => {
+                if (this.opponentHeroes[position]) {
+                    guestTrulyPermanentBonuses[position] = {
+                        permanentAttackBonusses: this.opponentHeroes[position].permanentAttackBonusses || 0,
+                        permanentHpBonusses: this.opponentHeroes[position].permanentHpBonusses || 0
+                    };
+                }
+            });
+            
             const battleEndData = {
                 hostResult,
                 guestResult,
@@ -2761,7 +2788,10 @@ export class BattleManager {
                 },
                 // ADD ROYAL CORGI BONUS DATA
                 hostRoyalCorgiBonusCards: hostRoyalCorgiBonusCards,
-                guestRoyalCorgiBonusCards: guestRoyalCorgiBonusCards
+                guestRoyalCorgiBonusCards: guestRoyalCorgiBonusCards,
+                // ===== ADD TRULY PERMANENT BONUSES FOR BOTH HOST AND GUEST =====
+                hostTrulyPermanentBonuses: hostTrulyPermanentBonuses,
+                guestTrulyPermanentBonuses: guestTrulyPermanentBonuses
             };
             
             // Save final battle state before cleanup
@@ -2939,6 +2969,29 @@ export class BattleManager {
         } catch (error) {
             return false;
         }
+    }
+
+    // Transfer TRULY PERMANENT stat bonuses from battle heroes back to formation heroes
+    transferTrulyPermanentBonusesToFormation() {
+        if (!window.heroSelection) return;
+        
+        const formation = window.heroSelection.formationManager.getBattleFormation();
+        
+        // Transfer bonuses for each position
+        ['left', 'center', 'right'].forEach(position => {
+            const battleHero = this.isHost ? this.playerHeroes[position] : this.opponentHeroes[position];
+            const formationHero = formation[position];
+            
+            if (battleHero && formationHero) {
+                // Transfer TRULY PERMANENT bonuses from battle to formation
+                if (battleHero.permanentAttackBonusses !== undefined) {
+                    formationHero.permanentAttackBonusses = battleHero.permanentAttackBonusses;
+                }
+                if (battleHero.permanentHpBonusses !== undefined) {
+                    formationHero.permanentHpBonusses = battleHero.permanentHpBonusses;
+                }
+            }
+        });
     }
     
 
@@ -3427,12 +3480,12 @@ export class BattleManager {
 
     // Add message to combat log through BattleScreen
     addCombatLog(message, type = 'info') {
-        // NEW: Delegate to BattleScreen's BattleLog system
+        // Delegate to BattleScreen's BattleLog system
         if (this.battleScreen && typeof this.battleScreen.addCombatLogMessage === 'function') {
             this.battleScreen.addCombatLogMessage(message, type);
         }
         
-        // LEGACY: Keep for compatibility - maintain the array for persistence
+        // Keep for compatibility - maintain the array for persistence
         this.battleLog.push({ 
             message, 
             type, 

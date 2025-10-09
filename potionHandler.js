@@ -930,6 +930,12 @@ export class PotionHandler {
                     const magicLampPotion = new MagicLampPotion();
                     await magicLampPotion.guest_handleVisualEffects(data, battleManager);
                     break;
+
+                case 'FireBomb':
+                    const { FireBombPotion } = await import('./Potions/fireBomb.js');
+                    const fireBombPotion = new FireBombPotion();
+                    await fireBombPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
                     
                 // Add more potion cases as needed
                 default:
@@ -1800,10 +1806,40 @@ export class PotionHandler {
                 
             case 'PunchInTheBox':
                 return await this.handlePunchInTheBoxEffects(effects, playerRole, battleManager);
+
+            case 'FireBomb':
+                return await this.handleFireBombEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
                 return 0;
+        }
+    }
+
+    async handleFireBombEffects(effects, playerRole, battleManager) {
+        try {
+            const { FireBombPotion } = await import('./Potions/fireBomb.js');
+            const fireBombPotion = new FireBombPotion();
+            
+            // Send visual sync to guest BEFORE applying effects
+            this.sendPotionVisualSync('potion_specific_visual', {
+                potionName: 'FireBomb',
+                visualType: 'potion_effects',
+                effectCount: effects.length,
+                playerSide: playerRole,
+                battleManager: battleManager 
+            });
+            
+            const effectsProcessed = await fireBombPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            return 0;
         }
     }
 

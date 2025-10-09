@@ -73,6 +73,20 @@ const CARD_DATABASE = {
         ability2: 'Fighting',
         tags: ["Attacker", "Sniper", "Damage Dealer"]
     },
+    'Gabby': {
+        name: 'Gabby',
+        image: './Cards/Characters/Gabby.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 80,
+        ability1: 'Navigation',
+        ability2: 'Thieving',
+        tags: ["Defense", "Defensive", "Setup"]
+    },
     'Ghuanjun': {
         name: 'Ghuanjun',
         image: './Cards/Characters/Ghuanjun.png',
@@ -352,6 +366,21 @@ const CARD_DATABASE = {
         ability1: 'Cannibalism',
         ability2: 'Toughness',
         tags: ["Attacker", "Damage Dealer", "Disruption"]
+    },
+    'ZombieGabby': {
+        name: 'ZombieGabby',
+        image: './Cards/Characters/ZombieGabby.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 80,
+        ability1: 'Navigation',
+        ability2: 'Thieving',
+        tags: ["Defense", "Defensive", "Setup"],
+        unobtainable: true
     },
 
     // CHARACTER-SPECIFIC CARDS - Alice's Cards
@@ -2549,7 +2578,7 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 50,
-        physicalAttack: false
+        physicalAttack: true
     },
     'SoulShardSah': {
         name: 'SoulShardSah',
@@ -2562,6 +2591,80 @@ const CARD_DATABASE = {
         subtype: 'Creature',
         hp: 50,
         physicalAttack: false
+    },
+
+
+
+    // GABBY
+    'FireBomb': {
+        name: 'FireBomb',
+        image: './Cards/All/FireBomb.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'AntiIntruderSystem': {
+        name: 'AntiIntruderSystem',
+        image: './Cards/All/AntiIntruderSystem.png',
+        cardType: 'Artifact',
+        cost: 4,
+        action: false,
+        spellSchool: null,
+        subtype: "Permanent"
+    },
+    'ForcefulRevival': {
+        name: 'ForcefulRevival',
+        image: './Cards/All/ForcefulRevival.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
+    },
+    'Expedition': {
+        name: 'Expedition',
+        image: './Cards/All/Expedition.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
+    },
+    'Infighting': {
+        name: 'Infighting',
+        image: './Cards/All/Infighting.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'DecayMagic',
+        subtype: null
+    },
+    'RescueMission': {
+        name: 'RescueMission',
+        image: './Cards/All/RescueMission.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null
+    },
+    'Shipwrecked': {
+        name: 'Shipwrecked',
+        image: './Cards/All/Shipwrecked.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: false,
+        spellSchool: 'MagicArts',
+        subtype: null,
+        global: true
     },
 
 
@@ -2731,6 +2834,11 @@ export function getCardInfo(cardName) {
     // Only add baseHero if it exists
     if (cardInfo.baseHero !== undefined) {
         baseInfo.baseHero = cardInfo.baseHero;
+    }
+
+    // Only add unobtainable if it exists
+    if (cardInfo.unobtainable !== undefined) {
+        baseInfo.unobtainable = cardInfo.unobtainable;
     }
 
     // Add hero-specific properties if this is a hero card

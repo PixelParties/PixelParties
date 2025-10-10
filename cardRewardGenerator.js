@@ -24,7 +24,10 @@ export class CardRewardGenerator {
         const allCards = getAllAbilityCards();
         
         // EXCLUDE FORBIDDEN CARDS - These cards can never be offered as rewards
-        const availableCards = allCards.filter(card => !this.excludedCards.includes(card.name));
+        const availableCards = allCards.filter(card => 
+            !this.excludedCards.includes(card.name) && 
+            !card.unobtainable
+        );
         
         // Get current deck contents
         const currentDeck = deckManager ? deckManager.getDeck() : [];

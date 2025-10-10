@@ -1684,6 +1684,12 @@ export class CardRewardManager {
             if (hero.name === 'Carris') {
                 return false;
             }
+        
+            // Skip unobtainable heroes
+            const heroInfo = this.heroSelection.getCardInfo(hero.name);
+            if (heroInfo && heroInfo.unobtainable) {
+                return false;
+            }
             
             // Skip if hero is already in player's formation
             if (usedHeroNames.includes(hero.name)) {
@@ -1706,7 +1712,6 @@ export class CardRewardManager {
             }
             
             // Check if hero has "Ascended" subtype and exclude it
-            const heroInfo = this.heroSelection.getCardInfo(hero.name);
             if (heroInfo && heroInfo.subtype === 'Ascended') {
                 return false;
             }

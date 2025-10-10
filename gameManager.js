@@ -167,7 +167,7 @@ export class GameManager {
         });
     }
 
-    // NEW: Intelligent UI update that only regenerates when necessary
+    // Intelligent UI update that only regenerates when necessary
     smartUpdateUI(updateType) {
         if (!this.heroSelection) return;
         
@@ -184,7 +184,7 @@ export class GameManager {
         }
     }
 
-    // NEW: Determine if full UI regeneration is necessary
+    // Determine if full UI regeneration is necessary
     shouldRegenerateUI(updateType, currentPhase) {
         // Only regenerate for major state changes that affect the current player's view
         
@@ -474,7 +474,7 @@ export class GameManager {
         }
     }
 
-    // NEW: Show loading overlay to prevent flashing during transition
+    // Show loading overlay to prevent flashing during transition
     showGameLoadingOverlay() {
         // Remove any existing overlay
         const existingOverlay = document.getElementById('gameLoadingOverlay');
@@ -559,7 +559,7 @@ export class GameManager {
         document.head.appendChild(style);
     }
 
-    // NEW: Hide loading overlay
+    // Hide loading overlay
     hideGameLoadingOverlay() {
         const overlay = document.getElementById('gameLoadingOverlay');
         if (overlay) {
@@ -993,8 +993,6 @@ export class GameManager {
             });
         }
     }
-
-    // NEW HELPER METHODS for surrender victory
 
     // Helper method to get opponent name
     async getOpponentName() {

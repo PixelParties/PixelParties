@@ -1678,6 +1678,18 @@ const CARD_DATABASE = {
         spellSchool: null,
         subtype: "Equip"
     },
+    'BladeOfTheSwampWitch': {
+        name: 'BladeOfTheSwampWitch',
+        image: './Cards/All/BladeOfTheSwampWitch.png',
+        cardType: 'Artifact',
+        cost: 5,
+        action: false,
+        spellSchool: null,
+        subtype: 'Equip'
+    },
+
+
+
     'SkeletonKingSkullmael': {
         name: 'SkeletonKingSkullmael',
         image: './Cards/All/SkeletonKingSkullmael.png',
@@ -2942,6 +2954,16 @@ export function getAllAbilityCards() {
             
             return true;
         })
+        .map(card => ({ ...card })); // Return copies
+}
+
+/**
+ * Get all cards except tokens (includes heroes and all other cards)
+ * @returns {Object[]} Array of all non-token card information objects
+ */
+export function getAllCardsExceptTokens() {
+    return Object.values(CARD_DATABASE)
+        .filter(card => card.cardType !== 'Token')
         .map(card => ({ ...card })); // Return copies
 }
 

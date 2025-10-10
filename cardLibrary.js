@@ -336,6 +336,7 @@ export function showCardLibraryScreen() {
     if (cardLibraryScreen && menu) {
         menu.classList.add('hidden');
         cardLibraryScreen.classList.remove('hidden');
+        document.querySelector('.container')?.classList.add('showing-subscreen');
         
         // Scroll to top of the scrollable content
         const scrollableContent = cardLibraryScreen.querySelector('.card-library-scrollable-content');
@@ -355,6 +356,7 @@ export function hideCardLibraryScreen() {
     if (cardLibraryScreen && menu) {
         cardLibraryScreen.classList.add('hidden');
         menu.classList.remove('hidden');
+        document.querySelector('.container')?.classList.remove('showing-subscreen');
     }
     
     // Clean up any tooltips

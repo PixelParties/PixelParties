@@ -55,20 +55,20 @@ export class WebRTCManager {
         this.peerConnection.onconnectionstatechange = () => {            
             switch (this.peerConnection.connectionState) {
                 case 'connecting':
-                    this.uiManager.showConnectionDetails('🔄 Establishing direct connection...<br>⚡ Setting up P2P tunnel...');
+                    // Connection details hidden when in room
                     break;
                 case 'connected':
                     this.battleSyncEnabled = true; // Enable battle sync when P2P is active
-                    this.uiManager.showConnectionDetails('✅ Direct P2P connection established!<br>🚀 Ultra-low latency mode active!<br>🔗 Real-time sync ready!<br>⚔️ Battle synchronization enabled!');
+                    // Connection details hidden when in room
                     this.processBattleMessageQueue(); // Process any queued battle messages
                     break;
                 case 'disconnected':
                     this.battleSyncEnabled = false;
-                    this.uiManager.showConnectionDetails('⚠️ P2P connection interrupted<br>🔄 Attempting to reconnect...<br>📡 Battle sync via Firebase...');
+                    // Connection details hidden when in room
                     break;
                 case 'failed':
                     this.battleSyncEnabled = false;
-                    this.uiManager.showConnectionDetails('⚠️ Direct P2P failed, using Firebase relay<br>🔄 Connection still functional for game sync<br>📡 Battle sync via Firebase (higher latency)');
+                    // Connection details hidden when in room
                     this.processBattleMessageQueue(); // Process via Firebase fallback
                     break;
                 case 'closed':
@@ -79,13 +79,13 @@ export class WebRTCManager {
         
         this.peerConnection.oniceconnectionstatechange = () => {            
             if (this.peerConnection.iceConnectionState === 'failed') {
-                this.uiManager.showConnectionDetails('🔄 Direct connection failed, using relay servers...<br>📡 TURN servers establishing backup connection...<br>⚔️ Battle sync will use Firebase relay...');
+                // Connection details hidden when in room
             }
         };
         
         this.peerConnection.onicegatheringstatechange = () => {           
             if (this.peerConnection.iceGatheringState === 'gathering') {
-                this.uiManager.showConnectionDetails('🔍 Discovering connection routes...<br>🌐 Testing STUN and TURN servers...<br>⚡ Optimizing for battle sync...');
+                // Connection details hidden when in room
             }
         };
     }
@@ -182,15 +182,7 @@ export class WebRTCManager {
             const username = this.uiManager.getCurrentUsername();
             
             if (isHost) {
-                this.uiManager.showStatus('🎉 Battle Arena Ready! Direct P2P with sync enabled!', 'connected');
-                this.uiManager.showConnectionDetails(
-                    '✅ Ultra-fast direct connection established!<br>' +
-                    '🎮 Real-time battle data ready!<br>' +
-                    '⚡ Latency: Testing...<br>' +
-                    '🔗 No server needed - pure P2P!<br>' +
-                    '⚔️ Battle synchronization active!' +
-                    (isFirefox ? '<br>🦊 Firefox mode: Optimized buffering' : '')
-                );
+                // Connection details hidden when in room
                 
                 this.sendMessage({
                     type: 'welcome',
@@ -200,15 +192,7 @@ export class WebRTCManager {
                     browserType: isFirefox ? 'firefox' : (isChrome ? 'chrome' : 'other')
                 });
             } else {
-                this.uiManager.showStatus('🎉 Battle Arena Ready! Connected directly to host with sync!', 'connected');
-                this.uiManager.showConnectionDetails(
-                    '✅ Ultra-fast direct connection established!<br>' +
-                    '🎮 Real-time battle data ready!<br>' +
-                    '⚡ Latency: Testing...<br>' +
-                    '🔗 No server needed - pure P2P!<br>' +
-                    '⚔️ Battle synchronization active!' +
-                    (isFirefox ? '<br>🦊 Firefox mode: Optimized buffering' : '')
-                );
+                // Connection details hidden when in room
                 
                 this.sendMessage({
                     type: 'joined',
@@ -246,13 +230,7 @@ export class WebRTCManager {
             }
             
             if (this.roomManager.getRoomRef()) {
-                this.uiManager.showStatus('🔄 Direct connection lost, using Firebase relay...', 'waiting', true);
-                this.uiManager.showConnectionDetails(
-                    '⚡ P2P connection closed<br>' +
-                    '📡 Switched to Firebase relay mode<br>' +
-                    '🔄 Game sync still active...<br>' +
-                    '⚔️ Battle sync via Firebase (higher latency)'
-                );
+                // Connection details hidden when in room
             }
         };
         
@@ -292,9 +270,7 @@ export class WebRTCManager {
                 } else if (data.type === 'pong') {
                     const latency = Date.now() - data.originalTimestamp;
                     
-                    const currentDetails = this.uiManager.elements.connectionDetails.innerHTML;
-                    const updatedDetails = currentDetails.replace('Latency: Testing...', `Latency: ${latency}ms ⚡`);
-                    this.uiManager.showConnectionDetails(updatedDetails);
+                    // Connection details hidden when in room - no latency updates shown
                     
                     // Store peer browser info
                     if (data.browserType) {
@@ -316,24 +292,12 @@ export class WebRTCManager {
                         }
                     }
                 } else if (data.type === 'welcome' && !this.roomManager.getIsHost()) {
-                    this.uiManager.showConnectionDetails(
-                        `🎉 Host says: ${data.message}<br>` +
-                        `✅ P2P connection confirmed!<br>` +
-                        `🔗 Direct communication established!<br>` +
-                        `⚔️ Battle synchronization ready!` +
-                        (data.browserType ? `<br>🌐 Host browser: ${data.browserType}` : '')
-                    );
+                    // Connection details hidden when in room
                     if (data.browserType) {
                         this.peerBrowserType = data.browserType;
                     }
                 } else if (data.type === 'joined' && this.roomManager.getIsHost()) {
-                    this.uiManager.showConnectionDetails(
-                        `🎉 ${data.message}<br>` +
-                        `✅ P2P connection confirmed!<br>` +
-                        `🔗 Direct communication established!<br>` +
-                        `⚔️ Battle synchronization ready!` +
-                        (data.browserType ? `<br>🌐 Guest browser: ${data.browserType}` : '')
-                    );
+                    // Connection details hidden when in room
                     if (data.browserType) {
                         this.peerBrowserType = data.browserType;
                     }
@@ -375,14 +339,7 @@ export class WebRTCManager {
                 this.keepAliveInterval = null;
             }
             
-            this.uiManager.showStatus('⚠️ P2P connection error - using Firebase backup...', 'waiting', true);
-            this.uiManager.showConnectionDetails(
-                '❌ Direct P2P error occurred<br>' +
-                '📡 Switching to Firebase relay mode<br>' +
-                '🔄 Game functionality maintained...<br>' +
-                '⚔️ Battle sync via Firebase' +
-                (isFirefox ? '<br>🦊 Firefox fallback mode active' : '')
-            );
+            // Connection details hidden when in room
             
             // Process any queued messages through Firebase
             this.processBattleMessageQueue();

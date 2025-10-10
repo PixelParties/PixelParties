@@ -1,5 +1,5 @@
 /* ============================================
-   10. ROOM BROWSER
+   10. ROOM BROWSER - Glowing Neon Style
    ============================================ */
 
 /* Font Face Declaration for Pixel Intv */
@@ -23,29 +23,38 @@
     align-items: center;
     margin-bottom: 25px;
     padding-bottom: 15px;
-    border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+    border-bottom: 3px solid rgba(138, 43, 226, 0.4);
+    box-shadow: 0 3px 15px rgba(138, 43, 226, 0.2);
 }
 
 .browser-header h2 {
     margin: 0;
     font-size: 1.8rem;
     font-weight: 800;
-    background: linear-gradient(45deg, #667eea, #764ba2);
+    background: linear-gradient(45deg, #FFD700, #FFA500, #FF69B4, #DA70D6);
+    background-size: 300% 300%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: gradientShift 6s ease infinite;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
 }
 
 .rooms-list {
     max-height: 400px;
     overflow-y: auto;
     margin-bottom: 20px;
-    padding: 10px;
-    background: rgba(248, 249, 250, 0.5);
+    padding: 15px;
+    background: rgba(30, 20, 60, 0.6);
+    backdrop-filter: blur(10px);
     border-radius: var(--radius-medium);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(138, 43, 226, 0.4);
+    box-shadow: 
+        inset 0 0 30px rgba(138, 43, 226, 0.1),
+        0 8px 25px rgba(0, 0, 0, 0.4);
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
@@ -53,50 +62,98 @@
 .no-rooms {
     text-align: center;
     padding: 40px 20px;
-    color: #666;
+    color: #DA70D6;
     font-size: 1.1rem;
     font-weight: 600;
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(218, 112, 214, 0.5);
 }
 
 .no-rooms-icon {
     font-size: 3rem;
     margin-bottom: 15px;
-    opacity: 0.5;
+    opacity: 0.7;
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.3));
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
 }
 
 .room-item {
-    background: rgba(255, 255, 255, 0.95);
-    border: 2px solid rgba(102, 126, 234, 0.2);
+    background: rgba(30, 20, 60, 0.8);
+    border: 3px solid rgba(138, 43, 226, 0.5);
     border-radius: var(--radius-medium);
     padding: 20px;
     margin-bottom: 15px;
     cursor: pointer;
-    transition: var(--transition-medium);
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    box-shadow: 
+        0 0 20px rgba(138, 43, 226, 0.3),
+        inset 0 0 20px rgba(138, 43, 226, 0.05);
+    backdrop-filter: blur(5px);
+}
+
+/* Glowing animated border effect */
+.room-item::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, 
+        transparent, 
+        rgba(138, 43, 226, 0.3), 
+        transparent, 
+        rgba(218, 112, 214, 0.3));
+    background-size: 400% 400%;
+    border-radius: var(--radius-medium);
+    z-index: -1;
+    animation: borderGlow 3s ease infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.room-item:hover::before {
+    opacity: 1;
+}
+
+@keyframes borderGlow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
 }
 
 .room-item:hover {
-    border-color: rgba(102, 126, 234, 0.4);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+    border-color: rgba(218, 112, 214, 0.8);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 
+        0 0 40px rgba(138, 43, 226, 0.6),
+        0 10px 30px rgba(0, 0, 0, 0.5),
+        inset 0 0 30px rgba(138, 43, 226, 0.1);
 }
 
 .room-item.full {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
-    background: rgba(240, 240, 240, 0.95);
-    border-color: rgba(150, 150, 150, 0.3);
+    background: rgba(60, 60, 60, 0.6);
+    border-color: rgba(100, 100, 100, 0.5);
+    box-shadow: 
+        0 0 10px rgba(100, 100, 100, 0.2),
+        inset 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+.room-item.full::before {
+    display: none;
 }
 
 .room-item.full:hover {
     transform: none;
-    box-shadow: none;
-    border-color: rgba(150, 150, 150, 0.3);
+    box-shadow: 
+        0 0 10px rgba(100, 100, 100, 0.2),
+        inset 0 0 15px rgba(0, 0, 0, 0.3);
+    border-color: rgba(100, 100, 100, 0.5);
 }
 
 .room-header {
@@ -109,40 +166,86 @@
 .room-id {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #333;
+    color: #FFD700;
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     display: flex;
     align-items: center;
     gap: 8px;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
+    text-shadow: 
+        0 0 10px rgba(255, 215, 0, 0.6),
+        0 0 20px rgba(255, 215, 0, 0.3);
+}
+
+.room-item.full .room-id {
+    color: #888;
+    text-shadow: none;
 }
 
 .lock-icon {
     font-size: 0.9rem;
-    color: #ff9800;
+    color: #FFA500;
+    filter: drop-shadow(0 0 8px rgba(255, 165, 0, 0.6));
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    animation: lockPulse 2s ease-in-out infinite;
+}
+
+@keyframes lockPulse {
+    0%, 100% { 
+        filter: drop-shadow(0 0 8px rgba(255, 165, 0, 0.6));
+        transform: scale(1);
+    }
+    50% { 
+        filter: drop-shadow(0 0 15px rgba(255, 165, 0, 0.9));
+        transform: scale(1.1);
+    }
 }
 
 .room-status {
-    padding: 6px 12px;
+    padding: 6px 14px;
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.room-status::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.room-item:hover .room-status::before {
+    left: 100%;
 }
 
 .room-status.available {
-    background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(32, 201, 151, 0.15));
-    color: #28a745;
-    border: 1px solid rgba(40, 167, 69, 0.3);
+    background: rgba(40, 167, 69, 0.2);
+    color: #4CAF50;
+    border: 2px solid rgba(76, 175, 80, 0.6);
+    box-shadow: 
+        0 0 15px rgba(76, 175, 80, 0.4),
+        inset 0 0 15px rgba(76, 175, 80, 0.1);
+    text-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
 }
 
 .room-status.full {
-    background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(200, 35, 51, 0.15));
-    color: #dc3545;
-    border: 1px solid rgba(220, 53, 69, 0.3);
+    background: rgba(220, 53, 69, 0.2);
+    color: #FF6B6B;
+    border: 2px solid rgba(244, 67, 54, 0.6);
+    box-shadow: 
+        0 0 15px rgba(244, 67, 54, 0.4),
+        inset 0 0 15px rgba(244, 67, 54, 0.1);
+    text-shadow: 0 0 10px rgba(244, 67, 54, 0.6);
 }
 
 .room-players {
@@ -155,42 +258,141 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
-    background: rgba(102, 126, 234, 0.1);
+    padding: 10px 14px;
+    background: rgba(138, 43, 226, 0.2);
+    backdrop-filter: blur(5px);
     border-radius: var(--radius-small);
     font-size: 0.9rem;
     font-weight: 600;
-    color: #333;
-    border: 1px solid rgba(102, 126, 234, 0.2);
+    color: #DA70D6;
+    border: 2px solid rgba(138, 43, 226, 0.4);
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     letter-spacing: 0.5px;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.2);
+    transition: all 0.3s ease;
+}
+
+.room-item:hover .room-player {
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.4);
 }
 
 .room-player.empty {
-    background: rgba(150, 150, 150, 0.1);
-    color: #999;
+    background: rgba(100, 100, 100, 0.2);
+    color: #888;
     font-style: italic;
-    border-color: rgba(150, 150, 150, 0.2);
+    border-color: rgba(100, 100, 100, 0.3);
+    box-shadow: 0 0 5px rgba(100, 100, 100, 0.2);
+}
+
+.room-item.full .room-player {
+    background: rgba(60, 60, 60, 0.3);
+    color: #666;
+    border-color: rgba(80, 80, 80, 0.4);
+    box-shadow: none;
 }
 
 .room-player-status {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
+    position: relative;
+}
+
+.room-player-status::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 currentColor;
+        opacity: 1;
+    }
+    50% { 
+        box-shadow: 0 0 0 4px currentColor;
+        opacity: 0;
+    }
 }
 
 .room-player-status.online {
-    background: var(--success-gradient);
-    box-shadow: 0 0 6px rgba(40, 167, 69, 0.6);
+    background: #4CAF50;
+    box-shadow: 0 0 10px #4CAF50, 0 0 20px rgba(76, 175, 80, 0.5);
+}
+
+.room-player-status.online::after {
+    color: #4CAF50;
 }
 
 .room-player-status.offline {
-    background: linear-gradient(135deg, #dc3545, #c82333);
+    background: #F44336;
+    box-shadow: 0 0 8px #F44336;
 }
 
 .browser-footer {
     display: flex;
     justify-content: center;
     gap: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .browser-header h2 {
+        font-size: 1.5rem;
+        letter-spacing: 1px;
+    }
+    
+    .room-item {
+        padding: 15px;
+    }
+    
+    .room-id {
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .room-players {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+    
+    .room-player {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .browser-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .browser-header h2 {
+        font-size: 1.3rem;
+        text-align: center;
+    }
+    
+    .rooms-list {
+        max-height: 300px;
+        padding: 10px;
+    }
+    
+    .room-item {
+        padding: 12px;
+    }
+    
+    .room-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
 }

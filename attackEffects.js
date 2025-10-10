@@ -40,6 +40,12 @@ export class AttackEffectsManager {
             trigger: 'on_attack_hit',
             handler: this.handleBladeOfTheFrostbringer.bind(this)
         });
+
+        // Register BladeOfTheSwampWitch handler
+        this.registerEffectHandler('BladeOfTheSwampWitch', {
+            trigger: 'on_attack_hit',
+            handler: this.handleBladeOfTheSwampWitch.bind(this)
+        });
         
         // Register SkullmaelsGreatsword handler
         this.registerEffectHandler('SkullmaelsGreatsword', {
@@ -221,6 +227,33 @@ export class AttackEffectsManager {
     // ============================================
     // SPECIFIC EFFECT HANDLERS
     // ============================================
+
+    // Handler for BladeOfTheSwampWitch effect
+    async handleBladeOfTheSwampWitch(attacker, defender, damage, equipmentItem) {
+        // Always apply 1 stack of poisoned (100% chance, no RNG)
+        if (this.battleManager.statusEffectsManager) {
+            this.battleManager.statusEffectsManager.applyStatusEffect(defender, 'poisoned', 1);
+        }
+        
+        // Create poison cloud visual effect
+        this.createPoisonCloudEffect(defender);
+        
+        // Add combat log message
+        this.battleManager.addCombatLog(
+            `${attacker.name}'s Blade of the Swamp Witch poisons ${defender.name}!`,
+            'info'
+        );
+        
+        // Send update to guest if host
+        if (this.battleManager.isAuthoritative) {
+            this.battleManager.sendBattleUpdate('blade_swamp_witch_triggered', {
+                attackerAbsoluteSide: attacker.absoluteSide,
+                attackerPosition: attacker.position,
+                defenderInfo: this.getDefenderSyncInfo(defender),
+                timestamp: Date.now()
+            });
+        }
+    }
     
     // Handler for BladeOfTheFrostbringer effect
     async handleBladeOfTheFrostbringer(attacker, defender, damage, equipmentItem) {
@@ -423,6 +456,76 @@ export class AttackEffectsManager {
             if (freezeOverlay.parentNode) freezeOverlay.remove();
         }, this.battleManager.getSpeedAdjustedDelay(800));
     }
+
+    // Create poison cloud visual effect
+    createPoisonCloudEffect(target) {
+        const targetElement = this.getTargetElement(target);
+        if (!targetElement) return;
+        
+        // Create poison cloud container
+        const poisonCloud = document.createElement('div');
+        poisonCloud.className = 'blade-swamp-witch-cloud';
+        
+        // Create multiple poison particles
+        const particleCount = 8;
+        for (let i = 0; i < particleCount; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'poison-particle';
+            particle.innerHTML = '☠️';
+            
+            // Random angle for each particle
+            const angle = (360 / particleCount) * i + (Math.random() * 30 - 15);
+            const distance = 20 + Math.random() * 15;
+            
+            particle.style.cssText = `
+                position: absolute;
+                font-size: ${12 + Math.random() * 6}px;
+                animation: poisonParticleDrift ${this.battleManager.getSpeedAdjustedDelay(1000)}ms ease-out forwards;
+                --angle: ${angle}deg;
+                --distance: ${distance}px;
+                z-index: 500;
+            `;
+            
+            poisonCloud.appendChild(particle);
+        }
+        
+        // Position the cloud at target center
+        poisonCloud.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 500;
+        `;
+        
+        targetElement.appendChild(poisonCloud);
+        
+        // Add poison overlay effect
+        const poisonOverlay = document.createElement('div');
+        poisonOverlay.className = 'blade-swamp-witch-overlay';
+        poisonOverlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle, rgba(128, 0, 128, 0.4) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 490;
+            animation: bladeSwampWitchPulse ${this.battleManager.getSpeedAdjustedDelay(800)}ms ease-out forwards;
+        `;
+        
+        targetElement.appendChild(poisonOverlay);
+        
+        // Clean up after animation
+        setTimeout(() => {
+            if (poisonCloud.parentNode) poisonCloud.remove();
+            if (poisonOverlay.parentNode) poisonOverlay.remove();
+        }, this.battleManager.getSpeedAdjustedDelay(1000));
+    }
     
     // Get target element
     getTargetElement(target) {
@@ -495,6 +598,18 @@ export class AttackEffectsManager {
         
         // Create the visual effect
         this.createIceBurstEffect(defender);
+    }
+
+    // Handle guest update for blade swamp witch trigger
+    handleGuestBladeSwampWitchTrigger(data) {
+        const { defenderInfo } = data;
+        
+        // Find the defender
+        const defender = this.findDefenderFromSyncInfo(defenderInfo);
+        if (!defender) return;
+        
+        // Create the visual effect
+        this.createPoisonCloudEffect(defender);
     }
     
     // Find defender from sync info
@@ -662,6 +777,60 @@ export class AttackEffectsManager {
 
             .damage-number.shield_damage::before {
                 content: "🛡️ ";
+            }
+
+            @keyframes poisonParticleDrift {
+                0% {
+                    opacity: 0;
+                    transform: translate(-50%, -50%) rotate(0deg) scale(0);
+                }
+                30% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%) rotate(120deg) scale(1.2);
+                }
+                100% {
+                    opacity: 0;
+                    transform: 
+                        translate(
+                            calc(-50% + var(--distance) * cos(var(--angle))), 
+                            calc(-50% + var(--distance) * sin(var(--angle)))
+                        ) 
+                        rotate(240deg) 
+                        scale(0.3);
+                }
+            }
+
+            @keyframes bladeSwampWitchPulse {
+                0% {
+                    opacity: 0;
+                    transform: scale(0.8);
+                }
+                50% {
+                    opacity: 1;
+                    transform: scale(1.1);
+                }
+                100% {
+                    opacity: 0;
+                    transform: scale(1);
+                }
+            }
+
+            .blade-swamp-witch-cloud {
+                will-change: transform, opacity;
+            }
+
+            .poison-particle {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform-origin: center;
+                filter: drop-shadow(0 0 4px rgba(128, 0, 128, 0.8));
+                will-change: transform, opacity;
+            }
+
+            .blade-swamp-witch-overlay {
+                will-change: transform, opacity;
+                mix-blend-mode: screen;
             }
         `;
         

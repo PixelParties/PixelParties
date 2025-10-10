@@ -1081,6 +1081,12 @@ export class BattleNetworkManager {
                 bm.guest_handleBladeFrostTriggered(data);
                 break;
 
+            case 'blade_swamp_witch_triggered':
+                if (bm.attackEffectsManager) {
+                    bm.attackEffectsManager.handleGuestBladeSwampWitchTrigger(data);
+                }
+                break;
+
             case 'sun_sword_burn':
                 bm.guest_handleSunSwordBurn(data);
                 break;

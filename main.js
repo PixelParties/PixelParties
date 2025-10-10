@@ -8,6 +8,7 @@ import { WebRTCManager } from './webRTCManager.js';
 import { GameManager } from './gameManager.js';
 import { showCardLibraryScreen } from './cardLibrary.js';
 import { howToPlayOverlay } from './howToPlayOverlay.js';
+import { startMenuBackground } from './menuBackground.js';
 
 
 class ProjectPixelParties {
@@ -28,6 +29,7 @@ class ProjectPixelParties {
         // State
         this.isInRoomBrowser = false;
         this.pendingRoomJoin = null;
+        this.guestHasJoinedBefore = false; 
         
         // Initialize after Firebase is ready
         if (this.database) {
@@ -381,6 +383,7 @@ class ProjectPixelParties {
             
             this.webRTCManager.cleanup();
             this.gameManager.reset();
+            this.guestHasJoinedBefore = false; 
             
             setTimeout(() => {
                 this.uiManager.returnToMainMenu();
@@ -429,7 +432,7 @@ class ProjectPixelParties {
             await this.webRTCManager.setupConnection(true);
             
             this.uiManager.showStatus('🎉 You are now the host! Waiting for new challenger...', 'connected');
-            this.uiManager.showConnectionDetails('✅ You have been promoted to host<br>🎮 Room is now open for new players!');
+            // Connection details hidden when in room
         }
         
         // Handle game state transitions
@@ -450,7 +453,10 @@ class ProjectPixelParties {
             if (room.guest && room.guestReady && room.guestOnline && !room.gameInProgress) {
                 const guestName = room.guestName || 'Challenger';
                 this.uiManager.showStatus(`🎉 ${guestName} joined the party! Establishing connection...`, 'connected');
-                this.uiManager.showConnectionDetails(`${guestName} connected! Setting up battle arena...`);
+                // Connection details hidden when in room
+                
+                // Track that a guest has joined at least once
+                this.guestHasJoinedBefore = true;
             } else if (!room.guest) {                
                 if (room.gameInProgress) {
                     await this.roomManager.getRoomRef().update({
@@ -462,8 +468,13 @@ class ProjectPixelParties {
                     this.gameManager.returnToLobby();
                 }
                 
-                this.uiManager.showStatus('🔄 Other player left. Waiting for new challenger...', 'waiting', true);
-                this.uiManager.showConnectionDetails('⚡ Player disconnected<br>🎮 Room is open for new players!');
+                // Show different message depending on whether a guest ever joined
+                if (this.guestHasJoinedBefore) {
+                    this.uiManager.showStatus('🔄 Opponent left. Waiting for new challenger...', 'waiting', true);
+                } else {
+                    this.uiManager.showStatus('Waiting for a challenger...', 'waiting', true);
+                }
+                // Connection details hidden when in room
                 
                 // Reset WebRTC for new connections
                 this.webRTCManager.cleanup();
@@ -507,6 +518,7 @@ class ProjectPixelParties {
             if (!isHost && room.host && room.guest && !room.gameInProgress && connectionState !== 'connected') {
                 const hostName = room.hostName || 'Host';
                 this.uiManager.showStatus(`🎉 Connected to ${hostName}! Establishing P2P connection...`, 'connected');
+                // Connection details hidden when in room
             }
             
         } catch (error) {
@@ -607,7 +619,7 @@ class ProjectPixelParties {
                 
                 // The game manager will automatically restore the hero selection state
                 this.uiManager.showStatus('🎉 Reconnected to ongoing battle!', 'connected');
-                this.uiManager.showConnectionDetails('✅ Game state restored!<br>🔄 Synchronizing with opponent...<br>⚔️ Battle continues!');
+                // Connection details hidden when in room/game
             } else {
                 // Normal lobby reconnection
                 if (room.host && room.guest && room.hostOnline && room.guestOnline) {
@@ -671,9 +683,13 @@ class ProjectPixelParties {
     }
 }
 
-// Initialize the application when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new ProjectPixelParties();
+    
+    // Start menu background
+    setTimeout(() => {
+        startMenuBackground();
+    }, 500);
 });
 
 window.emergencyTooltipCleanup = function() {

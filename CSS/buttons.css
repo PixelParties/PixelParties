@@ -1,14 +1,14 @@
 /* ============================================
-   7. BUTTONS WITH PIXEL FONT
+   ENHANCED BUTTONS - Transparent with Glowing Borders
    ============================================ */
 .btn {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    padding: 16px 32px;
-    font-size: 1.1rem;
-    border: none;
-    border-radius: var(--radius-medium);
+    padding: 18px 35px;
+    font-size: 1.2rem;
+    border: 3px solid transparent;
+    border-radius: 15px;
     cursor: pointer;
-    transition: var(--transition-medium);
+    transition: all 0.3s ease;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -18,8 +18,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    box-shadow: var(--shadow-light);
+    gap: 10px;
+    background: transparent;
 }
 
 .btn::before {
@@ -29,7 +29,7 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
     transition: left 0.5s;
 }
 
@@ -38,72 +38,129 @@
 }
 
 .btn:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
     transform: none;
 }
 
-/* Button variants */
+.btn:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* Button variants - Transparent with glowing borders */
 .btn-primary {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    background: var(--primary-gradient);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(139, 0, 255, 0.05);
+    color: #DA70D6;
+    border: 3px solid #8B00FF;
     letter-spacing: 2px;
+    box-shadow: 
+        0 0 20px rgba(139, 0, 255, 0.4),
+        inset 0 0 20px rgba(139, 0, 255, 0.05);
+    text-shadow: 0 0 10px rgba(218, 112, 214, 0.5);
 }
 
 .btn-primary:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-    background: linear-gradient(135deg, #7c8df0 0%, #8655b8 100%);
+    background: rgba(139, 0, 255, 0.15);
+    box-shadow: 
+        0 0 30px rgba(139, 0, 255, 0.6),
+        0 8px 25px rgba(139, 0, 255, 0.3),
+        inset 0 0 30px rgba(139, 0, 255, 0.1);
+    border-color: #DA70D6;
+    color: #EA80E6;
 }
 
 .btn-secondary {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    background: var(--secondary-gradient);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 20, 147, 0.05);
+    color: #FF69B4;
+    border: 3px solid #FF1493;
     letter-spacing: 2px;
+    box-shadow: 
+        0 0 20px rgba(255, 20, 147, 0.4),
+        inset 0 0 20px rgba(255, 20, 147, 0.05);
+    text-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
 }
 
 .btn-secondary:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
-    background: linear-gradient(135deg, #f3a3fc 0%, #f7677c 100%);
+    background: rgba(255, 20, 147, 0.15);
+    box-shadow: 
+        0 0 30px rgba(255, 20, 147, 0.6),
+        0 8px 25px rgba(255, 20, 147, 0.3),
+        inset 0 0 30px rgba(255, 20, 147, 0.1);
+    border-color: #FF69B4;
+    color: #FF79C4;
 }
 
 .btn-danger {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    background: var(--danger-gradient);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(220, 20, 60, 0.05);
+    color: #FF6B6B;
+    border: 3px solid #DC143C;
     letter-spacing: 2px;
+    box-shadow: 
+        0 0 20px rgba(220, 20, 60, 0.4),
+        inset 0 0 20px rgba(220, 20, 60, 0.05);
+    text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
 }
 
 .btn-danger:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
-    background: linear-gradient(135deg, #ff7b7b 0%, #fe6a34 100%);
+    background: rgba(220, 20, 60, 0.15);
+    box-shadow: 
+        0 0 30px rgba(220, 20, 60, 0.6),
+        0 8px 25px rgba(220, 20, 60, 0.3),
+        inset 0 0 30px rgba(220, 20, 60, 0.1);
+    border-color: #FF4500;
+    color: #FF7B7B;
 }
 
 .btn-back {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     padding: 8px 16px;
-    background: rgba(102, 126, 234, 0.1);
-    border: 2px solid rgba(102, 126, 234, 0.3);
-    border-radius: var(--radius-small);
-    color: #667eea;
+    background: rgba(138, 43, 226, 0.05);
+    border: 2px solid rgba(138, 43, 226, 0.6);
+    border-radius: 10px;
+    color: #DA70D6;
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition-medium);
     font-size: 0.9rem;
     letter-spacing: 1px;
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.3);
 }
 
 .btn-back:hover {
-    background: rgba(102, 126, 234, 0.2);
+    background: rgba(138, 43, 226, 0.15);
     transform: translateX(-2px);
-    border-color: rgba(102, 126, 234, 0.5);
+    border-color: rgba(138, 43, 226, 0.8);
+    box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+}
+
+.btn-info {
+    font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
+    background: rgba(30, 144, 255, 0.05);
+    color: #1E90FF;
+    border: 3px solid #1E90FF;
+    letter-spacing: 2px;
+    box-shadow: 
+        0 0 20px rgba(30, 144, 255, 0.4),
+        inset 0 0 20px rgba(30, 144, 255, 0.05);
+    text-shadow: 0 0 10px rgba(30, 144, 255, 0.5);
+}
+
+.btn-info:hover {
+    transform: translateY(-3px);
+    background: rgba(30, 144, 255, 0.15);
+    box-shadow: 
+        0 0 30px rgba(30, 144, 255, 0.6),
+        0 8px 25px rgba(30, 144, 255, 0.3),
+        inset 0 0 30px rgba(30, 144, 255, 0.1);
+    border-color: #00BFFF;
+    color: #10CFFF;
 }
 
 /* Ready button states */
@@ -159,28 +216,35 @@
     right: 30px;
     padding: 16px 32px;
     font-size: 1.1rem;
-    border: none;
-    border-radius: var(--radius-medium);
+    border: 3px solid #DC143C;
+    border-radius: 15px;
     cursor: pointer;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 2px;
-    background: var(--danger-gradient);
-    color: white;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(220, 20, 60, 0.05);
+    color: #FF6B6B;
     transition: var(--transition-medium);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 
+        0 0 20px rgba(220, 20, 60, 0.4),
+        inset 0 0 20px rgba(220, 20, 60, 0.05);
+    text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
     z-index: var(--z-modal);
 }
 
 .surrender-button:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
-    background: linear-gradient(135deg, #ff7b7b 0%, #fe6a34 100%);
+    background: rgba(220, 20, 60, 0.15);
+    box-shadow: 
+        0 0 30px rgba(220, 20, 60, 0.6),
+        0 8px 25px rgba(220, 20, 60, 0.3),
+        inset 0 0 30px rgba(220, 20, 60, 0.1);
+    border-color: #FF4500;
+    color: #FF7B7B;
 }
 
 .surrender-button:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
     transform: none;
 }
@@ -203,38 +267,51 @@ body.battle-active .surrender-button {
 
 .to-battle-button {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    background: linear-gradient(135deg, #ff6b6b 0%, #c44569 100%);
-    color: white;
-    border: none;
-    padding: 12px 30px;
-    font-size: 20px;
-    font-weight: bold;
-    border-radius: 30px;
+    background: rgba(220, 20, 60, 0.05);
+    color: #FF6B6B;
+    border: 3px solid #DC143C;
+    padding: 16px 32px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-radius: 15px;
     cursor: pointer;
     transition: var(--transition-medium);
-    box-shadow: 0 4px 15px rgba(196, 69, 105, 0.3);
+    box-shadow: 
+        0 0 20px rgba(220, 20, 60, 0.4),
+        inset 0 0 20px rgba(220, 20, 60, 0.05);
+    text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
     text-transform: uppercase;
     letter-spacing: 2px;
 }
 
 .to-battle-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(196, 69, 105, 0.4);
-    background: linear-gradient(135deg, #ff7d7d 0%, #d6567b 100%);
+    transform: translateY(-3px);
+    background: rgba(220, 20, 60, 0.15);
+    box-shadow: 
+        0 0 30px rgba(220, 20, 60, 0.6),
+        0 8px 25px rgba(220, 20, 60, 0.3),
+        inset 0 0 30px rgba(220, 20, 60, 0.1);
+    border-color: #FF4500;
+    color: #FF7B7B;
 }
 
 .to-battle-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 10px rgba(196, 69, 105, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 
+        0 0 20px rgba(220, 20, 60, 0.4),
+        inset 0 0 20px rgba(220, 20, 60, 0.05);
 }
 
 .to-battle-button:disabled,
 .to-battle-button:disabled:hover {
-    background: linear-gradient(135deg, #999 0%, #777 100%);
+    background: rgba(102, 102, 102, 0.05);
+    color: #666;
+    border: 3px solid #444;
     cursor: not-allowed;
-    opacity: 0.7;
-    box-shadow: none;
+    opacity: 0.4;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     transform: none;
+    text-shadow: none;
 }
 
 /* Modal buttons */
@@ -242,10 +319,10 @@ body.battle-active .surrender-button {
 .btn-surrender-confirm {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
     flex: 1;
-    padding: 12px 20px;
+    padding: 14px 24px;
     font-size: 1rem;
-    border: none;
-    border-radius: 10px;
+    border: 3px solid transparent;
+    border-radius: 12px;
     cursor: pointer;
     font-weight: 600;
     text-transform: uppercase;
@@ -255,40 +332,59 @@ body.battle-active .surrender-button {
 
 .btn-modal.primary,
 .btn-surrender-confirm.no {
-    background: var(--primary-gradient);
-    color: white;
+    background: rgba(139, 0, 255, 0.05);
+    color: #DA70D6;
+    border: 3px solid #8B00FF;
+    box-shadow: 
+        0 0 15px rgba(139, 0, 255, 0.3),
+        inset 0 0 15px rgba(139, 0, 255, 0.05);
+    text-shadow: 0 0 8px rgba(218, 112, 214, 0.5);
 }
 
 .btn-modal.primary:hover,
 .btn-surrender-confirm.no:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-
-.btn-surrender-confirm.no:hover {
-    background: linear-gradient(135deg, #34ce57 0%, #2dd4aa 100%);
-    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+    background: rgba(139, 0, 255, 0.15);
+    box-shadow: 
+        0 0 25px rgba(139, 0, 255, 0.5),
+        inset 0 0 25px rgba(139, 0, 255, 0.1);
+    border-color: #DA70D6;
+    color: #EA80E6;
 }
 
 .btn-modal.secondary {
-    background: rgba(108, 117, 125, 0.1);
-    color: #6c757d;
-    border: 1px solid rgba(108, 117, 125, 0.3);
+    background: rgba(108, 117, 125, 0.05);
+    color: #aaa;
+    border: 2px solid rgba(108, 117, 125, 0.5);
+    box-shadow: 0 0 10px rgba(108, 117, 125, 0.2);
 }
 
 .btn-modal.secondary:hover {
-    background: rgba(108, 117, 125, 0.2);
+    background: rgba(108, 117, 125, 0.15);
+    border-color: rgba(108, 117, 125, 0.7);
     transform: translateY(-1px);
+    box-shadow: 0 0 15px rgba(108, 117, 125, 0.3);
+    color: #ccc;
 }
 
 .btn-surrender-confirm.yes {
-    background: var(--danger-gradient);
-    color: white;
+    background: rgba(220, 20, 60, 0.05);
+    color: #FF6B6B;
+    border: 3px solid #DC143C;
+    box-shadow: 
+        0 0 15px rgba(220, 20, 60, 0.3),
+        inset 0 0 15px rgba(220, 20, 60, 0.05);
+    text-shadow: 0 0 8px rgba(255, 107, 107, 0.5);
 }
 
 .btn-surrender-confirm.yes:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+    background: rgba(220, 20, 60, 0.15);
+    box-shadow: 
+        0 0 25px rgba(220, 20, 60, 0.5),
+        inset 0 0 25px rgba(220, 20, 60, 0.1);
+    border-color: #FF4500;
+    color: #FF7B7B;
 }
 
 /* Battle formation button from reward screen */
@@ -302,20 +398,23 @@ body.battle-active .surrender-button {
 /* Log control buttons */
 .log-control-btn {
     font-family: 'Pixel Intv', 'Courier New', monospace, sans-serif !important;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: white;
-    padding: 3px 6px;
-    border-radius: 4px;
+    background: rgba(138, 43, 226, 0.05);
+    border: 1px solid rgba(138, 43, 226, 0.5);
+    color: #DA70D6;
+    padding: 4px 8px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 10px;
     transition: all 0.2s ease;
     letter-spacing: 0.5px;
+    box-shadow: 0 0 8px rgba(138, 43, 226, 0.3);
 }
 
 .log-control-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(138, 43, 226, 0.15);
+    border-color: rgba(138, 43, 226, 0.7);
+    box-shadow: 0 0 12px rgba(138, 43, 226, 0.5);
+    transform: translateY(-1px);
 }
 
 /* Menu buttons specifically */
@@ -345,9 +444,9 @@ button {
     }
     
     .to-battle-button {
-        font-size: 18px;
+        font-size: 1.1rem;
         letter-spacing: 1px;
-        padding: 10px 25px;
+        padding: 14px 28px;
     }
     
     .surrender-button {
@@ -360,7 +459,7 @@ button {
     .btn-surrender-confirm {
         font-size: 0.9rem;
         letter-spacing: 0.5px;
-        padding: 10px 16px;
+        padding: 12px 20px;
     }
 }
 
@@ -372,9 +471,9 @@ button {
     }
     
     .to-battle-button {
-        font-size: 16px;
+        font-size: 1rem;
         letter-spacing: 0.5px;
-        padding: 8px 20px;
+        padding: 12px 24px;
     }
     
     .surrender-button {

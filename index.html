@@ -280,7 +280,7 @@
         /* Card Library Screen Styles */
         .card-library-screen {
             position: relative;
-            max-width: 1000px;
+            max-width: 10000px;
             width: 95vw;
             margin: 0 auto;
             padding: 20px;
@@ -292,6 +292,19 @@
             max-height: 80vh;
             overflow-y: auto;
             box-sizing: border-box;
+        }
+
+        /* Override container width when How to Play or Card Library is shown */
+        .container:has(.how-to-play-screen:not(.hidden)),
+        .container:has(.card-library-screen:not(.hidden)) {
+            max-width: 1200px;
+            width: 95vw;
+        }
+
+        /* Alternative for browsers that don't support :has() */
+        .container.showing-subscreen {
+            max-width: 1200px;
+            width: 95vw;
         }
 
         .card-library-header {
@@ -446,8 +459,8 @@
 </head>
 <body class="fonts-loading">
     <div class="container">
-        <h1>Project Pixel Parties</h1>
-        <div class="game-subtitle">🃏 Pixel Parties Auto Battler 🎯</div>
+        <h1>Pixel Parties</h1>
+        <div class="game-subtitle">🃏 Build. Battle. Best your opponent. ⚔️</div>
         
         <div id="menu" class="menu-buttons">
             <div class="input-section">
@@ -461,10 +474,10 @@
                 <div class="password-hint">Leave empty to create a public room, or set a password for private access.</div>
             </div>
             
-            <button id="startBtn" class="btn btn-primary">🎯 Create Party</button>
+            <button id="startBtn" class="btn btn-primary">➕ Create Game</button>
             <button id="confirmCreateBtn" class="btn btn-primary hidden">🎮 Create Game</button>
             <button id="cancelCreateBtn" class="btn btn-secondary hidden">❌ Cancel</button>
-            <button id="joinBtn" class="btn btn-secondary">⚔️ Browse Battles</button>
+            <button id="joinBtn" class="btn btn-secondary">⚔️ Browse Games</button>
             <button id="howToPlayBtn" class="btn btn-info">📖 How to Play</button>
             <button id="cardLibraryBtn" class="btn btn-info">📚 Card Library</button>
             <button id="leaveBtn" class="btn btn-danger hidden">🚪 Leave Party</button>

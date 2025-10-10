@@ -1,4 +1,5 @@
 // uiManager.js - UI Management Module
+import { startMenuBackground, stopMenuBackground } from './menuBackground.js';
 
 export class UIManager {
     constructor() {
@@ -47,7 +48,10 @@ export class UIManager {
             // Surrender modal elements
             surrenderModal: document.getElementById('surrenderModal'),
             surrenderYesBtn: document.getElementById('surrenderYesBtn'),
-            surrenderNoBtn: document.getElementById('surrenderNoBtn')
+            surrenderNoBtn: document.getElementById('surrenderNoBtn'),
+            
+            // Card library button
+            cardLibraryBtn: document.getElementById('cardLibraryBtn')
         };
     }
 
@@ -115,6 +119,9 @@ export class UIManager {
         this.elements.startBtn.disabled = false;
         this.elements.joinBtn.disabled = false;
         this.elements.howToPlayBtn.disabled = false;
+        
+        // Show elements when returning to main menu
+        this.showElementsWhenLeavingRoom();
     }
 
     showLeaveButton() {
@@ -128,6 +135,40 @@ export class UIManager {
         this.elements.usernameInput.disabled = true;
         this.elements.passwordInput.disabled = true;
         this.elements.leaveBtn.disabled = false;
+        
+        // Hide elements when in room
+        this.hideElementsWhenInRoom();
+    }
+    
+    // Hide specific elements when player is in a room
+    hideElementsWhenInRoom() {
+        // Hide username input section
+        const usernameSection = this.elements.usernameInput?.closest('.input-section');
+        if (usernameSection) {
+            usernameSection.classList.add('hidden');
+        }
+        
+        // Hide card library button
+        if (this.elements.cardLibraryBtn) {
+            this.elements.cardLibraryBtn.classList.add('hidden');
+        }
+        
+        // Hide connection details
+        this.hideConnectionDetails();
+    }
+    
+    // Show elements when returning to main menu
+    showElementsWhenLeavingRoom() {
+        // Show username input section
+        const usernameSection = this.elements.usernameInput?.closest('.input-section');
+        if (usernameSection) {
+            usernameSection.classList.remove('hidden');
+        }
+        
+        // Show card library button
+        if (this.elements.cardLibraryBtn) {
+            this.elements.cardLibraryBtn.classList.remove('hidden');
+        }
     }
 
     // Room browser management
@@ -157,11 +198,13 @@ export class UIManager {
         this.elements.playersList.classList.add('hidden');
         this.hideConnectionDetails();
         this.elements.howToPlayScreen.classList.remove('hidden');
+        document.querySelector('.container')?.classList.add('showing-subscreen');
     }
 
     hideHowToPlay() {
         this.elements.howToPlayScreen.classList.add('hidden');
         this.elements.menu.classList.remove('hidden');
+        document.querySelector('.container')?.classList.remove('showing-subscreen');
     }
 
     // Password modal management
@@ -314,7 +357,7 @@ export class UIManager {
             playersHTML += `
                 <div class="player-item">
                     <div class="player-status offline"></div>
-                    <span style="font-style: italic; color: #666;">Waiting for player...</span>
+                    <span style="font-style: italic; color: #666;">Waiting for challenger...</span>
                 </div>
             `;
         }

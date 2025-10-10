@@ -307,6 +307,17 @@
             width: 95vw;
         }
 
+        /* Hide tagline when showing How to Play or Card Library */
+        .container.showing-subscreen .game-subtitle {
+            display: none;
+        }
+
+        /* Also hide using :has() for better browser support */
+        .container:has(.how-to-play-screen:not(.hidden)) .game-subtitle,
+        .container:has(.card-library-screen:not(.hidden)) .game-subtitle {
+            display: none;
+        }
+
         .card-library-header {
             text-align: center;
             margin-bottom: 30px;

@@ -830,24 +830,5 @@ body::before {
     .player-item {
         padding: 12px 15px;
     }
-
-
-
-
-    /* Force hide main container when game is active */
-    body:has(.game-screen:not(.hidden)) .container:first-of-type {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-
-    /* Alternative for browsers that don't support :has() */
-    .game-screen:not(.hidden) ~ .container,
-    .game-screen:not(.hidden) + * .container {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
+    
 }

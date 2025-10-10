@@ -386,7 +386,7 @@ export class HeroSelection {
         if (hero.name === 'Toras') {
             const equipment = this.heroEquipmentManager.getHeroEquipment(heroPosition);
             const equipmentCount = equipment ? equipment.length : 0;
-            equipmentAttackBonus = equipmentCount * 10; // +10 Attack per equipment for Toras
+            equipmentAttackBonus = equipmentCount * 20; // +20 Attack per equipment for Toras
         }
         
         // Check for Ancient Tech Infinite Energy Core bonus

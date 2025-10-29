@@ -20,9 +20,7 @@ export async function checkRescueMissionInterception(target, damage, context, ba
     
     // Need positive damage
     if (damage <= 0) return null;
-    
-    console.log(`🚨 Checking Rescue Mission reactions for ${target.name} taking ${damage} damage on ${target.side} side`);
-    
+        
     // Find all OTHER living ally heroes on the same side
     const alliedHeroes = target.side === 'player' 
         ? battleManager.playerHeroes 
@@ -35,14 +33,11 @@ export async function checkRescueMissionInterception(target, damage, context, ba
         const hero = alliedHeroes[position];
         if (hero && hero.alive && hero !== target) {
             const rescueMissionCount = countRescueMissionSpells(hero);
-            if (rescueMissionCount > 0) {
-                console.log(`🦸 ${hero.name} has ${rescueMissionCount} RescueMission spell(s), rolling for triggers...`);
-                
+            if (rescueMissionCount > 0) {                
                 // Roll for each RescueMission spell independently
                 for (let i = 0; i < rescueMissionCount; i++) {
                     const roll = battleManager.getRandom();
-                    console.log(`🎲 RescueMission roll ${i + 1}: ${roll.toFixed(3)} vs 0.200`);
-                    
+
                     if (roll < 0.20) { // 20% chance
                         // This one triggers! Add to potential rescuers
                         potentialRescuers.push({
@@ -50,7 +45,6 @@ export async function checkRescueMissionInterception(target, damage, context, ba
                             position: position,
                             spellIndex: i
                         });
-                        console.log(`✅ ${hero.name}'s RescueMission #${i + 1} succeeds!`);
                         break;
                     }
                 }
@@ -60,15 +54,12 @@ export async function checkRescueMissionInterception(target, damage, context, ba
     
     // If no rescuers triggered, return null
     if (potentialRescuers.length === 0) {
-        console.log('❌ No Rescue Mission triggered');
         return null;
     }
     
     // Use the FIRST rescuer that triggered (deterministic order: left -> center -> right)
     const rescuer = potentialRescuers[0];
-    
-    console.log(`🎯 ${rescuer.hero.name} will rescue ${target.name}!`);
-    
+        
     // Execute the rescue mission
     await executeRescueMission(rescuer.hero, target, damage, context, battleManager);
     
@@ -104,9 +95,7 @@ function countRescueMissionSpells(hero) {
  * @param {Object} context - Damage context
  * @param {Object} battleManager - The battle manager instance
  */
-async function executeRescueMission(rescuer, originalTarget, damage, context, battleManager) {
-    console.log(`🦸‍♂️ Executing Rescue Mission: ${rescuer.name} rescues ${originalTarget.name} from ${damage} damage`);
-    
+async function executeRescueMission(rescuer, originalTarget, damage, context, battleManager) {    
     // Add combat log for the rescue
     battleManager.addCombatLog(
         `🦸 ${rescuer.name}'s Rescue Mission activates! Intercepting damage for ${originalTarget.name}!`,
@@ -146,9 +135,7 @@ async function executeRescueMission(rescuer, originalTarget, damage, context, ba
         });
     }
     
-    // Now apply the damage to the rescuer instead
-    console.log(`💥 ${rescuer.name} takes ${damage} damage instead of ${originalTarget.name}`);
-    
+    // Now apply the damage to the rescuer instead    
     battleManager.addCombatLog(
         `💥 ${rescuer.name} takes ${damage} damage to protect ${originalTarget.name}!`,
         rescuer.side === 'player' ? 'error' : 'success'

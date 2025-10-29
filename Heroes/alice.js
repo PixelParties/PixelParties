@@ -13,8 +13,6 @@ export class AliceHeroManager {
         
         // Inject CSS styles
         this.injectAliceLaserStyles();
-        
-        console.log('🔴 Alice Hero Manager initialized');
     }
 
     // Static method to check if a hero is Alice (follows Creature pattern)
@@ -30,11 +28,8 @@ export class AliceHeroManager {
         
         // Safety check: ensure Alice is still alive
         if (!alice.alive || alice.currentHp <= 0) {
-            console.log(`Alice is dead, cannot execute special action`);
             return;
         }
-
-        console.log('🔴 Alice\'s laser effect triggered!');
         
         // Execute the laser effect
         await this.executeLaserEffect(alice);
@@ -52,9 +47,8 @@ export class AliceHeroManager {
         const creatureCount = this.countTeamCreatures(alice);
         const damage = this.DAMAGE_PER_CREATURE * creatureCount;
 
-        // NEW: Only trigger Alice's effect if she has living creatures (damage > 0)
+        // Only trigger Alice's effect if she has living creatures (damage > 0)
         if (creatureCount === 0) {
-            console.log(`🔴 Alice's laser effect cancelled - no living creatures on her team`);
             return;
         }
 
@@ -69,8 +63,6 @@ export class AliceHeroManager {
             return;
         }
 
-        console.log(`🔴 Alice laser: ${creatureCount} creatures × ${this.DAMAGE_PER_CREATURE} = ${damage} damage`);
-
         // Check resistance (spell damage)
         const isResisted = this.battleManager.resistanceManager && 
             this.battleManager.resistanceManager.shouldResistSpell(
@@ -80,7 +72,6 @@ export class AliceHeroManager {
             );
 
         if (isResisted) {
-            console.log(`🛡️ ${target.hero?.name || target.creature?.name} resisted Alice's laser!`);
         } else {
             // Log the laser effect
             this.logLaserEffect(alice, target, damage, creatureCount);
@@ -140,7 +131,6 @@ export class AliceHeroManager {
         });
 
         if (allTargets.length === 0) {
-            console.log(`🔴 Alice found no valid enemy targets`);
             return null;
         }
 
@@ -150,9 +140,7 @@ export class AliceHeroManager {
         const targetName = randomTarget.type === 'hero' 
             ? randomTarget.hero.name 
             : randomTarget.creature.name;
-            
-        console.log(`🎯 Alice targeting random ${randomTarget.type}: ${targetName} at ${randomTarget.position}`);
-        
+                    
         return randomTarget;
     }
 
@@ -174,14 +162,8 @@ export class AliceHeroManager {
             if (hero && hero.creatures) {
                 const livingCreatures = hero.creatures.filter(creature => creature.alive && creature.currentHp > 0);
                 totalCreatures += livingCreatures.length;
-                
-                if (livingCreatures.length > 0) {
-                    console.log(`🔴 ${hero.name} has ${livingCreatures.length} living creatures`);
-                }
             }
         });
-
-        console.log(`🔴 Alice's team has ${totalCreatures} total living creatures`);
         return totalCreatures;
     }
 
@@ -377,9 +359,8 @@ export class AliceHeroManager {
             laser.appendChild(core);
             document.body.appendChild(laser);
             
-            console.log(`🔴 Created red laser: ${distance.toFixed(1)}px at ${angle.toFixed(1)}°`);
             return laser;
-            
+
         } catch (error) {
             console.error('Error creating red laser:', error);
             return null;
@@ -518,8 +499,6 @@ export class AliceHeroManager {
             this.activeLasers.add(laser);
         }
 
-        console.log(`🔴 Guest created red laser`);
-
         // Remove laser after duration
         await this.battleManager.delay(duration);
         await this.removeLaser(laser);
@@ -606,9 +585,7 @@ export class AliceHeroManager {
     // ============================================
 
     // Clean up all active lasers
-    cleanup() {
-        console.log(`Cleaning up ${this.activeLasers.size} active Alice lasers`);
-        
+    cleanup() {       
         this.activeLasers.forEach(laser => {
             try {
                 if (laser && laser.parentNode) {
@@ -629,15 +606,9 @@ export class AliceHeroManager {
                     laser.remove();
                 }
             });
-            
-            if (orphanedLasers.length > 0) {
-                console.log(`Cleaned up ${orphanedLasers.length} orphaned Alice lasers`);
-            }
         } catch (error) {
             console.warn('Error cleaning up orphaned lasers:', error);
         }
-
-        console.log('🔴 Alice Hero Manager cleaned up');
     }
 }
 

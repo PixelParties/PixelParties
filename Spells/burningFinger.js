@@ -774,6 +774,105 @@ export class BurningFingerSpell {
         // Reset synchronization state
         this.stacksSynchronized = false;
     }
+
+    // ============================================
+    // CPU POST-BATTLE COUNTER INCREASES
+    // ============================================
+
+    /**
+     * Increase BurningFinger counters for CPU heroes after battle
+     * Heroes with BurningFinger in spellbook gain 1-4 stacks (weighted by copy count)
+     * @param {Object} computerTeam - The computer team with formation and spellbooks
+     * @returns {Object} Summary of changes
+     */
+    increaseCPUCountersAfterBattle(computerTeam) {
+        if (!computerTeam || !computerTeam.formation || !computerTeam.spellbooks) {
+            return { updated: false, changes: [] };
+        }
+
+        const changes = [];
+        const positions = ['left', 'center', 'right'];
+
+        positions.forEach(position => {
+            const hero = computerTeam.formation[position];
+            const spellbook = computerTeam.spellbooks[position];
+
+            if (!hero || !spellbook || !Array.isArray(spellbook)) {
+                return;
+            }
+
+            // Count BurningFinger spells in spellbook
+            const burningFingerCount = spellbook.filter(spell => 
+                spell.name === 'BurningFinger'
+            ).length;
+
+            if (burningFingerCount === 0) {
+                return;
+            }
+
+            // Calculate weighted stack increase
+            const stackIncrease = this.calculateWeightedIncrease(burningFingerCount);
+
+            // Initialize if needed
+            if (typeof hero.burningFingerStack !== 'number') {
+                hero.burningFingerStack = 0;
+            }
+
+            const oldStacks = hero.burningFingerStack;
+            hero.burningFingerStack += stackIncrease;
+
+            changes.push({
+                position,
+                heroName: hero.name,
+                burningFingerCopies: burningFingerCount,
+                stackIncrease,
+                oldStacks,
+                newStacks: hero.burningFingerStack
+            });
+
+            console.log(`[BurningFinger CPU] ${hero.name} (${position}): ${oldStacks} -> ${hero.burningFingerStack} stacks (+${stackIncrease}) [${burningFingerCount} copies]`);
+        });
+
+        return { updated: changes.length > 0, changes };
+    }
+
+    /**
+     * Calculate weighted random increase (1-4) based on BurningFinger copy count
+     * More copies = higher likelihood of larger increases
+     * @param {number} copyCount - Number of BurningFinger spells in spellbook
+     * @returns {number} Stack increase (1-4)
+     */
+    calculateWeightedIncrease(copyCount) {
+        let weights;
+        
+        if (copyCount === 1) {
+            weights = [0.40, 0.35, 0.20, 0.05]; // Favor smaller increases
+        } else if (copyCount === 2) {
+            weights = [0.25, 0.35, 0.30, 0.10]; // Balanced
+        } else if (copyCount === 3) {
+            weights = [0.15, 0.25, 0.35, 0.25]; // Favor higher increases
+        } else {
+            weights = [0.10, 0.20, 0.30, 0.40]; // Heavily favor highest
+        }
+
+        // Convert to cumulative distribution
+        const cumulative = [];
+        let sum = 0;
+        for (let i = 0; i < weights.length; i++) {
+            sum += weights[i];
+            cumulative.push(sum);
+        }
+
+        // Random selection
+        const random = Math.random();
+        for (let i = 0; i < cumulative.length; i++) {
+            if (random <= cumulative[i]) {
+                return i + 1; // Return 1, 2, 3, or 4
+            }
+        }
+
+        return 1; // Fallback
+    }
 }
 
 // Export for use in spell system

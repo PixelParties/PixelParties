@@ -12,7 +12,7 @@ export class ThievingStrikeSpell {
      */
     getTriggerChance(attacker, target, damage) {
         // 20% base chance to trigger
-        return 0.2;
+        return 0.20;
     }
 
     /**

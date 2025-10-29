@@ -32,25 +32,34 @@ export class SidHeroEffect {
             }
 
             const isHost = heroSelection.isHost;
+            const isSingleplayer = heroSelection.isSingleplayerMode();
             
-            // Get opponent's hand from Firebase
-            const gameStateSnapshot = await roomRef.child('gameState').once('value');
-            const gameState = gameStateSnapshot.val();
-            
-            if (!gameState) {
-                return null;
-            }
-
-            // Get opponent's hand data
-            const opponentHandKey = isHost ? 'guestHand' : 'hostHand';
-            let opponentHandData = gameState[opponentHandKey];
-
-            // Handle the correct HandManager export format
             let handArray = [];
-            if (opponentHandData && opponentHandData.cards && Array.isArray(opponentHandData.cards)) {
-                handArray = [...opponentHandData.cards]; // Copy the cards array
+            
+            if (isSingleplayer) {
+                // *** SINGLEPLAYER: Get hand from opponentHandData ***
+                if (heroSelection.opponentHandData && Array.isArray(heroSelection.opponentHandData)) {
+                    handArray = [...heroSelection.opponentHandData];
+                } else {
+                    return null;
+                }
             } else {
-                return null;
+                // *** MULTIPLAYER: Get hand from Firebase ***
+                const gameStateSnapshot = await roomRef.child('gameState').once('value');
+                const gameState = gameStateSnapshot.val();
+                
+                if (!gameState) {
+                    return null;
+                }
+
+                const opponentHandKey = isHost ? 'guestHand' : 'hostHand';
+                let opponentHandData = gameState[opponentHandKey];
+
+                if (opponentHandData && opponentHandData.cards && Array.isArray(opponentHandData.cards)) {
+                    handArray = [...opponentHandData.cards];
+                } else {
+                    return null;
+                }
             }
 
             if (handArray.length === 0) {
@@ -73,44 +82,57 @@ export class SidHeroEffect {
                 }
             }
 
-            const updates = {};
+            if (isSingleplayer) {
+                // *** SINGLEPLAYER: Update local opponent hand data ***
+                heroSelection.opponentHandData = handArray;
+                
+                // Store stolen card data for display
+                this.stolenCardData = {
+                    cardName: String(stolenCard),
+                    thiefSide: 'host',
+                    victimSide: 'computer',
+                    timestamp: Date.now()
+                };
+                
+                return this.stolenCardData;
+            } else {
+                // *** MULTIPLAYER: Update Firebase ***
+                const updates = {};
+                const opponentHandKey = isHost ? 'guestHand' : 'hostHand';
+                
+                updates[`gameState/${opponentHandKey}`] = {
+                    cards: handArray,
+                    size: handArray.length,
+                    maxSize: opponentHandData.maxSize || 10,
+                    overlapLevel: this.getOverlapLevel(handArray.length),
+                    timestamp: Date.now()
+                };
 
-            // Update opponent's hand maintaining the correct HandManager format
-            updates[`gameState/${opponentHandKey}`] = {
-                cards: handArray,
-                size: handArray.length,
-                maxSize: opponentHandData.maxSize || 10,
-                overlapLevel: this.getOverlapLevel(handArray.length),
-                timestamp: Date.now()
-            };
+                const myHandKey = isHost ? 'hostHand' : 'guestHand';
+                if (heroSelection.handManager) {
+                    updates[`gameState/${myHandKey}`] = heroSelection.handManager.exportHand();
+                }
 
-            // Update our hand using HandManager's export method
-            const myHandKey = isHost ? 'hostHand' : 'guestHand';
-            if (heroSelection.handManager) {
-                updates[`gameState/${myHandKey}`] = heroSelection.handManager.exportHand();
+                await roomRef.update(updates);
+                
+                this.stolenCardData = {
+                    cardName: String(stolenCard),
+                    thiefSide: isHost ? 'host' : 'guest',
+                    victimSide: isHost ? 'guest' : 'host',
+                    timestamp: Date.now()
+                };
+                
+                if (heroSelection.gameDataSender) {
+                    heroSelection.gameDataSender('sid_card_theft', {
+                        stolenCard: String(stolenCard),
+                        thiefSide: this.stolenCardData.thiefSide,
+                        victimSide: this.stolenCardData.victimSide,
+                        timestamp: this.stolenCardData.timestamp
+                    });
+                }
+
+                return this.stolenCardData;
             }
-
-            await roomRef.update(updates);
-            
-            // Store stolen card data for display
-            this.stolenCardData = {
-                cardName: String(stolenCard),
-                thiefSide: isHost ? 'host' : 'guest',
-                victimSide: isHost ? 'guest' : 'host',
-                timestamp: Date.now()
-            };
-            
-            // Send sync message
-            if (heroSelection.gameDataSender) {
-                heroSelection.gameDataSender('sid_card_theft', {
-                    stolenCard: String(stolenCard),
-                    thiefSide: this.stolenCardData.thiefSide,
-                    victimSide: this.stolenCardData.victimSide,
-                    timestamp: this.stolenCardData.timestamp
-                });
-            }
-
-            return this.stolenCardData;
 
         } catch (error) {
             console.error('🎭 SID THEFT: ERROR during card theft:', error);
@@ -335,6 +357,138 @@ export class SidHeroEffect {
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, str => str.toUpperCase())
             .trim();
+    }
+
+    /**
+     * CPU Sid steals from player in singleplayer mode
+     * @param {Object} cpuFormation - The CPU's hero formation
+     * @param {Object} heroSelection - Player's heroSelection instance
+     * @returns {Object|null} Theft data or null
+     */
+    async performCPUSidTheft(cpuFormation, heroSelection) {
+        if (!cpuFormation || !heroSelection) {
+            return null;
+        }
+
+        // Check if CPU has Sid
+        const hasSid = SidHeroEffect.hasSidInFormation(cpuFormation);
+        if (!hasSid) {
+            return null;
+        }
+
+        // Get player's hand
+        if (!heroSelection.handManager) {
+            return null;
+        }
+
+        const playerHand = heroSelection.handManager.getHand();
+        
+        if (playerHand.length === 0) {
+            console.log('🎭 CPU SID THEFT: Player has no cards to steal');
+            return null;
+        }
+
+        // Steal random card
+        const randomIndex = Math.floor(Math.random() * playerHand.length);
+        const stolenCard = playerHand[randomIndex];
+
+        // Remove from player's hand
+        const removed = heroSelection.handManager.removeCardFromHandByIndex(randomIndex);
+        
+        if (!removed) {
+            console.error('🎭 CPU SID THEFT: Failed to remove card from player hand');
+            return null;
+        }
+
+        // Store theft data
+        this.stolenCardData = {
+            cardName: String(stolenCard),
+            thiefSide: 'computer',
+            victimSide: 'player',
+            timestamp: Date.now()
+        };
+
+        console.log(`🎭 CPU SID THEFT: Stole "${stolenCard}" from player`);
+
+        // Show notification to player
+        this.showCPUTheftNotification(stolenCard);
+
+        // Save game state
+        if (heroSelection.autoSave) {
+            await heroSelection.autoSave();
+        }
+
+        return this.stolenCardData;
+    }
+
+    /**
+     * Show notification when CPU Sid steals from player
+     */
+    showCPUTheftNotification(cardName) {
+        const formattedName = this.formatCardName(cardName);
+        
+        const notification = document.createElement('div');
+        notification.className = 'cpu-sid-theft-notification';
+        notification.innerHTML = `
+            <div class="sid-theft-content">
+                <span class="sid-icon">🎭</span>
+                <span class="theft-text">Opponent's Sid stole <strong>${formattedName}</strong> from your hand!</span>
+            </div>
+        `;
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.95), rgba(138, 43, 226, 0.95));
+            color: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 10000;
+            box-shadow: 0 8px 25px rgba(138, 43, 226, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            animation: cpuSidTheftSlideIn 0.5s ease-out;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Add animation if not present
+        if (!document.getElementById('cpuSidTheftAnimations')) {
+            const style = document.createElement('style');
+            style.id = 'cpuSidTheftAnimations';
+            style.textContent = `
+                @keyframes cpuSidTheftSlideIn {
+                    from {
+                        transform: translateX(-50%) translateY(-100px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(-50%) translateY(0);
+                        opacity: 1;
+                    }
+                }
+                
+                @keyframes cpuSidTheftSlideOut {
+                    from {
+                        transform: translateX(-50%) translateY(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(-50%) translateY(-100px);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        setTimeout(() => {
+            notification.style.animation = 'cpuSidTheftSlideOut 0.5s ease-out';
+            setTimeout(() => notification.remove(), 500);
+        }, 4000);
     }
 
     // Get styles for Sid theft display

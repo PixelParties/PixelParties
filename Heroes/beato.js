@@ -1,5 +1,7 @@
 // ./Heroes/beato.js - Beato Hero Effect Manager: Start of Turn Spell Learning
 // At the start of every turn, Beato permanently learns 1 random spell following ButterflyCloud rules
+import { getHeroCards } from '../heroStartingCards.js';
+import { getAllHeroes } from '../cardDatabase.js';
 
 export class BeatoEffectManager {
     constructor() {
@@ -9,16 +11,21 @@ export class BeatoEffectManager {
     // Process Beato spell learning after battle (called from returnToFormationScreenAfterBattle)
     async processPostBattleEmpowerment(heroSelection) {
         if (!heroSelection) {
+            console.error('❌ Beato: No heroSelection provided');
             return;
         }
         
         if (!heroSelection.formationManager) {
+            console.error('❌ Beato: No formationManager found');
             return;
         }
         
         if (!heroSelection.heroSpellbookManager) {
+            console.error('❌ Beato: No heroSpellbookManager found');
             return;
         }
+
+        console.log('🎯 Beato: Starting post-battle spell learning');
 
         try {
             // Find Beato in current formation
@@ -26,23 +33,33 @@ export class BeatoEffectManager {
             const beatoPosition = this.findBeatoPosition(formation);
             
             if (!beatoPosition) {
+                console.log('ℹ️ Beato: Not in formation, skipping spell learning');
                 return; // No Beato in formation
             }
+
+            console.log(`✅ Beato found at position: ${beatoPosition}`);
 
             // Get available spells using ButterflyCloud logic
             const availableSpells = this.getAvailableSpellsForBeato(heroSelection);
             
             if (availableSpells.length === 0) {
-                return; // No spells available to learn
+                console.warn('⚠️ Beato: No spells available to learn!');
+                return;
             }
+
+            console.log(`📚 Beato: ${availableSpells.length} spells available`);
 
             // Select 1 random spell
             const selectedSpell = this.selectRandomSpell(availableSpells);
             
+            console.log(`🎲 Beato: Selected spell: ${selectedSpell.name}`);
+
             // Add spell to Beato's spellbook
             const success = heroSelection.heroSpellbookManager.addSpellToHero(beatoPosition, selectedSpell.name);
             
             if (success) {
+                console.log(`✅ Beato: Successfully learned ${selectedSpell.name}`);
+                
                 // Show visual effect
                 this.showBeatoSpellLearningEffect(beatoPosition, selectedSpell);
                 
@@ -50,22 +67,29 @@ export class BeatoEffectManager {
                 try {
                     if (heroSelection.saveGameState) {
                         await heroSelection.saveGameState();
+                        console.log('💾 Beato: Game state saved');
                     }
                 } catch (error) {
-                    console.error('Error saving game state after Beato spell learning:', error);
+                    console.error('❌ Error saving game state after Beato spell learning:', error);
+                    throw error; // Re-throw to prevent silent failure
                 }
 
                 // Send formation update to opponent
                 try {
                     if (heroSelection.sendFormationUpdate) {
                         await heroSelection.sendFormationUpdate();
+                        console.log('📡 Beato: Formation update sent');
                     }
                 } catch (error) {
-                    console.error('Error sending formation update after Beato spell learning:', error);
+                    console.error('❌ Error sending formation update after Beato spell learning:', error);
+                    // Don't throw here - the spell was learned, just notify
                 }
+            } else {
+                console.error(`❌ Beato: Failed to learn spell ${selectedSpell.name}`);
             }
         } catch (error) {
-            console.error('Exception in Beato processPostBattleEmpowerment:', error);
+            console.error('❌ Exception in Beato processPostBattleEmpowerment:', error);
+            throw error; // Re-throw so we know something failed
         }
     }
 
@@ -102,28 +126,43 @@ export class BeatoEffectManager {
         const beatoPosition = this.findBeatoPosition(formation);
         const isEternalBeato = beatoPosition && formation[beatoPosition]?.name === 'EternalBeato';
         
-        // Get all card names using the same logic as ButterflyCloud
+        // Get all card names - DYNAMICALLY load all hero names from cardDatabase
         let allCardNames = [];
         
         try {
-            const characterCards = heroSelection.characterCards;
-            if (characterCards) {
-                const cardSet = new Set();
-                Object.values(characterCards).forEach(cards => {
-                    cards.forEach(card => cardSet.add(card));
-                });
-                allCardNames = Array.from(cardSet);
-            }
+            // Dynamically get all hero names from cardDatabase
+            const allHeroes = getAllHeroes();
+            const heroNames = allHeroes.map(hero => hero.name);
             
+            console.log(`🔍 Beato: Dynamically loaded ${heroNames.length} heroes from database`);
+            
+            const cardSet = new Set();
+            heroNames.forEach(heroName => {
+                const heroCards = getHeroCards(heroName);
+                if (heroCards && Array.isArray(heroCards)) {
+                    heroCards.forEach(card => cardSet.add(card));
+                }
+            });
+            allCardNames = Array.from(cardSet);
+            
+            // Also get from card database
             if (typeof window !== 'undefined' && window.cardDatabase) {
                 allCardNames = allCardNames.concat(Object.keys(window.cardDatabase));
             }
         } catch (error) {
-            console.warn('Error accessing card database for Beato:', error);
+            console.error('Error accessing cards for Beato:', error);
+            // Don't return empty - still try with what we have
         }
         
         // Remove duplicates
         allCardNames = [...new Set(allCardNames)];
+        
+        if (allCardNames.length === 0) {
+            console.error('❌ Beato: No cards found in database!');
+            return [];
+        }
+        
+        console.log(`📋 Beato: Found ${allCardNames.length} total cards to filter`);
         
         const eligibleSpells = [];
         
@@ -175,6 +214,7 @@ export class BeatoEffectManager {
         console.log(`📚 ${isEternalBeato ? 'EternalBeato' : 'Beato'} eligible spells: ${eligibleSpells.length}${isEternalBeato ? ' (level 3+)' : ''}`);
         return eligibleSpells;
     }
+
 
     // Select 1 random spell
     selectRandomSpell(availableSpells) {

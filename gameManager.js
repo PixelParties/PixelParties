@@ -429,43 +429,78 @@ export class GameManager {
 
     // Show game screen and initialize hero selection - FIXED for immediate hero selection
     async showGameScreen() {
-        // Prevent multiple calls during transition
         const currentState = this.gameState;
+        
         if (currentState === 'starting' || currentState === 'selection') {
             return;
         }
         
-        // Check if this is a reconnection by examining hero selection state
-        const isReconnection = this.heroSelection && 
-                            this.heroSelection.stateMachine.isInState(
-                                this.heroSelection.stateMachine.states.RECONNECTING
-                            );
+        const isSingleplayer = this.isSingleplayerMode();
+
+        const savedGameData = this.roomManager?.storageManager?.getSavedGameData();
+        const hasExistingGame = savedGameData && savedGameData.roomId;
+        const isReconnection = hasExistingGame;
         
         this.gameState = 'selection';
         
-        // Clear all tooltips before transition
         this.clearAllTooltipsGlobally();
-        
-        // Show loading overlay
         this.showGameLoadingOverlay();
-        
-        // Show the game screen UI
         this.uiManager.showGameScreen();
         
-        // Wait for UI to settle
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Initialize hero selection
-        await this.initializeHeroSelection();
+        const initSuccess = await this.initializeHeroSelection();
         
-        // Hide loading overlay
         this.hideGameLoadingOverlay();
         
-        // For reconnections, let the reconnection manager handle the flow
-        if (isReconnection) {
-            // The reconnectionManager.handleReconnection() will be called during heroSelection.restoreGameState()
+        if (!initSuccess) {
+            this.uiManager.showStatus('Failed to initialize game', 'error');
+            setTimeout(() => {
+                this.uiManager.returnToMainMenu();
+            }, 2000);
+            return;
+        }
+        
+        if (isSingleplayer && isReconnection && this.heroSelection && this.heroSelection.selectedCharacter) {
+            this.uiManager.showSurrenderButton();
+        }
+        
+        if (isSingleplayer) {
+            const hasSavedData = this.heroSelection && 
+                            this.heroSelection.playerCharacters.length > 0;
+            
+            if (hasSavedData) {
+                setTimeout(async () => {
+                    if (this.heroSelection && this.heroSelection.cardRewardManager) {
+                        const hasPendingRewards = await this.heroSelection.cardRewardManager.checkAndRestorePendingRewards(this.heroSelection);
+                        
+                        if (!hasPendingRewards) {
+                            const gameStateSnapshot = await this.heroSelection.roomManager.getRoomRef().child('gameState').once('value');
+                            const gameState = gameStateSnapshot.val();
+                            
+                            if (gameState && gameState.gamePhase === 'Reward') {
+                                console.warn('Reward phase detected but no pending rewards - generating fresh rewards');
+                                if (this.heroSelection.turnTracker) {
+                                    await this.heroSelection.cardRewardManager.showRewardsAfterBattle(
+                                        this.heroSelection.turnTracker,
+                                        this.heroSelection,
+                                        'victory'
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }, 100);
+            } else {
+                setTimeout(() => {
+                    if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                        window.updateHeroSelectionUI();
+                    }
+                }, 50);
+            }
+        } else if (isReconnection) {
+            // For multiplayer reconnections, let the reconnection manager handle the flow
         } else {
-            // Force UI update for new games
             setTimeout(() => {
                 if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                     window.updateHeroSelectionUI();
@@ -604,131 +639,151 @@ export class GameManager {
             this.turnTracker = this.heroSelection.turnTracker;
         }
         
-        // Set up Firebase game data listener for P2P fallback
-        this.setupFirebaseGameDataListener();
+        // Set up Firebase game data listener for P2P fallback (only for multiplayer)
+        if (!this.isSingleplayerMode()) {
+            this.setupFirebaseGameDataListener();
+        }
         
         // Initialize with game context including roomManager for persistence
         const loadSuccess = await this.heroSelection.init(
             this.roomManager.getIsHost(),
-            (type, data) => this.webRTCManager.sendGameData(type, data),
+            (type, data) => {
+                // Only send data in multiplayer mode
+                if (!this.isSingleplayerMode()) {
+                    this.webRTCManager.sendGameData(type, data);
+                }
+            },
             (selectionData) => this.onHeroSelectionComplete(selectionData),
             this.roomManager // Pass roomManager for Firebase access
         );
         
-        // Set up life change callback to sync with opponent
-        this.heroSelection.initLifeChangeCallback((lifeChangeData) => {
-            // Get current life state
-            const lifeManager = this.heroSelection.getLifeManager();
-            const lifeUpdate = {
-                playerLives: lifeManager.getPlayerLives(),
-                opponentLives: lifeManager.getOpponentLives(),
-                playerTrophies: lifeManager.getPlayerTrophies(),
-                opponentTrophies: lifeManager.getOpponentTrophies(),
-                changeData: lifeChangeData
-            };
-            
-            // Send life update to opponent
-            this.webRTCManager.sendGameData('life_update', lifeUpdate);
-            
-            // Handle victory condition (10 trophies)
-            if (lifeChangeData.type === 'victory') {
-                // Get winner's formation data
-                const winnerFormation = lifeChangeData.winner === 'player' ? 
-                    this.heroSelection.formationManager.getBattleFormation() : 
-                    this.heroSelection.formationManager.getOpponentBattleFormation();
-                
-                // Get winner's name
-                const playerName = lifeChangeData.winner === 'player' ? 
-                    this.uiManager.getCurrentUsername() : 
-                    (this.roomManager.getIsHost() ? 
-                        this.roomManager.getRoomRef()?.guestName || 'Opponent' : 
-                        this.roomManager.getRoomRef()?.hostName || 'Opponent');
-                
-                const winnerData = {
-                    playerName: playerName,
-                    heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
-                    isLocalPlayer: lifeChangeData.winner === 'player'
-                };
-
-                // Save victory data to Firebase for reconnection support
-                const victoryData = {
-                    winner: lifeChangeData.winner,
-                    winnerName: playerName,
-                    trophies: lifeChangeData.trophies,
-                    timestamp: Date.now()
-                };
-
-                // Update game phase and save victory data
-                if (this.roomManager && this.roomManager.getRoomRef()) {
-                    this.roomManager.getRoomRef().child('gameState').update({
-                        gamePhase: 'Victory',
-                        gamePhaseUpdated: Date.now(),
-                        victoryData: victoryData
-                    }).catch(error => {
-                        // Error saving victory data, but continue with local victory display
-                    });
-                }
-                
-                // Send victory message to opponent
-                this.webRTCManager.sendGameData('victory_achieved', {
-                    winner: lifeChangeData.winner,
-                    winnerName: playerName,
-                    trophies: lifeChangeData.trophies
-                });
-                
-                // Transition to victory state and show victory screen
-                this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
-                this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
-                
-                return; // Don't check regular game over when victory condition is met
-            }
-            
-            // Check for regular game over (lives-based)
-            if (lifeManager.isGameOver()) {
-                const winner = lifeManager.getWinner();
-                this.handleGameOver(winner);
-            }
-        });
-        
-        if (loadSuccess) {
-            // Check if we have existing character data (restored from state)
-            const playerCharacters = this.heroSelection.getPlayerCharacters();
-            
-            if (playerCharacters.length > 0) {
-                // For reconnections, the restore process now handles showing the correct screen
-                // (Formation, Battle, or Reward) based on the gamePhase
-                if (isReconnection) {
-                    // The heroSelection.restoreGameState() method will determine the correct screen
-                } else {
-                    // For non-reconnections with existing data, check for pending rewards
-                    if (this.heroSelection.getCurrentPhase() === 'team_building') {
-                        setTimeout(async () => {
-                            const hasRewards = await this.heroSelection.checkAndRestorePendingCardRewards();
-                        }, 50);
-                    }
-                }
-            } else {
-                // No existing characters - start fresh selection (only for new games)
-                if (!isReconnection) {
-                    await this.heroSelection.startSelection();
-                    // UI update is handled inside startSelection() method
-                } else {
-                    // This case shouldn't occur, but handle gracefully
-                    await this.heroSelection.startSelection();
-                }
-            }
-        } else {
+        if (!loadSuccess) {
             // Fallback to basic game screen
             const heroContainer = document.querySelector('.hero-selection-screen');
             if (heroContainer) {
                 heroContainer.innerHTML = `
                     <div class="loading-heroes">
-                        <h2>⚠ Failed to Load Heroes</h2>
+                        <h2>⚠️ Failed to Load Heroes</h2>
                         <p>Using fallback battle mode...</p>
                     </div>
                 `;
             }
+            console.error('❌ Hero selection initialization failed');
+            return false; // Return false to indicate failure
         }
+        
+        // Set up life change callback to sync with opponent - AFTER heroSelection is created and initialized
+        if (this.heroSelection) {
+            this.heroSelection.initLifeChangeCallback((lifeChangeData) => {
+                // Get current life state
+                const lifeManager = this.heroSelection.getLifeManager();
+                const lifeUpdate = {
+                    playerLives: lifeManager.getPlayerLives(),
+                    opponentLives: lifeManager.getOpponentLives(),
+                    playerTrophies: lifeManager.getPlayerTrophies(),
+                    opponentTrophies: lifeManager.getOpponentTrophies(),
+                    changeData: lifeChangeData
+                };
+                
+                // Send life update to opponent (only in multiplayer mode)
+                if (!this.isSingleplayerMode()) {
+                    this.webRTCManager.sendGameData('life_update', lifeUpdate);
+                }
+                
+                // Handle victory condition (10 trophies)
+                if (lifeChangeData.type === 'victory') {
+                    // Get winner's formation data
+                    const winnerFormation = lifeChangeData.winner === 'player' ? 
+                        this.heroSelection.formationManager.getBattleFormation() : 
+                        this.heroSelection.formationManager.getOpponentBattleFormation();
+                    
+                    // Get winner's name
+                    const playerName = lifeChangeData.winner === 'player' ? 
+                        this.uiManager.getCurrentUsername() : 
+                        (this.roomManager.getIsHost() ? 
+                            this.roomManager.getRoomRef()?.guestName || 'Opponent' : 
+                            this.roomManager.getRoomRef()?.hostName || 'Opponent');
+                    
+                    const winnerData = {
+                        playerName: playerName,
+                        heroes: [winnerFormation.left, winnerFormation.center, winnerFormation.right].filter(h => h),
+                        isLocalPlayer: lifeChangeData.winner === 'player'
+                    };
+
+                    // Save victory data to Firebase for reconnection support
+                    const victoryData = {
+                        winner: lifeChangeData.winner,
+                        winnerName: playerName,
+                        trophies: lifeChangeData.trophies,
+                        timestamp: Date.now()
+                    };
+
+                    // Update game phase and save victory data
+                    if (this.roomManager && this.roomManager.getRoomRef()) {
+                        this.roomManager.getRoomRef().child('gameState').update({
+                            gamePhase: 'Victory',
+                            gamePhaseUpdated: Date.now(),
+                            victoryData: victoryData
+                        }).catch(error => {
+                            // Error saving victory data, but continue with local victory display
+                        });
+                    }
+                    
+                    // Send victory message to opponent (only in multiplayer mode)
+                    if (!this.isSingleplayerMode()) {
+                        this.webRTCManager.sendGameData('victory_achieved', {
+                            winner: lifeChangeData.winner,
+                            winnerName: playerName,
+                            trophies: lifeChangeData.trophies
+                        });
+                    }
+                    
+                    // Transition to victory state and show victory screen
+                    this.heroSelection.stateMachine.transitionTo(this.heroSelection.stateMachine.states.VICTORY);
+                    this.heroSelection.victoryScreen.showVictoryScreen(winnerData, this.heroSelection);
+                    
+                    return; // Don't check regular game over when victory condition is met
+                }
+                
+                // Check for regular game over (lives-based)
+                if (lifeManager.isGameOver()) {
+                    const winner = lifeManager.getWinner();
+                    this.handleGameOver(winner);
+                }
+            });
+            
+            // Initialize life manager with turn tracker after restoration
+            this.heroSelection.initializeLifeManagerWithTurnTracker();
+        }
+        
+        // Check if we have existing character data (restored from state)
+        const playerCharacters = this.heroSelection ? this.heroSelection.getPlayerCharacters() : [];
+        
+        if (playerCharacters.length > 0) {
+            // For reconnections, the restore process now handles showing the correct screen
+            // (Formation, Battle, or Reward) based on the gamePhase
+            if (isReconnection) {
+                // The heroSelection.restoreGameState() method will determine the correct screen
+            } else {
+                // For non-reconnections with existing data, check for pending rewards
+                if (this.heroSelection.getCurrentPhase() === 'team_building') {
+                    setTimeout(async () => {
+                        const hasRewards = await this.heroSelection.checkAndRestorePendingCardRewards();
+                    }, 50);
+                }
+            }
+        } else {
+            // No existing characters - start fresh selection (only for new games)
+            if (!isReconnection && this.heroSelection) {
+                await this.heroSelection.startSelection();
+                // UI update is handled inside startSelection() method
+            } else if (isReconnection && this.heroSelection) {
+                // This case shouldn't occur, but handle gracefully
+                await this.heroSelection.startSelection();
+            }
+        }
+        
+        return true; // Return true to indicate success
     }
 
     // Handle hero selection completion
@@ -774,6 +829,24 @@ export class GameManager {
 
     // Handle surrender with victory screen
     async handleSurrender() {
+        // Check if singleplayer mode
+        if (this.isSingleplayerMode()) {
+            // Close the singleplayer room
+            if (this.roomManager && this.roomManager.getRoomRef()) {
+                await this.roomManager.getRoomRef().remove();
+            }
+            
+            // Clean up game manager state
+            this.reset();
+            
+            // Return to main menu immediately (no victory screen)
+            this.uiManager.returnToMainMenu();
+            this.uiManager.showStatus('Returned to main menu', 'connected');
+            
+            return;
+        }
+        
+        // MULTIPLAYER MODE - existing logic
         try {
             // Get opponent info before surrendering
             const opponentName = await this.getOpponentName();
@@ -818,6 +891,7 @@ export class GameManager {
             this.uiManager.showStatus('🏳️ Game ended - returned to lobby', 'connected');
         }
     }
+
 
     // Handle game over (when someone reaches 0 lives)
     handleGameOver(winner) {
@@ -976,20 +1050,26 @@ export class GameManager {
         // Remove Firebase game data listener
         this.removeFirebaseGameDataListener();
         
+        // **FIX 1: Clear saved game data from storage manager (correct method name)**
+        if (this.roomManager && this.roomManager.storageManager) {
+            this.roomManager.storageManager.clearGameData();
+        }
+        
         if (this.heroSelection) {
             this.heroSelection.reset();
             this.heroSelection = null;
             window.heroSelection = null;
         }
         
-        // Reset game phase to Formation if we have room access
-        if (this.roomManager && this.roomManager.getRoomRef()) {
+        // **FIX 2: Only update game phase for multiplayer rooms**
+        // Don't try to update singleplayer rooms that are being deleted
+        if (this.roomManager && this.roomManager.getRoomRef() && !this.isSingleplayerMode()) {
             this.roomManager.getRoomRef().child('gameState').update({
                 gamePhase: 'Formation',
                 gamePhaseUpdated: Date.now(),
                 gameManagerReset: Date.now()
             }).catch(error => {
-                // Silently handle error - could not reset game phase during game manager reset
+                // Silently handle error
             });
         }
     }
@@ -1051,5 +1131,16 @@ export class GameManager {
         } catch (error) {
             // Error saving surrender victory data - silently handle
         }
+    }
+
+
+    isSingleplayerMode() {
+        // Check if we're in a singleplayer session
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return false;
+        }
+        
+        const roomId = this.roomManager.getRoomRef().key;
+        return roomId && roomId.startsWith('sp_');
     }
 }

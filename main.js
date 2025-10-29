@@ -88,6 +88,7 @@ class ProjectPixelParties {
         };
         
         // Main menu buttons
+        safeAddEventListener(elements.singleplayerBtn, 'click', () => this.startSingleplayer());
         safeAddEventListener(elements.startBtn, 'click', () => this.showPasswordSection());
         safeAddEventListener(elements.confirmCreateBtn, 'click', () => this.startGame());
         safeAddEventListener(elements.cancelCreateBtn, 'click', () => this.cancelRoomCreation());
@@ -167,6 +168,74 @@ class ProjectPixelParties {
         const savedUsername = this.storageManager.getSavedUsername();
         if (savedUsername) {
             this.uiManager.elements.usernameInput.value = savedUsername;
+        }
+    }
+
+    async startSingleplayer() {
+        if (!this.database) {
+            this.uiManager.showStatus('Demo: Singleplayer requires Firebase connection', 'error');
+            return;
+        }
+        
+        try {
+            this.uiManager.showStatus('Starting singleplayer...', 'waiting', true);
+            
+            // Hide menu buttons and show leave button
+            this.uiManager.showLeaveButton();
+            
+            const username = this.uiManager.getCurrentUsername();
+            
+            // Create a local "singleplayer" room that won't be visible to others
+            const roomId = 'sp_' + this.playerId;
+            this.roomManager.roomRef = this.database.ref('rooms/' + roomId);
+            this.roomManager.setIsHost(true);
+            
+            const roomData = {
+                host: this.playerId,
+                hostName: username,
+                hostReady: true,
+                hostOnline: true,
+                hostGameReady: true, // CHANGED: Set to true immediately
+                guest: null,
+                guestName: null,
+                guestReady: false,
+                guestOnline: false,
+                guestGameReady: false,
+                gameStarted: true, // CHANGED: Mark as started immediately
+                gameInProgress: true, // CHANGED: Mark as in progress immediately
+                singleplayer: true,
+                created: firebase.database.ServerValue.TIMESTAMP,
+                lastActivity: firebase.database.ServerValue.TIMESTAMP,
+                gameStartTime: firebase.database.ServerValue.TIMESTAMP // ADDED: Set start time
+            };
+            
+            await this.roomManager.roomRef.set(roomData);
+            
+            // Save for tracking
+            this.storageManager.saveGameData(roomId, this.playerId, true, null);
+            
+            // Setup presence detection
+            this.roomManager.setupPresenceDetection(roomId);
+            
+            this.uiManager.showStatus('Singleplayer mode active', 'connected');
+            this.uiManager.showRoomInfo(`Singleplayer Session`);
+            
+            // Setup WebRTC as host (even though no peer will connect)
+            await this.webRTCManager.setupConnection(true);
+            
+            // REMOVED: Don't listen for room updates in singleplayer
+            // Instead, directly initialize the game
+            
+            // ADDED: Directly show the game screen and initialize hero selection
+            await this.gameManager.showGameScreen();
+            
+            // Update status
+            this.uiManager.showStatus('🎮 Ready to select your hero!', 'connected');
+            
+        } catch (error) {
+            console.error('Error starting singleplayer:', error);
+            this.uiManager.showStatus('Error starting singleplayer: ' + error.message, 'error');
+            this.uiManager.showMainMenuButtons();
         }
     }
 
@@ -540,7 +609,10 @@ class ProjectPixelParties {
         if (!savedData || !savedData.roomId) {
             return;
         }
-                
+        
+        // Check if this is a singleplayer room
+        const isSingleplayer = savedData.roomId && savedData.roomId.startsWith('sp_');
+        
         try {
             this.uiManager.showStatus('🔍 Checking for previous room...', 'waiting', true);
             this.uiManager.showLeaveButton();
@@ -561,9 +633,9 @@ class ProjectPixelParties {
             
             const wasHost = savedData.isHost;
             const savedPassword = savedData.password;
-                        
-            // Validate password if needed
-            if (!wasHost && room.password && room.password.trim() !== '') {
+            
+            // Validate password if needed (only for multiplayer)
+            if (!isSingleplayer && !wasHost && room.password && room.password.trim() !== '') {
                 if (!savedPassword || savedPassword !== room.password) {
                     this.storageManager.clearGameData();
                     this.uiManager.showStatus('❌ Cannot auto-reconnect: room password changed', 'error');
@@ -590,7 +662,7 @@ class ProjectPixelParties {
                 updateData.hostName = username;
                 updateData.hostReady = true;
                 updateData.hostOnline = true;
-                updateData.hostGameReady = false;
+                updateData.hostGameReady = isSingleplayer ? true : false; // Auto-ready in singleplayer
             } else {
                 updateData.guest = this.playerId;
                 updateData.guestName = username;
@@ -604,13 +676,28 @@ class ProjectPixelParties {
             this.uiManager.showRoomInfo(`Reconnected to Room: ${savedData.roomId}${room.password ? ' 🔒' : ''}`);
             this.uiManager.showLeaveButton();
             
-            // Setup WebRTC connection
-            await this.webRTCManager.setupConnection(wasHost);
+            // Setup WebRTC connection (only for multiplayer)
+            if (!isSingleplayer) {
+                await this.webRTCManager.setupConnection(wasHost);
+                // Listen for room updates
+                roomRef.on('value', (snapshot) => this.handleRoomUpdate(snapshot));
+            }
             
-            // Listen for room updates
-            roomRef.on('value', (snapshot) => this.handleRoomUpdate(snapshot));
+            // SINGLEPLAYER: Skip waiting and go straight to game
+            if (isSingleplayer) {
+                console.log('🎮 Singleplayer reconnection detected - going straight to game');
+                
+                this.uiManager.showStatus('🎮 Reconnecting to singleplayer game...', 'waiting', true);
+                                
+                // Transition to game screen and restore state
+                await this.gameManager.showGameScreen();
+                
+                this.uiManager.showStatus('🎉 Reconnected to singleplayer game!', 'connected');
+                
+                return;
+            }
             
-            // Check if game is in progress and restore game state
+            // MULTIPLAYER: Check if game is in progress and restore game state
             if (room.gameInProgress || room.gameStarted) {
                 this.uiManager.showStatus('🎮 Rejoining battle in progress...', 'waiting', true);
                 
@@ -619,7 +706,6 @@ class ProjectPixelParties {
                 
                 // The game manager will automatically restore the hero selection state
                 this.uiManager.showStatus('🎉 Reconnected to ongoing battle!', 'connected');
-                // Connection details hidden when in room/game
             } else {
                 // Normal lobby reconnection
                 if (room.host && room.guest && room.hostOnline && room.guestOnline) {

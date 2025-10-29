@@ -803,6 +803,17 @@ export class HeroSelectionUI {
         return canUse.canUse;
     }
 
+    // Check if Kazena effect is currently usable
+    isKazenaEffectUsable(character) {
+        if (character.name !== 'Kazena') return false;
+        
+        if (!window.heroSelection || !window.heroSelection.kazenaEffectManager) return false;
+        
+        const handManager = window.heroSelection.handManager;
+        const canUse = window.heroSelection.kazenaEffectManager.canUseKazenaEffect(handManager);
+        return canUse.canUse;
+    }
+
     // Helper method to get hero stats for display
     getHeroStats(slotPosition) {
         if (!window.heroSelection || !slotPosition) return null;
@@ -959,6 +970,10 @@ export class HeroSelectionUI {
         // Check if this is Nicolas and if the effect is usable
         const isNicolasUsable = character.name === 'Nicolas' && isDraggable && this.isNicolasEffectUsable(character);
         const nicolasUsableClass = isNicolasUsable ? 'nicolas-effect-usable' : '';
+
+        // Check if this is Kazena and if the effect is usable
+        const isKazenaUsable = character.name === 'Kazena' && isDraggable && this.isKazenaEffectUsable(character);
+        const kazenaUsableClass = isKazenaUsable ? 'kazena-effect-usable' : '';
         
         let tooltipEvents = '';
         if (showTooltip) {
@@ -1000,6 +1015,8 @@ export class HeroSelectionUI {
         if (isDraggable && slotPosition) {
             if (character.name === 'Nicolas') {
                 heroClickEvents = `onclick="window.handleNicolasClick(event, '${slotPosition}', '${character.name}')"`;
+            } else if (character.name === 'Kazena') {
+                heroClickEvents = `onclick="window.handleKazenaClick(event, '${slotPosition}', '${character.name}')"`;
             } else if (character.name === 'Vacarn') {
                 heroClickEvents = `onclick="window.handleVacarnClick(event, '${slotPosition}', '${character.name}')"`;
             } else if (character.name.includes('Waflav')) {  // NEW - Waflav click handling
@@ -1037,10 +1054,10 @@ export class HeroSelectionUI {
                 data-character-name="${character.name}"
                 ${isSelectable && !isDraggable ? `onclick="window.selectCharacterCard(${character.id})"` : ''}
                 ${hoverEvents}>
-                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass} ${character.name.includes('Waflav') && isDraggable ? 'waflav-clickable' : ''}">
+                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass} ${character.name === 'Kazena' && isDraggable ? 'kazena-clickable' : ''} ${kazenaUsableClass} ${character.name.includes('Waflav') && isDraggable ? 'waflav-clickable' : ''}">
                     <img src="${character.image}" 
                         alt="${character.name}" 
-                        class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''}"
+                        class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''} ${character.name === 'Kazena' && isDraggable ? 'kazena-hero-image' : ''}"
                         ${tooltipEvents}
                         ${heroHoverEvents}
                         ${dragEvents}
@@ -2671,6 +2688,20 @@ function handleNicolasClick(event, heroPosition, heroName) {
     // Show Nicolas dialog
     window.heroSelection.nicolasEffectManager.showNicolasDialog(window.heroSelection, heroPosition);
 }
+
+// Kazena click handler
+function handleKazenaClick(event, heroPosition, heroName) {
+    event.stopPropagation();
+    
+    // Only handle if this is actually Kazena and we have the effect manager
+    if (heroName !== 'Kazena' || !window.heroSelection?.kazenaEffectManager) {
+        return;
+    }
+    
+    // Show Kazena dialog
+    window.heroSelection.kazenaEffectManager.showKazenaDialog(window.heroSelection, heroPosition);
+}
+
 function handleVacarnClick(event, heroPosition, heroName) {
     event.stopPropagation();
     
@@ -2703,7 +2734,8 @@ if (typeof window !== 'undefined') {
     window.onAbilityClick = onAbilityClick;
     window.handleNicolasClick = handleNicolasClick;
     window.handleVacarnClick = handleVacarnClick;
-    window.handleWaflavClick = handleWaflavClick;  // NEW - Add this line
+    window.handleWaflavClick = handleWaflavClick;
+    window.handleKazenaClick = handleKazenaClick;
     
     // Creature drag and drop functions
     window.onCreatureDragStart = onCreatureDragStart;
@@ -3632,6 +3664,34 @@ if (typeof document !== 'undefined' && !document.getElementById('equipmentToolti
         /* Ensure evolution counters appear above hero stats */
         .hero-stats-overlay {
             z-index: 10;
+        }
+
+        /* Kazena clickable hero styling */
+        .kazena-clickable {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .kazena-clickable:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2) drop-shadow(0 0 10px rgba(59, 130, 246, 0.6));
+        }
+
+        .kazena-effect-usable {
+            animation: kazenaGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes kazenaGlow {
+            0%, 100% {
+                filter: brightness(1) drop-shadow(0 0 5px rgba(59, 130, 246, 0.4));
+            }
+            50% {
+                filter: brightness(1.3) drop-shadow(0 0 15px rgba(59, 130, 246, 0.8));
+            }
+        }
+
+        .kazena-hero-image {
+            cursor: pointer;
         }
     `;
     document.head.appendChild(style);

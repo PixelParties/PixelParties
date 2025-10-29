@@ -306,6 +306,39 @@ export class ArrowSystem {
         }
     }
 
+    /**
+     * Swap arrow counters between two hero positions
+     * @param {string} side - 'player' or 'opponent'
+     * @param {string} position1 - First position ('left', 'center', or 'right')
+     * @param {string} position2 - Second position ('left', 'center', or 'right')
+     */
+    swapArrowCounters(side, position1, position2) {
+        const heroId1 = `${side}_${position1}`;
+        const heroId2 = `${side}_${position2}`;
+        
+        const counters1 = this.heroCounters.get(heroId1);
+        const counters2 = this.heroCounters.get(heroId2);
+        
+        // Swap the counter Maps
+        if (counters1) {
+            this.heroCounters.set(heroId2, counters1);
+        } else {
+            this.heroCounters.delete(heroId2);
+        }
+        
+        if (counters2) {
+            this.heroCounters.set(heroId1, counters2);
+        } else {
+            this.heroCounters.delete(heroId1);
+        }
+        
+        // Update visual displays for both positions
+        this.updateArrowDisplay(side, position1);
+        this.updateArrowDisplay(side, position2);
+        
+        console.log(`🏹 Arrow counters swapped between ${heroId1} and ${heroId2}`);
+    }
+
     // ============================================
     // DAMAGE MODIFICATION
     // ============================================

@@ -6,6 +6,12 @@ import { killTracker } from './killTracker.js';
 import CharmeManager from './Abilities/charme.js';
 import { SidHeroEffect } from './Heroes/sid.js';
 import { CardRewardGenerator } from './cardRewardGenerator.js';
+import { 
+    initializeComputerTeams, 
+    addHeroToComputerTeams, 
+    computerTeamsExist 
+} from './generateComputerParty.js';
+import { getHeroCards, getHeroCardSets } from './heroStartingCards.js';
 
 import { calculateFormationWantedPosterBonuses, generateWantedPosterBonusHTML, getWantedPosterStyles } from './Artifacts/wantedPoster.js';
 
@@ -18,7 +24,7 @@ export class CardRewardManager {
         this.goldManager = goldManager;
         this.selectionMade = false;
         this.lastAddedRewardCard = null;
-        this.heroSelection = null; // Set when showing rewards
+        this.heroSelection = null;
         this.cardPreviewManager = new CardPreviewManager();
         
         // Store gold breakdown for display
@@ -63,45 +69,18 @@ export class CardRewardManager {
             { name: 'ZombieGabby', image: './Cards/Characters/ZombieGabby.png' }
         ];
         
-        this.heroCardSets = {
-            'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
-            'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
-            'Carris': ['Divinity', 'Premonition', 'BigGwen', 'TheHandsOfBigGwen', 'HatOfMadness', 'Haste', 'Slow', 'DivineGiftOfTime'],
-            'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
-            'Darge': ['AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'Fighting', 'RainbowsArrow', 'RainOfArrows'],
-            'Gabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
-            'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
-            'Gon': ['BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'DecayMagic', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
-            'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechFists', 'FutureTechLamp', 'FutureTechCopyDevice'],
-            'Ida': ['BottledFlame', 'BurningFinger', 'MountainTearRiver', 'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'VampireOnFire'],
-            'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
-            'Kyli': ['Biomancy',  'Occultism', 'MonsterInABottle', 'OverflowingChalice', 'BloodSoakedCoin', 'DoomClock', 'GraveWorm', 'TheRootOfAllEvil'],
-            'Luna': ['DestructionMagic',  'Friendship', 'TearingMountain', 'MountainTearRiver', 'LunaKiai', 'PriestOfLuna', 'HeartOfTheMountain', 'DichotomyOfLunaAndTempeste'],
-            'Mary': ['Charme',  'Leadership', 'CuteBird', 'CutePhoenix', 'PhoenixTackle', 'VictoryPhoenixCannon', 'CuteCrown', 'PinkSky'],
-            'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
-            'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
-            'Nao': ['Friendship', 'SupportMagic', 'Heal', 'HealingMelody', 'Cure', 'HealingPotion', 'HolyCheese', 'ShieldOfLife'],
-            'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
-            'Nomu': ['MagicArts', 'Training', 'Teleport', 'Teleportal', 'StaffOfTheTeleporter', 'TeleportationPowder', 'PlanetInABottle', 'SpatialCrevice'],
-            'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
-            'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
-            'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
-            'Thep': ['SoulShardBa', 'SoulShardIb', 'SoulShardKa', 'SoulShardKhet', 'SoulShardRen', 'SoulShardSah', 'SoulShardSekhem', 'SoulShardShut'],
-            'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
-            'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
-            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet'],
-            'ZombieGabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
-        };
+        // UPDATED: Use centralized hero card sets
+        this.heroCardSets = getHeroCardSets();
 
         // Redraw system
-        this.redrawCost = 1; // Starting cost
-        this.totalRedraws = 0; // Track total redraws this session
-        this.currentRewardCards = []; // Store current rewards for redraw
-        this.currentRewardType = null; // 'cards' or 'heroes'
-        this.isRedrawing = false; // Prevent multiple redraws at once
+        this.redrawCost = 1;
+        this.totalRedraws = 0;
+        this.currentRewardCards = [];
+        this.currentRewardType = null;
+        this.isRedrawing = false;
 
         // View mode system
-        this.viewMode = 'rewards'; // 'rewards' or 'battlefield'
+        this.viewMode = 'rewards';
 
         // Initialize Charme manager
         this.charmeManager = new CharmeManager();
@@ -268,30 +247,26 @@ export class CardRewardManager {
 
     // Enhanced show rewards method with gold breakdown
     async showRewardsAfterBattle(turnTracker, heroSelection, battleResult = 'victory') {
-        // Reset redraw cost for new reward session
-        this.redrawCost = 1;
-
-        this.heroSelection = heroSelection;
         const currentTurn = turnTracker.getCurrentTurn();
+        const isHeroRewardTurn = currentTurn === 3 || currentTurn === 5;
         
-        // Set game phase to Reward when showing rewards
-        await this.heroSelection.setGamePhase('Reward');
+        const preGeneratedRewards = isHeroRewardTurn ? 
+            this.generateHeroRewards(3) : 
+            this.generateRewardCards(3);
         
-        // Calculate gold breakdown for this battle BEFORE generating rewards
         this.lastGoldBreakdown = this.calculateGoldBreakdown(battleResult);
-        
-        // Store the gold breakdown in a local variable to ensure it's not lost
         const goldBreakdown = this.lastGoldBreakdown;
-
-        // Charme counters
+        
+        await this.savePendingRewards(preGeneratedRewards, isHeroRewardTurn);
+        
+        this.redrawCost = 1;
+        this.heroSelection = heroSelection;
+        
+        await this.heroSelection.setGamePhase('Reward');
         this.charmeManager.setCharmeCounters(heroSelection);
 
-        // Sid card theft
         let sidTheftData = null;
-
-        // Check formation
         const formation = heroSelection.formationManager.getBattleFormation();
-
         const hasSid = ['left', 'center', 'right'].some(position => {
             const hero = formation[position];
             const isSid = hero && hero.name === 'Sid';
@@ -300,17 +275,14 @@ export class CardRewardManager {
 
         if (hasSid) {            
             try {
-                // Import Sid effect if not already loaded
                 if (!this.sidHeroEffect) {
                     const module = await import('./Heroes/sid.js');
                     this.sidHeroEffect = module.sidHeroEffect || new module.SidHeroEffect();
                 }
                 
-                // Perform card theft
                 sidTheftData = await this.sidHeroEffect.performCardTheft(heroSelection, this);
                 
                 if (sidTheftData) {
-                    // Refresh display if already shown
                     const breakdownContainer = document.querySelector('.gold-breakdown-container');
                     if (breakdownContainer) {
                         breakdownContainer.outerHTML = this.createGoldBreakdownHTML();
@@ -321,17 +293,45 @@ export class CardRewardManager {
             }
         }
 
-        // Use cached Royal Corgi bonus cards (calculated before cleanup reset counters)
+        // Check if CPU opponent has Sid (singleplayer only)
+        if (heroSelection.isSingleplayerMode && heroSelection.isSingleplayerMode()) {
+            try {
+                // Get the opponent formation
+                const opponentFormation = heroSelection.formationManager?.getOpponentBattleFormation();
+                
+                if (opponentFormation) {
+                    // Check if CPU has Sid and perform theft
+                    if (!this.sidHeroEffect) {
+                        const module = await import('./Heroes/sid.js');
+                        this.sidHeroEffect = module.sidHeroEffect || new module.SidHeroEffect();
+                    }
+                    
+                    const cpuSidTheftData = await this.sidHeroEffect.performCPUSidTheft(opponentFormation, heroSelection);
+                    
+                    if (cpuSidTheftData) {
+                        console.log('🎭 CPU Sid successfully stole from player');
+                        
+                        // Store the theft data for breakdown display
+                        this.cpuSidTheftData = cpuSidTheftData;
+                        
+                        // Update gold breakdown to show the theft
+                        const breakdownContainer = document.querySelector('.gold-breakdown-container');
+                        if (breakdownContainer) {
+                            breakdownContainer.outerHTML = this.createGoldBreakdownHTML();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error processing CPU Sid theft:', error);
+            }
+        }
+
         let royalCorgiBonusCards = this.cachedRoyalCorgiBonusCards || 0;
-        
-        // Clear the cached value to prevent reuse
         this.cachedRoyalCorgiBonusCards = 0;
 
-        // Add bonus cards to hand if any
         if (royalCorgiBonusCards > 0 && this.handManager) {
             this.handManager.drawCards(royalCorgiBonusCards);
             
-            // Show notification
             const notification = document.createElement('div');
             notification.textContent = `Royal Corgi bonus: +${royalCorgiBonusCards} cards!`;
             notification.style.cssText = `
@@ -356,54 +356,15 @@ export class CardRewardManager {
             }, 3000);
         }
 
-        let kazenaBonusCards = 0;
-        if (window.kazenaEffect) {
-            kazenaBonusCards = window.kazenaEffect.calculateKazenaBonusCards(heroSelection);
-        }
-
-        // Add bonus cards to hand if any
-        if (kazenaBonusCards > 0 && this.handManager) {
-            this.handManager.drawCards(kazenaBonusCards);
-            
-            // Show notification
-            const notification = document.createElement('div');
-            notification.textContent = `Kazena bonus: +${kazenaBonusCards} cards!`;
-            notification.style.cssText = `
-                position: fixed;
-                top: 25%;
-                left: 50%;
-                transform: translateX(-50%);
-                background: rgba(135, 206, 235, 0.9);
-                color: black;
-                padding: 15px 25px;
-                border-radius: 8px;
-                font-size: 18px;
-                font-weight: bold;
-                z-index: 10000;
-                animation: fadeIn 0.3s ease-out;
-            `;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.style.animation = 'fadeOut 0.3s ease-out';
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
-        }
-
-        // Check for Supply Chain bonus cards
         let supplyChainBonusCards = 0;
         if (heroSelection.playerCounters && heroSelection.playerCounters.supplyChain) {
             supplyChainBonusCards = heroSelection.playerCounters.supplyChain;
-            
-            // Clear the counter since it's been used
             heroSelection.playerCounters.supplyChain = 0;
         }
 
-        // Add Supply Chain bonus cards to hand if any
         if (supplyChainBonusCards > 0 && this.handManager) {
             this.handManager.drawCards(supplyChainBonusCards);
             
-            // Show notification
             const notification = document.createElement('div');
             notification.textContent = `Supply Chain bonus: +${supplyChainBonusCards} cards!`;
             notification.style.cssText = `
@@ -427,25 +388,19 @@ export class CardRewardManager {
                 setTimeout(() => notification.remove(), 300);
             }, 3000);
             
-            // Store this for the breakdown display
             this.supplyChainBonusCards = supplyChainBonusCards;
         }
 
-        // Check for Birthday Present bonus cards from opponent
         let birthdayPresentBonusCards = 0;
-
-        // Use the correct field name and add fallback
         const opponentCounter = heroSelection.opponentCounters?.birthdayPresent || 
                     heroSelection.opponentBirthdayPresentCounterData || 0;
 
         if (opponentCounter > 0) {
             birthdayPresentBonusCards = opponentCounter;
                         
-            // Add bonus cards to hand
             if (this.handManager) {
                 this.handManager.drawCards(birthdayPresentBonusCards);
                 
-                // Show notification
                 const notification = document.createElement('div');
                 notification.textContent = `Birthday Present bonus: +${birthdayPresentBonusCards} cards!`;
                 notification.style.cssText = `
@@ -470,45 +425,27 @@ export class CardRewardManager {
                 }, 3000);
             }
             
-            // Clear the counter since it's been used
-            if (heroSelection.playerCounters) {
-                heroSelection.playerCounters.birthdayPresent = 0;
-            }
-            
+            // Reset our local view of the opponent's counter (the one we just consumed)
+            // Note: The opponent will reset their own playerCounters.birthdayPresent 
+            // unconditionally in returnToFormation() - no messaging needed
             if (heroSelection.opponentCounters) {
                 heroSelection.opponentCounters.birthdayPresent = 0;
             }
+            await heroSelection.saveGameState();
             
-            // Store this for the breakdown display
             this.birthdayPresentBonusCards = birthdayPresentBonusCards;
         }
         
-        // Check if this is a Hero reward turn
-        const isHeroRewardTurn = currentTurn === 3 || currentTurn === 5;
+        await this.savePendingRewards(preGeneratedRewards, isHeroRewardTurn);
         
-        if (isHeroRewardTurn) {
-            const rewardHeroes = this.generateHeroRewards(3);
-            
-            // TIMING FIX: Save pending rewards AFTER all bonus cards have been added to hand
-            await this.savePendingRewards(rewardHeroes, true); // true = isHeroReward
-            
-            // Pass gold breakdown directly to ensure it's available
-            setTimeout(() => {
-                this.lastGoldBreakdown = goldBreakdown; // Restore it before display
-                this.displayHeroRewardUI(rewardHeroes, currentTurn);
-            }, 100);
-        } else {
-            const rewardCards = this.generateRewardCards(3);
-            
-            // TIMING FIX: Save pending rewards AFTER all bonus cards have been added to hand
-            await this.savePendingRewards(rewardCards, false); // false = not hero reward
-            
-            // Pass gold breakdown directly to ensure it's available
-            setTimeout(() => {
-                this.lastGoldBreakdown = goldBreakdown; // Restore it before display
-                this.displayRewardUI(rewardCards, currentTurn);
-            }, 100);
-        }
+        setTimeout(() => {
+            this.lastGoldBreakdown = goldBreakdown;
+            if (isHeroRewardTurn) {
+                this.displayHeroRewardUI(preGeneratedRewards, currentTurn);
+            } else {
+                this.displayRewardUI(preGeneratedRewards, currentTurn);
+            }
+        }, 100);
         
         return true;
     }
@@ -612,24 +549,6 @@ export class CardRewardManager {
                         </div>
                     ` : ''}
 
-                    <!-- Kazena Section -->
-                    ${(() => {
-                        if (window.kazenaEffect && this.heroSelection) {
-                            const kazenaBonusCards = window.kazenaEffect.calculateKazenaBonusCards(this.heroSelection);
-                            
-                            if (kazenaBonusCards > 0) {
-                                return `
-                                    <div class="gold-line-item kazena-bonus">
-                                        <span class="gold-source">Kazena Winds (${kazenaBonusCards} bonus cards)</span>
-                                        <span class="gold-arrow">→</span>
-                                        <span class="gold-amount">Cards</span>
-                                    </div>
-                                `;
-                            }
-                        }
-                        return '';
-                    })()}
-
                     <!-- Birthday Present Section -->
                     ${(() => {
                         if (this.birthdayPresentBonusCards && this.birthdayPresentBonusCards > 0) {
@@ -653,6 +572,30 @@ export class CardRewardManager {
                             );
                             const html = this.sidHeroEffect.generateStolenCardsHTML(hasSid);
                             return html;
+                        }
+                        return '';
+                    })()}
+
+                    <!-- CPU Sid Card Theft Section -->
+                    ${(() => {
+                        if (this.cpuSidTheftData && this.cpuSidTheftData.cardName) {
+                            const formattedName = this.sidHeroEffect ? 
+                                this.sidHeroEffect.formatCardName(this.cpuSidTheftData.cardName) : 
+                                this.cpuSidTheftData.cardName;
+                            
+                            return `
+                                <div class="sid-theft-section">
+                                    <div class="sid-theft-header">
+                                        <span class="sid-icon">🎭</span>
+                                        <span class="sid-title">CPU Sid Theft</span>
+                                    </div>
+                                    <div class="sid-theft-item loss">
+                                        <span class="theft-icon">-</span>
+                                        <span class="theft-card-name">${formattedName}</span>
+                                        <span class="theft-message">Enemy Sid stole from you!</span>
+                                    </div>
+                                </div>
+                            `;
                         }
                         return '';
                     })()}
@@ -1749,7 +1692,8 @@ export class CardRewardManager {
     }
 
     createHeroRewardHTML(hero, index) {
-        const heroCards = this.heroCardSets[hero.name] || [];
+        // Use centralized function to get hero cards
+        const heroCards = getHeroCards(hero.name);
         
         // Add tags HTML using the existing tagsManager
         const tagsHTML = window.tagsManager ? 
@@ -1822,8 +1766,8 @@ export class CardRewardManager {
         });
         
         try {
-            // Get hero's card set
-            const heroCards = this.heroCardSets[heroName];
+            // UPDATED: Get hero's card set using centralized function
+            const heroCards = getHeroCards(heroName);
             if (!heroCards || heroCards.length === 0) {
                 throw new Error(`No cards found for hero: ${heroName}`);
             }
@@ -1850,7 +1794,7 @@ export class CardRewardManager {
                     this.handManager.drawCards(1);
                 }
                 
-                // Add the hero to the leftmost free slot in battle formation
+                // Determine target slot and check hero count BEFORE adding hero
                 let targetSlot = null;
                 let heroAddedToFormation = false;
                 
@@ -1866,6 +1810,48 @@ export class CardRewardManager {
                         targetSlot = 'right';
                     }
 
+                    // ===== SINGLEPLAYER: Initialize/update computer teams BEFORE adding hero =====
+                    if (this.heroSelection.roomManager && targetSlot) {
+                        const roomRef = this.heroSelection.roomManager.getRoomRef();
+                        const roomId = roomRef ? roomRef.key : null;
+                        
+                        // Check if singleplayer mode
+                        if (roomId && roomId.startsWith('sp_')) {
+                            const currentHeroCount = this.heroSelection.formationManager.getHeroCount();
+                            
+                            // Will be first hero (count will become 1)
+                            if (currentHeroCount === 0) {
+                                try {
+                                    await initializeComputerTeams(roomRef, heroName);
+                                    console.log('✅ Computer teams initialized for singleplayer');
+                                } catch (error) {
+                                    console.error('Failed to initialize computer teams:', error);
+                                    throw error;
+                                }
+                            }
+                            // Will be 2nd or 3rd hero (count will become 2 or 3)
+                            else if (currentHeroCount === 1 || currentHeroCount === 2) {
+                                // Get current heroes + the one we're about to add
+                                const playerHeroNames = [];
+                                ['left', 'center', 'right'].forEach(pos => {
+                                    if (formation[pos]) {
+                                        playerHeroNames.push(formation[pos].name);
+                                    }
+                                });
+                                playerHeroNames.push(heroName);
+                                
+                                try {
+                                    await addHeroToComputerTeams(roomRef, playerHeroNames);
+                                    console.log('✅ Computer teams updated with new heroes');
+                                } catch (error) {
+                                    console.error('Failed to update computer teams:', error);
+                                    throw error;
+                                }
+                            }
+                        }
+                    }
+
+                    // NOW add the hero to player's formation
                     if (targetSlot) {
                         // Find the hero from the reward selection to get the image
                         const rewardHero = this.allHeroes.find(h => h.name === heroName);
@@ -1930,13 +1916,6 @@ export class CardRewardManager {
                         }, 300);
                     }
                 }
-
-                // Reset Kazena
-                if (window.kazenaEffect) {
-                    window.kazenaEffect.clearAllKazenaCounters(heroSelection);
-                }
-                this.kazenaReconnectionCards = null;
-
                 
                 // Clear pending rewards from Firebase
                 await this.clearPendingRewards();
@@ -1992,6 +1971,8 @@ export class CardRewardManager {
             }
             
         } catch (error) {
+            console.error('Error in handleHeroSelection:', error);
+            
             // Re-enable selection on error
             this.selectionMade = false;
             
@@ -2076,11 +2057,6 @@ export class CardRewardManager {
                     // Update action display immediately
                     window.heroSelection.updateActionDisplay();
                 }
-
-                if (window.kazenaEffect) {
-                    window.kazenaEffect.clearAllKazenaCounters(heroSelection);
-                }
-                this.kazenaReconnectionCards = null;
                 
                 // Wait a moment for visual feedback
                 await new Promise(resolve => setTimeout(resolve, 1000));
@@ -2747,6 +2723,11 @@ export class CardRewardManager {
                     this.heroSelection ? this.heroSelection.gameDataSender : null
                 );
             }
+
+            // *** In singleplayer, update computer team's gold after thieving ***
+            if (this.heroSelection && this.heroSelection.isSingleplayerMode && this.heroSelection.isSingleplayerMode()) {
+                this.updateComputerGoldAfterThieving(this.lastGoldBreakdown.thievingDetails);
+            }
             
             // Send gold update to opponent so they know how much we got
             if (this.heroSelection && this.heroSelection.gameDataSender) {
@@ -2764,6 +2745,48 @@ export class CardRewardManager {
         }
         
         return totalGold !== 0;
+    }
+
+    /**
+     * Update computer team's gold after thieving in singleplayer
+     * @param {Object} thievingDetails - Thieving calculation results
+     */
+    async updateComputerGoldAfterThieving(thievingDetails) {
+        if (!thievingDetails || !this.heroSelection || !this.heroSelection.roomManager) {
+            return;
+        }
+
+        const playerGoldStolen = thievingDetails.playerGoldStolen || 0;
+        const opponentGoldStolen = thievingDetails.opponentGoldStolen || 0;
+
+        // Calculate net gold change for computer team
+        const netGoldChange = opponentGoldStolen - playerGoldStolen;
+
+        if (netGoldChange === 0) {
+            return; // No change needed
+        }
+
+        try {
+            const roomRef = this.heroSelection.roomManager.getRoomRef();
+            
+            // Get the selected computer team (we need to know which team was used)
+            const selectedTeamKey = this.heroSelection.selectedComputerTeamKey || 'team1';
+            
+            // Get current computer team gold
+            const snapshot = await roomRef.child(`singleplayer/computerTeams/${selectedTeamKey}/gold`).once('value');
+            const currentGold = snapshot.val() || 0;
+            
+            // Calculate new gold (can't go below 0)
+            const newGold = Math.max(0, currentGold + netGoldChange);
+            
+            // Update in Firebase
+            await roomRef.child(`singleplayer/computerTeams/${selectedTeamKey}/gold`).set(newGold);
+            
+            console.log(`💰 Computer team ${selectedTeamKey} gold updated: ${currentGold} → ${newGold} (${netGoldChange > 0 ? '+' : ''}${netGoldChange})`);
+            
+        } catch (error) {
+            console.error('Failed to update computer gold after thieving:', error);
+        }
     }
 
     applySwordBonuses(swordBonuses) {

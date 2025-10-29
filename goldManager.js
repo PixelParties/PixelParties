@@ -95,6 +95,54 @@ export class GoldManager {
         return this.opponentGold;
     }
 
+    // Subtract gold from player (for thieving, etc.)
+    subtractPlayerGold(amount, reason = 'thieving') {
+        const oldGold = this.playerGold;
+        this.playerGold = Math.max(0, this.playerGold - amount);
+        const actualChange = this.playerGold - oldGold;
+        
+        // Record the change
+        this.recordGoldChange(actualChange, reason);
+                
+        // Trigger callback if set
+        if (this.goldChangeCallback) {
+            this.goldChangeCallback({
+                type: 'player_gold_change',
+                oldValue: oldGold,
+                newValue: this.playerGold,
+                change: actualChange,
+                reason: reason
+            });
+        }
+        
+        // Queue animation
+        this.queueGoldAnimation('player', actualChange);
+        
+        return this.playerGold;
+    }
+
+    // Subtract gold from opponent (for thieving, etc.)
+    subtractOpponentGold(amount, reason = 'thieving') {
+        const oldGold = this.opponentGold;
+        this.opponentGold = Math.max(0, this.opponentGold - amount);
+                
+        // Trigger callback if set
+        if (this.goldChangeCallback) {
+            this.goldChangeCallback({
+                type: 'opponent_gold_change',
+                oldValue: oldGold,
+                newValue: this.opponentGold,
+                change: this.opponentGold - oldGold,
+                reason: reason
+            });
+        }
+        
+        // Queue animation
+        this.queueGoldAnimation('opponent', this.opponentGold - oldGold);
+        
+        return this.opponentGold;
+    }
+
     // Set player's gold (for syncing) with enhanced tracking
     setPlayerGold(amount, reason = 'sync') {
         const oldGold = this.playerGold;

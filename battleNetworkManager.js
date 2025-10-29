@@ -90,10 +90,9 @@ export class BattleNetworkManager {
                     }
                     break;
                     
-                case 'stormblade_wind_swap':
-                    if (bm.attackEffectsManager && bm.attackEffectsManager.stormbladeEffect) {
-                        await bm.attackEffectsManager.stormbladeEffect.handleGuestWindSwap(message.data);
-                    }
+                case 'expedition_position_swap':
+                    const { handleGuestExpeditionSwap } = await import('./Spells/expedition.js');
+                    await handleGuestExpeditionSwap(bm, message.data);
                     break;
                     
                 default:
@@ -404,10 +403,17 @@ export class BattleNetworkManager {
 
     sendBattleUpdate(type, data) {
         const bm = this.battleManager;
+        
+        // Skip network updates in singleplayer
+        if (window.heroSelection && window.heroSelection.isSingleplayerMode()) {
+            return;
+        }
+        
         if (!bm.isAuthoritative) return;
         
         this.sendBattleData(type, data);
     }
+
 
     sendBattleData(type, data) {
         const bm = this.battleManager;
@@ -438,19 +444,21 @@ export class BattleNetworkManager {
     // ============================================
 
     async waitForGuestAcknowledgment(ackType, timeout = 500) {
-        const startTime = Date.now();
+        // Skip waiting in singleplayer mode
+        if (window.heroSelection && window.heroSelection.isSingleplayerMode()) {
+            return Promise.resolve();
+        }
         
-        // Apply speed adjustment to the timeout
-        const adjustedTimeout = 1000;
+        const startTime = Date.now();
+        const adjustedTimeout = this.getSpeedAdjustedDelay(timeout); // Use actual timeout param
         
         return new Promise((resolve) => {
             const timeoutId = setTimeout(() => {
                 delete this.pendingAcks[ackType];
                 delete this.ackTimeouts[ackType];
-                
-                this.connectionLatency = Math.min(this.connectionLatency * 1.2, 500);
                 resolve();
             }, adjustedTimeout);
+
             
             this.pendingAcks[ackType] = () => {
                 const responseTime = Date.now() - startTime;
@@ -513,7 +521,7 @@ export class BattleNetworkManager {
         }
         
         // Queue swap messages for sequential processing
-        if (type === 'crusader_hookshot_swap' || type === 'stormblade_wind_swap') {
+        if (type === 'crusader_hookshot_swap' || type === 'expedition_position_swap') {
             this.queueSwapMessage(type, data);
             return;
         }
@@ -1202,8 +1210,8 @@ export class BattleNetworkManager {
                 bm.guest_handleCrusaderHookshotSwap(data);
                 break;
 
-            case 'stormblade_wind_swap':
-                bm.guest_handleStormbladeWindSwap(data);
+            case 'stormblade_banishment':
+                bm.guest_handleStormbladeBanishment(data);
                 break;
 
             case 'greatsword_skeleton_summon':
@@ -2419,10 +2427,6 @@ export class BattleNetworkManager {
         // Transfer guest-side permanent effects from battle
         if (bm.battleScreen && bm.battleScreen.transferBurningFingerStacksToPermanent) {
             bm.battleScreen.transferBurningFingerStacksToPermanent();
-        }
-        
-        if (bm.kazenaEffect) {
-            bm.kazenaEffect.transferCountersToFormation(bm);
         }
 
         const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn, permanentGuardians, permanentCaptures,

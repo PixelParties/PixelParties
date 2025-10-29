@@ -18,6 +18,10 @@ export class BattleStartManager {
         if (!bm.isAuthoritative) {
             return; // Only host applies start-of-battle effects
         }
+        
+        if (bm.battleScreen && typeof bm.battleScreen.renderCreaturesAfterInit === 'function') {
+            bm.battleScreen.renderCreaturesAfterInit();
+        }
 
         try {
             // Phase 0: Nomu teleport shield effects (before all other effects)

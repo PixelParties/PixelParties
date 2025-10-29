@@ -1,5 +1,11 @@
 // reconnectionManager.js - Centralized Reconnection Management System with Guard Change Support and Vacarn Integration
 
+import { 
+    selectComputerTeamForBattle, 
+    computerTeamsExist,
+    getRepresentativeHero 
+} from './generateComputerParty.js';
+
 export class ReconnectionManager {
     constructor() {
         this.heroSelection = null;
@@ -35,20 +41,17 @@ export class ReconnectionManager {
         }
 
         try {
-            // Fetch the LATEST game state from Firebase before routing
             const latestGameState = await this.fetchLatestGameState();
             const gameStateToUse = latestGameState || gameState;
 
-            // First, restore basic game data (characters, formations, etc.)
             const basicDataRestored = await this.restoreBasicGameData(gameStateToUse);
+            
             if (!basicDataRestored) {
                 return false;
             }
 
-            // Get the current game phase from the latest state
             const gamePhase = gameStateToUse.gamePhase || 'Formation';
 
-            // Route to appropriate reconnection handler based on phase
             switch (gamePhase) {
                 case 'Battle':
                     return await this.handleBattleReconnection(gameStateToUse);
@@ -65,7 +68,9 @@ export class ReconnectionManager {
             }
 
         } catch (error) {
-            // Transition to error state on failure
+            console.error('[BATTLE RECON DEBUG] ❌ CRITICAL ERROR in reconnection handler:', error);
+            console.error('[BATTLE RECON DEBUG] Error stack:', error.stack);
+            
             if (this.heroSelection && this.heroSelection.stateMachine) {
                 this.heroSelection.stateMachine.transitionTo(
                     this.heroSelection.stateMachine.states.ERROR,
@@ -274,6 +279,7 @@ export class ReconnectionManager {
                     gameState.hostdelayedEffects,
                     gameState.hostSemiState,
                     gameState.hostHeinzState,
+                    gameState.hostKazenaState, 
                     gameState.hostPermanentArtifacts,
                     gameState.guestPermanentArtifacts,
                     gameState.hostMagicSapphiresUsed,
@@ -287,9 +293,8 @@ export class ReconnectionManager {
                     gameState.hostCrystalWellState,
                     gameState.hostTeleportState,
                     gameState.guestPlayerCounters
-                );  
-
-            } else if (!this.isHost && gameState.guestSelected) {                
+                );
+            } else if (!this.isHost && gameState.guestSelected) {
                 this.heroSelection.selectedCharacter = gameState.guestSelected;
                 
                 // Skip formation restoration during battle reconnection
@@ -325,6 +330,7 @@ export class ReconnectionManager {
                     gameState.guestdelayedEffects,
                     gameState.guestSemiState,
                     gameState.guestHeinzState,
+                    gameState.guestKazenaState,
                     gameState.guestPermanentArtifacts,
                     gameState.hostPermanentArtifacts, 
                     guestMagicSapphireValue,
@@ -632,6 +638,20 @@ export class ReconnectionManager {
                 this.heroSelection.heinzEffectManager.reset();
             }
         }
+        if (this.isHost && gameState.hostKazenaState) {
+            if (this.heroSelection.kazenaEffectManager) {
+                const kazenaRestored = this.heroSelection.kazenaEffectManager.importKazenaState(gameState.hostKazenaState);
+            }
+        } else if (!this.isHost && gameState.guestKazenaState) {
+            if (this.heroSelection.kazenaEffectManager) {
+                const kazenaRestored = this.heroSelection.kazenaEffectManager.importKazenaState(gameState.guestKazenaState);
+            }
+        } else {
+            // Initialize Kazena state if no saved data
+            if (this.heroSelection.kazenaEffectManager) {
+                this.heroSelection.kazenaEffectManager.reset();
+            }
+        }
 
         // Restore GraveWorm state
         if (this.isHost && gameState.hostGraveWormState) {
@@ -731,30 +751,41 @@ export class ReconnectionManager {
         }
     }
 
+    isSingleplayerMode() {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return false;
+        }
+        const roomId = this.roomManager.getRoomRef().key;
+        return roomId && roomId.startsWith('sp_');
+    }
+
     // Restore opponent data
     restoreOpponentData(gameState) {
-        // Restore opponent selection
+        // Skip opponent data restoration in singleplayer
+        if (this.isSingleplayerMode()) {
+            console.log('🎮 Singleplayer: Skipping opponent data restoration');
+            return;
+        }
+
+        // Original multiplayer logic
         if (this.isHost && gameState.guestSelected) {
             this.heroSelection.opponentSelectedCharacter = gameState.guestSelected;
         } else if (!this.isHost && gameState.hostSelected) {
             this.heroSelection.opponentSelectedCharacter = gameState.hostSelected;
         }
 
-        // Restore opponent abilities data
         if (this.isHost && gameState.guestAbilitiesData) {
             this.heroSelection.opponentAbilitiesData = gameState.guestAbilitiesData;
         } else if (!this.isHost && gameState.hostAbilitiesData) {
             this.heroSelection.opponentAbilitiesData = gameState.hostAbilitiesData;
         }
 
-        // Store opponent spellbooks data
         if (this.isHost && gameState.guestSpellbooksData) {
             this.heroSelection.opponentSpellbooksData = gameState.guestSpellbooksData;
         } else if (!this.isHost && gameState.hostSpellbooksData) {
             this.heroSelection.opponentSpellbooksData = gameState.hostSpellbooksData;
         }
 
-        // Store opponent creatures data
         if (this.isHost && gameState.guestCreaturesData) {
             this.heroSelection.opponentCreaturesData = gameState.guestCreaturesData;
         } else if (!this.isHost && gameState.hostCreaturesData) {
@@ -762,10 +793,237 @@ export class ReconnectionManager {
         }
     }
 
+    // Singleplayer-specific battle reconnection
+    async handleSingleplayerBattleReconnection(gameState) {
+        this.reconnectionInProgress = true;
+
+        const currentBattleState = await this.checkCurrentBattleState();
+        
+        if (currentBattleState.battleEnded || !currentBattleState.battleActive) {
+            await this.setGamePhase('Formation');
+            return await this.handleFormationReconnection(gameState);
+        }
+
+        let checkpointLoaded = false;
+        let checkpointSystem = null;
+        let checkpoint = null;
+        
+        try {
+            const { getCheckpointSystem } = await import('./checkpointSystem.js');
+            checkpointSystem = getCheckpointSystem();
+            
+            checkpointSystem.init(null, this.roomManager, this.isHost);
+            checkpoint = await checkpointSystem.loadCheckpoint();
+            
+            if (checkpoint && checkpoint.formations) {
+                const myFormation = checkpoint.formations.player;
+                const aiFormation = checkpoint.formations.opponent;
+                
+                if (myFormation && this.heroSelection.formationManager) {
+                    this.heroSelection.formationManager.battleFormation = myFormation;
+                }
+                
+                if (aiFormation && this.heroSelection.formationManager) {
+                    this.heroSelection.formationManager.opponentBattleFormation = aiFormation;
+                }
+                
+                checkpointLoaded = true;
+            }
+        } catch (error) {
+            // Could not load checkpoint
+        }
+
+        if (!this.heroSelection.opponentSelectedCharacter) {
+            try {
+                // Select and randomize one of the 3 computer teams
+                const computerTeam = await selectComputerTeamForBattle(this.roomManager.getRoomRef());
+                
+                if (computerTeam) {
+                    console.log('✅ Computer team loaded for battle');
+                    
+                    // Store the full team data for battle initialization
+                    this.heroSelection.computerTeamData = computerTeam;
+                    
+                    // Set representative hero for opponent selection display
+                    const formation = computerTeam.formation;
+                    this.heroSelection.opponentSelectedCharacter = 
+                        formation.left || formation.center || formation.right || {
+                            id: 999,
+                            name: 'AI Opponent',
+                            image: './Cards/All/Alice.png',
+                            filename: 'Alice.png'
+                        };
+                    
+                    // Set opponent formation
+                    this.heroSelection.formationManager.opponentBattleFormation = computerTeam.formation;
+                    
+                    // Set opponent abilities data
+                    this.heroSelection.opponentAbilitiesData = computerTeam.abilities;
+                    
+                    // Set opponent spellbooks data
+                    this.heroSelection.opponentSpellbooksData = computerTeam.spellbooks;
+                    
+                    // Set opponent creatures data
+                    this.heroSelection.opponentCreaturesData = computerTeam.creatures;
+                    
+                    // Set opponent equipment (if your system supports it)
+                    if (this.heroSelection.opponentEquipmentData !== undefined) {
+                        this.heroSelection.opponentEquipmentData = computerTeam.equipment;
+                    }
+                    
+                } else {
+                    console.error('Failed to load computer team, using fallback');
+                    // Fallback to default opponent
+                    this.heroSelection.opponentSelectedCharacter = {
+                        id: 999,
+                        name: 'AI Opponent',
+                        image: './Cards/All/Alice.png',
+                        filename: 'Alice.png'
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading computer team:', error);
+                // Fallback to default opponent
+                this.heroSelection.opponentSelectedCharacter = {
+                    id: 999,
+                    name: 'AI Opponent',
+                    image: './Cards/All/Alice.png',
+                    filename: 'Alice.png'
+                };
+            }
+        }
+
+        const battleInitialized = this.heroSelection.initBattleScreen();
+        
+        if (!battleInitialized) {
+            await this.setGamePhase('Formation');
+            return await this.handleFormationReconnection(gameState);
+        }
+        
+        this.showBattleArena();
+
+        if (this.heroSelection.battleScreen) {
+            this.heroSelection.battleScreen.initializeSpeedControlUI();
+        }
+
+        if (checkpoint && checkpointSystem) {
+            try {
+                if (this.heroSelection.battleScreen && this.heroSelection.battleScreen.battleManager) {
+                    checkpointSystem.init(
+                        this.heroSelection.battleScreen.battleManager,
+                        this.roomManager,
+                        this.isHost
+                    );
+                    
+                    this.heroSelection.battleScreen.battleManager.checkpointSystem = checkpointSystem;
+                    
+                    const restored = await checkpointSystem.restoreFromCheckpoint(checkpoint);
+                    
+                    if (restored) {
+                        this.addCombatLog('Battle state restored!', 'success');
+                        
+                        const battleManager = this.heroSelection.battleScreen.battleManager;
+                        battleManager.onBattleEnd = async (battleResult) => {
+                            await this.heroSelection.setGamePhase('Reward');
+                            
+                            if (this.heroSelection.cardRewardManager && this.heroSelection.turnTracker) {
+                                await this.heroSelection.cardRewardManager.showRewardsAfterBattle(
+                                    this.heroSelection.turnTracker,
+                                    this.heroSelection,
+                                    battleResult
+                                );
+                            }
+                        };
+                        
+                        this.heroSelection.stateMachine.transitionTo(
+                            this.heroSelection.stateMachine.states.IN_BATTLE,
+                            { source: 'singleplayer_checkpoint_restoration' }
+                        );
+                        
+                        const battleManager2 = this.heroSelection.battleScreen.battleManager;
+                        if (battleManager2 && battleManager2.battleActive && !battleManager2.checkBattleEnd()) {
+                            setTimeout(() => {
+                                battleManager2.flowManager.authoritative_battleLoop();
+                            }, this.getSpeedAdjustedDelay(1000));
+                        }
+                        
+                        this.completeReconnection();
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('Checkpoint restoration failed:', error);
+            }
+        }
+
+        const battleManager = this.heroSelection.battleScreen?.battleManager;
+        
+        if (battleManager) {
+            battleManager.forceRefreshBattleState();
+            
+            battleManager.onBattleEnd = async (battleResult) => {
+                await this.heroSelection.setGamePhase('Reward');
+                
+                if (this.heroSelection.cardRewardManager && this.heroSelection.turnTracker) {
+                    await this.heroSelection.cardRewardManager.showRewardsAfterBattle(
+                        this.heroSelection.turnTracker,
+                        this.heroSelection,
+                        battleResult
+                    );
+                }
+            };
+            
+            this.addCombatLog('Restarting battle...', 'warning');
+            
+            await this.roomManager.getRoomRef().update({
+                battleRestarted: true,
+                battleRestartedAt: Date.now(),
+                gamePhase: 'Battle',
+                battleActive: true,
+                battleStarted: true
+            });
+            
+            this.heroSelection.stateMachine.transitionTo(
+                this.heroSelection.stateMachine.states.IN_BATTLE,
+                { source: 'singleplayer_battle_restart' }
+            );
+            
+            setTimeout(() => {
+                this.heroSelection.battleScreen.startBattle();
+            }, this.getSpeedAdjustedDelay(1000));
+            
+            this.completeReconnection();
+            return true;
+        }
+
+        await this.setGamePhase('Formation');
+        this.heroSelection.stateMachine.transitionTo(
+            this.heroSelection.stateMachine.states.TEAM_BUILDING,
+            { source: 'singleplayer_battle_reconnection_failed' }
+        );
+        
+        this.reconnectionInProgress = false;
+        return false;
+    }
+
     // ===== SPECIFIC RECONNECTION HANDLERS =====
 
     // Handle battle reconnection
     async handleBattleReconnection(gameState) {
+        console.log('[BATTLE RECON DEBUG] ========================================');
+        console.log('[BATTLE RECON DEBUG] handleBattleReconnection() called');
+        console.log('[BATTLE RECON DEBUG] Checking if singleplayer mode...');
+        
+        // Singleplayer mode: Skip all opponent-waiting logic
+        if (this.isSingleplayerMode()) {
+            console.log('[BATTLE RECON DEBUG] ✅ SINGLEPLAYER MODE DETECTED');
+            console.log('[BATTLE RECON DEBUG] Delegating to handleSingleplayerBattleReconnection()');
+            return await this.handleSingleplayerBattleReconnection(gameState);
+        }
+        
+        console.log('[BATTLE RECON DEBUG] Multiplayer mode - continuing with standard reconnection');
+        console.log('[BATTLE RECON DEBUG] ========================================');
+
         // Verify we have both characters selected before attempting battle reconnection
         if (!this.heroSelection.selectedCharacter || !this.heroSelection.opponentSelectedCharacter) {
             return await this.handleFormationReconnection(gameState);
@@ -1123,14 +1381,16 @@ export class ReconnectionManager {
             
             const battleEnded = gamePhase === 'Reward' || 
                 (battleStarted && !battleActive) ||
-                (gameState.battleEndedAt && gamePhase !== 'Battle');  
+                (gameState.battleEndedAt && gamePhase !== 'Battle');
             
-            return {
+            const result = {
                 battleActive,
                 battleStarted,
                 battleEnded,
                 gamePhase
             };
+            
+            return result;
             
         } catch (error) {
             return { battleActive: false, battleEnded: true };
@@ -1164,6 +1424,22 @@ export class ReconnectionManager {
 
     // Handle reward screen reconnection
     async handleRewardReconnection(gameState) {
+        // Singleplayer: Ensure AI opponent is set
+        if (this.isSingleplayerMode() && !this.heroSelection.opponentSelectedCharacter) {
+            // Set AI opponent for singleplayer
+            if (gameState.guestSelected) {
+                this.heroSelection.opponentSelectedCharacter = gameState.guestSelected;
+            } else {
+                // Fallback: Create default AI opponent
+                this.heroSelection.opponentSelectedCharacter = {
+                    id: 999,
+                    name: 'AI Opponent',
+                    image: './Cards/All/Alice.png',
+                    filename: 'Alice.png'
+                };
+            }
+        }
+
         // Ensure we have the battle data needed for battle screen initialization
         if (!this.heroSelection.selectedCharacter || !this.heroSelection.opponentSelectedCharacter) {
             await this.setGamePhase('Formation');
@@ -1237,18 +1513,9 @@ export class ReconnectionManager {
             { source: 'reward_reconnection' }
         );
         
-        // Check selection complete
-        if (this.heroSelection.selectedCharacter && this.heroSelection.opponentSelectedCharacter) {
-            setTimeout(() => {
-                if (this.heroSelection.onSelectionComplete) {
-                    this.heroSelection.onSelectionComplete({
-                        playerCharacter: this.heroSelection.selectedCharacter,
-                        opponentCharacter: this.heroSelection.opponentSelectedCharacter
-                    });
-                }
-            }, this.getSpeedAdjustedDelay(100));
-        }
-
+        // REMOVED: Don't trigger onSelectionComplete during reconnection
+        // This was causing the initial hand draw to overwrite the restored hand
+        
         this.heroSelection.stateInitialized = true;
 
         // Show reward screen immediately after UI settles
@@ -1381,86 +1648,71 @@ export class ReconnectionManager {
         }
     }
 
-    // Alternative battle screen setup for reward reconnection
-    async setupBattleScreenForRewardReconnection() {
-        try {
-            // Ensure both characters are selected
-            if (!this.heroSelection.selectedCharacter || !this.heroSelection.opponentSelectedCharacter) {
-                return false;
-            }
-            
-            // Get formations
-            const playerFormation = this.heroSelection.formationManager.getBattleFormation();
-            const opponentFormation = this.heroSelection.formationManager.getOpponentBattleFormation();
-            
-            if (!playerFormation || !opponentFormation) {
-                return false;
-            }
-            
-            // Import BattleScreen if needed
-            if (!this.heroSelection.battleScreen) {
-                const { BattleScreen } = await import('./battleScreen.js');
-                this.heroSelection.battleScreen = new BattleScreen();
-            }
-            
-            // Get all the battle data
-            const playerAbilities = {
-                left: this.heroSelection.heroAbilitiesManager.getHeroAbilities('left'),
-                center: this.heroSelection.heroAbilitiesManager.getHeroAbilities('center'),
-                right: this.heroSelection.heroAbilitiesManager.getHeroAbilities('right')
-            };
-            
-            const playerSpellbooks = {
-                left: this.heroSelection.heroSpellbookManager.getHeroSpellbook('left'),
-                center: this.heroSelection.heroSpellbookManager.getHeroSpellbook('center'),
-                right: this.heroSelection.heroSpellbookManager.getHeroSpellbook('right')
-            };
-            
-            const playerCreatures = {
-                left: this.heroSelection.heroCreatureManager.getHeroCreatures('left'),
-                center: this.heroSelection.heroCreatureManager.getHeroCreatures('center'),
-                right: this.heroSelection.heroCreatureManager.getHeroCreatures('right')
-            };
-            
-            // Initialize with current data
-            this.heroSelection.battleScreen.init(
-                this.heroSelection.isHost,
-                playerFormation,
-                opponentFormation,
-                this.heroSelection.gameDataSender,
-                this.heroSelection.roomManager,
-                this.heroSelection.lifeManager,
-                this.heroSelection.goldManager,
-                this.heroSelection.turnTracker,
-                this.heroSelection.roomManager,
-                playerAbilities,
-                this.heroSelection.opponentAbilitiesData,
-                playerSpellbooks,
-                this.heroSelection.opponentSpellbooksData,
-                this.heroSelection.actionManager,
-                playerCreatures,
-                this.heroSelection.opponentCreaturesData
-            );
-            
-            // Create battle screen HTML
-            this.heroSelection.battleScreen.createBattleScreen();
-            
-            // Hide it initially
-            const battleArena = document.getElementById('battleArena');
-            if (battleArena) {
-                battleArena.style.display = 'none';
-                return true;
-            } else {
-                return false;
-            }
-            
-        } catch (error) {
-            return false;
-        }
-    }
-
     // Handle formation screen reconnection
     async handleFormationReconnection(gameState) {
+        // Singleplayer: Generate AI opponent if needed
+        if (this.isSingleplayerMode()) {
+            // Ensure we have an opponent character (AI)
+            if (!this.heroSelection.opponentSelectedCharacter) {
+                this.heroSelection.opponentSelectedCharacter = {
+                    id: 999,
+                    name: 'AI Opponent',
+                    image: './Cards/All/Alice.png'
+                };
+            }
+            
+            // For singleplayer, we don't need to wait for character assignments
+            // Just check if the player has selected their hero
+            const hasPlayerSelected = this.heroSelection.selectedCharacter !== null;
+            
+            if (hasPlayerSelected) {
+                // Player has selected - go to team building
+                this.heroSelection.stateMachine.transitionTo(
+                    this.heroSelection.stateMachine.states.TEAM_BUILDING,
+                    { source: 'singleplayer_reconnection', hasSelection: true }
+                );
+                
+                // Force UI update
+                if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                    setTimeout(() => {
+                        window.updateHeroSelectionUI();
+                    }, 150);
+                }
+                
+                this.heroSelection.stateInitialized = true;
+                return true;
+            } else {
+                // Player hasn't selected yet - go to hero selection
+                this.heroSelection.stateMachine.transitionTo(
+                    this.heroSelection.stateMachine.states.SELECTING_HERO,
+                    { source: 'singleplayer_reconnection', hasSelection: false }
+                );
+                
+                this.heroSelection.stateInitialized = true;
+                return true;
+            }
+        }
+        
+        if (this.isSingleplayerMode()) {
+            const roomRef = this.roomManager.getRoomRef();
+            
+            // Check if computer teams exist
+            const teamsExist = await computerTeamsExist(roomRef);
+            
+            // If player has a hero but computer teams don't exist, initialize them
+            if (!teamsExist && this.heroSelection.selectedCharacter) {
+                const playerHeroName = this.heroSelection.selectedCharacter.name;
+                try {
+                    await initializeComputerTeams(roomRef, playerHeroName);
+                    console.log('✅ Computer teams initialized during reconnection');
+                } catch (error) {
+                    console.error('Failed to initialize computer teams during reconnection:', error);
+                }
+            }
+        }
+        
+
+        // MULTIPLAYER MODE
         // Check if this is actually a fresh game (no characters assigned)
         const hasHostCharacters = gameState.hostCharacters && gameState.hostCharacters.length > 0;
         const hasGuestCharacters = gameState.guestCharacters && gameState.guestCharacters.length > 0;
@@ -1510,31 +1762,29 @@ export class ReconnectionManager {
             );
         }
 
-
         // Check for active teleport state and restore if needed
         if (hasPlayerSelected && this.heroSelection.teleportState) {
-        
-        // Let teleport.js handle its own reconnection logic
-        setTimeout(async () => {
-            // Ensure teleport module is available
-            if (window.teleportSpell) {
-                await window.teleportSpell.handleReconnection(this.heroSelection, this.getSpeedAdjustedDelay(500));
-            } else {
-                // Try to import teleport module if not available
-                try {
-                    const teleportModule = await import('./Spells/teleport.js');
-                    if (typeof window !== 'undefined') {
-                        window.teleportSpell = teleportModule.teleportSpell;
-                    }
+            // Let teleport.js handle its own reconnection logic
+            setTimeout(async () => {
+                // Ensure teleport module is available
+                if (window.teleportSpell) {
                     await window.teleportSpell.handleReconnection(this.heroSelection, this.getSpeedAdjustedDelay(500));
-                } catch (error) {
-                    // Clear invalid state
-                    this.heroSelection.teleportState = null;
-                    this.heroSelection.saveGameState();
+                } else {
+                    // Try to import teleport module if not available
+                    try {
+                        const teleportModule = await import('./Spells/teleport.js');
+                        if (typeof window !== 'undefined') {
+                            window.teleportSpell = teleportModule.teleportSpell;
+                        }
+                        await window.teleportSpell.handleReconnection(this.heroSelection, this.getSpeedAdjustedDelay(500));
+                    } catch (error) {
+                        // Clear invalid state
+                        this.heroSelection.teleportState = null;
+                        this.heroSelection.saveGameState();
+                    }
                 }
-            }
-        }, this.getSpeedAdjustedDelay(500));
-    }
+            }, this.getSpeedAdjustedDelay(500));
+        }
 
 
         // Clear battle ready states when returning to formation
@@ -1546,18 +1796,6 @@ export class ReconnectionManager {
             });
         }
         
-        // Check selection complete with speed-aware delay
-        if (this.heroSelection.selectedCharacter && this.heroSelection.opponentSelectedCharacter) {
-            setTimeout(() => {
-                if (this.heroSelection.onSelectionComplete) {
-                    this.heroSelection.onSelectionComplete({
-                        playerCharacter: this.heroSelection.selectedCharacter,
-                        opponentCharacter: this.heroSelection.opponentSelectedCharacter
-                    });
-                }
-            }, this.getSpeedAdjustedDelay(100));
-        }
-
         this.heroSelection.stateInitialized = true;
         
         return true;

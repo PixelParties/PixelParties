@@ -23,6 +23,9 @@ import AreaHandler from './areaHandler.js'
 import { graveyardManager } from './graveyard.js';
 import { tagsManager } from './tags.js';
 import { ascendedManager } from './ascendeds.js';
+import { selectComputerTeamForBattle, getRepresentativeHero } from './generateComputerParty.js';
+import { getHeroCards } from './heroStartingCards.js';
+
 
 import { leadershipAbility } from './Abilities/leadership.js';
 import { trainingAbility } from './Abilities/training.js';
@@ -41,6 +44,7 @@ import { BeatoEffectManager } from './Heroes/beato.js';
 import { WaflavEffectManager } from './Heroes/waflav.js';
 import { StormkissedWaflavEffectManager } from './Heroes/stormkissedWaflav.js';
 import { MaryEffectManager } from './Heroes/mary.js';
+import { KazenaEffectManager } from './Heroes/kazena.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
@@ -49,7 +53,6 @@ import { cuteCrownEffect } from './Artifacts/cuteCrown.js';
 
 import { resetDoomClockCountersIfNeeded } from './Spells/doomClock.js';
 import { crystalWellManager } from './Spells/crystalWell.js';
-import { initializeSpatialCreviceSystem } from './Spells/spatialCrevice.js';
 
 import { GraveWormCreature } from './Creatures/graveWorm.js';
 import { NimbleMonkeeCreature } from './Creatures/nimbleMonkee.js';
@@ -65,15 +68,15 @@ export class HeroSelection {
     constructor() {
         this.allCharacters = [];
         this.allPreviewCharacters = [];
-        this.playerCharacters = []; // Player's 3 character options
-        this.opponentCharacters = []; // Opponent's 3 character options
+        this.playerCharacters = [];
+        this.opponentCharacters = [];
         this.selectedCharacter = null;
         this.opponentSelectedCharacter = null;
         this.isHost = false;
-        this.gameDataSender = null; // Function to send data to opponent
-        this.onSelectionComplete = null; // Callback when selection is done
-        this.roomManager = null; // Reference to room manager for Firebase access
-        this.battleStateListener = null; // Firebase listener for battle state
+        this.gameDataSender = null;
+        this.onSelectionComplete = null;
+        this.roomManager = null;
+        this.battleStateListener = null;
         this.globalSpellManager = globalSpellManager;
         this.opponentPermanentArtifactsData = null;
         this.heroTooltipManager = heroTooltipManager;
@@ -101,7 +104,6 @@ export class HeroSelection {
             lunaBuffs: 0,
             supplyChain: 0,
         };
-
 
         // Guard Change mode tracking
         this.guardChangeMode = false;
@@ -134,7 +136,6 @@ export class HeroSelection {
 
         this.potionHandler = potionHandler; 
 
-
         this.nicolasEffectManager = new NicolasEffectManager();
         this.vacarnEffectManager = new VacarnEffectManager();
         this.semiEffectManager = new SemiEffectManager();
@@ -144,6 +145,8 @@ export class HeroSelection {
         this.waflavEffectManager = new WaflavEffectManager();
         this.stormkissedWaflavEffectManager = new StormkissedWaflavEffectManager();
         this.maryEffectManager = new MaryEffectManager();
+        this.kazenaEffectManager = new KazenaEffectManager();
+
 
         
         this.graveWormCreature = new GraveWormCreature(this);
@@ -153,12 +156,10 @@ export class HeroSelection {
         this.demonsGateCreature = new DemonsGateCreature(null);
         this.cuteBirdCreature = new CuteBirdCreature(this);
 
-
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
         this.ancientTechInfiniteEnergyCoreEffect = ancientTechInfiniteEnergyCoreEffect;
         this.skullNecklaceEffect = skullNecklaceEffect; 
         this.cuteCrownEffect = cuteCrownEffect;
-
 
         // Initialize hero abilities manager with references
         this.heroAbilitiesManager.init(
@@ -166,7 +167,7 @@ export class HeroSelection {
             this.formationManager, 
             async () => {
                 // Enhanced callback for when ability state changes
-                this.updateBattleFormationUI(); // This now includes stat updates
+                this.updateBattleFormationUI();
                 this.updateHandDisplay();
                 
                 // Update Ability bonuses when abilities change
@@ -241,47 +242,14 @@ export class HeroSelection {
         // UI state
         this.stateInitialized = false;
         
-        // Character card mappings
-        this.characterCards = {
-            'Alice': ['CrumTheClassPet', 'DestructionMagic', 'Jiggles', 'GrinningCat', 'MoonlightButterfly', 'PhoenixBombardment', 'RoyalCorgi', 'SummoningMagic'],
-            'Beato': ['MagicArts', 'ButterflyCloud', 'DivineGiftOfMagic', 'CreateIllusion', 'AntiMagicShield', 'AuroraBorealis', 'MoonlightButterfly', 'MagicLamp'],
-            'Carris': ['Divinity', 'Premonition', 'BigGwen', 'TheHandsOfBigGwen', 'HatOfMadness', 'Haste', 'Slow', 'DivineGiftOfTime'],
-            'Cecilia': ['CrusadersArm-Cannon', 'CrusadersCutlass', 'CrusadersFlintlock', 'CrusadersHookshot', 'Leadership', 'Navigation', 'WantedPoster', 'Wealth'],
-            'Darge': ['Fighting', 'AngelfeatherArrow', 'BombArrow', 'FlameArrow', 'GoldenArrow', 'PoisonedArrow', 'RainbowsArrow', 'RainOfArrows'],
-            'Gabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
-            'Ghuanjun': ['Fighting', 'Necromancy', 'BlowOfTheVenomSnake', 'FerociousTigerKick', 'StrongOxHeadbutt', 'GraveyardOfLimitedPower', 'SkullNecklace', 'PunchInTheBox'],
-            'Gon': ['DecayMagic', 'BladeOfTheFrostbringer', 'ElixirOfCold', 'Cold-HeartedYuki-Onna', 'HeartOfIce', 'Icebolt', 'IcyGrave', 'SnowCannon'],
-            'Heinz': ['Inventing', 'FutureTechDrone', 'FutureTechMech', 'AncientTechInfiniteEnergyCore', 'BirthdayPresent', 'FutureTechCopyDevice', 'FutureTechFists', 'FutureTechLamp'],
-            'Ida': ['BottledFlame', 'BurningFinger',  'DestructionMagic', 'Fireball', 'Fireshield', 'FlameAvalanche', 'MountainTearRiver', 'VampireOnFire'],
-            'Kazena': ['Adventurousness',  'SupportMagic', 'GatheringStorm', 'Haste', 'CloudPillow', 'StormRing', 'CloudInABottle', 'ElixirOfQuickness'],
-            'Kyli': ['Biomancy',  'Occultism', 'MonsterInABottle', 'OverflowingChalice', 'BloodSoakedCoin', 'DoomClock', 'GraveWorm', 'TheRootOfAllEvil'],
-            'Luna': ['DestructionMagic',  'Friendship', 'TearingMountain', 'MountainTearRiver', 'LunaKiai', 'PriestOfLuna', 'HeartOfTheMountain', 'DichotomyOfLunaAndTempeste'],
-            'Mary': ['Charme',  'Leadership', 'CuteBird', 'CutePhoenix', 'PhoenixTackle', 'VictoryPhoenixCannon', 'CuteCrown', 'PinkSky'],
-            'Medea': ['DecayMagic', 'PoisonedMeat', 'PoisonedWell', 'PoisonPollen', 'PoisonVial', 'ToxicFumes', 'ToxicTrap', 'VenomInfusion'],
-            'Monia': ['CoolCheese', 'CoolnessOvercharge', 'CoolPresents', 'CrashLanding', 'GloriousRebirth', 'LifeSerum', 'TrialOfCoolness', 'UltimateDestroyerPunch'],
-            'Nao': ['Friendship', 'SupportMagic', 'Heal', 'HealingMelody', 'Cure', 'HealingPotion', 'HolyCheese', 'ShieldOfLife'],
-            'Nicolas': ['AlchemicJournal', 'Alchemy', 'BottledFlame', 'BottledLightning', 'BoulderInABottle', 'ExperimentalPotion', 'MonsterInABottle', 'AcidVial'],
-            'Nomu': ['MagicArts', 'Training', 'Teleport', 'Teleportal', 'StaffOfTheTeleporter', 'TeleportationPowder', 'PlanetInABottle', 'SpatialCrevice'],
-            'Semi': ['Adventurousness', 'ElixirOfImmortality', 'Wheels', 'HealingMelody', 'MagneticGlove', 'Stoneskin', 'TreasureChest', 'TreasureHuntersBackpack'],
-            'Sid': ['MagicAmethyst', 'MagicCobalt', 'MagicEmerald', 'MagicRuby', 'MagicSapphire', 'MagicTopaz', 'Thieving', 'ThievingStrike'],
-            'Tharx': ['Leadership', 'Archer', 'Cavalry', 'FieldStandard', 'FrontSoldier', 'FuriousAnger', 'GuardChange', 'TharxianHorse'],
-            'Thep': ['SoulShardBa', 'SoulShardIb', 'SoulShardKa', 'SoulShardKhet', 'SoulShardRen', 'SoulShardSah', 'SoulShardSekhem', 'SoulShardShut'],
-            'Toras': ['Fighting', 'HeavyHit', 'LegendarySwordOfABarbarianKing', 'SkullmaelsGreatsword', 'SwordInABottle', 'TheMastersSword', 'TheStormblade', 'TheSunSword'],
-            'Vacarn': ['Necromancy', 'SkeletonArcher', 'SkeletonBard', 'SkeletonDeathKnight', 'SkeletonMage', 'SkeletonNecromancer', 'SkeletonReaper', 'SummoningMagic'],
-            'Waflav': ['Cannibalism', 'Toughness', 'StormkissedWaflav', 'FlamebathedWaflav', 'ThunderstruckWaflav', 'SwampborneWaflav', 'DeepDrownedWaflav', 'CaptureNet'],
-            'ZombieGabby': ['Navigation', 'AntiIntruderSystem', 'FireBomb', 'ForcefulRevival', 'Infighting', 'Shipwrecked', 'RescueMission', 'Expedition'],
-        };
-
+        // NO MORE characterCards object - we'll use getHeroCards() function directly
         
-
-
         // Individual Abilities
         this.trainingAbility = trainingAbility;
         this.inventingAbility = inventingAbility;
         this.occultismAbility = occultismAbility;
         this.premonitionAbility = premonitionAbility; 
         this.learningAbility = learningAbility;
-
 
         // Initialize individual systems
         if (typeof window !== 'undefined') {
@@ -698,6 +666,10 @@ export class HeroSelection {
                 this.nicolasEffectManager.resetForNewTurn();
             }
 
+            if (this.kazenaEffectManager) {
+                this.kazenaEffectManager.resetForNewTurn();
+            }
+
             // Reset Vacarn effect usage for new turn
             if (this.vacarnEffectManager) {
                 this.vacarnEffectManager.resetForNewTurn();
@@ -854,11 +826,17 @@ export class HeroSelection {
             const snapshot = await roomRef.child('gameState').once('value');
             const gameState = snapshot.val();
             
-            // Check if game state exists AND has character assignments
-            if (!gameState || 
-                !gameState.hostCharacters || gameState.hostCharacters.length === 0 ||
-                !gameState.guestCharacters || gameState.guestCharacters.length === 0) {
-                                
+            // Check if this is singleplayer mode
+            const isSingleplayer = this.isSingleplayerMode();
+            
+            // Check if game state exists AND has character assignments OR selected character
+            const hasRequiredCharacters = isSingleplayer 
+                ? (gameState && gameState.hostSelected) // In singleplayer, just check if host selected a hero
+                : (gameState && 
+                gameState.hostCharacters && gameState.hostCharacters.length > 0 &&
+                gameState.guestCharacters && gameState.guestCharacters.length > 0);
+            
+            if (!hasRequiredCharacters) {
                 // Transition to initializing state for fresh game
                 this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
                 
@@ -871,7 +849,7 @@ export class HeroSelection {
                     });
                     return false;
                 }
-                                
+                
                 // Update UI
                 if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                     window.updateHeroSelectionUI();
@@ -879,7 +857,7 @@ export class HeroSelection {
                 
                 return false; // Indicate no state was restored (this is a new game)
             }
-                        
+            
             // Transition to reconnecting state
             this.stateMachine.transitionTo(this.stateMachine.states.RECONNECTING, {
                 reason: 'restoring_saved_state'
@@ -896,7 +874,6 @@ export class HeroSelection {
                     this.isHost
                 );
             }
-
 
             // Delegate all reconnection logic to the centralized manager
             const success = await this.reconnectionManager.handleReconnection(gameState);
@@ -915,13 +892,12 @@ export class HeroSelection {
             return success;
 
         } catch (error) {
-                        
             this.stateMachine.transitionTo(this.stateMachine.states.INITIALIZING);
             
             // Try to start fresh game
             try {
                 const selectionStarted = await this.startSelection();
-                if (selectionStarted) {                    
+                if (selectionStarted) {
                     if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
                         window.updateHeroSelectionUI();
                     }
@@ -929,6 +905,7 @@ export class HeroSelection {
                     return false;
                 }
             } catch (startError) {
+                // Silent catch
             }
             
             // If all else fails, transition to error state
@@ -976,8 +953,13 @@ export class HeroSelection {
             };
             
             const gameState = {
-                hostCharacters: this.isHost ? this.playerCharacters : this.opponentCharacters,
-                guestCharacters: this.isHost ? this.opponentCharacters : this.playerCharacters,
+                // For singleplayer, always save playerCharacters as hostCharacters
+                hostCharacters: this.isSingleplayerMode() ? 
+                    this.playerCharacters : 
+                    (this.isHost ? this.playerCharacters : this.opponentCharacters),
+                guestCharacters: this.isSingleplayerMode() ? 
+                    [] : // No guest in singleplayer
+                    (this.isHost ? this.opponentCharacters : this.playerCharacters),
                 // Use TurnTracker for turn data
                 ...this.turnTracker.exportTurnData(),
                 lastUpdated: Date.now()
@@ -1015,6 +997,10 @@ export class HeroSelection {
                     gameState.hostGoldData = sanitizeForFirebase(this.goldManager.exportGoldData());
                 }
 
+                // *** NEW: Save opponent gold data for singleplayer ***
+                if (this.isSingleplayerMode()) {
+                    gameState.hostOpponentGoldData = sanitizeForFirebase(this.opponentGoldData || 0);
+                }
                 
                 // Save GraveWorm state for host
                 if (this.graveWormCreature) {
@@ -1130,6 +1116,9 @@ export class HeroSelection {
                 }
                 if (this.heinzEffectManager) {
                     gameState.hostHeinzState = sanitizeForFirebase(this.heinzEffectManager.exportHeinzState());
+                }
+                if (this.kazenaEffectManager) {
+                    gameState.hostKazenaState = sanitizeForFirebase(this.kazenaEffectManager.exportKazenaState());
                 }
 
 
@@ -1302,6 +1291,9 @@ export class HeroSelection {
                 if (this.heinzEffectManager) {
                     gameState.guestHeinzState = sanitizeForFirebase(this.heinzEffectManager.exportHeinzState());
                 }
+                if (this.kazenaEffectManager) {
+                    gameState.guestKazenaState = sanitizeForFirebase(this.kazenaEffectManager.exportKazenaState());
+                }
 
 
                 // Abilities
@@ -1346,14 +1338,6 @@ export class HeroSelection {
 
             // Sanitize the entire gameState object
             const sanitizedGameState = sanitizeForFirebase(gameState);
-
-            // Before saving, log current burning finger stacks in formation
-            const formation = this.formationManager.getBattleFormation();
-            ['left', 'center', 'right'].forEach(position => {
-                const hero = formation[position];
-                if (hero && hero.burningFingerStack !== undefined) {
-                }
-            });
             
             await roomRef.child('gameState').update(sanitizedGameState);
             return true;
@@ -1379,11 +1363,11 @@ export class HeroSelection {
     // Helper method to restore player-specific data
     restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, 
         nicolasData = null, vacarnData = null, delayedEffectsData = null, semiData = null, 
-        heinzData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null, 
+        heinzData = null, kazenaData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null,
         magicSapphiresUsedData = null, magicRubiesUsedData = null, playerCountersData = null, 
         areaCardData = null, graveyardData = null, inventingData = null, occultismData = null, 
         graveWormData = null, crystalWellData = null, teleportData = null, opponentCountersData = null,
-        trulyPermanentBonusesData = null)  {
+        trulyPermanentBonusesData = null, opponentGoldData = null)  {
         // Restore deck
         if (deckData && this.deckManager) {
             const deckRestored = this.deckManager.importDeck(deckData);
@@ -1419,6 +1403,14 @@ export class HeroSelection {
             const goldRestored = this.goldManager.importGoldData(goldData);
         }
 
+        // *** Restore opponent gold data for singleplayer ***
+        if (opponentGoldData !== undefined && opponentGoldData !== null) {
+            this.opponentGoldData = opponentGoldData;
+        } else {
+            // Initialize to 0 if not provided
+            this.opponentGoldData = 0;
+        }
+
         // ===== Restore potion state =====
         if (potionData && this.potionHandler) {
             const potionRestored = this.potionHandler.importPotionState(potionData, false);
@@ -1434,6 +1426,7 @@ export class HeroSelection {
         // Restore opponent counters
         if (opponentCountersData) {
             this.opponentCounters = { ...opponentCountersData };
+
         } else {
             this.opponentCounters = { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1, lunaBuffs: 0, supplyChain: 0  };
         }
@@ -1494,6 +1487,16 @@ export class HeroSelection {
             // Initialize Heinz state if no saved data
             if (this.heinzEffectManager) {
                 this.heinzEffectManager.reset();
+            }
+        }
+        if (kazenaData && this.kazenaEffectManager) {
+            const kazenaRestored = this.kazenaEffectManager.importKazenaState(kazenaData);
+            if (kazenaRestored) {
+            }
+        } else {
+            // Initialize Kazena state if no saved data
+            if (this.kazenaEffectManager) {
+                this.kazenaEffectManager.reset();
             }
         }
                 
@@ -1640,6 +1643,14 @@ export class HeroSelection {
         setTimeout(() => this.refreshHeroStats(), 200);
     }
 
+    isSingleplayerMode() {
+        if (!this.roomManager || !this.roomManager.getRoomRef()) {
+            return false;
+        }
+        const roomId = this.roomManager.getRoomRef().key;
+        return roomId && roomId.startsWith('sp_');
+    }
+
     // Enhanced start character selection process  TEST HEROES HERE!!!
     async startSelection() {
         window._debugHostHeroes = ['', '', '']; // '' = random
@@ -1649,8 +1660,22 @@ export class HeroSelection {
             return false;
         }
 
-        // Check if we already have character assignments (from restoration)
+        // **Check if we already have character assignments (from restoration)**
         if (this.playerCharacters.length > 0 && this.opponentCharacters.length > 0) {
+            // **In singleplayer, check if we already have a selected character**
+            const isSingleplayer = this.isSingleplayerMode();
+            if (isSingleplayer && this.selectedCharacter) {
+                // Transition to team building state
+                this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING);
+                
+                // Update the UI with existing state
+                if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                    window.updateHeroSelectionUI();
+                }
+                
+                return true;
+            }
+            
             // Transition to selecting hero state
             this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
             
@@ -1683,26 +1708,31 @@ export class HeroSelection {
         // Transition to selecting hero state
         this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
         
-        // Clear any previous selections to ensure fresh start
-        this.selectedCharacter = null;
-        this.opponentSelectedCharacter = null;
-        this.formationManager.reset();
-        this.cardRewardManager.clearAnyActiveCardRewards();
+        // **MOVED: Only clear selections for NEW games**
+        const isSingleplayer = this.isSingleplayerMode();
         
-        // Reset managers for new game
-        this.deckManager.reset();
-        this.handManager.reset();
-        this.lifeManager.reset();
-        this.goldManager.reset();
+        // **NEW: Don't clear if we're reconnecting and already have a selected character**
+        if (!isSingleplayer || !this.selectedCharacter) {
+            this.selectedCharacter = null;
+            this.opponentSelectedCharacter = null;
+            this.formationManager.reset();
+            this.cardRewardManager.clearAnyActiveCardRewards();
+            
+            // Reset managers for new game
+            this.deckManager.reset();
+            this.handManager.reset();
+            this.lifeManager.reset();
+            this.goldManager.reset();
 
-        if (this.potionHandler) {
-            this.potionHandler.resetForNewGame();
-        }
-        
-        // Reset turn tracker for new game ONLY if it's truly turn 1
-        if (currentTurn === 1) {
-            this.turnTracker.reset();
-            this.initializeLifeManagerWithTurnTracker();
+            if (this.potionHandler) {
+                this.potionHandler.resetForNewGame();
+            }
+            
+            // Reset turn tracker for new game ONLY if it's truly turn 1
+            if (currentTurn === 1) {
+                this.turnTracker.reset();
+                this.initializeLifeManagerWithTurnTracker();
+            }
         }
         
         // Filter out unobtainable heroes before selection
@@ -1711,7 +1741,57 @@ export class HeroSelection {
             return !heroInfo || !heroInfo.unobtainable;
         });
 
-        // Generate new character selection using OBTAINABLE PREVIEW characters with debug support
+        if (isSingleplayer) {            
+            // **If we already have a selected character, skip generation**
+            if (this.selectedCharacter) {
+                this.selectedComputerTeamKey = null;
+                this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING);
+                await this.saveGameState();
+                
+                if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                    window.updateHeroSelectionUI();
+                }
+                
+                return true;
+            }
+            
+            // Check for debug hero arrays - DECLARE THESE FIRST
+            const debugHost = (window._debugHostHeroes || []).filter(h => h && h.trim() !== '');
+            const debugGuest = (window._debugGuestHeroes || []).filter(h => h && h.trim() !== '');
+            
+            // Helper function to get hero by name
+            const getHeroByName = (name) => obtainableHeroes.find(char => char.name === name);
+            
+            // In singleplayer, only generate player characters
+            // No opponent needed yet
+            if (debugHost.length > 0) {
+                const hostChars = debugHost.map(getHeroByName).filter(Boolean);
+                const remaining = obtainableHeroes.filter(char => !debugHost.includes(char.name));
+                const randomIndices = this.getRandomUniqueIndices(remaining.length, 3 - hostChars.length);
+                this.playerCharacters = [...hostChars, ...randomIndices.map(i => remaining[i])];
+            } else {
+                const selectedIndices = this.getRandomUniqueIndices(obtainableHeroes.length, 3);
+                this.playerCharacters = selectedIndices.map(index => obtainableHeroes[index]);
+            }
+            
+            // No opponent characters in singleplayer
+            this.opponentCharacters = [];
+            
+            // Transition to selecting hero
+            this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
+            
+            // Save state
+            await this.saveGameState();
+            
+            // Update UI
+            if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                window.updateHeroSelectionUI();
+            }
+            
+            return true;
+        }
+
+        // MULTIPLAYER MODE - Generate new character selection using OBTAINABLE PREVIEW characters with debug support
         // Check for debug hero arrays
         const debugHost = (window._debugHostHeroes || []).filter(h => h && h.trim() !== '');
         const debugGuest = (window._debugGuestHeroes || []).filter(h => h && h.trim() !== '');
@@ -1771,6 +1851,7 @@ export class HeroSelection {
         return true;
     }
 
+
     // Receive character selection from opponent
     receiveCharacterSelection(data) {
         if (data.phase === 'selection_ready') {
@@ -1808,20 +1889,20 @@ export class HeroSelection {
             return false;
         }
 
-        this.selectedCharacter = formationCharacter; // Use formation character with Cards/All path
+        this.selectedCharacter = formationCharacter;
         
         // Transition to team building state
         this.stateMachine.transitionTo(this.stateMachine.states.TEAM_BUILDING);
 
         // Calculate and award starting gold
-        const startingGold = this.calculateStartingGold(formationCharacter); // Use formation character
+        const startingGold = this.calculateStartingGold(formationCharacter);
         this.goldManager.setPlayerGold(startingGold, 'starting_gold');
 
         // Initialize battle formation with selected character in center
-        this.formationManager.initWithCharacter(formationCharacter); // Use formation character
+        this.formationManager.initWithCharacter(formationCharacter);
 
         // Get full hero info from database
-        const heroInfo = getHeroInfo(formationCharacter.name); // Use formation character
+        const heroInfo = getHeroInfo(formationCharacter.name);
         if (heroInfo) {
             // Initialize hero with starting abilities in center position
             this.heroAbilitiesManager.updateHeroPlacement('center', heroInfo);
@@ -1833,9 +1914,9 @@ export class HeroSelection {
         // Initialize life manager with turn tracker for team building phase
         this.initializeLifeManagerWithTurnTracker();
 
-        // Add character's cards to deck
-        const characterCards = this.characterCards[formationCharacter.name]; // Use formation character
-        if (characterCards) {
+        // UPDATED: Add character's cards to deck using centralized function
+        const characterCards = getHeroCards(formationCharacter.name);
+        if (characterCards && characterCards.length > 0) {
             this.deckManager.addCards(characterCards);
         } else {
             this.deckManager.clearDeck();
@@ -1853,24 +1934,65 @@ export class HeroSelection {
         // Save complete selection state to Firebase (including new hand)
         await this.saveGameState();
 
-        // Send selection to opponent (send the formation character)
-        if (this.gameDataSender) {
-            this.gameDataSender('character_selected', {
-                character: formationCharacter, // Use formation character
-                playerRole: this.isHost ? 'host' : 'guest'
-            });
+        // Check if this is singleplayer mode
+        const isSingleplayer = this.isSingleplayerMode();
+        
+        if (isSingleplayer) {
+            // In singleplayer, auto-complete the opponent selection
+            // Create a dummy opponent character for UI purposes
+            this.opponentSelectedCharacter = {
+                id: 999,
+                name: 'AI Opponent',
+                image: './Cards/All/Alice.png',
+                filename: 'AI.png'
+            };
+                        
+            // **Initialize computer teams if they don't exist**
+            const { computerTeamsExist, initializeComputerTeams, updateCPUTeams } = await import('./generateComputerParty.js');
+            const teamsExist = await computerTeamsExist(this.roomManager.getRoomRef());
+            
+            if (!teamsExist) {
+                await initializeComputerTeams(this.roomManager.getRoomRef(), formationCharacter.name);
+                
+                // **NEW: Run initial CPU team updates after creation**
+                const roomRef = this.roomManager.getRoomRef();
+                const currentTurn = this.turnTracker.getCurrentTurn();
+                
+                // Fire-and-forget initial CPU setup (runs in background)
+                updateCPUTeams(roomRef, currentTurn, 'defeat').catch(error => {
+                    console.error('Initial CPU team setup failed:', error);
+                });
+            }
+            
+            // Trigger selection complete callback immediately
+            if (this.onSelectionComplete) {
+                this.onSelectionComplete({
+                    playerCharacter: formationCharacter,
+                    opponentCharacter: this.opponentSelectedCharacter
+                });
+            }
+        } else {
+            // Multiplayer mode: Send selection to opponent
+            if (this.gameDataSender) {
+                this.gameDataSender('character_selected', {
+                    character: formationCharacter,
+                    playerRole: this.isHost ? 'host' : 'guest'
+                });
+            }
+            
+            // Check if both players have selected (multiplayer only)
+            this.checkSelectionComplete();
         }
 
-        // Send initial formation update to opponent
-        await this.sendFormationUpdate();
+        // Send initial formation update to opponent (multiplayer only)
+        if (!isSingleplayer) {
+            await this.sendFormationUpdate();
+        }
 
         // Update the UI to show the new hand immediately
         if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
             window.updateHeroSelectionUI();
         }
-
-        // Check if both players have selected
-        this.checkSelectionComplete();
 
         return true;
     }
@@ -2117,7 +2239,7 @@ export class HeroSelection {
     showCharacterPreview(character) {
         this.cardPreviewManager.showCharacterPreview(
             character, 
-            this.characterCards, 
+            getHeroCards, // Pass the function instead of the object
             (cardName) => this.formatCardName(cardName)
         );
     }
@@ -2304,6 +2426,13 @@ export class HeroSelection {
                 window.birthdayPresentArtifact.processBirthdayPresentEffectsAfterBattle(this);
             }
 
+
+            // ===== RESET BIRTHDAY PRESENT COUNTER UNCONDITIONALLY =====
+            // Each player must reset their own counter after battle to prevent persistence bug
+            // The opponent will have already drawn cards from this counter during their reward screen
+            if (this.playerCounters) {
+                this.playerCounters.birthdayPresent = 0;
+            }
             // ===== PROCESS START OF TURN HERO EMPOWERMENTS =====
             if (this.kyliEffectManager) {
                 await this.kyliEffectManager.processPostBattleEmpowerment(this);
@@ -2329,8 +2458,22 @@ export class HeroSelection {
                 await this.cuteBirdCreature.processPostBattleEvolution(this);
             }
 
+            // ===== **UPDATE COMPUTER PARTIES AFTER BATTLE (SINGLEPLAYER ONLY)** =====
+            if (this.isSingleplayerMode() && this.roomManager) {
+                const roomRef = this.roomManager.getRoomRef();
+                const currentTurn = this.turnTracker.getCurrentTurn();
+                
+                // Import and fire-and-forget the master update function
+                import('./generateComputerParty.js').then(({ updateCPUTeams }) => {
+                    // Run in background - player won't experience any delay
+                    updateCPUTeams(roomRef, currentTurn, 'defeat').catch(error => {
+                        console.error('Background CPU team update failed:', error);
+                    });
+                });
+            }
             
             // ===== SAVE COUNTER STATE IMMEDIATELY AFTER BATTLE =====
+            
             const saveResult = await this.saveGameState(); // Ensure counters are saved to Firebase immediately
             
             // STEP 2: IMMEDIATE UI UPDATES (no waiting for Firebase)
@@ -2382,12 +2525,15 @@ export class HeroSelection {
                 this.actionManager.resetActions();
             }
 
-            // Reset Nicolas effect usage when returning to formation
+            // Reset Hero effect usages when returning to formation
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.resetForNewTurn();
             }
             if (this.vacarnEffectManager) {
                 this.vacarnEffectManager.resetForNewTurn();
+            }
+            if (this.kazenaEffectManager) {
+                this.kazenaEffectManager.resetForNewTurn();
             }
             
             // STEP 3: Transition to team building state BEFORE updating UI
@@ -2412,6 +2558,7 @@ export class HeroSelection {
             });
         }
     }
+
 
     // More aggressive state clearing with multiple approaches
     async aggressiveBattleStateClear() {
@@ -2467,6 +2614,247 @@ export class HeroSelection {
             toBattleBtn.disabled = true;
         }
         
+        if (this.isSingleplayerMode()) {
+            // ===== LOAD PERSISTENT COMPUTER TEAM =====
+            const currentTurn = this.turnTracker.getCurrentTurn();
+            
+            // Select one of the 3 persistent computer teams (now cycles based on turn)
+            const computerTeam = await selectComputerTeamForBattle(
+                this.roomManager.getRoomRef(),
+                currentTurn,  // Pass current turn for cycling
+                ''  // Empty string to disable test mode and enable cycling
+            );
+            
+            if (!computerTeam) {
+                console.error('Failed to load computer team');
+                // Re-enable button on error
+                if (toBattleBtn) toBattleBtn.disabled = false;
+                return;
+            }
+            
+            // **Store which computer team was selected**
+            this.selectedComputerTeamKey = computerTeam.selectedTeamKey || 'team1';
+
+            if (this.roomManager && this.roomManager.getRoomRef()) {
+                await this.roomManager.getRoomRef().child('gameState/selectedComputerTeam').set(this.selectedComputerTeamKey);
+            }
+            
+            // Load deck, hand, graveyard from team's heroes
+            const computerDeck = computerTeam.deck || [];
+            const computerHand = computerTeam.hand || [];
+            const computerGraveyard = computerTeam.graveyard || [];
+            
+            // ===== CALCULATE CPU ALCHEMY BONUSES FOR POTION STATE =====
+            let cpuAlchemyCount = 0;
+            if (computerTeam.abilities) {
+                ['left', 'center', 'right'].forEach(position => {
+                    if (computerTeam.abilities[position]) {
+                        ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                            if (computerTeam.abilities[position][zone]) {
+                                const alchemyInZone = computerTeam.abilities[position][zone].filter(
+                                    ability => ability && ability.name === 'Alchemy'
+                                ).length;
+                                cpuAlchemyCount += alchemyInZone;
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // ===== WRITE CPU POTION STATE TO FIREBASE =====
+            const cpuPotionState = {
+                basePotions: 1,
+                alchemyBonuses: cpuAlchemyCount,
+                availablePotions: 1 + cpuAlchemyCount,
+                maxPotions: 1 + cpuAlchemyCount,
+                activePotionEffects: computerTeam.activePotionEffects || [],
+                exportedAt: Date.now()
+            };
+            
+            // ===== WRITE PLAYER POTION STATE TO FIREBASE =====
+            const playerPotionState = window.potionHandler ? 
+                window.potionHandler.exportPotionState() : 
+                {
+                    basePotions: 1,
+                    alchemyBonuses: 0,
+                    availablePotions: 1,
+                    maxPotions: 1,
+                    activePotionEffects: [],
+                    exportedAt: Date.now()
+                };
+            
+            // Write both potion states to Firebase (host = player, guest = CPU)
+            if (this.roomManager && this.roomManager.getRoomRef()) {
+                await this.roomManager.getRoomRef().child('gameState').update({
+                    hostPotionState: playerPotionState,
+                    guestPotionState: cpuPotionState
+                }).catch(error => {
+                    console.error('Error writing potion states to Firebase:', error);
+                });
+            }
+            // ===== WRITE CPU DELAYED EFFECTS TO FIREBASE =====
+            if (this.roomManager && this.roomManager.getRoomRef()) {
+                const cpuDelayedEffects = computerTeam.delayedEffects || [];
+                await this.roomManager.getRoomRef().child('gameState').update({
+                    guestdelayedEffects: cpuDelayedEffects.length > 0 ? cpuDelayedEffects : null
+                }).catch(error => {
+                    console.error('Error writing CPU delayed effects to Firebase:', error);
+                });
+                console.log('💾 Wrote CPU delayed effects to gameState:', cpuDelayedEffects);
+            }
+            
+            // Build complete computer party data structure
+            const computerParty = {
+                formation: computerTeam.formation,
+                deck: computerDeck,
+                hand: computerHand,
+                graveyard: computerGraveyard,
+                heroCount: computerTeam.heroCount,
+                abilities: computerTeam.abilities,
+                spellbooks: computerTeam.spellbooks,
+                creatures: computerTeam.creatures,
+                equipment: computerTeam.equipment,
+                permanentArtifacts: computerTeam.permanentArtifacts || [],
+                counters: computerTeam.counters || {
+                    birthdayPresent: 0,
+                    teleports: 0,
+                    goldenBananas: 0,
+                    evolutionCounters: 1,
+                    lunaBuffs: 0,
+                    supplyChain: 0
+                },
+                areaCard: computerTeam.areaCard || null,
+                effectiveStats: {
+                    left: null,
+                    center: null,
+                    right: null
+                },
+                representativeHero: getRepresentativeHero(computerTeam.formation)
+            };
+                    
+            // Set ALL computer opponent data from the generated party
+            this.opponentSelectedCharacter = computerParty.representativeHero;
+            this.formationManager.opponentBattleFormation = computerParty.formation;
+            this.opponentHandData = computerParty.hand;
+            this.opponentDeckData = computerParty.deck;
+            this.opponentGraveyardData = computerParty.graveyard;
+            this.opponentAbilitiesData = computerParty.abilities;
+            this.opponentSpellbooksData = computerParty.spellbooks;
+            this.opponentCreaturesData = computerParty.creatures;
+            this.opponentEquipmentData = computerParty.equipment;
+            this.opponentPermanentArtifactsData = computerParty.permanentArtifacts || [];
+            this.opponentCounters = computerParty.counters;
+            this.opponentAreaCardData = computerParty.areaCard;
+            this.opponentEffectiveStatsData = computerParty.effectiveStats;
+            this.opponentAreaCardData = computerTeam.areaCard || null;
+            this.opponentDelayedEffectsData = computerParty.delayedEffects || []; 
+            
+            // Transition state machine
+            this.stateMachine.transitionTo(this.stateMachine.states.TRANSITIONING_TO_BATTLE, {
+                reason: 'singleplayer_battle_start'
+            });
+            
+            // Mark battle as started in Firebase (local only)
+            if (this.roomManager && this.roomManager.getRoomRef()) {
+                await this.roomManager.getRoomRef().child('gameState').update({
+                    battleStarted: true,
+                    battleStartTime: Date.now(),
+                    hostBattleReady: true,
+                    guestBattleReady: false,
+                    gamePhase: 'Battle',
+                    gamePhaseUpdated: Date.now()
+                }).catch(error => {
+                    console.error('Error marking singleplayer battle started:', error);
+                });
+            }
+            
+            // Initialize battle screen with all the generated opponent data
+            if (this.battleScreen) {
+                // Get player's latest data
+                const playerAbilities = this.heroAbilitiesManager.exportAbilitiesState();
+                const playerSpellbooks = this.heroSpellbookManager.exportSpellbooksState();
+                const playerCreatures = this.heroCreatureManager.exportCreaturesState();
+                const playerEquipment = this.heroEquipmentManager.exportEquipmentState();
+                const playerEffectiveStats = {};
+                
+                // Calculate player's effective stats
+                ['left', 'center', 'right'].forEach(position => {
+                    const stats = this.calculateEffectiveHeroStats(position);
+                    if (stats) {
+                        playerEffectiveStats[position] = stats;
+                    }
+                });
+                
+                const playerPermanentArtifacts = window.artifactHandler ? 
+                    window.artifactHandler.getPermanentArtifacts() : [];
+                
+                const playerHand = this.handManager.getHand();
+                const playerDeck = this.deckManager.getDeck();
+                const playerGraveyard = this.graveyardManager.getGraveyard();
+                const playerAreaCard = this.areaHandler.getAreaCard();
+
+                // Get player's delayed effects (empty for now in singleplayer)
+                const playerDelayedEffects = this.delayedEffects || [];
+
+                // Get CPU's delayed effects from the computer team
+                const cpuDelayedEffects = computerParty.delayedEffects || [];
+
+                // Initialize the battle screen with all data
+                this.battleScreen.init(
+                    true, // isHost (always true in singleplayer)
+                    this.formationManager.getBattleFormation(), // playerFormation
+                    computerParty.formation, // opponentFormation
+                    this.gameDataSender,
+                    this.roomManager,
+                    this.lifeManager,
+                    this.goldManager,
+                    this.turnTracker,
+                    this.roomManager,
+                    playerAbilities,
+                    computerParty.abilities,
+                    playerSpellbooks,
+                    computerParty.spellbooks,
+                    this.actionManager,
+                    playerCreatures,
+                    computerParty.creatures,
+                    playerEquipment,
+                    computerParty.equipment,
+                    playerEffectiveStats,
+                    computerParty.effectiveStats,
+                    playerPermanentArtifacts,
+                    computerParty.permanentArtifacts,
+                    playerHand,
+                    computerParty.hand,
+                    playerDeck,
+                    computerParty.deck,
+                    playerAreaCard,
+                    computerParty.areaCard,
+                    playerGraveyard,
+                    computerParty.graveyard,
+                    this.playerCounters,
+                    computerParty.counters,
+                    playerDelayedEffects,
+                    cpuDelayedEffects    
+                );
+                
+                // Show the battle arena
+                this.battleScreen.showBattleArena();
+                
+                // Transition to in battle state
+                this.stateMachine.transitionTo(this.stateMachine.states.IN_BATTLE, {
+                    reason: 'singleplayer_battle_initialized'
+                });
+                
+                // Start the battle
+                setTimeout(() => {
+                    this.battleScreen.startBattle();
+                }, 500);
+            }
+            
+            return;
+        }
+        
+        // MULTIPLAYER MODE
         // Transition to waiting state
         this.stateMachine.transitionTo(this.stateMachine.states.WAITING_FOR_BATTLE);
 
@@ -3679,6 +4067,9 @@ export class HeroSelection {
         }
         if (this.maryEffectManager) {
             this.maryEffectManager.reset();
+        }
+        if (this.kazenaEffectManager) {
+            this.kazenaEffectManager.reset();
         }
 
 

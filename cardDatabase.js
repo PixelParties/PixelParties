@@ -15,7 +15,10 @@ const CARD_DATABASE = {
         atk: 30,
         ability1: 'DestructionMagic',
         ability2: 'SummoningMagic',
-        tags: ["Summoner", "Damage Dealer", "Card Draw"]
+        tags: ["Summoner", "Damage Dealer", "Card Draw", "Needs Action"],
+        wants: ["Summoner", "Support"],
+        avoids: ["Needs Action"],
+        order: null
     },
     'Beato': {
         name: 'Beato',
@@ -29,7 +32,10 @@ const CARD_DATABASE = {
         atk: 30,
         ability1: 'MagicArts',
         ability2: 'MagicArts',
-        tags: ["High-Value", "Random", "Card Draw"]
+        tags: ["High-Value", "Random", "Card Draw"],
+        wants: ["Support", "Damage Dealer"],
+        avoids: [],
+        order: null
     },
     'Carris': {
         name: 'Carris',
@@ -43,7 +49,10 @@ const CARD_DATABASE = {
         atk: 60,
         ability1: 'Divinity',
         ability2: 'Premonition',
-        tags: ["Multiple Actions", "Extra Turns", "High-Risk"]
+        tags: ["Multiple Actions", "Extra Turns", "High-Risk"],
+        wants: ["Needs Action", "Damage Dealer", "Sniper", "Area Damage", "Burst Damage"],
+        avoids: ["Defense", "Disruption"],
+        order: null
     },
     'Cecilia': {
         name: 'Cecilia',
@@ -57,7 +66,10 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Navigation',
         ability2: 'Wealth',
-        tags: ["Attacker", "Gold Generation", "Damage Dealer"]
+        tags: ["Attacker", "Gold Generation", "Damage Dealer"],
+        wants: ["Gold Generation", "Needs Action", "Card Draw"],
+        avoids: [],
+        order: null
     },
     'Darge': {
         name: 'Darge',
@@ -71,7 +83,10 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Adventurousness',
         ability2: 'Fighting',
-        tags: ["Attacker", "Sniper", "Damage Dealer"]
+        tags: ["Attacker", "Sniper", "Damage Dealer", "Needs Gold", "Squishy"],
+        wants: ["Gold Generation", "Defense", "Summoner", "Card Draw"],
+        avoids: ["Needs Gold"],
+        order: null
     },
     'Gabby': {
         name: 'Gabby',
@@ -85,7 +100,10 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Navigation',
         ability2: 'Thieving',
-        tags: ["Defense", "Defensive", "Setup"]
+        tags: ["Defense", "Damage Dealer", "Setup", "Card Draw"],
+        wants: ["Damage Dealer", "Summoner", "Squishy"],
+        avoids: ["Defense"],
+        order: null
     },
     'Ghuanjun': {
         name: 'Ghuanjun',
@@ -99,7 +117,10 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Fighting',
         ability2: 'Necromancy',
-        tags: ["Attacker", "Defensive", "Setup"]
+        tags: ["Attacker", "Defense", "Setup", "Needs Actions"],
+        wants: ["Support", "Card Draw", "Multiple Actions"],
+        avoids: ["Needs Actions"],
+        order: null
     },
     'Gon': {
         name: 'Gon',
@@ -113,7 +134,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'DecayMagic',
         ability2: 'Resistance',
-        tags: ["Support", "Disruption", "Status Effects"]
+        tags: ["Support", "Disruption", "Status Effects", "Needs Actions"],
+        wants: ["Damage Dealer", "Area Damage", "Sniper"],
+        avoids: ["Needs Actions"],
+        order: null
     },
     'Heinz': {
         name: 'Heinz',
@@ -127,7 +151,10 @@ const CARD_DATABASE = {
         atk: 10,
         ability1: 'Inventing',
         ability2: 'Inventing',
-        tags: ["Setup", "Summoner", "Card Draw"]
+        tags: ["Setup", "Summoner", "Card Draw"],
+        wants: ["Damage Dealer", "Support", "Defense"],
+        avoids: [],
+        order: [1]
     },
     'Ida': {
         name: 'Ida',
@@ -141,7 +168,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'DestructionMagic',
         ability2: 'DestructionMagic',
-        tags: ["Damage Dealer", "Area Damage", "Status Effects"]
+        tags: ["Damage Dealer", "Area Damage", "Status Effects", "Needs Actions"],
+        wants: ["Multiple Actions", "Support", "Defense"],
+        avoids: ["Needs Actions"],
+        order: null
     },
     'Kazena': {
         name: 'Kazena',
@@ -155,7 +185,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'Adventurousness',
         ability2: 'SupportMagic',
-        tags: ["Card Draw", "Support", "Setup"]
+        tags: ["Card Draw", "Support", "Setup", "Area Damage"],
+        wants: ["Damage Dealer", "Summoner"],
+        avoids: ["Support"],
+        order: [2,3]
     },
     'Kyli': {
         name: 'Kyli',
@@ -169,7 +202,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'Biomancy',
         ability2: 'Occultism',
-        tags: ["Summoner", "Setup", "Attacker"]
+        tags: ["Summoner", "Setup", "Attacker"],
+        wants: ["Summoner", "Damage Dealer", "Potions"],
+        avoids: [],
+        order: [1,2]
     },
     'Luna': {
         name: 'Luna',
@@ -183,7 +219,10 @@ const CARD_DATABASE = {
         atk: 30,
         ability1: 'DestructionMagic',
         ability2: 'Friendship',
-        tags: ["Status Effects", "Area Damage", "Self-Damage"]
+        tags: ["Status Effects", "Area Damage", "Self-Damage", "Setup"],
+        wants: ["Defense", "Support", "Attacker"],
+        avoids: ["Status Effects"],
+        order: null
     },
     'Mary': {
         name: 'Mary',
@@ -193,11 +232,14 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: null,
         subtype: null,
-        hp: 250,
-        atk: 20,
+        hp: 350,
+        atk: 30,
         ability1: 'Charme',
         ability2: 'Leadership',
-        tags: ["Summoner", "Damage Dealer", "Late-Game"]
+        tags: ["Summoner", "Damage Dealer", "Late-Game", "Needs Actions"],
+        wants: ["Multiple Actions", "Support", "Defense", "Summoner"],
+        avoids: [],
+        order: [1]
     },
     'Medea': {
         name: 'Medea',
@@ -211,7 +253,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'Alchemy',
         ability2: 'DecayMagic',
-        tags: ["Damage Dealer", "Status Effects", "Damage Over Time"]
+        tags: ["Damage Dealer", "Status Effects", "Damage Over Time", "Needs Actions"],
+        wants: ["Multiple Actions", "Defense", "Summoner", "Status Effects"],
+        avoids: ["Needs Actions"],
+        order: null
     },
     'Monia': {
         name: 'Monia',
@@ -225,7 +270,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'Charme',
         ability2: 'Fighting',
-        tags: ["Defense", "Support", "Attacker"]
+        tags: ["Defense", "Support", "Attacker"],
+        wants: ["Attacker", "Damage Dealer", "Stat Buffs"],
+        avoids: ["Defense"],
+        order: [3]
     },
     'Nao': {
         name: 'Nao',
@@ -239,7 +287,10 @@ const CARD_DATABASE = {
         atk: 30,
         ability1: 'Friendship',
         ability2: 'SupportMagic',
-        tags: ["Defense", "Shield", "Support"]
+        tags: ["Defense", "Shield", "Support", "Needs Actions"],
+        wants: ["Damage Dealer", "Area Damage", "Attacker"],
+        avoids: [],
+        order: [2,3]
     },
     'Nicolas': {
         name: 'Nicolas',
@@ -253,7 +304,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'Alchemy',
         ability2: 'Alchemy',
-        tags: ["Support", "Card Draw", "Potions"]
+        tags: ["Support", "Card Draw", "Potions"],
+        wants: ["Needs Actions", "Card Draw", "Damage Dealer"],
+        avoids: [],
+        order: null
     },
     'Nomu': {
         name: 'Nomu',
@@ -267,7 +321,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'MagicArts',
         ability2: 'Training',
-        tags: ["Support", "Card Draw", "Defense"]
+        tags: ["Support", "Card Draw", "Defense"],
+        wants: [],
+        avoids: [],
+        order: [2,3]
     },
     'Semi': {
         name: 'Semi',
@@ -281,7 +338,10 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Adventurousness',
         ability2: 'Adventurousness',
-        tags: ["Support", "Gold Gain", "Card Draw"]
+        tags: ["Support", "Gold Generation", "Card Draw"],
+        wants: ["Attacker", "Needs Gold", "Multiple Actions"],
+        avoids: [],
+        order: null
     },
     'Sid': {
         name: 'Sid',
@@ -295,7 +355,10 @@ const CARD_DATABASE = {
         atk: 50,
         ability1: 'Thieving',
         ability2: 'Thieving',
-        tags: ["Support", "Stealing", "Card Draw"]
+        tags: ["Support", "Stealing", "Card Draw", "Stat Buffs"],
+        wants: ["Attacker", "Damage Dealer", "Summoner"],
+        avoids: [],
+        order: null
     },
     'Tharx': {
         name: 'Tharx',
@@ -309,7 +372,10 @@ const CARD_DATABASE = {
         atk: 50,
         ability1: 'Leadership',
         ability2: 'Leadership',
-        tags: ["Defense", "Summoner", "Support"]
+        tags: ["Defense", "Summoner", "Support"],
+        wants: ["Summoner", "Damage Dealer"],
+        avoids: [],
+        order: null
     },
     'Thep': {
         name: 'Thep',
@@ -323,7 +389,10 @@ const CARD_DATABASE = {
         atk: 30,
         ability1: 'Learning',
         ability2: 'MagicArts',
-        tags: ["Summoner", "Utility", "Support"]
+        tags: ["Summoner", "Utility", "Support", "Needs Actions"],
+        wants: ["Card Draw", "Multiple Actions"],
+        avoids: ["Needs Actions"],
+        order: null
     },
     'Toras': {
         name: 'Toras',
@@ -337,7 +406,10 @@ const CARD_DATABASE = {
         atk: 120,
         ability1: 'Fighting',
         ability2: 'Fighting',
-        tags: ["Attacker", "Burst Damage", "Damage Dealer"]
+        tags: ["Attacker", "Burst Damage", "Damage Dealer", "Needs Gold"],
+        wants: ["Gold Generation", "Support", "Defense"],
+        avoids: ["Needs Gold"],
+        order: null
     },
     'Vacarn': {
         name: 'Vacarn',
@@ -351,7 +423,10 @@ const CARD_DATABASE = {
         atk: 40,
         ability1: 'Leadership',
         ability2: 'Necromancy',
-        tags: ["Summoner", "Creature Spam", "Disruption"]
+        tags: ["Summoner", "Creature Spam", "Disruption", "Needs Actions"],
+        wants: ["Multiple Actions", "Card Draw", "Damage Dealer"],
+        avoids: ["Needs Actions"],
+        order: [1]
     },
     'Waflav': {
         name: 'Waflav',
@@ -365,7 +440,10 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Cannibalism',
         ability2: 'Toughness',
-        tags: ["Attacker", "Damage Dealer", "Disruption"]
+        tags: ["Attacker", "Damage Dealer", "Disruption"],
+        wants: ["Needs Actions", "Support", "Defense"],
+        avoids: ["Damage Dealer"],
+        order: null
     },
     'ZombieGabby': {
         name: 'ZombieGabby',
@@ -379,7 +457,7 @@ const CARD_DATABASE = {
         atk: 80,
         ability1: 'Navigation',
         ability2: 'Thieving',
-        tags: ["Defense", "Defensive", "Setup"],
+        tags: ["Defense", "Defense", "Setup"],
         unobtainable: true
     },
 
@@ -1673,7 +1751,7 @@ const CARD_DATABASE = {
         name: 'ShieldOfDeath',
         image: './Cards/All/ShieldOfDeath.png',
         cardType: 'Artifact',
-        cost: 0,
+        cost: 12,
         action: false,
         spellSchool: null,
         subtype: "Equip"

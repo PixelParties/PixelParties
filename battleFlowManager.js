@@ -926,7 +926,11 @@ export class BattleFlowManager {
 
                 this.clearRoundInitiative();
                 
-                // Create checkpoint at end of turn
+                // ============================================
+                // CREATE CHECKPOINT ONLY AFTER FULL ROUND COMPLETES
+                // This ensures all positions have been processed and
+                // the checkpoint captures a clean round boundary
+                // ============================================
                 if (bm.checkpointSystem) {
                     try {
                         await bm.checkpointSystem.createBattleCheckpoint('turn_end');
@@ -1148,13 +1152,6 @@ export class BattleFlowManager {
         // Clear temporary modifiers at end of turn
         this.clearTurnModifiers(playerHero, opponentHero, position);
         
-        // Smart delay: Only wait if TheStormblade animations are actually playing
-        if (this.battleManager.attackEffectsManager && 
-            this.battleManager.attackEffectsManager.hasActiveStormbladeAnimations()) {
-            
-            await this.battleManager.attackEffectsManager.waitForStormbladeAnimations();
-        }
-
         // ============================================
         // Process cavalry movements at end of position
         // ============================================

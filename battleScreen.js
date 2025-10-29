@@ -55,7 +55,7 @@ export class BattleScreen {
         playerDeck = null, opponentDeck = null,
         playerAreaCard = null, opponentAreaCard = null,
         playerGraveyard = null, opponentGraveyard = null,
-        playerCounters = null, opponentCounters = null) { 
+        playerCounters = null, opponentCounters = null) {
             
         this.isHost = isHost;
         this.playerFormation = playerFormation;
@@ -85,6 +85,7 @@ export class BattleScreen {
         this.opponentAreaCard = opponentAreaCard;
         this.playerCounters = playerCounters || { birthdayPresent: 0 };
         this.opponentCounters = opponentCounters || { birthdayPresent: 0 };
+
 
         // Initialize battle manager with abilities and creatures
         this.battleManager.init(
@@ -903,10 +904,33 @@ export class BattleScreen {
 
     // Generate battle screen HTML with speed controls in battle center
     generateBattleScreenHTML() {
+        console.log('🎮 [generateBattleScreenHTML] Starting generation with:', {
+            playerFormation: this.playerFormation,
+            opponentFormation: this.opponentFormation,
+            playerCreatures: this.playerCreatures,
+            opponentCreatures: this.opponentCreatures,
+        });
+
         // Player formation (bottom row)
         const playerFormation = this.playerFormation;
         // Opponent formation (top row)
         const opponentFormation = this.opponentFormation;
+        
+        // FIX: Handle the nested structure correctly
+        const playerCreaturesData = this.playerCreatures?.heroCreatures || this.playerCreatures || {};
+        const opponentCreaturesData = this.opponentCreatures || {};
+        
+        // Debug what we're about to pass
+        console.log('📦 [generateBattleScreenHTML] Extracted creatures data:', {
+            playerCreaturesData,
+            opponentCreaturesData,
+            playerLeft: playerCreaturesData.left,
+            playerCenter: playerCreaturesData.center,
+            playerRight: playerCreaturesData.right,
+            opponentLeft: opponentCreaturesData.left,
+            opponentCenter: opponentCreaturesData.center,
+            opponentRight: opponentCreaturesData.right
+        });
         
         return `
             <div class="battle-field-container">
@@ -914,16 +938,46 @@ export class BattleScreen {
                 <div class="battle-field">
                     <!-- Opponent Heroes Row (Top) -->
                     <div class="battle-row opponent-row">
-                        ${this.createBattleHeroSlot(opponentFormation.left, 'opponent', 'left')}
-                        ${this.createBattleHeroSlot(opponentFormation.center, 'opponent', 'center')}
-                        ${this.createBattleHeroSlot(opponentFormation.right, 'opponent', 'right')}
+                        ${this.createBattleHeroSlot(
+                            opponentFormation.left, 
+                            'opponent', 
+                            'left',
+                            opponentCreaturesData.left
+                        )}
+                        ${this.createBattleHeroSlot(
+                            opponentFormation.center, 
+                            'opponent', 
+                            'center',
+                            opponentCreaturesData.center
+                        )}
+                        ${this.createBattleHeroSlot(
+                            opponentFormation.right, 
+                            'opponent', 
+                            'right',
+                            opponentCreaturesData.right
+                        )}
                     </div>
                     
                     <!-- Player Heroes Row (Bottom) -->
                     <div class="battle-row player-row">
-                        ${this.createBattleHeroSlot(playerFormation.left, 'player', 'left')}
-                        ${this.createBattleHeroSlot(playerFormation.center, 'player', 'center')}
-                        ${this.createBattleHeroSlot(playerFormation.right, 'player', 'right')}
+                        ${this.createBattleHeroSlot(
+                            playerFormation.left, 
+                            'player', 
+                            'left',
+                            playerCreaturesData.left
+                        )}
+                        ${this.createBattleHeroSlot(
+                            playerFormation.center, 
+                            'player', 
+                            'center',
+                            playerCreaturesData.center
+                        )}
+                        ${this.createBattleHeroSlot(
+                            playerFormation.right, 
+                            'player', 
+                            'right',
+                            playerCreaturesData.right
+                        )}
                     </div>
                     
                     <!-- Speed Control Panel (Far Right) -->
@@ -976,6 +1030,8 @@ export class BattleScreen {
             </div>
         `;
     }
+
+
 
     // Updated initializeLogControls method to handle the new combat toggle button
     initializeLogControls() {
@@ -1078,8 +1134,18 @@ export class BattleScreen {
     }
 
     // Create individual battle hero slot using pre-calculated hero stats
-    createBattleHeroSlot(hero, side, position) {
+    createBattleHeroSlot(hero, side, position, creatures = null) {
+        console.log(`🔍 [createBattleHeroSlot] Called for ${side}-${position}:`, {
+            heroName: hero?.name || 'NO HERO',
+            creaturesParam: creatures,
+            creaturesLength: creatures?.length || 0,
+            battleManagerExists: !!this.battleManager,
+            playerCreatures: this.playerCreatures,
+            opponentCreatures: this.opponentCreatures
+        });
+
         if (!hero) {
+            console.log(`⚠️ [createBattleHeroSlot] No hero for ${side}-${position}`);
             return `
                 <div class="battle-hero-slot empty-hero-slot ${side}-slot ${position}-slot">
                     <div class="empty-hero-placeholder">
@@ -1090,7 +1156,7 @@ export class BattleScreen {
             `;
         }
         
-        // FIXED: Create card data for hover preview WITH HERO STATS
+        // Create card data for hover preview WITH HERO STATS
         let heroStats = null;
         try {
             // Get the actual hero instance from battle manager to get current stats
@@ -1122,7 +1188,7 @@ export class BattleScreen {
         };
         const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
         
-        // SIMPLIFIED: Use pre-calculated stats from Hero objects
+        // Use pre-calculated stats from Hero objects
         let displayAttack = 10; // fallback
         let attackBonus = 0;
         let attackContainerClass = '';
@@ -1171,17 +1237,46 @@ export class BattleScreen {
             bonusDisplay = `<span class="attack-bonus" style="display: none;"></span>`;
         }
 
-        // Get creatures for this hero from battle manager
+        // Get creatures HTML - UPDATED LOGIC WITH DEBUGGING
         let creaturesHTML = '';
-        if (this.battleManager) {
-            const heroInstance = side === 'player' 
-                ? this.battleManager.playerHeroes[position]
-                : this.battleManager.opponentHeroes[position];
+        
+        console.log(`🐾 [createBattleHeroSlot] Checking creatures for ${side}-${position}:`, {
+            passedCreatures: creatures,
+            passedCreaturesLength: creatures?.length || 0,
+            battleManagerExists: !!this.battleManager,
+            heroInstanceExists: this.battleManager ? !!(side === 'player' ? this.battleManager.playerHeroes[position] : this.battleManager.opponentHeroes[position]) : false
+        });
+        
+        // First priority: use the passed creatures parameter (for initial display)
+        if (creatures && creatures.length > 0) {
+            console.log(`✅ [createBattleHeroSlot] Using passed creatures for ${side}-${position}:`, creatures);
+            creaturesHTML = this.createCreaturesHTML(creatures, side, position);
+            console.log(`📝 [createBattleHeroSlot] Generated HTML length: ${creaturesHTML.length}`);
+        } 
+        // Second priority: get from battleManager's hero objects (for updates)
+        else if (this.battleManager) {
+            const heroInstance = side === 'player' ? 
+                this.battleManager.playerHeroes[position] : 
+                this.battleManager.opponentHeroes[position];
+            
+            console.log(`🔍 [createBattleHeroSlot] Checking battleManager for ${side}-${position}:`, {
+                heroInstance: !!heroInstance,
+                heroInstanceCreatures: heroInstance?.creatures,
+                creaturesLength: heroInstance?.creatures?.length || 0
+            });
             
             if (heroInstance && heroInstance.creatures && heroInstance.creatures.length > 0) {
+                console.log(`✅ [createBattleHeroSlot] Using battleManager creatures for ${side}-${position}:`, heroInstance.creatures);
                 creaturesHTML = this.createCreaturesHTML(heroInstance.creatures, side, position);
+                console.log(`📝 [createBattleHeroSlot] Generated HTML length: ${creaturesHTML.length}`);
+            } else {
+                console.log(`❌ [createBattleHeroSlot] No creatures from battleManager for ${side}-${position}`);
             }
+        } else {
+            console.log(`❌ [createBattleHeroSlot] No creatures source available for ${side}-${position}`);
         }
+        
+        console.log(`🎯 [createBattleHeroSlot] Final creatures HTML empty? ${creaturesHTML === ''} for ${side}-${position}`);
         
         // Enhanced hover handlers
         return `
@@ -1220,6 +1315,7 @@ export class BattleScreen {
             </div>
         `;
     }
+
 
     // Show card preview in interface panel WITH STATS SUPPORT
     showCardPreview(cardData) {
@@ -1273,21 +1369,13 @@ export class BattleScreen {
         return `
             <div class="battle-hero-creatures" data-hero-position="${position}" data-side="${side}">
                 ${creatures.map((creature, index) => {
-                    const creatureSprite = `./Creatures/${creature.name}.png`;
-                    const cardData = {
-                        imagePath: creature.image,
-                        displayName: this.formatCardName(creature.name),
-                        cardType: 'creature'
-                    };
-                    const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
+                    // For initial display, assume creatures are alive if not explicitly marked dead
+                    const isAlive = creature.alive !== false;
                     
-                    // Vary animation speed for visual interest
-                    const speedClasses = ['speed-slow', 'speed-normal', 'speed-fast'];
-                    const speedClass = speedClasses[index % speedClasses.length];
-                    
-                    // Get creature's current stats
-                    const currentHp = creature.currentHp || creature.maxHp || 10;
-                    const maxHp = creature.maxHp || 10;
+                    // Get creature's HP values - use defaults if not set
+                    const creatureInfo = getCardInfo(creature.name);
+                    const maxHp = creature.maxHp || creature.hp || creatureInfo?.hp || 10;
+                    const currentHp = creature.currentHp !== undefined ? creature.currentHp : maxHp;
                     const hpPercentage = (currentHp / maxHp) * 100;
                     
                     // Determine health bar color based on percentage
@@ -1298,8 +1386,20 @@ export class BattleScreen {
                         healthBarColor = 'linear-gradient(90deg, #ff9800 0%, #ffa726 100%)'; // Orange
                     }
                     
+                    const creatureSprite = `./Creatures/${creature.name}.png`;
+                    const cardData = {
+                        imagePath: creature.image || `./Cards/All/${creature.name}.png`,
+                        displayName: this.formatCardName(creature.name),
+                        cardType: 'creature'
+                    };
+                    const cardDataJson = JSON.stringify(cardData).replace(/"/g, '&quot;');
+                    
+                    // Vary animation speed for visual interest
+                    const speedClasses = ['speed-slow', 'speed-normal', 'speed-fast'];
+                    const speedClass = speedClasses[index % speedClasses.length];
+                    
                     return `
-                        <div class="creature-icon ${!creature.alive ? 'defeated' : ''}" 
+                        <div class="creature-icon ${!isAlive ? 'defeated' : ''}" 
                             data-creature-index="${index}"
                             onmouseenter="window.showBattleCardPreview('${cardDataJson}')"
                             onmouseleave="window.hideBattleCardPreview()">
@@ -1308,9 +1408,9 @@ export class BattleScreen {
                                     alt="${creature.name}" 
                                     class="creature-sprite ${speedClass}"
                                     onerror="this.src='./Creatures/placeholder.png'"
-                                    style="${!creature.alive ? 'filter: grayscale(100%); opacity: 0.5;' : ''}">
+                                    style="${!isAlive ? 'filter: grayscale(100%); opacity: 0.5;' : ''}">
                             </div>
-                            ${creature.alive ? `
+                            ${isAlive ? `
                                 <div class="creature-health-bar">
                                     <div class="creature-health-fill" style="width: ${hpPercentage}%; background: ${healthBarColor};"></div>
                                 </div>

@@ -145,6 +145,12 @@ export class AreaHandler {
     }
 
     createAreaCardHTML(areaCard) {
+        // Validate that areaCard has required properties
+        if (!areaCard || !areaCard.name || !areaCard.image) {
+            console.warn('Invalid area card data:', areaCard);
+            return '<div class="area-placeholder"><div class="area-globe">🌍</div><div class="area-label">Area</div></div>';
+        }
+        
         const cardData = {
             imagePath: areaCard.image,
             displayName: this.formatCardName(areaCard.name),
@@ -167,6 +173,9 @@ export class AreaHandler {
     }
 
     formatCardName(cardName) {
+        if (!cardName) {
+            return 'Unknown Card';
+        }
         return cardName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
     }
 
@@ -748,8 +757,23 @@ export class AreaHandler {
 
     importAreaState(areaState) {
         if (!areaState) return false;
-        this.areaCard = areaState.areaCard || null;
-        this.opponentAreaCard = areaState.opponentAreaCard || null;
+        
+        // Validate area card before importing - must have name and image
+        const isValidAreaCard = (card) => {
+            return card && typeof card === 'object' && card.name && card.image;
+        };
+        
+        // Only import if valid, otherwise set to null
+        this.areaCard = isValidAreaCard(areaState.areaCard) ? areaState.areaCard : null;
+        this.opponentAreaCard = isValidAreaCard(areaState.opponentAreaCard) ? areaState.opponentAreaCard : null;
+        
+        // Log if invalid data was found
+        if (areaState.areaCard && !isValidAreaCard(areaState.areaCard)) {
+            console.warn('Invalid area card data during import, clearing:', areaState.areaCard);
+        }
+        if (areaState.opponentAreaCard && !isValidAreaCard(areaState.opponentAreaCard)) {
+            console.warn('Invalid opponent area card data during import, clearing:', areaState.opponentAreaCard);
+        }
         
         // Update cached state after import
         this.updateCachedState();

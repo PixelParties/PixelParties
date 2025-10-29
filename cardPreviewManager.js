@@ -615,11 +615,23 @@ export class CardPreviewManager {
     }
 
     // Show card preview for character in right sidebar
-    showCharacterPreview(character, characterCards, formatCardNameFunction) {
+    showCharacterPreview(character, characterCardsOrFunction, formatCardNameFunction) {
         const characterName = character.name;
-        const cards = characterCards[characterName];
         
-        if (!cards) {
+        // Determine if we received an object or a function
+        let cards;
+        if (typeof characterCardsOrFunction === 'function') {
+            // It's a function - call it with the hero name
+            cards = characterCardsOrFunction(characterName);
+        } else if (typeof characterCardsOrFunction === 'object') {
+            // It's an object - access it like before
+            cards = characterCardsOrFunction[characterName];
+        } else {
+            console.warn(`Invalid characterCards parameter type: ${typeof characterCardsOrFunction}`);
+            return;
+        }
+        
+        if (!cards || cards.length === 0) {
             console.warn(`No cards found for character: ${characterName}`);
             return;
         }

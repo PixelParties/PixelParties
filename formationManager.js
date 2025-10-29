@@ -33,10 +33,20 @@ export class FormationManager {
             right: null
         };
     }
+    
 
     // Get player's battle formation
     getBattleFormation() {
         return { ...this.battleFormation };
+    }
+
+    // Get the number of heroes currently in the formation
+    getHeroCount() {
+        let count = 0;
+        if (this.battleFormation.left !== null) count++;
+        if (this.battleFormation.center !== null) count++;
+        if (this.battleFormation.right !== null) count++;
+        return count;
     }
 
     // Get opponent's battle formation (properly aligned for battlefield view)

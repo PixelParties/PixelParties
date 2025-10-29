@@ -15,7 +15,7 @@ export class CheckpointSystem {
         
         // Checkpoint timing control
         this.lastCheckpointTime = 0;
-        this.minCheckpointInterval = 100; // ms
+        this.minCheckpointInterval = 5000; // ms
     }
 
     // Initialize with battle context
@@ -542,6 +542,12 @@ export class CheckpointSystem {
             // Store this as current checkpoint
             this.currentCheckpoint = checkpoint;
             
+            // ============================================
+            // SET CHECKPOINT COOLDOWN AFTER RESTORATION
+            // Prevents immediate checkpoint creation after reconnect
+            // ============================================
+            this.lastCheckpointTime = Date.now();
+            
             // NEW: Sync creature states to guest after successful restoration
             if (this.isHost) {
                 await this.syncCreatureStatesToGuest();
@@ -571,21 +577,34 @@ export class CheckpointSystem {
         this.battleManager.turnInProgress = battleState.turnInProgress || false;
         this.battleManager.totalDamageDealt = battleState.totalDamageDealt || {};
 
-        // Restore hands
-        this.battleManager.playerHand = battleState.playerHand || [];
-        this.battleManager.opponentHand = battleState.opponentHand || [];
-        
-        // Restore decks:
-        this.battleManager.playerDeck = battleState.playerDeck || [];
-        this.battleManager.opponentDeck = battleState.opponentDeck || [];
-        
-        // Restore graveyards - ADD THESE TWO LINES
-        this.battleManager.playerGraveyard = battleState.playerGraveyard || [];
-        this.battleManager.opponentGraveyard = battleState.opponentGraveyard || [];
-    
-        // Restore birthday present counters - ADD THESE LINES
-        this.battleManager.playerBirthdayPresentCounter = battleState.playerBirthdayPresentCounter || 0;
-        this.battleManager.opponentBirthdayPresentCounter = battleState.opponentBirthdayPresentCounter || 0;
+        // For guests, swap player and opponent data since checkpoint was saved from host perspective
+        if (this.isHost) {
+            // HOST: Direct assignment
+            this.battleManager.playerHand = battleState.playerHand || [];
+            this.battleManager.opponentHand = battleState.opponentHand || [];
+            
+            this.battleManager.playerDeck = battleState.playerDeck || [];
+            this.battleManager.opponentDeck = battleState.opponentDeck || [];
+            
+            this.battleManager.playerGraveyard = battleState.playerGraveyard || [];
+            this.battleManager.opponentGraveyard = battleState.opponentGraveyard || [];
+            
+            this.battleManager.playerBirthdayPresentCounter = battleState.playerBirthdayPresentCounter || 0;
+            this.battleManager.opponentBirthdayPresentCounter = battleState.opponentBirthdayPresentCounter || 0;
+        } else {
+            // GUEST: Swap the data since checkpoint was saved from host perspective
+            this.battleManager.playerHand = battleState.opponentHand || [];  // Guest's actual hand
+            this.battleManager.opponentHand = battleState.playerHand || [];   // Host's hand (guest's opponent)
+            
+            this.battleManager.playerDeck = battleState.opponentDeck || [];  // Guest's actual deck
+            this.battleManager.opponentDeck = battleState.playerDeck || [];   // Host's deck (guest's opponent)
+            
+            this.battleManager.playerGraveyard = battleState.opponentGraveyard || [];  // Guest's actual graveyard
+            this.battleManager.opponentGraveyard = battleState.playerGraveyard || [];   // Host's graveyard (guest's opponent)
+            
+            this.battleManager.playerBirthdayPresentCounter = battleState.opponentBirthdayPresentCounter || 0;  // Guest's counter
+            this.battleManager.opponentBirthdayPresentCounter = battleState.playerBirthdayPresentCounter || 0;   // Host's counter
+        }
         
         // Initialize battleLog as empty array before restoration
         this.battleManager.battleLog = [];

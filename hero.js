@@ -64,12 +64,12 @@ export class Hero {
         this.equipment = [];
         
         // Stat bonuses from LegendarySwordOfABarbarianKing
-        this.attackBonusses = 0;  // Permanent attack bonuses
-        this.hpBonusses = 0;      // Permanent HP bonuses
+        this.attackBonusses = heroData.attackBonusses || 0;
+        this.hpBonusses = heroData.hpBonusses || 0;
 
         // Truly permanent bonuses (persist across all game states)
-        this.permanentAttackBonusses = 0;
-        this.permanentHpBonusses = 0;  
+        this.permanentAttackBonusses = heroData.permanentAttackBonusses || 0;
+        this.permanentHpBonusses = heroData.permanentHpBonusses || 0;
         
         // Battle-duration temporary bonuses (persist until battle ends)
         this.battleAttackBonus = 0;  // Temporary attack bonus for this battle only
@@ -350,7 +350,7 @@ export class Hero {
     }
 
     // ============================================
-    // EXISTING METHODS (unchanged from here down)
+    // EXISTING METHODS
     // ============================================
 
     addPermanentStatBonuses(attackBonus, hpBonus) {
@@ -358,7 +358,7 @@ export class Hero {
         this.hpBonusses += hpBonus;
     }
     
-    // NEW: Battle bonus system - these bonuses last for the entire battle
+    // Battle bonus system - these bonuses last for the entire battle
     addBattleAttackBonus(amount) {
         if (amount <= 0) return;
         

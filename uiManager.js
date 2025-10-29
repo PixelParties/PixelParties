@@ -9,6 +9,7 @@ export class UIManager {
     initializeElements() {
         return {
             // Main menu elements
+            singleplayerBtn: document.getElementById('singleplayerBtn'),
             startBtn: document.getElementById('startBtn'),
             confirmCreateBtn: document.getElementById('confirmCreateBtn'),
             cancelCreateBtn: document.getElementById('cancelCreateBtn'),
@@ -90,6 +91,7 @@ export class UIManager {
     // Password section management
     showPasswordSection() {
         this.elements.passwordSection.classList.remove('hidden');
+        this.elements.singleplayerBtn.classList.add('hidden');
         this.elements.startBtn.classList.add('hidden');
         this.elements.joinBtn.classList.add('hidden');
         this.elements.howToPlayBtn.classList.add('hidden');
@@ -107,6 +109,7 @@ export class UIManager {
 
     // Button visibility management
     showMainMenuButtons() {
+        this.elements.singleplayerBtn.classList.remove('hidden');
         this.elements.startBtn.classList.remove('hidden');
         this.elements.joinBtn.classList.remove('hidden');
         this.elements.howToPlayBtn.classList.remove('hidden');
@@ -116,6 +119,7 @@ export class UIManager {
         this.hidePasswordSection();
         this.elements.usernameInput.disabled = false;
         this.elements.passwordInput.disabled = false;
+        this.elements.singleplayerBtn.disabled = false;
         this.elements.startBtn.disabled = false;
         this.elements.joinBtn.disabled = false;
         this.elements.howToPlayBtn.disabled = false;
@@ -125,6 +129,7 @@ export class UIManager {
     }
 
     showLeaveButton() {
+        this.elements.singleplayerBtn.classList.add('hidden');
         this.elements.startBtn.classList.add('hidden');
         this.elements.joinBtn.classList.add('hidden');
         this.elements.howToPlayBtn.classList.add('hidden');
@@ -395,6 +400,9 @@ export class UIManager {
         });
 
         for (const [roomId, room] of sortedRooms) {
+            // Skip singleplayer rooms
+            if (room.singleplayer) continue;
+            
             // Skip very old rooms (older than 10 minutes)
             if (room.created && (now - room.created) > 600000) continue;
             

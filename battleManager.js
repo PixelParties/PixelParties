@@ -29,7 +29,6 @@ import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import RoyalCorgiCreature from './Creatures/royalCorgi.js';
 
 import { MoniaHeroEffect } from './Heroes/monia.js';
-import { kazenaEffect } from './Heroes/kazena.js';
 import { NomuHeroEffect } from './Heroes/nomu.js';
 import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
 
@@ -110,8 +109,6 @@ export class BattleManager {
         
         // Individual cards
         this.crusaderArtifactsHandler = null;
-        this.kazenaEffect = null;
-
 
 
         // EXTENSIBLE STATE
@@ -331,6 +328,7 @@ export class BattleManager {
         playerGraveyard = null, opponentGraveyard = null,
         playerCounters = null, opponentCounters = null){
         
+        
         this.playerFormation = playerFormation;
         this.opponentFormation = opponentFormation;
         this.gameDataSender = gameDataSender;
@@ -429,11 +427,6 @@ export class BattleManager {
 
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
         this.crusaderArtifactsHandler.initBattleEffects(this);
-        
-        // Initialize Kazena Effect
-        this.kazenaEffect = kazenaEffect;
-        this.kazenaEffect.init(this);
-        window.kazenaEffect = kazenaEffect;
 
         this.swampborneWaflavEffect = SwampborneWaflavHeroEffect.init(this);
     }
@@ -508,7 +501,7 @@ export class BattleManager {
         const mySide = this.isHost ? 'host' : 'guest';
         const opponentSide = this.isHost ? 'guest' : 'host';
         
-        // Initialize all heroes - NOW INCLUDING EQUIPMENT
+        // Initialize all heroes
         this.initializeHeroesForSide('player', this.playerFormation, this.playerHeroes, 
                                 this.playerAbilities, this.playerSpellbooks, 
                                 this.playerCreatures, this.playerEquips, mySide,
@@ -521,16 +514,16 @@ export class BattleManager {
 
     // Initialize heroes for a specific side
 
-    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide, effectiveStats = null) {
+    initializeHeroesForSide(side, formation, heroesObj, abilities, spellbooks, creatures, equipment, absoluteSide, effectiveStats = null) {        
         ['left', 'center', 'right'].forEach(position => {
             const heroData = formation[position];
-            if (heroData) {
+            if (heroData) {                
                 const hero = new Hero(heroData, position, side, absoluteSide);
                 
                 // Initialize shield system for hero
-                hero.currentShield = 0; // All heroes start with 0 shield
+                hero.currentShield = 0;
                 
-                // Set abilities first (needed for creature HP calculations)
+                // Set abilities first
                 if (abilities && abilities[position]) {
                     hero.setAbilities(abilities[position]);
                 }
@@ -540,13 +533,11 @@ export class BattleManager {
                     hero.setSpellbook(spellbooks[position]);
                 }
                 
-                // Add creatures with health (including Kyli bonuses AND Summoning Magic bonuses)
+                // Add creatures with health
                 if (creatures && creatures.hasOwnProperty(position)) {
                     if (creatures[position] && Array.isArray(creatures[position]) && creatures[position].length > 0) {
                         const creaturesWithHealth = creatures[position].map(creature => {
                             const creatureInfo = getCardInfo(creature.name);
-                            
-                            // Use creature's existing HP if modified by Kyli, otherwise use database
                             const baseHp = creature.hp !== undefined ? creature.hp : (creatureInfo?.hp || 10);
                             const baseCurrentHp = creature.currentHp !== undefined ? creature.currentHp : baseHp;
                             
@@ -556,11 +547,9 @@ export class BattleManager {
                                 hpMultiplier = 1 + (0.25 * summoningMagicLevel);
                             }
                             
-                            // Apply Summoning Magic bonus to the already-modified HP (if any)
                             const finalMaxHp = Math.floor(baseHp * hpMultiplier);
                             const finalCurrentHp = Math.floor(baseCurrentHp * hpMultiplier);
                             
-                            // Create clean creature object without status effects
                             const { statusEffects, ...cleanCreature } = creature;
                             
                             return {
@@ -569,12 +558,11 @@ export class BattleManager {
                                 maxHp: finalMaxHp,
                                 atk: creatureInfo?.atk || 0,
                                 alive: true,
-                                type: 'creature'  
+                                type: 'creature'
                             };
                         });
                         hero.setCreatures(creaturesWithHealth);
                     } else {
-                        // Handle null case or empty array - set empty creatures
                         hero.setCreatures([]);
                     }
                     hero.initializeNecromancyStacks();
@@ -587,44 +575,120 @@ export class BattleManager {
                     hero.setEquipment([]);
                 }
                 
-                // Transfer burning finger stacks from permanent to battle hero
+                // Transfer burning finger stacks
                 if (heroData.burningFingerStack !== undefined) {
                     hero.burningFingerStack = heroData.burningFingerStack;
                 }
                 
-                // Initialize arrow counters immediately after setting equipment
+                // Initialize arrow counters
                 this.initializeHeroArrowCounters(hero, side, position);
-                
+                                
                 // Use existing setPrecalculatedStats method
                 if (effectiveStats && effectiveStats[position]) {
                     hero.setPrecalculatedStats(effectiveStats[position]);
+                } else {
+                    // No pre-calculated stats available - calculate them now
+                    // This happens for CPU opponents in singleplayer
                     
-                    // Log bonuses for debugging
-                    if (effectiveStats[position].bonuses) {
-                        const bonuses = effectiveStats[position].bonuses;
-                        if (bonuses.hpBonus > 0 || bonuses.totalAttackBonus > 0) {
-                            // Debug logging can be added here if needed
+                    const heroInfo = getCardInfo(hero.name);
+                    if (heroInfo) {
+                        // === CALCULATE ALL BONUSES (matching calculateComputerHeroStats logic) ===
+                        
+                        // 1. Count ability stacks
+                        const toughnessStacks = hero.getAbilityStackCount('Toughness');
+                        const fightingStacks = hero.getAbilityStackCount('Fighting');
+                        
+                        // 2. Calculate Toras equipment bonus
+                        let equipmentAttackBonus = 0;
+                        if (hero.name === 'Toras') {
+                            const heroEquipment = equipment?.[position] || [];
+                            equipmentAttackBonus = heroEquipment.length * 20;
                         }
+                        
+                        // 3. Calculate Ancient Tech Infinite Energy Core bonus
+                        let energyCoreAttackBonus = 0;
+                        const heroEquipment = equipment?.[position] || [];
+                        const energyCoreCount = heroEquipment.filter(item => {
+                            const name = item.name || item.cardName || item;
+                            return name === 'AncientTechInfiniteEnergyCore';
+                        }).length;
+                        
+                        if (energyCoreCount > 0) {
+                            // Get unique graveyard cards - need to access from battle manager
+                            let uniqueGraveyardCards = 0;
+                            if (side === 'opponent' && this.opponentGraveyard) {
+                                uniqueGraveyardCards = new Set(this.opponentGraveyard).size;
+                            } else if (side === 'player' && this.playerGraveyard) {
+                                uniqueGraveyardCards = new Set(this.playerGraveyard).size;
+                            }
+                            energyCoreAttackBonus = uniqueGraveyardCards * 5 * energyCoreCount;
+                        }
+                        
+                        // 4. Calculate Skull Necklace bonus (simplified - would need full graveyard analysis)
+                        let skullNecklaceAttackBonus = 0;
+                        const hasSkullNecklace = heroEquipment.some(item => {
+                            const name = item.name || item.cardName || item;
+                            return name === 'SkullNecklace';
+                        });
+                        // Note: Full skull necklace calculation would need card type analysis
+                        // For now, just flag that it exists
+                        
+                        // 5. Get permanent bonuses from hero object
+                        const permanentAttackBonus = hero.attackBonusses || 0;
+                        const permanentHpBonus = hero.hpBonusses || 0;
+                        const trulyPermanentAttackBonus = hero.permanentAttackBonusses || 0;
+                        const trulyPermanentHpBonus = hero.permanentHpBonusses || 0;
+                        
+                        // 6. Calculate totals
+                        const hpBonus = toughnessStacks * 200;
+                        const fightingAttackBonus = fightingStacks * 20;
+                        const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + 
+                            energyCoreAttackBonus + skullNecklaceAttackBonus + 
+                            permanentAttackBonus + trulyPermanentAttackBonus;
+                        const totalHpBonus = hpBonus + permanentHpBonus + trulyPermanentHpBonus;
+                        
+                        // 7. Calculate final stats
+                        const calculatedMaxHp = heroInfo.hp + totalHpBonus;
+                        const finalMaxHp = Math.max(1, calculatedMaxHp);
+                        const finalAttack = heroInfo.atk + totalAttackBonus;
+                        
+                        const calculatedStats = {
+                            maxHp: finalMaxHp,
+                            currentHp: finalMaxHp,
+                            attack: finalAttack,
+                            bonuses: {
+                                toughnessStacks,
+                                fightingStacks,
+                                hpBonus,
+                                attackBonus: fightingAttackBonus,
+                                equipmentCount: hero.name === 'Toras' ? heroEquipment.length : 0,
+                                equipmentAttackBonus,
+                                energyCoreCount,
+                                energyCoreAttackBonus,
+                                skullNecklaceAttackBonus,
+                                permanentAttackBonus,
+                                permanentHpBonus,
+                                trulyPermanentAttackBonus,
+                                trulyPermanentHpBonus,
+                                totalAttackBonus,
+                                totalHpBonus
+                            }
+                        };
+                        
+                        hero.setPrecalculatedStats(calculatedStats);
                     }
                 }
 
                 // Store the hero
                 heroesObj[position] = hero;
                 
-                // Update all visual elements with the correct stats
+                // Update all visual elements
                 this.resetHeroVisualState(side, position);
                 this.updateHeroHealthBar(side, position, hero.currentHp, hero.maxHp);
                 this.updateHeroAttackDisplay(side, position, hero);
                 this.updateCreatureVisuals(side, position, hero.creatures);
             }
         });
-        
-        // Clear manager-level equipment references to prevent future conflicts
-        /*if (side === 'player') {
-            this.playerEquips = {};
-        } else {
-            this.opponentEquips = {};
-        }*/
     }
 
     initializeHeroArrowCounters(hero, side, position) {
@@ -1615,9 +1679,9 @@ export class BattleManager {
         }
     }
 
-    guest_handleStormbladeWindSwap(data) {
+    guest_handleStormbladeBanishment(data) {
         if (this.attackEffectsManager && this.attackEffectsManager.stormbladeEffect) {
-            this.attackEffectsManager.stormbladeEffect.handleGuestWindSwap(data);
+            this.attackEffectsManager.stormbladeEffect.handleGuestStormbladeBanishment(data);
         }
     }
     
@@ -2556,9 +2620,102 @@ export class BattleManager {
         
         // Transfer burning finger stacks from battle heroes to permanent heroes
         this.battleScreen.transferBurningFingerStacksToPermanent();
-        
-        if (this.kazenaEffect) {
-            this.kazenaEffect.transferCountersToFormation(this);
+
+        // ===== COLLECT PERMANENT CREATURES EARLY (BEFORE THEY'RE USED) =====
+        let permanentGuardians = [];
+        let permanentCaptures = [];
+        if (this.isAuthoritative) {
+            try {
+                const { SkeletonKingSkullmaelCreature } = await import('./Creatures/skeletonKingSkullmael.js');
+                permanentGuardians = SkeletonKingSkullmaelCreature.collectPermanentGuardiansFromBattle(this);
+            } catch (error) {
+                console.error('Error collecting permanent guardian skeletons:', error);
+            }
+
+            try {
+                const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
+                permanentCaptures = CaptureNetArtifact.collectPermanentCapturesFromBattle(this);
+            } catch (error) {
+                console.error('Error collecting permanent captures:', error);
+            }
+        }
+
+        // ===== SAVE CPU PERMANENT CREATURES TO FIREBASE =====
+        if (this.isAuthoritative && this.roomManager) {
+            try {
+                const roomRef = this.roomManager.getRoomRef();
+                if (roomRef) {
+                    const selectedTeamSnapshot = await roomRef.child('gameState/selectedComputerTeam').once('value');
+                    const selectedTeamKey = selectedTeamSnapshot.val();
+                    
+                    if (selectedTeamKey) {
+                        // Import the helper function
+                        const { mergePermanentCreaturesForCPU } = await import('./generateComputerParty.js');
+                        
+                        // Get current CPU creatures data
+                        const cpuCreaturesSnapshot = await roomRef
+                            .child(`singleplayer/computerTeams/${selectedTeamKey}/creatures`)
+                            .once('value');
+                        const currentCPUCreatures = cpuCreaturesSnapshot.val() || { 
+                            left: [], 
+                            center: [], 
+                            right: [] 
+                        };
+                        
+                        // Determine CPU side
+                        const cpuAbsoluteSide = this.isHost ? 'guest' : 'host';
+                        
+                        // Merge permanent creatures using helper function
+                        const mergedCreatures = mergePermanentCreaturesForCPU(
+                            currentCPUCreatures,
+                            permanentGuardians,
+                            permanentCaptures,
+                            cpuAbsoluteSide
+                        );
+                        
+                        // Save merged creatures to Firebase
+                        await roomRef.child(`singleplayer/computerTeams/${selectedTeamKey}/creatures`).set(mergedCreatures);
+                        
+                        const guardianCount = permanentGuardians.filter(g => g.heroAbsoluteSide === cpuAbsoluteSide).length;
+                        const captureCount = permanentCaptures.filter(c => c.heroAbsoluteSide === cpuAbsoluteSide).length;
+                        
+                        if (guardianCount > 0 || captureCount > 0) {
+                            console.log(`💾 Saved ${guardianCount} guardian groups and ${captureCount} capture groups to CPU team ${selectedTeamKey}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving CPU permanent creatures:', error);
+            }
+        }
+
+        // Save computer team changes (singleplayer only)
+        if (this.isAuthoritative && this.roomManager) {
+            try {
+                const roomRef = this.roomManager.getRoomRef();
+                if (roomRef) {
+                    // Check if this is a singleplayer battle
+                    const selectedTeamSnapshot = await roomRef.child('gameState/selectedComputerTeam').once('value');
+                    const selectedTeamKey = selectedTeamSnapshot.val();
+                    
+                    if (selectedTeamKey) {                        
+                        const { saveComputerTeamAfterBattle } = await import('./generateComputerParty.js');
+                        await saveComputerTeamAfterBattle(
+                            roomRef,
+                            selectedTeamKey,
+                            this.getOpponentDeck(),
+                            this.getOpponentHand(),
+                            this.getOpponentGraveyard(),
+                            this.opponentCreatures
+                        );
+                        
+                        // Clear the team key after saving
+                        await roomRef.child('gameState/selectedComputerTeam').remove();
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving computer team after battle:', error);
+            }
         }
 
         // Handle CrystalWell card exchange before battle ends
@@ -2588,28 +2745,6 @@ export class BattleManager {
                     this.opponentAreaCard.doomCounters = 0;
                 }
                 window.heroSelection.areaHandler.opponentAreaCard = this.opponentAreaCard;
-            }
-        }
-
-        // Collect permanent guardian skeletons before cleanup
-        let permanentGuardians = [];
-        if (this.isAuthoritative) {
-            try {
-                const { SkeletonKingSkullmaelCreature } = await import('./Creatures/skeletonKingSkullmael.js');
-                permanentGuardians = SkeletonKingSkullmaelCreature.collectPermanentGuardiansFromBattle(this);
-            } catch (error) {
-                console.error('Error collecting permanent guardian skeletons:', error);
-            }
-        }
-
-        // Collect permanent captures before cleanup
-        let permanentCaptures = [];
-        if (this.isAuthoritative) {
-            try {
-                const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
-                permanentCaptures = CaptureNetArtifact.collectPermanentCapturesFromBattle(this);
-            } catch (error) {
-                console.error('Error collecting permanent captures:', error);
             }
         }
 
@@ -3622,17 +3757,36 @@ export class BattleManager {
             this.terrainModifiers = stateData.terrainModifiers || [];
             this.specialRules = stateData.specialRules || [];
 
-            this.playerHand = stateData.playerHand || [];
-            this.opponentHand = stateData.opponentHand || [];
+            // For guests, swap player and opponent data since state was saved from host perspective
+            // NOTE: This assumes the battle state in Firebase is always from host perspective
+            // which is true when using the checkpoint/persistence system
+            if (this.isHost) {
+                // HOST: Direct assignment
+                this.playerHand = stateData.playerHand || [];
+                this.opponentHand = stateData.opponentHand || [];
 
-            this.playerDeck = stateData.playerDeck || [];
-            this.opponentDeck = stateData.opponentDeck || [];
+                this.playerDeck = stateData.playerDeck || [];
+                this.opponentDeck = stateData.opponentDeck || [];
 
-            this.playerGraveyard = stateData.playerGraveyard || [];
-            this.opponentGraveyard = stateData.opponentGraveyard || [];
-            
-            this.playerCounters = stateData.playerCounters || { birthdayPresent: 0 };
-            this.opponentCounters = stateData.opponentCounters || { birthdayPresent: 0 };
+                this.playerGraveyard = stateData.playerGraveyard || [];
+                this.opponentGraveyard = stateData.opponentGraveyard || [];
+                
+                this.playerCounters = stateData.playerCounters || { birthdayPresent: 0 };
+                this.opponentCounters = stateData.opponentCounters || { birthdayPresent: 0 };
+            } else {
+                // GUEST: Swap the data since state was saved from host perspective
+                this.playerHand = stateData.opponentHand || [];  // Guest's actual hand
+                this.opponentHand = stateData.playerHand || [];   // Host's hand (guest's opponent)
+
+                this.playerDeck = stateData.opponentDeck || [];  // Guest's actual deck
+                this.opponentDeck = stateData.playerDeck || [];   // Host's deck (guest's opponent)
+
+                this.playerGraveyard = stateData.opponentGraveyard || [];  // Guest's actual graveyard
+                this.opponentGraveyard = stateData.playerGraveyard || [];   // Host's graveyard (guest's opponent)
+                
+                this.playerCounters = stateData.opponentCounters || { birthdayPresent: 0 };  // Guest's counter
+                this.opponentCounters = stateData.playerCounters || { birthdayPresent: 0 };   // Host's counter
+            }
 
             if (stateData.randomnessState) {
                 this.randomnessManager.importState(stateData.randomnessState);

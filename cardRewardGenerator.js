@@ -152,7 +152,7 @@ export class CardRewardGenerator {
         const formation = heroSelection.formationManager.getBattleFormation();
         const ownedHeroNames = ['left', 'center', 'right']
             .map(position => formation[position])
-            .filter(hero => hero !== null)
+            .filter(hero => hero !== null && hero !== undefined)
             .map(hero => hero.name);
 
         // Get all Ascended Heroes from the database

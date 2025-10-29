@@ -512,12 +512,37 @@ export class VictoryScreen {
         // Hide victory screen
         this.hideVictoryScreen();
         
-        // Reset both players to Not Ready state via room manager
+        // Check if we're in singleplayer mode
+        const isSingleplayer = this.heroSelection.isSingleplayerMode();
+        
+        if (isSingleplayer) {
+            // SINGLEPLAYER: Return to main menu
+            
+            // Close the singleplayer room
+            if (this.heroSelection.roomManager && this.heroSelection.roomManager.getRoomRef()) {
+                try {
+                    await this.heroSelection.roomManager.getRoomRef().remove();
+                } catch (error) {
+                    console.error('Error clearing singleplayer room:', error);
+                }
+            }
+            
+            // Use gameManager reset (which now clears storage correctly!)
+            if (window.app && window.app.gameManager) {
+                window.app.gameManager.reset();
+                window.app.uiManager.returnToMainMenu();
+                window.app.uiManager.showStatus('Returned to main menu', 'connected');
+            }
+            
+            return;
+        }
+        
+        // MULTIPLAYER: Reset room state and return to lobby
         if (this.heroSelection && this.heroSelection.roomManager) {
             try {
                 const roomRef = this.heroSelection.roomManager.getRoomRef();
                 if (roomRef) {
-                    // Reset ready states and clear game data (like surrender)
+                    // Reset ready states and clear game data
                     await roomRef.update({
                         hostGameReady: false,
                         guestGameReady: false,

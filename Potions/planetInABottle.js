@@ -1,6 +1,8 @@
 // Potions/planetInABottle.js - Planet in a Bottle Potion Implementation
 // Selects a random Area Spell and places it in the player's Area Zone
 
+import { getCardsByFilters } from '../cardDatabase.js';
+
 export class PlanetInABottlePotion {
     constructor() {
         this.name = 'PlanetInABottle';
@@ -8,13 +10,6 @@ export class PlanetInABottlePotion {
         this.description = 'Selects a random Area Spell and places it in your Area Zone. Replaces any existing Area card.';
         this.effectType = 'area_placement';
         this.targetType = 'self';
-        
-        // Available Area Spell cards
-        this.availableAreaSpells = [
-            'CrystalWell',
-            'GatheringStorm', 
-            'DoomClock'
-        ];
         
         console.log('PlanetInABottle potion initialized - area placement only, no battle effects');
     }
@@ -46,10 +41,28 @@ export class PlanetInABottlePotion {
 
     // ===== CORE FUNCTIONALITY =====
 
+    // Get all available Area Spells from the card database
+    getAvailableAreaSpells() {
+        const areaSpells = getCardsByFilters({
+            cardType: 'Spell',
+            subtype: 'Area'
+        });
+        
+        // Return just the card names
+        return areaSpells.map(card => card.name);
+    }
+
     // Select a random Area Spell from available options
     selectRandomAreaSpell() {
-        const randomIndex = Math.floor(Math.random() * this.availableAreaSpells.length);
-        return this.availableAreaSpells[randomIndex];
+        const availableAreaSpells = this.getAvailableAreaSpells();
+        
+        if (availableAreaSpells.length === 0) {
+            console.error('PlanetInABottle: No Area spells found in database!');
+            return null;
+        }
+        
+        const randomIndex = Math.floor(Math.random() * availableAreaSpells.length);
+        return availableAreaSpells[randomIndex];
     }
 
     // Apply the Planet in a Bottle effect
@@ -61,6 +74,12 @@ export class PlanetInABottlePotion {
 
         // Select random Area Spell
         const selectedAreaSpell = this.selectRandomAreaSpell();
+        
+        if (!selectedAreaSpell) {
+            console.error('PlanetInABottle: Failed to select an Area spell');
+            this.showPlanetInABottleError('No Area Spells available!', heroSelection);
+            return false;
+        }
         
         try {
             // Get card info for the selected Area Spell

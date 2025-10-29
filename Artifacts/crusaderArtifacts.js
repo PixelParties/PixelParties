@@ -412,6 +412,10 @@ class CrusaderArtifactsHandler {
         
         // ===== SWAP VISUAL ELEMENTS =====
         this.swapHeroVisuals(side, position1, position2);
+
+        if (this.battleManager.arrowSystem) {
+            this.battleManager.arrowSystem.swapArrowCounters(side, position1, position2);
+        }
         
         // ===== UPDATE DISPLAYS =====
         // Update any visual displays that depend on position
@@ -755,6 +759,11 @@ class CrusaderArtifactsHandler {
         
         // ===== ENHANCED VISUAL SWAPPING =====
         await this.swapHeroVisuals(localSide, position1, position2);
+
+        // ===== SWAP ARROW COUNTERS =====
+        if (this.battleManager.arrowSystem) {
+            this.battleManager.arrowSystem.swapArrowCounters(localSide, position1, position2);
+        }
         
         // ===== SWAP RESISTANCE STACKS ON GUEST SIDE =====
         // Use local swap to avoid triggering network messages

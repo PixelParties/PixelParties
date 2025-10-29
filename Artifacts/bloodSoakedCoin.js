@@ -285,6 +285,8 @@ export async function applyBothPlayersBloodTollEffects(hostEffects, guestEffects
         
         if (hostBloodTollEffects.length > 0) {
             console.log('🩸 Applying HOST BloodSoakedCoin toll...');
+            createBloodSoakedCoinCardEffect(battleManager, 'host');
+            await battleManager.delay(300);
             damagePromises.push(damagePlayerHeroes(battleManager, hostBloodTollEffects, 'host'));
         }
     }
@@ -297,6 +299,8 @@ export async function applyBothPlayersBloodTollEffects(hostEffects, guestEffects
         
         if (guestBloodTollEffects.length > 0) {
             console.log('🩸 Applying GUEST BloodSoakedCoin toll...');
+            createBloodSoakedCoinCardEffect(battleManager, 'guest');
+            await battleManager.delay(300);
             damagePromises.push(damagePlayerHeroes(battleManager, guestBloodTollEffects, 'guest'));
         }
     }
@@ -613,7 +617,7 @@ async function clearProcessedBloodTollEffects(battleManager, hostEffects, guestE
     }
 }
 
-// 🔧 FIXED: Apply damage to all player heroes (original function - backward compatibility)
+// Apply damage to all player heroes (original function - backward compatibility)
 async function damageAllPlayerHeroes(battleManager, bloodTollEffects) {
     // Calculate total stacks from all effects
     const totalStacks = bloodTollEffects.reduce((sum, effect) => sum + effect.stacks, 0);
@@ -664,6 +668,103 @@ async function damageAllPlayerHeroes(battleManager, bloodTollEffects) {
     
     // Small delay for visual effect processing
     await battleManager.delay(500);
+}
+
+function createBloodSoakedCoinCardEffect(battleManager, playerSide) {
+    ensureSpellCardEffectCSS();
+    const side = playerSide === 'host' ? 'player' : 'opponent';
+    const heroElement = battleManager.getHeroElement ? battleManager.getHeroElement(side, 'center') : null;
+    
+    if (!heroElement) {
+        const heroContainer = document.querySelector(`.${side}-heroes`);
+        if (!heroContainer) return;
+        const tempElement = document.createElement('div');
+        tempElement.style.cssText = `
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 1px;
+            height: 1px;
+        `;
+        heroContainer.appendChild(tempElement);
+        createCardAnimationOnElement(tempElement, battleManager, 'BloodSoakedCoin');
+        setTimeout(() => tempElement.remove(), 2500);
+        return;
+    }
+    createCardAnimationOnElement(heroElement, battleManager, 'BloodSoakedCoin');
+}
+
+function createCardAnimationOnElement(element, battleManager, cardName = 'BloodSoakedCoin') {
+    const cardContainer = document.createElement('div');
+    cardContainer.className = 'spell-card-container';
+    const cardDisplay = document.createElement('div');
+    cardDisplay.className = 'spell-card-display';
+    const cardImagePath = `./Cards/All/${cardName}.png`;
+    cardDisplay.innerHTML = `
+        <img src="${cardImagePath}" alt="${cardName}" class="spell-card-image" 
+             onerror="this.src='./Cards/placeholder.png'">
+    `;
+    cardContainer.appendChild(cardDisplay);
+    cardContainer.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 600;
+        pointer-events: none;
+        animation: spellCardEffect ${battleManager.getSpeedAdjustedDelay ? battleManager.getSpeedAdjustedDelay(2000) : 2000}ms ease-out forwards;
+    `;
+    element.appendChild(cardContainer);
+    const animationDuration = battleManager.getSpeedAdjustedDelay ? battleManager.getSpeedAdjustedDelay(2000) : 2000;
+    setTimeout(() => {
+        if (cardContainer && cardContainer.parentNode) {
+            cardContainer.remove();
+        }
+    }, animationDuration);
+}
+
+function ensureSpellCardEffectCSS() {
+    if (document.getElementById('spellCardEffectCSS')) return;
+    const style = document.createElement('style');
+    style.id = 'spellCardEffectCSS';
+    style.textContent = `
+        @keyframes spellCardEffect {
+            0% { 
+                opacity: 0;
+                transform: translateX(-50%) scale(0.3) translateY(20px);
+            }
+            25% { 
+                opacity: 1;
+                transform: translateX(-50%) scale(1.1) translateY(-10px);
+            }
+            75% { 
+                opacity: 1;
+                transform: translateX(-50%) scale(1.0) translateY(-5px);
+            }
+            100% { 
+                opacity: 0;
+                transform: translateX(-50%) scale(0.8) translateY(-30px);
+            }
+        }
+        .spell-card-container {
+            will-change: transform, opacity;
+        }
+        .spell-card-display {
+            position: relative;
+            width: 120px;
+            height: 168px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+        .spell-card-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 // CSS styles for the blood-soaked coin effect

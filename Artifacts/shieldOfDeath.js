@@ -76,7 +76,7 @@ export function checkShieldOfDeathEffects(battleManager, target, attackDamage, c
     let anyTriggered = false;
     for (let i = 0; i < shieldCount; i++) {
         const roll = battleManager.getRandom();
-        if (roll < 0.99) { // 20% chance
+        if (roll < 0.2) { // 20% chance
             anyTriggered = true;
             console.log(`💀 Shield of Death #${i + 1} triggered! (rolled ${(roll * 100).toFixed(1)}%)`);
         } else {

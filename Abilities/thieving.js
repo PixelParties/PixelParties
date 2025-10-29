@@ -225,7 +225,12 @@ export class ThievingManager {
 
         // Get current gold amounts BEFORE rewards
         const playerCurrentGold = goldManager.getPlayerGold();
-        const opponentCurrentGold = goldManager.getOpponentGold();
+        
+        // *** SINGLEPLAYER: Get opponent gold from computer team data ***
+        const isSingleplayer = heroSelection.isSingleplayerMode && heroSelection.isSingleplayerMode();
+        const opponentCurrentGold = isSingleplayer 
+            ? (heroSelection.opponentGoldData || 0)  // Use stored computer gold
+            : goldManager.getOpponentGold();  // Use goldManager for multiplayer
 
         // Calculate thieving effects
         const thievingData = this.calculateThievingEffects(
@@ -247,6 +252,15 @@ export class ThievingManager {
      * @returns {Object|null} Opponent formation and abilities data
      */
     getOpponentDataForThieving(heroSelection) {
+        // Check if singleplayer mode
+        if (heroSelection && heroSelection.isSingleplayerMode && heroSelection.isSingleplayerMode()) {
+            // *** SINGLEPLAYER: Use cached opponent data ***
+            return {
+                opponentFormation: heroSelection.formationManager.getOpponentBattleFormation(),
+                opponentAbilities: heroSelection.opponentAbilitiesData
+            };
+        }
+        
         // Try to get cached opponent data from hero selection
         if (heroSelection && heroSelection.cachedOpponentData) {
             return heroSelection.cachedOpponentData;

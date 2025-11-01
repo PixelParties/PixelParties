@@ -445,6 +445,7 @@ export class BattleStartManager {
                     (effect.source === 'SoulShardSekhem') ||
                     (effect.source === 'SoulShardSah') ||
                     (effect.source === 'SoulShardBa') ||
+                    (effect.source === 'SoulShardShut') ||
                     // Expedition effects
                     (effect.source === 'Shipwrecked') ||
                     (effect.source === 'Expedition')
@@ -465,6 +466,7 @@ export class BattleStartManager {
                     (effect.source === 'SoulShardSekhem') ||
                     (effect.source === 'SoulShardSah') ||
                     (effect.source === 'SoulShardBa') ||
+                    (effect.source === 'SoulShardShut') ||
                     // Expedition effects
                     (effect.source === 'Shipwrecked') ||
                     (effect.source === 'Expedition')

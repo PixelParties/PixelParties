@@ -38,7 +38,7 @@ export async function processComputerArtifactsAfterBattle(roomRef) {
             let currentGraveyard = [...(team.graveyard || [])];
             let currentDeck = [...(team.deck || [])];
             let currentFormation = JSON.parse(JSON.stringify(team.formation));
-            let currentDelayedEffects = [...(team.delayedEffects || [])];
+            let currentDelayedEffects = [];
             let currentMagicSapphiresUsed = team.magicSapphiresUsed || 0;
             let currentSpellbooks = JSON.parse(JSON.stringify(team.spellbooks || { left: [], center: [], right: [] }));
 

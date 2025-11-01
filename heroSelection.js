@@ -1653,8 +1653,13 @@ export class HeroSelection {
 
     // Enhanced start character selection process  TEST HEROES HERE!!!
     async startSelection() {
-        window._debugHostHeroes = ['', '', '']; // '' = random
-        window._debugGuestHeroes = ['', '', ''];             // Missing slots = random
+        // Only set debug arrays if they don't already exist (e.g., from singleplayer lobby)
+        if (!window._debugHostHeroes) {
+            window._debugHostHeroes = ['', '', '']; // '' = random
+        }
+        if (!window._debugGuestHeroes) {
+            window._debugGuestHeroes = ['', '', ''];             // Missing slots = random
+        }
 
         if (this.allPreviewCharacters.length < 6) { 
             return false;
@@ -1761,6 +1766,41 @@ export class HeroSelection {
             
             // Helper function to get hero by name
             const getHeroByName = (name) => obtainableHeroes.find(char => char.name === name);
+            
+            // **NEW: Check if specific hero was chosen in singleplayer lobby (not random)**
+            const skipHeroSelection = window._singleplayerSkipHeroSelection === true;
+            
+            if (skipHeroSelection && debugHost.length > 0 && debugHost[0]) {
+                // A specific hero was chosen - skip the 3-hero selection entirely
+                const chosenHeroName = debugHost[0];
+                const chosenHero = getHeroByName(chosenHeroName);
+                
+                if (chosenHero) {
+                    // Set up playerCharacters with just this hero (for state consistency)
+                    this.playerCharacters = [chosenHero];
+                    
+                    // No opponent characters in singleplayer
+                    this.opponentCharacters = [];
+                    
+                    // Transition to selecting hero state first (for proper flow)
+                    this.stateMachine.transitionTo(this.stateMachine.states.SELECTING_HERO);
+                    
+                    // Save state before selection
+                    await this.saveGameState();
+                    
+                    // Immediately select this character and go to team building
+                    await this.selectCharacter(chosenHero.id);
+                    
+                    // Update UI
+                    if (typeof window !== 'undefined' && window.updateHeroSelectionUI) {
+                        window.updateHeroSelectionUI();
+                    }
+                    
+                    return true;
+                }
+            }
+            
+            // Normal flow: Generate 3 random heroes for selection (or use debug if provided)
             
             // In singleplayer, only generate player characters
             // No opponent needed yet
@@ -1952,7 +1992,9 @@ export class HeroSelection {
             const teamsExist = await computerTeamsExist(this.roomManager.getRoomRef());
             
             if (!teamsExist) {
-                await initializeComputerTeams(this.roomManager.getRoomRef(), formationCharacter.name);
+                // Get CPU config from window variable set by singleplayer lobby
+                const cpuConfig = window._singleplayerCPUConfig || null;
+                await initializeComputerTeams(this.roomManager.getRoomRef(), formationCharacter.name, cpuConfig);
                 
                 // **NEW: Run initial CPU team updates after creation**
                 const roomRef = this.roomManager.getRoomRef();

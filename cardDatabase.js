@@ -18,7 +18,9 @@ const CARD_DATABASE = {
         tags: ["Summoner", "Damage Dealer", "Card Draw", "Needs Action"],
         wants: ["Summoner", "Support"],
         avoids: ["Needs Action"],
-        order: null
+        order: null,
+        position: [[1],6],
+        counteredBy: ["AoE", "Creature Hate"],
     },
     'Beato': {
         name: 'Beato',
@@ -35,7 +37,9 @@ const CARD_DATABASE = {
         tags: ["High-Value", "Random", "Card Draw"],
         wants: ["Support", "Damage Dealer"],
         avoids: [],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["Silence"],
     },
     'Carris': {
         name: 'Carris',
@@ -52,7 +56,9 @@ const CARD_DATABASE = {
         tags: ["Multiple Actions", "Extra Turns", "High-Risk"],
         wants: ["Needs Action", "Damage Dealer", "Sniper", "Area Damage", "Burst Damage"],
         avoids: ["Defense", "Disruption"],
-        order: null
+        order: null,
+        position: [[1],4],
+        counteredBy: ["Sustain", "Tank Stuff"],
     },
     'Cecilia': {
         name: 'Cecilia',
@@ -69,7 +75,9 @@ const CARD_DATABASE = {
         tags: ["Attacker", "Gold Generation", "Damage Dealer"],
         wants: ["Gold Generation", "Needs Action", "Card Draw"],
         avoids: [],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["Tank Stuff"],
     },
     'Darge': {
         name: 'Darge',
@@ -86,7 +94,9 @@ const CARD_DATABASE = {
         tags: ["Attacker", "Sniper", "Damage Dealer", "Needs Gold", "Squishy"],
         wants: ["Gold Generation", "Defense", "Summoner", "Card Draw"],
         avoids: ["Needs Gold"],
-        order: null
+        order: null,
+        position: [[1],2],
+        counteredBy: ["Tank Stuff"],
     },
     'Gabby': {
         name: 'Gabby',
@@ -103,7 +113,9 @@ const CARD_DATABASE = {
         tags: ["Defense", "Damage Dealer", "Setup", "Card Draw"],
         wants: ["Damage Dealer", "Summoner", "Squishy"],
         avoids: ["Defense"],
-        order: null
+        order: null,
+        position: [[1],7],
+        counteredBy: ["Fast DPS"],
     },
     'Ghuanjun': {
         name: 'Ghuanjun',
@@ -120,7 +132,9 @@ const CARD_DATABASE = {
         tags: ["Attacker", "Defense", "Setup", "Needs Actions"],
         wants: ["Support", "Card Draw", "Multiple Actions"],
         avoids: ["Needs Actions"],
-        order: null
+        order: null,
+        position: [[1],1],
+        counteredBy: ["Fast DPS"],
     },
     'Gon': {
         name: 'Gon',
@@ -137,7 +151,9 @@ const CARD_DATABASE = {
         tags: ["Support", "Disruption", "Status Effects", "Needs Actions"],
         wants: ["Damage Dealer", "Area Damage", "Sniper"],
         avoids: ["Needs Actions"],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["Silence", "Self-Burn", "Anti-Status"],
     },
     'Heinz': {
         name: 'Heinz',
@@ -154,7 +170,9 @@ const CARD_DATABASE = {
         tags: ["Setup", "Summoner", "Card Draw"],
         wants: ["Damage Dealer", "Support", "Defense"],
         avoids: [],
-        order: [1]
+        order: [1],
+        position: [[2,3],2],
+        counteredBy: [],
     },
     'Ida': {
         name: 'Ida',
@@ -171,7 +189,9 @@ const CARD_DATABASE = {
         tags: ["Damage Dealer", "Area Damage", "Status Effects", "Needs Actions"],
         wants: ["Multiple Actions", "Support", "Defense"],
         avoids: ["Needs Actions"],
-        order: null
+        order: null,
+        position: [[1,3],3],
+        counteredBy: ["Silence", "Anti-AoE"],
     },
     'Kazena': {
         name: 'Kazena',
@@ -188,7 +208,9 @@ const CARD_DATABASE = {
         tags: ["Card Draw", "Support", "Setup", "Area Damage"],
         wants: ["Damage Dealer", "Summoner"],
         avoids: ["Support"],
-        order: [2,3]
+        order: [2,3],
+        position: [[2],1],
+        counteredBy: [],
     },
     'Kyli': {
         name: 'Kyli',
@@ -205,7 +227,9 @@ const CARD_DATABASE = {
         tags: ["Summoner", "Setup", "Attacker"],
         wants: ["Summoner", "Damage Dealer", "Potions"],
         avoids: [],
-        order: [1,2]
+        order: [1,2],
+        position: [[1,2],4],
+        counteredBy: ["AoE", "Creature Hate"],
     },
     'Luna': {
         name: 'Luna',
@@ -222,7 +246,9 @@ const CARD_DATABASE = {
         tags: ["Status Effects", "Area Damage", "Self-Damage", "Setup"],
         wants: ["Defense", "Support", "Attacker"],
         avoids: ["Status Effects"],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["Self-Freeze", "Anti-Status", "AoE"],
     },
     'Mary': {
         name: 'Mary',
@@ -239,7 +265,9 @@ const CARD_DATABASE = {
         tags: ["Summoner", "Damage Dealer", "Late-Game", "Needs Actions"],
         wants: ["Multiple Actions", "Support", "Defense", "Summoner"],
         avoids: [],
-        order: [1]
+        order: [1],
+        position: [[1,2],2],
+        counteredBy: ["AoE", "Creature Hate", "Silence"],
     },
     'Medea': {
         name: 'Medea',
@@ -256,7 +284,9 @@ const CARD_DATABASE = {
         tags: ["Damage Dealer", "Status Effects", "Damage Over Time", "Needs Actions"],
         wants: ["Multiple Actions", "Defense", "Summoner", "Status Effects"],
         avoids: ["Needs Actions"],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["Anti-Status", "Sustain", "Silence", "Tank Stuff"],
     },
     'Monia': {
         name: 'Monia',
@@ -273,7 +303,9 @@ const CARD_DATABASE = {
         tags: ["Defense", "Support", "Attacker"],
         wants: ["Attacker", "Damage Dealer", "Stat Buffs"],
         avoids: ["Defense"],
-        order: [3]
+        order: [3],
+        position: [[2],9],
+        counteredBy: ["AoE", "Fast DPS"],
     },
     'Nao': {
         name: 'Nao',
@@ -290,7 +322,9 @@ const CARD_DATABASE = {
         tags: ["Defense", "Shield", "Support", "Needs Actions"],
         wants: ["Damage Dealer", "Area Damage", "Attacker"],
         avoids: [],
-        order: [2,3]
+        order: [2,3],
+        position: [[],0],
+        counteredBy: ["Anti-Heal", "Silence"],
     },
     'Nicolas': {
         name: 'Nicolas',
@@ -307,7 +341,9 @@ const CARD_DATABASE = {
         tags: ["Support", "Card Draw", "Potions"],
         wants: ["Needs Actions", "Card Draw", "Damage Dealer"],
         avoids: [],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["Tank Stuff", "Sustain"],
     },
     'Nomu': {
         name: 'Nomu',
@@ -324,7 +360,9 @@ const CARD_DATABASE = {
         tags: ["Support", "Card Draw", "Defense"],
         wants: [],
         avoids: [],
-        order: [2,3]
+        order: [2,3],
+        position: [[],0],
+        counteredBy: [],
     },
     'Semi': {
         name: 'Semi',
@@ -341,7 +379,9 @@ const CARD_DATABASE = {
         tags: ["Support", "Gold Generation", "Card Draw"],
         wants: ["Attacker", "Needs Gold", "Multiple Actions"],
         avoids: [],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: [],
     },
     'Sid': {
         name: 'Sid',
@@ -358,7 +398,9 @@ const CARD_DATABASE = {
         tags: ["Support", "Stealing", "Card Draw", "Stat Buffs"],
         wants: ["Attacker", "Damage Dealer", "Summoner"],
         avoids: [],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: [],
     },
     'Tharx': {
         name: 'Tharx',
@@ -375,7 +417,9 @@ const CARD_DATABASE = {
         tags: ["Defense", "Summoner", "Support"],
         wants: ["Summoner", "Damage Dealer"],
         avoids: [],
-        order: null
+        order: null,
+        position: [[1],5],
+        counteredBy: ["AoE", "Creature Hate"],
     },
     'Thep': {
         name: 'Thep',
@@ -392,7 +436,9 @@ const CARD_DATABASE = {
         tags: ["Summoner", "Utility", "Support", "Needs Actions"],
         wants: ["Card Draw", "Multiple Actions"],
         avoids: ["Needs Actions"],
-        order: null
+        order: null,
+        position: [[],0],
+        counteredBy: ["AoE", "Creature Hate"],
     },
     'Toras': {
         name: 'Toras',
@@ -409,7 +455,9 @@ const CARD_DATABASE = {
         tags: ["Attacker", "Burst Damage", "Damage Dealer", "Needs Gold"],
         wants: ["Gold Generation", "Support", "Defense"],
         avoids: ["Needs Gold"],
-        order: null
+        order: null,
+        position: [[1],6],
+        counteredBy: ["Tank Stuff", "Fast DPS", "Status"],
     },
     'Vacarn': {
         name: 'Vacarn',
@@ -426,7 +474,9 @@ const CARD_DATABASE = {
         tags: ["Summoner", "Creature Spam", "Disruption", "Needs Actions"],
         wants: ["Multiple Actions", "Card Draw", "Damage Dealer"],
         avoids: ["Needs Actions"],
-        order: [1]
+        order: [1],
+        position: [[1,2],4],
+        counteredBy: ["AoE", "Creature Hate"],
     },
     'Waflav': {
         name: 'Waflav',
@@ -443,7 +493,9 @@ const CARD_DATABASE = {
         tags: ["Attacker", "Damage Dealer", "Disruption"],
         wants: ["Needs Actions", "Support", "Defense"],
         avoids: ["Damage Dealer"],
-        order: null
+        order: null,
+        position: [[2],5],
+        counteredBy: ["Status", "Anti-Heal"],
     },
     'ZombieGabby': {
         name: 'ZombieGabby',
@@ -458,7 +510,8 @@ const CARD_DATABASE = {
         ability1: 'Navigation',
         ability2: 'Thieving',
         tags: ["Defense", "Defense", "Setup"],
-        unobtainable: true
+        unobtainable: true,
+        position: [[1],6],
     },
 
     // CHARACTER-SPECIFIC CARDS - Alice's Cards
@@ -557,7 +610,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["AoE"],
     },
     'CrusadersCutlass': {
         name: 'CrusadersCutlass',
@@ -566,7 +620,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Silence"],
     },
     'CrusadersFlintlock': {
         name: 'CrusadersFlintlock',
@@ -575,7 +630,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Creature Hate"],
     },
     'CrusadersHookshot': {
         name: 'CrusadersHookshot',
@@ -622,7 +678,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS"],
     },
     'BombArrow': {
         name: 'BombArrow',
@@ -631,7 +688,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["AoE", "Fast DPS"],
     },
     'FlameArrow': {
         name: 'FlameArrow',
@@ -640,7 +698,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS"],
     },
     'GoldenArrow': {
         name: 'GoldenArrow',
@@ -649,7 +708,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS"],
     },
     'PoisonedArrow': {
         name: 'PoisonedArrow',
@@ -658,7 +718,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS"],
     },
     'RacketArrow': {
         name: 'RacketArrow',
@@ -667,7 +728,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Creature Hate", "Fast DPS"],
     },
     'RainbowsArrow': {
         name: 'RainbowsArrow',
@@ -676,7 +738,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS"],
     },
     'RainOfArrows': {
         name: 'RainOfArrows',
@@ -687,7 +750,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'Fighting',
         subtype: null,
-        aoe: true
+        aoe: true,
+        counterType: ["AoE"],
     },
 
     // Gon's Cards
@@ -698,7 +762,8 @@ const CARD_DATABASE = {
         cost: 5,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Status"],
     },
     'Cold-HeartedYuki-Onna': {
         name: 'Cold-HeartedYuki-Onna',
@@ -719,7 +784,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Status"],
     },
     'FrostRune': {
         name: 'FrostRune',
@@ -729,7 +795,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: 'Trap'
+        subtype: 'Trap',
+        counterType: ["Status"],
     },
     'HeartOfIce': {
         name: 'HeartOfIce',
@@ -738,7 +805,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Status"],
     },
     'Icebolt': {
         name: 'Icebolt',
@@ -748,7 +816,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Status"],
     },
     'IcyGrave': {
         name: 'IcyGrave',
@@ -758,7 +827,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Status"],
     },
     'SnowCannon': {
         name: 'SnowCannon',
@@ -767,7 +837,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: "Permanent"
+        subtype: "Permanent",
+        counterType: ["Status"],
     },
 
     // Ida's Cards
@@ -778,7 +849,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["AoE"],
     },
     'BurningSkeleton': {
         name: 'BurningSkeleton',
@@ -790,7 +862,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 50,
-        physicalAttack: true
+        physicalAttack: true,
+        counterType: ["AoE"],
     },
     'BurningFinger': {
         name: 'BurningFinger',
@@ -832,7 +905,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DestructionMagic',
         subtype: null,
-        aoe: true
+        aoe: true,
+        counterType: ["AoE"],
     },
     'MountainTearRiver': {
         name: 'MountainTearRiver',
@@ -843,7 +917,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DestructionMagic',
         subtype: null,
-        aoe: true
+        aoe: true,
+        counterType: ["AoE"],
     },
     'VampireOnFire': {
         name: 'VampireOnFire',
@@ -854,7 +929,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DestructionMagic',
         subtype: null,
-        aoe: true
+        aoe: true,
+        counterType: ["Anti-Heal", "AoE"],
     },
 
     // Medea's Cards
@@ -885,7 +961,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DecayMagic',
         subtype: null,
-        aoe: true
+        aoe: true,
+        counterType: ["AoE"],
     },
     'PoisonPollen': {
         name: 'PoisonPollen',
@@ -976,7 +1053,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: null
+        subtype: null,
+        counterType: ["Creature Hate"],
     },
     'GloriousRebirth': {
         name: 'GloriousRebirth',
@@ -986,7 +1064,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Sustain", "Tank Stuff"],
     },
     'LifeSerum': {
         name: 'LifeSerum',
@@ -995,7 +1074,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Tank Stuff"],
     },
     'TrialOfCoolness': {
         name: 'TrialOfCoolness',
@@ -1005,7 +1085,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: null
+        subtype: null,
+        counterType: ["Fast DPS"],
     },
     'UltimateDestroyerPunch': {
         name: 'UltimateDestroyerPunch',
@@ -1015,7 +1096,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: null
+        subtype: null,
+        counterType: ["Creature Hate"],
     },
 
     // Nicolas's Cards
@@ -1044,7 +1126,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["AoE", "Fast DPS"],
     },
     'BoulderInABottle': {
         name: 'BoulderInABottle',
@@ -1080,7 +1163,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Anti-Heal", "Fast Damage"],
     },
 
     // Semi's Cards
@@ -1100,7 +1184,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Sustain"],
     },
     'ElixirOfStrength': {
         name: 'ElixirOfStrength',
@@ -1119,7 +1204,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Sustain"],
     },
     'MagneticGlove': {
         name: 'MagneticGlove',
@@ -1139,7 +1225,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Tank Stuff"],
     },
     'TreasureHuntersBackpack': {
         name: 'TreasureHuntersBackpack',
@@ -1260,7 +1347,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 150
+        hp: 150,
+        counterType: ["Tank Stuff"],
     },
     'Challenge': {
         name: 'Challenge',
@@ -1335,7 +1423,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: null
+        subtype: null,
+        counterType: ["Status"],
     },
     'LegendarySwordOfABarbarianKing': {
         name: 'LegendarySwordOfABarbarianKing',
@@ -1344,7 +1433,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS", "Tank Stuff"],
     },
     'Overheat': {
         name: 'Overheat',
@@ -1381,7 +1471,8 @@ const CARD_DATABASE = {
         cost: 8,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Fast DPS"],
     },
     'TheStormblade': {
         name: 'TheStormblade',
@@ -1390,7 +1481,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: 'Equip'
+        subtype: 'Equip',
+        counterType: ["Creature Hate"],
     },
     'TheSunSword': {
         name: 'TheSunSword',
@@ -1454,7 +1546,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 50,
-        physicalAttack: true
+        physicalAttack: true,
+        counterType: ["Silence"],
     },
     'SkeletonMage': {
         name: 'SkeletonMage',
@@ -1489,7 +1582,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 50,
-        physicalAttack: true
+        physicalAttack: true,
+        counterType: ["AoE"],
     },
 
 
@@ -1506,7 +1600,9 @@ const CARD_DATABASE = {
         atk: 120,
         ability1: null,
         ability2: null,
-        baseHero: 'Monia'
+        baseHero: 'Monia',
+        position: [[2],9],
+        counteredBy: ["AoE", "Fast DPS"],
     },
     'EternalBeato': {
         name: 'EternalBeato',
@@ -1520,7 +1616,9 @@ const CARD_DATABASE = {
         atk: 10,
         ability1: null,
         ability2: null,
-        baseHero: 'Beato'
+        baseHero: 'Beato',
+        position: [[3],6],
+        counteredBy: ["Silence"],
     },
 
     'Charme': {
@@ -1539,7 +1637,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Creature Hate"],
     },
     'Fighting': {
         name: 'Fighting',
@@ -1575,7 +1674,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Silence"],
     },
     'SupportMagic': {
         name: 'SupportMagic',
@@ -1593,7 +1693,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Tank Stuff"],
     },
     'Training': {
         name: 'Training',
@@ -1613,7 +1714,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DecayMagic',
         subtype: null,
-        aoe: true
+        aoe: true,
+        counterType: ["Status"],
     },
     'Curse': {
         name: 'Curse',
@@ -1623,7 +1725,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Silence"],
     },
     'CrystalWell': {
         name: 'CrystalWell',
@@ -1653,7 +1756,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'Fighting',
-        subtype: null
+        subtype: null,
+        counterType: ["Fast DPS"],
     },
     'DarkDeal': {
         name: 'DarkDeal',
@@ -1663,7 +1767,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'DecayMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Creature Hate"],
     },
     'SupplyChain': {
         name: 'SupplyChain',
@@ -1682,7 +1787,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: 'Permanent'
+        subtype: 'Permanent',
+        counterType: ["Anti-Status"],
     },
     'DarkGear': {
         name: 'DarkGear',
@@ -1691,7 +1797,8 @@ const CARD_DATABASE = {
         cost: 6,
         action: false,
         spellSchool: null,
-        subtype: "Permanent"
+        subtype: "Permanent",
+        counterType: ["Creature Hate"],
     },
     'AngryCheese': {
         name: 'AngryCheese',
@@ -1745,7 +1852,8 @@ const CARD_DATABASE = {
         cost: 12,
         action: false,
         spellSchool: null,
-        subtype: "Equip"
+        subtype: "Equip",
+        counterType: ["Tank Stuff"],
     },
     'ShieldOfDeath': {
         name: 'ShieldOfDeath',
@@ -1754,7 +1862,8 @@ const CARD_DATABASE = {
         cost: 12,
         action: false,
         spellSchool: null,
-        subtype: "Equip"
+        subtype: "Equip",
+        counterType: ["Tank Stuff"],
     },
     'BladeOfTheSwampWitch': {
         name: 'BladeOfTheSwampWitch',
@@ -1790,7 +1899,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 50,
-        physicalAttack: true
+        physicalAttack: true,
+        counterType: ["Sustain"],
     },
     'BlueIceDragon': {
         name: 'BlueIceDragon',
@@ -1802,7 +1912,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 250,
-        physicalAttack: false
+        physicalAttack: false,
+        counterType: ["Status"],
     },
     'ExplodingSkull': {
         name: 'ExplodingSkull',
@@ -1814,7 +1925,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 1,
-        physicalAttack: false
+        physicalAttack: false,
+        counterType: ["AoE"],
     },
     'DemonsGate': {
         name: 'DemonsGate',
@@ -1859,7 +1971,8 @@ const CARD_DATABASE = {
         cost: 12,
         action: false,
         spellSchool: null,
-        subtype: "Permanent"
+        subtype: "Permanent",
+        counterType: ["Anti-AoE"],
     },
     'Haste': {
         name: 'Haste',
@@ -1880,7 +1993,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DestructionMagic',
         subtype: 'Area',
-        aoe: true
+        aoe: true,
+        counterType: ["AoE"],
     },
     'CloudInABottle': {
         name: 'CloudInABottle',
@@ -1922,7 +2036,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 20,
-        physicalAttack: false
+        physicalAttack: false,
+        counterType: ["Tank Stuff"],
     },
     'FutureTechMech': {
         name: 'FutureTechMech',
@@ -1934,7 +2049,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 150,
-        physicalAttack: false
+        physicalAttack: false,
+        counterType: ["AoE"],
     },
     'AncientTechInfiniteEnergyCore': {
         name: 'AncientTechInfiniteEnergyCore',
@@ -1943,7 +2059,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: "Equip"
+        subtype: "Equip",
+        counterType: ["Fast DPS"],
     },
     'BirthdayPresent': {
         name: 'BirthdayPresent',
@@ -2075,7 +2192,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Creature Hate"],
     },
     'StaffOfTheTeleporter': {
         name: 'StaffOfTheTeleporter',
@@ -2153,7 +2271,8 @@ const CARD_DATABASE = {
         action: false,
         spellSchool: 'MagicArts',
         subtype: 'Quick',
-        global: true
+        global: true,
+        counterType: ["Silence"],
     },
     'CreateIllusion': {
         name: 'CreateIllusion',
@@ -2197,7 +2316,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Sustain"],
     },
     'ThunderstruckWaflav': {
         name: 'ThunderstruckWaflav',
@@ -2211,7 +2331,9 @@ const CARD_DATABASE = {
         atk: 120,
         ability1: null,
         ability2: null,
-        baseHero: 'Waflav'
+        baseHero: 'Waflav',
+        position: [[],0],
+        counteredBy: ["Status", "Anti-Heal"],
     },
     'SwampborneWaflav': {
         name: 'SwampborneWaflav',
@@ -2225,7 +2347,9 @@ const CARD_DATABASE = {
         atk: 180,
         ability1: null,
         ability2: null,
-        baseHero: 'Waflav'
+        baseHero: 'Waflav',
+        position: [[1],7],
+        counteredBy: ["Status", "Anti-Heal"],
     },
     'FlamebathedWaflav': {
         name: 'FlamebathedWaflav',
@@ -2239,7 +2363,9 @@ const CARD_DATABASE = {
         atk: 140,
         ability1: null,
         ability2: null,
-        baseHero: 'Waflav'
+        baseHero: 'Waflav',
+        position: [[1],9],
+        counteredBy: ["Status", "Anti-Heal"],
     },
     'StormkissedWaflav': {
         name: 'StormkissedWaflav',
@@ -2253,7 +2379,9 @@ const CARD_DATABASE = {
         atk: 100,
         ability1: null,
         ability2: null,
-        baseHero: 'Waflav'
+        baseHero: 'Waflav',
+        position: [[],0],
+        counteredBy: ["Status", "Anti-Heal"],
     },
     'DeepDrownedWaflav': {
         name: 'DeepDrownedWaflav',
@@ -2267,7 +2395,9 @@ const CARD_DATABASE = {
         atk: 180,
         ability1: null,
         ability2: null,
-        baseHero: 'Waflav'
+        baseHero: 'Waflav',
+        position: [[],0],
+        counteredBy: ["Status", "Anti-Heal"],
     },
     'CaptureNet': {
         name: 'CaptureNet',
@@ -2276,7 +2406,8 @@ const CARD_DATABASE = {
         cost: 30,
         action: false,
         spellSchool: null,
-        subtype: "Equip"
+        subtype: "Equip",
+        counterType: ["Creature Hate"],
     },
 
 
@@ -2289,7 +2420,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Fast DPS", "Tank Stuff"],
     },
     'TearingMountain': {
         name: 'TearingMountain',
@@ -2300,7 +2432,8 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'DestructionMagic',
         subtype: 'Area',
-        aoe: true
+        aoe: true,
+        counterType: ["Self-Burn"],
     },
     'LunaKiai': {
         name: 'LunaKiai',
@@ -2312,7 +2445,8 @@ const CARD_DATABASE = {
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
         hp: 100,
-        physicalAttack: false
+        physicalAttack: false,
+        counterType: ["AoE"],
     },
     'PriestOfLuna': {
         name: 'PriestOfLuna',
@@ -2333,7 +2467,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: "Permanent"
+        subtype: "Permanent",
+        counterType: ["AoE", "Self-Burn"],
     },
     'DichotomyOfLunaAndTempeste': {
         name: 'DichotomyOfLunaAndTempeste',
@@ -2342,7 +2477,8 @@ const CARD_DATABASE = {
         cost: 6,
         action: false,
         spellSchool: null,
-        subtype: "Equip"
+        subtype: "Equip",
+        counterType: ["Self-Freeze"],
     },
 
 
@@ -2394,7 +2530,8 @@ const CARD_DATABASE = {
         cost: 10,
         action: false,
         spellSchool: null,
-        subtype: "Equip"
+        subtype: "Equip",
+        counterType: ["Fast DPS"],
     },
     'PunchInTheBox': {
         name: 'PunchInTheBox',
@@ -2403,7 +2540,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Status"],
     },
 
 
@@ -2552,7 +2690,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Sustain"],
     },
     'Cure': {
         name: 'Cure',
@@ -2562,7 +2701,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: true,
         spellSchool: 'SupportMagic',
-        subtype: null
+        subtype: null,
+        counterType: ["Anti-Status"],
     },
     'HealingPotion': {
         name: 'HealingPotion',
@@ -2571,7 +2711,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Sustain"],
     },
 
 
@@ -2693,7 +2834,8 @@ const CARD_DATABASE = {
         cost: 0,
         action: false,
         spellSchool: null,
-        subtype: null
+        subtype: null,
+        counterType: ["Fast DPS"],
     },
     'AntiIntruderSystem': {
         name: 'AntiIntruderSystem',
@@ -2702,7 +2844,8 @@ const CARD_DATABASE = {
         cost: 4,
         action: false,
         spellSchool: null,
-        subtype: "Permanent"
+        subtype: "Permanent",
+        counterType: ["Creature Hate"],
     },
     'ForcefulRevival': {
         name: 'ForcefulRevival',

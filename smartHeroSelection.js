@@ -2,14 +2,16 @@
 // Implements weighted hero selection based on order, tags, wants, and avoids
 
 import { getHeroInfo } from './cardDatabase.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Calculate the weight multiplier for a hero based on their order attribute
  * @param {Array|null} orderArray - The hero's preferred positions [1], [2,3], etc.
  * @param {number} position - Current position being filled (1, 2, or 3)
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
  * @returns {number} - Multiplier for this hero
  */
-function getOrderMultiplier(orderArray, position) {
+function getOrderMultiplier(orderArray, position, difficulty = 'Normal') {
     // If order is null, no modifier
     if (!orderArray || orderArray.length === 0) {
         return 1.0;
@@ -20,8 +22,9 @@ function getOrderMultiplier(orderArray, position) {
 
     // Check if this position is in the preferred order
     if (order.includes(position)) {
-        // Hero wants this position
-        return 3.0;
+        // Hero wants this position - use difficulty-based multiplier
+        const preferredMultiplier = getDifficultyValue(difficulty, 'positioning', 'preferredPositionMultiplier');
+        return preferredMultiplier;
     }
 
     // Hero doesn't want this position - apply penalties based on position
@@ -199,14 +202,19 @@ function resolveWantsAndAvoids(wants, avoids) {
  * @param {Object} heroInfo - Hero information from database
  * @param {Array<string>} resolvedWants - Team's resolved wanted tags
  * @param {Array<string>} resolvedAvoids - Team's resolved avoided tags
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
  * @returns {number} - Compatibility multiplier
  */
-function getCompatibilityMultiplier(heroInfo, resolvedWants, resolvedAvoids) {
+function getCompatibilityMultiplier(heroInfo, resolvedWants, resolvedAvoids, difficulty = 'Normal') {
     if (!heroInfo || !heroInfo.tags) {
         return 1.0;
     }
 
     let multiplier = 1.0;
+
+    // Get difficulty-based multipliers
+    const wantsMultiplier = getDifficultyValue(difficulty, 'heroSelection', 'compatibilityWantsMultiplier');
+    const avoidsMultiplier = getDifficultyValue(difficulty, 'heroSelection', 'compatibilityAvoidsMultiplier');
 
     // Check each hero tag against wants and avoids
     heroInfo.tags.forEach(tag => {
@@ -217,12 +225,12 @@ function getCompatibilityMultiplier(heroInfo, resolvedWants, resolvedAvoids) {
 
         // Apply bonuses for wants (multiplicative)
         for (let i = 0; i < wantMatches; i++) {
-            multiplier *= 1.2;
+            multiplier *= wantsMultiplier;
         }
 
         // Apply penalties for avoids (multiplicative)
         for (let i = 0; i < avoidMatches; i++) {
-            multiplier *= 0.7;
+            multiplier *= avoidsMultiplier;
         }
     });
 
@@ -234,9 +242,10 @@ function getCompatibilityMultiplier(heroInfo, resolvedWants, resolvedAvoids) {
  * @param {string} heroName - Name of the hero
  * @param {number} position - Position being filled (1, 2, or 3)
  * @param {Object} currentFormation - Current team formation (for positions 2+)
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
  * @returns {number} - Weight for this hero
  */
-function calculateHeroWeight(heroName, position, currentFormation = null) {
+function calculateHeroWeight(heroName, position, currentFormation = null, difficulty = 'Normal') {
     const heroInfo = getHeroInfo(heroName);
     if (!heroInfo) {
         return 0; // Invalid hero
@@ -245,7 +254,7 @@ function calculateHeroWeight(heroName, position, currentFormation = null) {
     let weight = 1.0;
 
     // Apply order multiplier
-    const orderMultiplier = getOrderMultiplier(heroInfo.order, position);
+    const orderMultiplier = getOrderMultiplier(heroInfo.order, position, difficulty);
     weight *= orderMultiplier;
 
     if (position === 1) {
@@ -259,7 +268,7 @@ function calculateHeroWeight(heroName, position, currentFormation = null) {
             const teamAvoids = getTeamAvoids(currentFormation);
             const { resolvedWants, resolvedAvoids } = resolveWantsAndAvoids(teamWants, teamAvoids);
             
-            const compatMultiplier = getCompatibilityMultiplier(heroInfo, resolvedWants, resolvedAvoids);
+            const compatMultiplier = getCompatibilityMultiplier(heroInfo, resolvedWants, resolvedAvoids, difficulty);
             weight *= compatMultiplier;
         }
     }
@@ -274,9 +283,10 @@ function calculateHeroWeight(heroName, position, currentFormation = null) {
  * @param {Array<string>} availableHeroes - List of hero names to choose from
  * @param {number} position - Position being filled (1, 2, or 3)
  * @param {Object} currentFormation - Current team formation (for positions 2+)
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
  * @returns {string} - Selected hero name
  */
-export function selectSmartHero(availableHeroes, position, currentFormation = null) {
+export function selectSmartHero(availableHeroes, position, currentFormation = null, difficulty = 'Normal') {
     if (!availableHeroes || availableHeroes.length === 0) {
         return null;
     }
@@ -288,7 +298,7 @@ export function selectSmartHero(availableHeroes, position, currentFormation = nu
 
     // Calculate weights for all available heroes
     const weights = availableHeroes.map(heroName => 
-        calculateHeroWeight(heroName, position, currentFormation)
+        calculateHeroWeight(heroName, position, currentFormation, difficulty)
     );
 
     // Calculate total weight
@@ -311,9 +321,10 @@ export function selectSmartHero(availableHeroes, position, currentFormation = nu
 /**
  * Select 3 heroes for a complete team using smart selection
  * @param {Array<string>} availableHeroes - List of all available hero names
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
  * @returns {Array<string>} - Array of 3 selected hero names
  */
-export function selectSmartTeam(availableHeroes) {
+export function selectSmartTeam(availableHeroes, difficulty = 'Normal') {
     if (!availableHeroes || availableHeroes.length < 3) {
         // Fallback to random if not enough heroes
         return availableHeroes.slice(0, 3);
@@ -323,7 +334,7 @@ export function selectSmartTeam(availableHeroes) {
     const remaining = [...availableHeroes];
 
     // Select first hero
-    const firstHero = selectSmartHero(remaining, 1, null);
+    const firstHero = selectSmartHero(remaining, 1, null, difficulty);
     selectedHeroes.push(firstHero);
     remaining.splice(remaining.indexOf(firstHero), 1);
 
@@ -335,7 +346,7 @@ export function selectSmartTeam(availableHeroes) {
     };
 
     // Select second hero
-    const secondHero = selectSmartHero(remaining, 2, formationAfterFirst);
+    const secondHero = selectSmartHero(remaining, 2, formationAfterFirst, difficulty);
     selectedHeroes.push(secondHero);
     remaining.splice(remaining.indexOf(secondHero), 1);
 
@@ -347,7 +358,7 @@ export function selectSmartTeam(availableHeroes) {
     };
 
     // Select third hero
-    const thirdHero = selectSmartHero(remaining, 3, formationAfterSecond);
+    const thirdHero = selectSmartHero(remaining, 3, formationAfterSecond, difficulty);
     selectedHeroes.push(thirdHero);
 
     return selectedHeroes;

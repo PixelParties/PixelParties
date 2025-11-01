@@ -1,6 +1,7 @@
 // cpuCreatureUpdates.js - CPU creature evolution processing
 
 import { getCardInfo } from './cardDatabase.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Process creature effects for all computer teams after battle
@@ -20,6 +21,9 @@ export async function processComputerCreaturesAfterBattle(roomRef) {
             const team = teams[teamKey];
             if (!team || !team.formation) continue;
 
+            // Get team difficulty
+            const difficulty = team.difficulty || 'Normal';
+
             let currentCreatures = JSON.parse(JSON.stringify(team.creatures || { left: [], center: [], right: [] }));
             let evolutionOccurred = false;
 
@@ -37,8 +41,8 @@ export async function processComputerCreaturesAfterBattle(roomRef) {
                     return itemName === 'CuteCrown';
                 }).length;
 
-                // Calculate evolution chance (10% base + 10% per CuteCrown)
-                const baseChance = 0.10;
+                // Calculate evolution chance (difficulty-based base + 10% per CuteCrown)
+                const baseChance = getDifficultyValue(difficulty, 'creatures', 'cuteBirdEvolution').baseChance;
                 const evolutionChance = baseChance + (cuteCrownCount * 0.10);
 
                 // Process each creature in reverse order

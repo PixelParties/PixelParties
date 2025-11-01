@@ -2,6 +2,7 @@
 
 import { getCardInfo, getAllCardNames } from './cardDatabase.js';
 import { countAbilityStacks } from './cpuHelpers.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Process hero-specific effects after battle for all computer teams
@@ -20,6 +21,9 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
             const team = teams[teamKey];
             if (!team || !team.formation) continue;
 
+            // Get team difficulty
+            const difficulty = team.difficulty || 'Normal';
+
             let currentCreatures = JSON.parse(JSON.stringify(team.creatures || { left: [], center: [], right: [] }));
             let currentDeck = [...(team.deck || [])];
             let currentGraveyard = [...(team.graveyard || [])];
@@ -35,8 +39,15 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
                 const X = Math.ceil(currentTurn / 2);
                 const Y = currentGraveyard.filter(cardName => cardName === 'FutureTechLamp').length;
                 const randomBonus = Math.floor(Math.random() * (X + 1));
-                let cardsToMill = currentTurn + (randomBonus * Y);
-                cardsToMill = Math.max(1, Math.min(8, cardsToMill));
+                
+                // Apply difficulty-based multiplier and cap
+                const millingMultiplier = getDifficultyValue(difficulty, 'heroEffects', 'heinz').millingMultiplier;
+                const millingCap = getDifficultyValue(difficulty, 'heroEffects', 'heinz').millingCap;
+                
+                let cardsToMill = Math.floor((currentTurn + (randomBonus * Y)) * millingMultiplier);
+                cardsToMill = Math.max(1, Math.min(millingCap, cardsToMill));
+                
+                console.log(`[${difficulty}] Heinz milling ${cardsToMill} cards (cap: ${millingCap}, multiplier: ${millingMultiplier}x)`);
                 
                 for (let i = 0; i < cardsToMill; i++) {
                     const randomIndex = Math.floor(Math.random() * currentDeck.length);
@@ -72,7 +83,9 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
             });
 
             if (vacarnPosition) {
-                if (Math.random() < 0.9) {
+                const summonChance = getDifficultyValue(difficulty, 'heroEffects', 'vacarn').summonChance;
+                
+                if (Math.random() < summonChance) {
                     const necromancyLevel = countAbilityStacks(team.abilities, vacarnPosition, 'Necromancy');
                     
                     if (necromancyLevel > 0) {
@@ -161,8 +174,12 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
                         }
                     }
                     
+                    // Get difficulty-based multiplier range
+                    const teamDifficulty = loopTeam.difficulty || 'Normal';
+                    const buffRange = getDifficultyValue(teamDifficulty, 'heroEffects', 'luna').buffMultiplierRange;
+                    const multiplier = Math.random() * (buffRange.max - buffRange.min) + buffRange.min;
+                    
                     const lunaItemCount = countLunaItems(loopTeam);
-                    const multiplier = Math.random() * 1.5 + 0.5;
                     const lunaBuffsToAdd = Math.floor(targetCount * lunaItemCount * multiplier);
                     
                     if (lunaBuffsToAdd > 0) {

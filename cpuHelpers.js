@@ -1,6 +1,7 @@
 // cpuHelpers.js - Shared utility functions for CPU team updates
 
 import { getCardInfo } from './cardDatabase.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Count ability stacks for a specific ability
@@ -21,6 +22,184 @@ export function countAbilityStacks(abilities, position, abilityName) {
     });
     
     return count;
+}
+
+/**
+ * Intelligently position heroes based on their position preferences and priorities
+ * @param {Object} formation - Current formation with heroes
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
+ * @returns {Object} New formation with intelligently positioned heroes
+ */
+export function positionHeroesIntelligently(formation, difficulty = 'Normal') {
+    // Collect all heroes from formation
+    const heroes = [];
+    ['left', 'center', 'right'].forEach(pos => {
+        if (formation[pos]) {
+            heroes.push({
+                hero: formation[pos],
+                originalPos: pos
+            });
+        }
+    });
+
+    if (heroes.length === 0) {
+        return { left: null, center: null, right: null };
+    }
+
+    // Get difficulty-based random positioning chance
+    const randomChance = getDifficultyValue(difficulty, 'positioning', 'randomChance');
+    const roll = Math.random();
+
+    if (roll < randomChance) {
+        // Complete randomization
+        console.log(`[${difficulty}] CPU positioning: Random (${(roll * 100).toFixed(1)}% < ${(randomChance * 100).toFixed(0)}%)`);
+        return completelyRandomizeHeroes(heroes);
+    } else {
+        // Intelligent positioning
+        console.log(`[${difficulty}] CPU positioning: Intelligent (${(roll * 100).toFixed(1)}% >= ${(randomChance * 100).toFixed(0)}%)`);
+        return intelligentPositioning(heroes);
+    }
+}
+
+/**
+ * Completely randomize hero positions (used on 1-15 roll)
+ * @param {Array} heroes - Array of hero objects with their data
+ * @returns {Object} Formation with randomly positioned heroes
+ */
+function completelyRandomizeHeroes(heroes) {
+    // Shuffle heroes
+    const shuffled = [...heroes];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Place in formation
+    const formation = { left: null, center: null, right: null };
+    const slots = ['left', 'center', 'right'];
+    
+    shuffled.forEach((heroObj, index) => {
+        if (index < slots.length) {
+            formation[slots[index]] = heroObj.hero;
+        }
+    });
+
+    return formation;
+}
+
+/**
+ * Position heroes intelligently based on their position attributes
+ * @param {Array} heroes - Array of hero objects with their data
+ * @returns {Object} Formation with intelligently positioned heroes
+ */
+function intelligentPositioning(heroes) {
+    const formation = { left: null, center: null, right: null };
+    
+    // Get hero info with position preferences
+    const heroesWithPreferences = heroes.map(heroObj => {
+        const heroInfo = getCardInfo(heroObj.hero.name);
+        let preferredPositions = [];
+        let priority = 0;
+        
+        if (heroInfo && heroInfo.position) {
+            preferredPositions = heroInfo.position[0] || [];
+            priority = heroInfo.position[1] || 0;
+        }
+        
+        return {
+            hero: heroObj.hero,
+            preferredPositions,
+            priority,
+            randomTieBreaker: Math.random() // For randomizing equal priorities
+        };
+    });
+
+    // Sort by priority (highest first), randomize ties
+    heroesWithPreferences.sort((a, b) => {
+        if (b.priority !== a.priority) {
+            return b.priority - a.priority; // Higher priority first
+        }
+        return a.randomTieBreaker - b.randomTieBreaker; // Random tiebreaker
+    });
+
+    // Track which positions are filled
+    const filledPositions = new Set();
+    const unplacedHeroes = [];
+
+    // First pass: Place heroes with preferences
+    for (const heroData of heroesWithPreferences) {
+        if (heroData.preferredPositions.length === 0) {
+            // No preferences, save for later
+            unplacedHeroes.push(heroData.hero);
+            continue;
+        }
+
+        // Convert 1-3 positions to position names and filter available ones
+        const availablePreferences = heroData.preferredPositions
+            .map(pos => {
+                if (pos === 1) return 'left';
+                if (pos === 2) return 'center';
+                if (pos === 3) return 'right';
+                return null;
+            })
+            .filter(posName => posName && !filledPositions.has(posName));
+
+        if (availablePreferences.length > 0) {
+            // Pick random available preferred position
+            const chosenPosition = availablePreferences[
+                Math.floor(Math.random() * availablePreferences.length)
+            ];
+            formation[chosenPosition] = heroData.hero;
+            filledPositions.add(chosenPosition);
+        } else {
+            // All preferred positions taken, save for later
+            unplacedHeroes.push(heroData.hero);
+        }
+    }
+
+    // Second pass: Place remaining heroes in any free positions
+    const allPositions = ['left', 'center', 'right'];
+    const freePositions = allPositions.filter(pos => !filledPositions.has(pos));
+    
+    // Shuffle free positions for randomness
+    for (let i = freePositions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [freePositions[i], freePositions[j]] = [freePositions[j], freePositions[i]];
+    }
+
+    unplacedHeroes.forEach((hero, index) => {
+        if (index < freePositions.length) {
+            formation[freePositions[index]] = hero;
+        }
+    });
+
+    // Final step: Shift all heroes left to remove gaps (for teams with < 3 heroes)
+    return shiftHeroesLeft(formation);
+}
+
+/**
+ * Shift heroes left to remove gaps in formation
+ * @param {Object} formation - Formation to shift
+ * @returns {Object} Shifted formation
+ */
+function shiftHeroesLeft(formation) {
+    const heroes = [];
+    ['left', 'center', 'right'].forEach(pos => {
+        if (formation[pos]) {
+            heroes.push(formation[pos]);
+        }
+    });
+
+    const shifted = { left: null, center: null, right: null };
+    const slots = ['left', 'center', 'right'];
+    
+    heroes.forEach((hero, index) => {
+        if (index < slots.length) {
+            shifted[slots[index]] = hero;
+        }
+    });
+
+    return shifted;
 }
 
 /**

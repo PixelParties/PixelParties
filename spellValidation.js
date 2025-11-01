@@ -43,10 +43,12 @@ export function canHeroUseSpell(heroPosition, spellCardName, context) {
         return { canUse: false, reason: "You can't add Spells to an empty slot!" };
     }
     
-    // Check 2: Spellbook restrictions (includes Area spell restriction)
-    const spellbookCheck = checkSpellbookRestrictions(heroPosition, spellCardName, context);
-    if (spellbookCheck && !spellbookCheck.canLearn) {
-        return { canUse: false, reason: spellbookCheck.reason };
+    // Check 2: Spellbook restrictions (skip for Area spells - they're cast from hand, not learned)
+    if (cardInfo.subtype !== 'Area') {
+        const spellbookCheck = checkSpellbookRestrictions(heroPosition, spellCardName, context);
+        if (spellbookCheck && !spellbookCheck.canLearn) {
+            return { canUse: false, reason: spellbookCheck.reason };
+        }
     }
     
     // Check 3: Special free-cast conditions (bypass normal requirements)

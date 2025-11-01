@@ -18,6 +18,7 @@ import { processComputerCreaturesAfterBattle } from './cpuCreatureUpdates.js';
 import { processComputerPotionsAfterBattle } from './cpuPotionUpdates.js';
 import { processComputerAscensionsAfterBattle } from './cpuAscensionUpdates.js';
 import { processAllCreatureTurnEffects } from './cpuCreatureTurnEffects.js';
+import { positionHeroesIntelligently } from './cpuHelpers.js';
 
 import { selectSmartHero } from './smartHeroSelection.js';
 import BurningFingerSpell from './Spells/burningFinger.js';
@@ -53,7 +54,7 @@ function getUnavailableHeroes(playerHeroNames, computerTeams = null) {
     
     // Add all CPU team heroes
     if (computerTeams) {
-        ['team1', 'team2', 'team3'].forEach(teamKey => {
+        Object.keys(computerTeams).forEach(teamKey => {
             const team = computerTeams[teamKey];
             if (team && team.formation) {
                 ['left', 'center', 'right'].forEach(pos => {
@@ -92,54 +93,59 @@ function getAvailableHeroesForDraft(playerHeroNames, computerTeams = null) {
 }
 
 /**
- * Initialize 3 computer teams when player selects first hero
+ * Initialize X computer teams when player selects first hero
  * @param {Object} roomRef - Firebase room reference
  * @param {string} playerHeroName - Player's first hero name
- * @param {string} guaranteedOpponent - TEST ONLY: Force team1's first hero to be this hero
- * @returns {Promise<Object>} The 3 initialized teams
+ * @param {Array} cpuConfig - Array of CPU player configs from lobby (optional, defaults to 3 CPUs)
+ * @returns {Promise<Object>} The X initialized teams
  */
-export async function initializeComputerTeams(roomRef, playerHeroName, guaranteedOpponent = '') {
+export async function initializeComputerTeams(roomRef, playerHeroName, cpuConfig = null) {
     if (!roomRef || !playerHeroName) {
         return null;
     }
 
-    const availableHeroes = getAvailableHeroesForDraft([playerHeroName], null);
-    
-    let selectedHeroes = [];
-    
-    if (guaranteedOpponent && guaranteedOpponent !== '') {
-        // If there's a guaranteed opponent for team1, use it
-        selectedHeroes.push(guaranteedOpponent);
-        
-        // Smart select for teams 2 and 3
-        const remainingHeroes = availableHeroes.filter(name => name !== guaranteedOpponent);
-        const hero2 = selectSmartHero(remainingHeroes, 1, null);
-        selectedHeroes.push(hero2);
-        
-        const remainingAfterHero2 = remainingHeroes.filter(name => name !== hero2);
-        const hero3 = selectSmartHero(remainingAfterHero2, 1, null);
-        selectedHeroes.push(hero3);
-    } else {
-        // Smart select all 3 first heroes
-        const hero1 = selectSmartHero(availableHeroes, 1, null);
-        selectedHeroes.push(hero1);
-        
-        const remainingAfterHero1 = availableHeroes.filter(name => name !== hero1);
-        const hero2 = selectSmartHero(remainingAfterHero1, 1, null);
-        selectedHeroes.push(hero2);
-        
-        const remainingAfterHero2 = remainingAfterHero1.filter(name => name !== hero2);
-        const hero3 = selectSmartHero(remainingAfterHero2, 1, null);
-        selectedHeroes.push(hero3);
+    // If no config provided, create default config with 3 normal CPUs with random heroes
+    if (!cpuConfig || cpuConfig.length === 0) {
+        cpuConfig = [
+            { startingHero: '', difficulty: 'Normal' },
+            { startingHero: '', difficulty: 'Normal' },
+            { startingHero: '', difficulty: 'Normal' }
+        ];
     }
 
-    const teams = {
-        team1: await createTeamWithHero(selectedHeroes[0]),
-        team2: await createTeamWithHero(selectedHeroes[1]),
-        team3: await createTeamWithHero(selectedHeroes[2])
-    };
+    const availableHeroes = getAvailableHeroesForDraft([playerHeroName], null);
+    const teams = {};
+    const usedHeroes = [playerHeroName];
+
+    // Create a team for each CPU in the config
+    for (let i = 0; i < cpuConfig.length; i++) {
+        const cpuInfo = cpuConfig[i];
+        const teamKey = `team${i + 1}`;
+        let selectedHero;
+
+        // Check if a specific hero was chosen for this CPU (not random)
+        if (cpuInfo.startingHero && cpuInfo.startingHero.trim() !== '') {
+            selectedHero = cpuInfo.startingHero;
+        } else {
+            // Random selection - use smart selection from available heroes
+            const remainingHeroes = availableHeroes.filter(name => !usedHeroes.includes(name));
+            if (remainingHeroes.length > 0) {
+                selectedHero = selectSmartHero(remainingHeroes, 1, null);
+            } else {
+                // Fallback if somehow we run out (shouldn't happen with enough heroes)
+                selectedHero = availableHeroes[Math.floor(Math.random() * availableHeroes.length)];
+            }
+        }
+
+        usedHeroes.push(selectedHero);
+        
+        // Create the team with the hero and difficulty
+        teams[teamKey] = await createTeamWithHero(selectedHero, cpuInfo.difficulty);
+    }
 
     try {
+        // Store team count for cycling
+        await roomRef.child('singleplayer/computerTeamsCount').set(cpuConfig.length);
         await roomRef.child('singleplayer/computerTeams').set(teams);
         return teams;
     } catch (error) {
@@ -149,8 +155,10 @@ export async function initializeComputerTeams(roomRef, playerHeroName, guarantee
 
 /**
  * Create a team with a single hero (fully initialized)
+ * @param {string} heroName - The hero's name
+ * @param {string} difficulty - The difficulty level ('Easy', 'Normal', or 'Hard')
  */
-async function createTeamWithHero(heroName) {
+async function createTeamWithHero(heroName, difficulty = 'Normal') {
     const heroInfo = getHeroInfo(heroName);
     if (!heroInfo) return null;
 
@@ -199,7 +207,8 @@ async function createTeamWithHero(heroName) {
         permanentArtifacts: [],
         areaCard: null,
         delayedEffects: [],
-        heroCount: 1
+        heroCount: 1,
+        difficulty: difficulty  // Store difficulty for later use
     };
 }
 
@@ -278,7 +287,7 @@ function calculateStartingGoldForHero(heroName) {
 }
 
 /**
- * Add a hero to all 3 computer teams (when player gets hero 2 or 3)
+ * Add a hero to all X computer teams (when player gets hero 2 or 3)
  */
 export async function addHeroToComputerTeams(roomRef, playerHeroNames) {
     if (!roomRef || !Array.isArray(playerHeroNames)) {
@@ -292,11 +301,14 @@ export async function addHeroToComputerTeams(roomRef, playerHeroNames) {
 
         // Use new filtering function that handles ascended heroes
         const availableHeroes = getAvailableHeroesForDraft(playerHeroNames, teams);
-        if (availableHeroes.length < 3) return false;
+        
+        // Get team count
+        const teamKeys = Object.keys(teams);
+        if (availableHeroes.length < teamKeys.length) return false;
 
         // Select heroes smartly for each team based on their current formation
         const newHeroes = [];
-        ['team1', 'team2', 'team3'].forEach((teamKey) => {
+        teamKeys.forEach((teamKey) => {
             const team = teams[teamKey];
             const position = team.heroCount + 1; // 2 or 3 depending on current count
             
@@ -309,7 +321,7 @@ export async function addHeroToComputerTeams(roomRef, playerHeroNames) {
         });
 
         const updates = {};
-        ['team1', 'team2', 'team3'].forEach((teamKey, index) => {
+        teamKeys.forEach((teamKey, index) => {
             const team = teams[teamKey];
             const newHeroName = newHeroes[index];
             const targetSlot = team.heroCount === 1 ? 'center' : 'right';
@@ -375,7 +387,7 @@ async function processBurningFingerCounters(roomRef) {
         const updates = {};
         let totalUpdates = 0;
         
-        ['team1', 'team2', 'team3'].forEach(teamKey => {
+        Object.keys(teams).forEach(teamKey => {
             const team = teams[teamKey];
             if (!team) return;
             
@@ -428,7 +440,7 @@ export async function updateCPUTeams(roomRef, currentTurn, battleResult = 'defea
         const teamsSnapshot = await roomRef.child('singleplayer/computerTeams').once('value');
         const currentTeams = teamsSnapshot.val();
 
-        ['team1', 'team2', 'team3'].forEach(teamKey => {
+        Object.keys(currentTeams).forEach(teamKey => {
             clearUpdates[`${teamKey}/activePotionEffects`] = [];
             clearUpdates[`${teamKey}/delayedEffects`] = [];
             
@@ -525,11 +537,16 @@ export async function selectComputerTeamForBattle(roomRef, currentTurn = 1, guar
         const teams = snapshot.val();
         if (!teams) return null;
 
+        // Get the team count (number of CPU opponents)
+        const teamCountSnapshot = await roomRef.child('singleplayer/computerTeamsCount').once('value');
+        const teamCount = teamCountSnapshot.val() || 3; // Default to 3 if not set
+
         let randomTeamKey;
         if (guaranteedOpponent && guaranteedOpponent !== '') {
             randomTeamKey = 'team1';
         } else {
-            const teamIndex = ((currentTurn - 1) % 3) + 1;
+            // Cycle through X teams instead of hardcoded 3
+            const teamIndex = ((currentTurn - 1) % teamCount) + 1;
             randomTeamKey = `team${teamIndex}`;
         }
         
@@ -903,55 +920,12 @@ function getObtainableHeroes() {
 }
 
 /**
- * Randomize hero formation with special positioning rules
+ * Randomize hero formation with intelligent positioning based on hero preferences
+ * This function now uses the intelligent positioning system from cpuHelpers.js
  */
 function randomizeFormation(formation, heroCount) {
-    const heroes = [];
-    ['left', 'center', 'right'].forEach(pos => {
-        if (formation[pos]) {
-            const hero = { 
-                ...formation[pos],
-                originalPos: pos 
-            };
-            heroes.push(hero);
-        }
-    });
-
-    if (heroes.length === 0) {
-        return { left: null, center: null, right: null };
-    }
-
-    const newFormation = { left: null, center: null, right: null };
-
-    const monicaHero = heroes.find(h => h.name === 'Monia');
-    const tharxHero = heroes.find(h => h.name === 'Tharx');
-
-    if (monicaHero && heroCount === 3 && Math.random() < 0.8) {
-        newFormation.center = monicaHero;
-        heroes.splice(heroes.indexOf(monicaHero), 1);
-    }
-
-    if (tharxHero && heroCount >= 2 && Math.random() < 0.66 && !newFormation.left) {
-        newFormation.left = tharxHero;
-        heroes.splice(heroes.indexOf(tharxHero), 1);
-    }
-
-    for (let i = heroes.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [heroes[i], heroes[j]] = [heroes[j], heroes[i]];
-    }
-
-    const slots = ['left', 'center', 'right'];
-    let heroIndex = 0;
-
-    for (const slot of slots) {
-        if (!newFormation[slot] && heroIndex < heroes.length) {
-            newFormation[slot] = heroes[heroIndex];
-            heroIndex++;
-        }
-    }
-
-    return newFormation;
+    // Use the new intelligent positioning system
+    return positionHeroesIntelligently(formation);
 }
 
 /**

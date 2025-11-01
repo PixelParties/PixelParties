@@ -2,10 +2,12 @@
 
 import { getCardInfo, getAllCardNames } from './cardDatabase.js';
 import { countAbilityStacks } from './cpuHelpers.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Process potions for all computer teams after battle
- * Each team gets potion usages (1 + Alchemy stacks), then processes potions from deck
+ * Each team gets potion usages based on difficulty (1/1/2 + Alchemy stacks), then processes potions from deck
+ * Difficulty is read from each team's difficulty property
  */
 export async function processComputerPotionsAfterBattle(roomRef) {
     if (!roomRef) return false;
@@ -38,7 +40,9 @@ export async function processComputerPotionsAfterBattle(roomRef) {
             const shuffledPotions = [...allPotions].sort(() => Math.random() - 0.5);
 
             // CALCULATE POTION USAGES
-            let availablePotionUsages = 1;
+            const difficulty = team.difficulty || 'Normal';
+            const basePotionUsages = getDifficultyValue(difficulty, 'potions', 'baseUsages');
+            let availablePotionUsages = basePotionUsages;
             ['left', 'center', 'right'].forEach(position => {
                 if (team.formation[position] && team.abilities && team.abilities[position]) {
                     const alchemyStacks = countAbilityStacks(team.abilities, position, 'Alchemy');
@@ -47,6 +51,7 @@ export async function processComputerPotionsAfterBattle(roomRef) {
             });
 
             // PROCESS POTIONS
+            const activationChance = getDifficultyValue(difficulty, 'potions', 'activationChance');
             const activePotionEffects = [];
             let currentHand = [...(team.hand || [])];
             let currentDeck = [...(team.deck || [])];
@@ -56,8 +61,8 @@ export async function processComputerPotionsAfterBattle(roomRef) {
             for (const potionName of shuffledPotions) {
                 if (availablePotionUsages <= 0) break;
 
-                // 10% chance to activate
-                if (Math.random() >= 0.10) continue;
+                // Difficulty-based activation chance
+                if (Math.random() >= activationChance) continue;
 
                 // Potion activates! Consume one usage
                 availablePotionUsages--;

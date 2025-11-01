@@ -1,7 +1,11 @@
-// cpuResourceUpdates.js - CPU hand/deck/graveyard/gold/area counter management
+// cpuResourceUpdates.js - ENHANCED VERSION
+// CPU hand/deck/graveyard/gold/area counter management
 
 import { getCardInfo, getHeroInfo, getAllCardNames } from './cardDatabase.js';
 import { countAbilityStacks } from './cpuHelpers.js';
+import { attemptSmartDraft } from './cpuSmartDraft.js';
+import { canHeroUseSpell } from './spellValidation.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Update hands, decks, and graveyards for all computer teams after a battle
@@ -10,6 +14,10 @@ export async function updateComputerHandsAfterBattle(roomRef) {
     if (!roomRef) return false;
 
     try {
+        // Get human team data for smart draft system
+        const humanSnapshot = await roomRef.child('singleplayer/humanTeam').once('value');
+        const humanTeam = humanSnapshot.val();
+        
         const snapshot = await roomRef.child('singleplayer/computerTeams').once('value');
         const teams = snapshot.val();
         if (!teams) return false;
@@ -20,6 +28,7 @@ export async function updateComputerHandsAfterBattle(roomRef) {
             const team = teams[teamKey];
             if (!team || !team.formation) return;
 
+            const difficulty = team.difficulty || 'Normal';
             const currentDeck = [...(team.deck || [])];
             const currentHand = [...(team.hand || [])];
             const currentGraveyard = [...(team.graveyard || [])];
@@ -33,8 +42,26 @@ export async function updateComputerHandsAfterBattle(roomRef) {
                 newHand.push(card1Name);
             }
             
-            // Card 2: Random card with weighted selection
-            const card2Name = selectRandomCardForComputer(team.formation, currentDeck);
+            // Card 2: Smart draft with fallback to random
+            let card2Name = null;
+            
+            // Try smart draft system
+            if (humanTeam) {
+                const smartResult = attemptSmartDraft(humanTeam, team, difficulty);
+                
+                if (smartResult.useSmartMode && smartResult.selectedCard) {
+                    // Smart mode activated and found a counter card!
+                    card2Name = smartResult.selectedCard;
+                    console.log(`${teamKey}: Smart draft selected ${card2Name}`);
+                }
+            }
+            
+            // Fall back to random selection if smart draft didn't activate or failed
+            if (!card2Name) {
+                card2Name = selectRandomCardForComputer(team.formation, currentDeck, team.abilities, team.creatures, team.graveyard);
+                console.log(`${teamKey}: Random draft selected ${card2Name || 'none'}`);
+            }
+            
             if (card2Name) {
                 newHand.push(card2Name);
                 currentDeck.push(card2Name);
@@ -86,7 +113,7 @@ export async function updateComputerHandsAfterBattle(roomRef) {
                         currentGold -= coolPresentsCost;
                         
                         for (let j = 0; j < 3; j++) {
-                            const randomCard = selectRandomCardForComputer(team.formation, currentDeck);
+                            const randomCard = selectRandomCardForComputer(team.formation, currentDeck, team.abilities, team.creatures, team.graveyard);
                             if (randomCard) {
                                 finalHand.push(randomCard);
                                 currentDeck.push(randomCard);
@@ -139,9 +166,12 @@ export async function awardComputerGoldAfterBattle(roomRef, battleResult = 'defe
             const team = teams[teamKey];
             if (!team || !team.formation) return;
 
-            const goldBreakdown = calculateComputerGoldBreakdown(team, battleResult);
+            const difficulty = team.difficulty || 'Normal';
+            const goldBreakdown = calculateComputerGoldBreakdown(team, battleResult, difficulty);
             const currentGold = team.gold || 0;
             const newGold = currentGold + goldBreakdown.total;
+            
+            console.log(`[${difficulty}] ${teamKey} gold: +${goldBreakdown.total} (multiplier: ${goldBreakdown.multiplier}x)`);
             
             updates[`${teamKey}/gold`] = newGold;
         });
@@ -159,8 +189,12 @@ export async function awardComputerGoldAfterBattle(roomRef, battleResult = 'defe
 
 /**
  * Calculate gold breakdown for a computer team
+ * @param {Object} team - Team data
+ * @param {string} battleResult - 'victory', 'defeat', or 'draw'
+ * @param {string} difficulty - Difficulty level ('Easy', 'Normal', or 'Hard')
+ * @returns {Object} Gold breakdown with total
  */
-function calculateComputerGoldBreakdown(team, battleResult) {
+function calculateComputerGoldBreakdown(team, battleResult, difficulty = 'Normal') {
     const breakdown = {
         baseGold: 4,
         battleBonus: 0,
@@ -168,6 +202,7 @@ function calculateComputerGoldBreakdown(team, battleResult) {
         semiBonus: 0,
         sapphireBonus: 0,
         rainbowsArrowBonus: 0,
+        multiplier: 1.0,
         total: 0
     };
 
@@ -200,22 +235,19 @@ function calculateComputerGoldBreakdown(team, battleResult) {
                 });
                 
                 if (wealthLevel > 0) {
-                    const goldFromWealth = wealthLevel * 4;
-                    breakdown.wealthBonus += goldFromWealth;
+                    breakdown.wealthBonus += wealthLevel;
                 }
             }
         });
     }
 
     if (team.formation) {
-        const hasSemi = ['left', 'center', 'right'].some(position => {
+        ['left', 'center', 'right'].forEach(position => {
             const hero = team.formation[position];
-            return hero && hero.name === 'Semi';
+            if (hero && hero.name === 'Semi') {
+                breakdown.semiBonus = 2;
+            }
         });
-        
-        if (hasSemi) {
-            breakdown.semiBonus = 6;
-        }
     }
 
     if (team.magicSapphiresUsed) {
@@ -244,6 +276,10 @@ function calculateComputerGoldBreakdown(team, battleResult) {
 
     breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
                      breakdown.semiBonus + breakdown.sapphireBonus + breakdown.rainbowsArrowBonus;
+
+    // Apply difficulty-based gold multiplier
+    breakdown.multiplier = getDifficultyValue(difficulty, 'resources', 'goldGainMultiplier');
+    breakdown.total = Math.floor(breakdown.total * breakdown.multiplier);
 
     return breakdown;
 }
@@ -301,34 +337,235 @@ export async function processComputerAreaCountersAfterBattle(roomRef) {
 }
 
 /**
- * Select a random card for computer with weighted probabilities
+ * ENHANCED: Select a random card for computer with weighted probabilities and 1d3 roll
+ * @param {Object} formation - Current formation with heroes
+ * @param {Array} currentDeck - Current deck contents
+ * @param {Object} abilities - Team abilities structure (for spell validation and ability checks)
+ * @param {Object} creatures - Team creatures structure (for spell validation)
+ * @param {Array} graveyard - Team graveyard (for spell validation)
+ * @returns {string} Selected card name
  */
-export function selectRandomCardForComputer(formation, currentDeck) {
-    const roll = Math.random();
+export function selectRandomCardForComputer(formation, currentDeck, abilities = null, creatures = null, graveyard = null) {
+    // Roll 1d3 to determine card type
+    const typeRoll = Math.floor(Math.random() * 3) + 1;
     
-    // 50% chance: Copy of card already in deck
-    if (roll < 0.5) {
-        if (currentDeck.length > 0) {
-            return currentDeck[Math.floor(Math.random() * currentDeck.length)];
+    if (typeRoll === 1) {
+        // Roll 1: Add random Ability
+        return selectRandomAbility(formation, currentDeck, abilities);
+    } else if (typeRoll === 2) {
+        // Roll 2: Add random Spell (with validation)
+        const spell = selectRandomValidSpell(formation, currentDeck, abilities, creatures, graveyard);
+        
+        // If spell selection failed after 100 attempts, fallback to Ability
+        if (!spell) {
+            return selectRandomAbility(formation, currentDeck, abilities);
         }
-        return selectFromAllCards(formation);
+        
+        return spell;
+    } else {
+        // Roll 3: Add anything else (using original logic)
+        return selectFromAllCards(formation, currentDeck);
+    }
+}
+
+/**
+ * Select a random Ability with special weighting rules
+ * @param {Object} formation - Current formation
+ * @param {Array} currentDeck - Current deck
+ * @param {Object} abilities - Team abilities (to check if SpellSchool abilities already exist)
+ * @returns {string} Selected ability name
+ */
+function selectRandomAbility(formation, currentDeck, abilities) {
+    const allCards = getAllCardNames();
+    const abilityCards = allCards.filter(cardName => {
+        const cardInfo = getCardInfo(cardName);
+        return cardInfo && cardInfo.cardType === 'Ability';
+    });
+    
+    if (abilityCards.length === 0) {
+        return selectFromAllCards(formation, currentDeck);
     }
     
-    // 25% chance: Spell with matching SpellSchool
-    if (roll < 0.75) {
-        const matchingSpell = selectMatchingSpellSchoolCard(formation);
-        if (matchingSpell) {
-            return matchingSpell;
-        }
-        return selectFromAllCards(formation);
+    // Check if Mary is in the formation
+    const hasMary = ['left', 'center', 'right'].some(pos => 
+        formation[pos] && formation[pos].name === 'Mary'
+    );
+    
+    // Check which SpellSchool abilities the heroes already have
+    const heroHasSpellSchool = {};
+    const spellSchoolAbilities = ['DestructionMagic', 'SummoningMagic', 'DecayMagic', 'SupportMagic', 'MagicArts', 'Fighting'];
+    
+    if (abilities) {
+        spellSchoolAbilities.forEach(spellSchool => {
+            heroHasSpellSchool[spellSchool] = false;
+            
+            ['left', 'center', 'right'].forEach(position => {
+                if (abilities[position]) {
+                    ['zone1', 'zone2', 'zone3'].forEach(zone => {
+                        if (abilities[position][zone] && Array.isArray(abilities[position][zone])) {
+                            if (abilities[position][zone].some(a => a && a.name === spellSchool)) {
+                                heroHasSpellSchool[spellSchool] = true;
+                            }
+                        }
+                    });
+                }
+            });
+        });
     }
     
-    // 25% chance: Any card except non-matching SpellSchool spells
-    return selectFromAllCards(formation);
+    // Build weighted ability pool
+    const weightedAbilities = [];
+    
+    // First, check if we should prioritize cards already in deck (50% chance)
+    const shouldPrioritizeDeck = Math.random() < 0.5;
+    if (shouldPrioritizeDeck && currentDeck.length > 0) {
+        const abilityInDeck = currentDeck.filter(cardName => {
+            const cardInfo = getCardInfo(cardName);
+            return cardInfo && cardInfo.cardType === 'Ability';
+        });
+        
+        if (abilityInDeck.length > 0) {
+            // Apply same weighting rules to deck cards
+            abilityInDeck.forEach(abilityName => {
+                const weight = getAbilityWeight(abilityName, hasMary, heroHasSpellSchool);
+                for (let i = 0; i < weight; i++) {
+                    weightedAbilities.push(abilityName);
+                }
+            });
+            
+            // Return from this weighted pool
+            if (weightedAbilities.length > 0) {
+                return weightedAbilities[Math.floor(Math.random() * weightedAbilities.length)];
+            }
+        }
+    }
+    
+    // Otherwise, select from all abilities with weighting
+    abilityCards.forEach(abilityName => {
+        const weight = getAbilityWeight(abilityName, hasMary, heroHasSpellSchool);
+        for (let i = 0; i < weight; i++) {
+            weightedAbilities.push(abilityName);
+        }
+    });
+    
+    if (weightedAbilities.length === 0) {
+        // Fallback to any ability if somehow we have none
+        return abilityCards[Math.floor(Math.random() * abilityCards.length)];
+    }
+    
+    return weightedAbilities[Math.floor(Math.random() * weightedAbilities.length)];
+}
+
+/**
+ * Get the weight for an ability based on special rules
+ * @param {string} abilityName - Name of the ability
+ * @param {boolean} hasMary - Whether Mary is in the party
+ * @param {Object} heroHasSpellSchool - Map of which SpellSchool abilities heroes have
+ * @returns {number} Weight (higher = more likely)
+ */
+function getAbilityWeight(abilityName, hasMary, heroHasSpellSchool) {
+    // Toughness and Resistance: Even MORE increased priority (5x base weight)
+    if (abilityName === 'Toughness' || abilityName === 'Resistance') {
+        return 5;
+    }
+    
+    // SpellSchool abilities: Check special cases
+    const spellSchoolAbilities = ['DestructionMagic', 'SummoningMagic', 'DecayMagic', 'SupportMagic', 'MagicArts', 'Fighting'];
+    
+    if (spellSchoolAbilities.includes(abilityName)) {
+        // Exception: DestructionMagic with Mary gets increased priority
+        if (abilityName === 'DestructionMagic' && hasMary) {
+            return 3; // Increased priority for Mary
+        }
+        
+        // Exception: If hero already has this SpellSchool, normal priority
+        if (heroHasSpellSchool[abilityName]) {
+            return 1; // Normal priority
+        }
+        
+        // Otherwise, vastly reduced priority (0.1x = 10% of normal)
+        // Using fractional approach: only add it 10% of the time
+        if (Math.random() < 0.1) {
+            return 1;
+        } else {
+            return 0; // Don't add to pool this time
+        }
+    }
+    
+    // All other abilities: Normal weight
+    return 1;
+}
+
+/**
+ * Select a random valid Spell with validation
+ * @param {Object} formation - Current formation
+ * @param {Array} currentDeck - Current deck
+ * @param {Object} abilities - Team abilities
+ * @param {Object} creatures - Team creatures
+ * @param {Array} graveyard - Team graveyard
+ * @returns {string|null} Selected spell name or null if failed after 100 attempts
+ */
+function selectRandomValidSpell(formation, currentDeck, abilities, creatures, graveyard) {
+    const allCards = getAllCardNames();
+    const spellCards = allCards.filter(cardName => {
+        const cardInfo = getCardInfo(cardName);
+        return cardInfo && cardInfo.cardType === 'Spell';
+    });
+    
+    if (spellCards.length === 0) {
+        return null;
+    }
+    
+    // Try up to 100 times to find a valid spell
+    for (let attempt = 0; attempt < 100; attempt++) {
+        let selectedSpell = null;
+        
+        // 50% chance to select from deck, 50% from all spells
+        if (Math.random() < 0.5 && currentDeck.length > 0) {
+            const spellsInDeck = currentDeck.filter(cardName => {
+                const cardInfo = getCardInfo(cardName);
+                return cardInfo && cardInfo.cardType === 'Spell';
+            });
+            
+            if (spellsInDeck.length > 0) {
+                selectedSpell = spellsInDeck[Math.floor(Math.random() * spellsInDeck.length)];
+            }
+        }
+        
+        // If we didn't get a spell from deck, pick from all spells
+        if (!selectedSpell) {
+            selectedSpell = spellCards[Math.floor(Math.random() * spellCards.length)];
+        }
+        
+        // Check if any hero in the formation can use this spell
+        const canAnyHeroUse = ['left', 'center', 'right'].some(position => {
+            const hero = formation[position];
+            if (!hero) return false;
+            
+            // Build context for spell validation
+            const context = {
+                formation: formation,
+                abilities: abilities || { left: null, center: null, right: null },
+                creatures: creatures || { left: [], center: [], right: [] },
+                graveyard: graveyard || []
+            };
+            
+            const validationResult = canHeroUseSpell(position, selectedSpell, context);
+            return validationResult.canUse || validationResult.isFree;
+        });
+        
+        if (canAnyHeroUse) {
+            return selectedSpell;
+        }
+    }
+    
+    // Failed after 100 attempts
+    return null;
 }
 
 /**
  * Select a spell card with SpellSchool matching at least one hero's ability
+ * (DEPRECATED - kept for compatibility but no longer used in main flow)
  */
 function selectMatchingSpellSchoolCard(formation) {
     const heroSpellSchools = new Set();
@@ -385,8 +622,16 @@ export function isSpellSchoolAbility(abilityName) {
 
 /**
  * Select any valid card (excluding Spells with non-matching SpellSchools)
+ * This is used for the "anything else" case (roll 3)
  */
-function selectFromAllCards(formation) {
+function selectFromAllCards(formation, currentDeck) {
+    // 50% chance: Copy of card already in deck
+    const shouldPrioritizeDeck = Math.random() < 0.5;
+    if (shouldPrioritizeDeck && currentDeck.length > 0) {
+        return currentDeck[Math.floor(Math.random() * currentDeck.length)];
+    }
+    
+    // Otherwise select from all valid cards
     const heroSpellSchools = new Set();
     
     ['left', 'center', 'right'].forEach(position => {

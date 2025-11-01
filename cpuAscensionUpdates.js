@@ -2,6 +2,7 @@
 
 import { getCardInfo } from './cardDatabase.js';
 import { calculateComputerHeroStats } from './cpuArtifactUpdates.js';
+import { getDifficultyValue } from './cpuDifficultyConfig.js';
 
 /**
  * Process ascensions for all computer teams after battle
@@ -32,6 +33,10 @@ export async function processComputerAscensionsAfterBattle(roomRef, currentTurn 
             const team = teams[teamKey];
             if (!team || !team.formation) continue;
 
+            // Get team difficulty
+            const difficulty = team.difficulty || 'Normal';
+            const ascensionChance = getDifficultyValue(difficulty, 'ascension', 'moniaBeato');
+
             // Process each hero position
             for (const position of ['left', 'center', 'right']) {
                 const hero = team.formation[position];
@@ -39,21 +44,21 @@ export async function processComputerAscensionsAfterBattle(roomRef, currentTurn 
 
                 const heroName = hero.name;
 
-                // Check for Monia -> MoniaBot ascension (25% chance if conditions met)
+                // Check for Monia -> MoniaBot ascension (difficulty-based chance if conditions met)
                 if (heroName === 'Monia') {
                     const canAscend = checkMoniaAscension(team, position);
-                    if (canAscend && Math.random() < 0.25) {
+                    if (canAscend && Math.random() < ascensionChance) {
                         performAscension(updates, teamKey, position, hero, 'MoniaBot', team);
-                        console.log(`🌟 CPU ${teamKey} ${position}: Monia ascended to MoniaBot (600+ HP)!`);
+                        console.log(`🌟 CPU ${teamKey} [${difficulty}] ${position}: Monia ascended to MoniaBot (600+ HP)!`);
                     }
                 }
 
-                // Check for Beato -> EternalBeato ascension (25% chance if conditions met)
+                // Check for Beato -> EternalBeato ascension (difficulty-based chance if conditions met)
                 if (heroName === 'Beato') {
                     const canAscend = checkBeatoAscension(team, position);
-                    if (canAscend && Math.random() < 0.25) {
+                    if (canAscend && Math.random() < ascensionChance) {
                         performAscension(updates, teamKey, position, hero, 'EternalBeato', team);
-                        console.log(`🌟 CPU ${teamKey} ${position}: Beato ascended to EternalBeato (8+ unique spells)!`);
+                        console.log(`🌟 CPU ${teamKey} [${difficulty}] ${position}: Beato ascended to EternalBeato (8+ unique spells)!`);
                     }
                 }
 
@@ -63,7 +68,8 @@ export async function processComputerAscensionsAfterBattle(roomRef, currentTurn 
                         team, 
                         position, 
                         hero, 
-                        playerCreatureCount
+                        playerCreatureCount,
+                        difficulty
                     );
                     
                     if (evolutionResult.shouldEvolve) {
@@ -143,7 +149,7 @@ function isWaflavForm(heroName) {
 /**
  * Process Waflav evolution logic with complex counter-based rules
  */
-function processWaflavEvolution(team, position, hero, playerCreatureCount) {
+function processWaflavEvolution(team, position, hero, playerCreatureCount, difficulty = 'Normal') {
     const heroName = hero.name;
     
     // Initialize counters if not present
@@ -160,11 +166,12 @@ function processWaflavEvolution(team, position, hero, playerCreatureCount) {
     
     let currentCounters = team.counters.evolutionCounters || 1;
     
-    // Add 1-3 random counters after battle (for any Waflav form)
-    const counterGain = Math.floor(Math.random() * 3) + 1;
+    // Get difficulty-based counter gain range
+    const counterRange = getDifficultyValue(difficulty, 'ascension', 'evolutionCounterGain');
+    const counterGain = Math.floor(Math.random() * (counterRange.max - counterRange.min + 1)) + counterRange.min;
     currentCounters += counterGain;
     
-    console.log(`🔄 CPU Waflav evolution check: ${heroName}, ${currentCounters} counters (gained ${counterGain}), player creatures: ${playerCreatureCount}`);
+    console.log(`🔄 CPU Waflav evolution check [${difficulty}]: ${heroName}, ${currentCounters} counters (gained ${counterGain}), player creatures: ${playerCreatureCount}`);
     
     // PRIORITY 1 (GUARANTEED): Devolve from FlamebathedWaflav if > 6 counters
     if (heroName === 'FlamebathedWaflav' && currentCounters > 6) {

@@ -9,6 +9,7 @@ import { GameManager } from './gameManager.js';
 import { showCardLibraryScreen } from './cardLibrary.js';
 import { howToPlayOverlay } from './howToPlayOverlay.js';
 import { startMenuBackground } from './menuBackground.js';
+import { SingleplayerLobby } from './singleplayerLobby.js';
 
 
 class ProjectPixelParties {
@@ -25,6 +26,8 @@ class ProjectPixelParties {
         this.roomManager = null;
         this.webRTCManager = null;
         this.gameManager = null;
+        this.singleplayerLobby = new SingleplayerLobby();
+        this.singleplayerConfig = null;
         
         // State
         this.isInRoomBrowser = false;
@@ -177,6 +180,42 @@ class ProjectPixelParties {
             return;
         }
         
+        const username = this.uiManager.getCurrentUsername();
+        
+        // Show the singleplayer lobby screen
+        this.singleplayerLobby.show(
+            username, 
+            (config) => {
+                // onStart callback
+                // Store configuration
+                this.singleplayerConfig = config;
+                
+                // Set window debug variables for starting hero selection
+                window._debugHostHeroes = config.humanStartingHero ? [config.humanStartingHero] : [''];
+                window._singleplayerCPUConfig = config.cpuPlayers;
+                
+                // Set flag to skip hero selection if a specific hero was chosen (not random)
+                window._singleplayerSkipHeroSelection = config.humanStartingHero !== '';
+                
+                // Proceed with game setup
+                this.startSingleplayerGame();
+            },
+            () => {
+                // onExit callback
+                // Clean up any stored configuration
+                this.singleplayerConfig = null;
+                window._debugHostHeroes = undefined;
+                window._singleplayerCPUConfig = undefined;
+                window._singleplayerSkipHeroSelection = undefined;
+                
+                // Return to main menu
+                this.uiManager.showMainMenuButtons();
+                this.uiManager.hideStatus();
+            }
+        );
+    }
+    
+    async startSingleplayerGame() {
         try {
             this.uiManager.showStatus('Starting singleplayer...', 'waiting', true);
             
@@ -195,18 +234,18 @@ class ProjectPixelParties {
                 hostName: username,
                 hostReady: true,
                 hostOnline: true,
-                hostGameReady: true, // CHANGED: Set to true immediately
+                hostGameReady: true,
                 guest: null,
                 guestName: null,
                 guestReady: false,
                 guestOnline: false,
                 guestGameReady: false,
-                gameStarted: true, // CHANGED: Mark as started immediately
-                gameInProgress: true, // CHANGED: Mark as in progress immediately
+                gameStarted: true,
+                gameInProgress: true,
                 singleplayer: true,
                 created: firebase.database.ServerValue.TIMESTAMP,
                 lastActivity: firebase.database.ServerValue.TIMESTAMP,
-                gameStartTime: firebase.database.ServerValue.TIMESTAMP // ADDED: Set start time
+                gameStartTime: firebase.database.ServerValue.TIMESTAMP
             };
             
             await this.roomManager.roomRef.set(roomData);
@@ -223,10 +262,7 @@ class ProjectPixelParties {
             // Setup WebRTC as host (even though no peer will connect)
             await this.webRTCManager.setupConnection(true);
             
-            // REMOVED: Don't listen for room updates in singleplayer
-            // Instead, directly initialize the game
-            
-            // ADDED: Directly show the game screen and initialize hero selection
+            // Directly show the game screen and initialize hero selection
             await this.gameManager.showGameScreen();
             
             // Update status

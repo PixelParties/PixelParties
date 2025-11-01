@@ -385,8 +385,18 @@ export class CardPreviewManager {
             
             this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false);
         } else {
-            // Regular game positioning - near deck area
-            this.positionTooltipForGameScreenFixed(tooltipContent, tooltipWidth, tooltipHeight);
+            // Check if we're in singleplayer lobby
+            const isSingleplayerLobby = document.getElementById('singleplayerLobby');
+            
+            if (isSingleplayerLobby) {
+                // Position on the right side for singleplayer lobby
+                const finalX = window.innerWidth - tooltipWidth - 50;  // 50px from right edge
+                const finalY = 200;
+                this.applyTooltipStylesFixed(tooltipContent, finalX, finalY, false);
+            } else {
+                // Regular game positioning - near deck area
+                this.positionTooltipForGameScreenFixed(tooltipContent, tooltipWidth, tooltipHeight);
+            }
         }
     }
 

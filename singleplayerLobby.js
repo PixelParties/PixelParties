@@ -66,7 +66,7 @@ export class SingleplayerLobby {
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            z-index: 10000;
+            z-index: 2000;
             padding: 20px;
             box-sizing: border-box;
         `;
@@ -375,7 +375,7 @@ export class SingleplayerLobby {
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 10001;
+            z-index: 2500;
         `;
 
         // Create popup content

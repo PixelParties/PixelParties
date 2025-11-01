@@ -44,6 +44,13 @@ export class CardPreviewManager {
             cardData.imagePath = this.getCardImagePath(cardData.cardName, cardData.cardType);
         }
         
+        // Check if we're in the singleplayer lobby
+        const lobbyTooltipContent = document.getElementById('lobbyTooltipContent');
+        if (lobbyTooltipContent) {
+            this.showLobbyTooltip(cardData, lobbyTooltipContent);
+            return;
+        }
+        
         // Check if we're in reward screen first
         const isRewardScreen = document.getElementById('cardRewardOverlay');
         
@@ -171,6 +178,64 @@ export class CardPreviewManager {
         
         // Position the tooltip
         this.positionCardTooltipFixed(tooltipContainer, tooltipContent);
+    }
+
+    showLobbyTooltip(cardData, lobbyTooltipContent) {
+        // Hide placeholder
+        const placeholder = document.getElementById('lobbyTooltipPlaceholder');
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+
+        // Check if this is a character card with stats
+        const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
+        const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats;
+
+        // Build the card HTML with sprite-positioned stats
+        let cardHTML = `
+            <div class="large-card-tooltip ${isCharacterWithStats ? 'character-with-stats' : ''}">
+                <div class="tooltip-image-container">
+                    <img src="${cardData.imagePath}" 
+                        alt="${cardData.displayName}" 
+                        class="large-card-image"
+                        style="transform: scale(1.5); transform-origin: center;"
+                        onerror="this.src='./Cards/placeholder.png'">
+        `;
+        
+        // Add hero stats positioned on the sprite if available
+        if (isCharacterWithStats) {
+            const stats = cardData.heroStats;
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat hp-stat">
+                            <span class="stat-value">${stats.currentHp}</span>
+                        </div>
+                        <div class="tooltip-sprite-stat attack-stat">
+                            <span class="stat-value">${stats.attack}</span>
+                        </div>
+                    </div>
+            `;
+        }
+
+        if (isCreatureWithStats) {
+            const stats = cardData.creatureStats;
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat hp-stat" style="left: 130px;">
+                            <span class="stat-value">${stats.maxHp}</span>
+                        </div>
+                    </div>
+            `;
+        }
+        
+        cardHTML += `
+                </div>
+                <div class="card-tooltip-name">${cardData.displayName}</div>
+            </div>
+        `;
+
+        // Set content
+        lobbyTooltipContent.innerHTML = cardHTML;
     }
 
     showDeckTooltip(cardData) {
@@ -318,6 +383,22 @@ export class CardPreviewManager {
 
     // Enhanced hideCardTooltip with reward screen support and deck positioning reset
     hideCardTooltip() {
+        // Check if we're in the singleplayer lobby
+        const lobbyTooltipContent = document.getElementById('lobbyTooltipContent');
+        if (lobbyTooltipContent) {
+            // Show placeholder again
+            const placeholder = document.getElementById('lobbyTooltipPlaceholder');
+            if (placeholder) {
+                placeholder.style.display = 'block';
+            }
+            // Clear the tooltip content except the placeholder
+            const cardTooltip = lobbyTooltipContent.querySelector('.large-card-tooltip');
+            if (cardTooltip) {
+                cardTooltip.remove();
+            }
+            return;
+        }
+        
         // Check if we're in reward screen first
         const isRewardScreen = document.getElementById('cardRewardOverlay');
         

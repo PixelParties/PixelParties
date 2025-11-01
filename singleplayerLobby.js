@@ -82,6 +82,54 @@ export class SingleplayerLobby {
         `;
         lobbyContainer.appendChild(title);
 
+        // Create permanent tooltip border container
+        const tooltipBorder = document.createElement('div');
+        tooltipBorder.id = 'lobbyTooltipBorder';
+        tooltipBorder.style.cssText = `
+            position: fixed;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 518px;
+            height: 725px;
+            border: 6px solid #008cffff;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.4), inset 0 0 30px rgba(0, 0, 0, 0.3);
+            z-index: 2001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        `;
+
+        // Add inner content container for the tooltip
+        const tooltipContent = document.createElement('div');
+        tooltipContent.id = 'lobbyTooltipContent';
+        tooltipContent.style.cssText = `
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        `;
+        tooltipBorder.appendChild(tooltipContent);
+
+        // Add placeholder text when no card is hovered
+        const placeholder = document.createElement('div');
+        placeholder.id = 'lobbyTooltipPlaceholder';
+        placeholder.textContent = 'Hover over a Hero';
+        placeholder.style.cssText = `
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 1.2em;
+            text-align: center;
+            pointer-events: none;
+        `;
+        tooltipContent.appendChild(placeholder);
+
+        document.body.appendChild(tooltipBorder);
+
         // Players container
         const playersContainer = document.createElement('div');
         playersContainer.id = 'lobbyPlayersContainer';
@@ -656,6 +704,12 @@ export class SingleplayerLobby {
         const lobby = document.getElementById('singleplayerLobby');
         if (lobby) {
             lobby.remove();
+        }
+
+        // Remove tooltip border
+        const tooltipBorder = document.getElementById('lobbyTooltipBorder');
+        if (tooltipBorder) {
+            tooltipBorder.remove();
         }
 
         // Remove popup if open

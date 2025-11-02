@@ -172,6 +172,15 @@ function processWaflavEvolution(team, position, hero, playerCreatureCount, diffi
     currentCounters += counterGain;
     
     console.log(`🔄 CPU Waflav evolution check [${difficulty}]: ${heroName}, ${currentCounters} counters (gained ${counterGain}), player creatures: ${playerCreatureCount}`);
+
+    // PRIORITY 0 (GUARANTEED): Devolve ThunderstruckWaflav after it was used in battle
+        if (heroName === 'ThunderstruckWaflav') {
+            return {
+                shouldEvolve: true,
+                targetForm: 'Waflav',
+                newCounters: 0  // Reset to 0 after using the powerful effect
+            };
+        }
     
     // PRIORITY 1 (GUARANTEED): Devolve from FlamebathedWaflav if > 6 counters
     if (heroName === 'FlamebathedWaflav' && currentCounters > 6) {

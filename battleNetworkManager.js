@@ -1533,6 +1533,22 @@ export class BattleNetworkManager {
                 }
                 break;
 
+            case 'arms_trade_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('ArmsTrade')) {
+                    const armsTradeSpell = this.battleManager.spellSystem.spellImplementations.get('ArmsTrade');
+                    armsTradeSpell.handleGuestEffect(data);
+                }
+                break;
+            
+            case 'future_tech_barrage_triggered':
+                if (this.battleManager.spellSystem && 
+                    this.battleManager.spellSystem.spellImplementations.has('FutureTechBarrage')) {
+                    const futureTechBarrageSpell = this.battleManager.spellSystem.spellImplementations.get('FutureTechBarrage');
+                    futureTechBarrageSpell.handleGuestEffect(data);
+                }
+                break;
+
             case 'blow_of_the_venom_snake_triggered':
                 if (this.battleManager.spellSystem && 
                     this.battleManager.spellSystem.spellImplementations.has('BlowOfTheVenomSnake')) {
@@ -1723,6 +1739,27 @@ export class BattleNetworkManager {
                 });
                 break;
 
+            case 'ritual_chamber_start':
+                import('./Spells/ritualChamber.js').then(({ handleGuestRitualChamberStart }) => {
+                    handleGuestRitualChamberStart(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling ritual chamber start:', error);
+                });
+                break;
+
+            case 'ritual_chamber_buff':
+                import('./Spells/ritualChamber.js').then(({ handleGuestRitualChamberBuff }) => {
+                    handleGuestRitualChamberBuff(data, this.battleManager);
+                }).catch(error => {
+                    console.error('Error handling ritual chamber buff:', error);
+                });
+                break;
+
+            case 'ritual_chamber_cleanup':
+                const { handleGuestRitualChamberCleanup } = await import('./Spells/ritualChamber.js');
+                handleGuestRitualChamberCleanup(message.data, battleManager);
+                break;
+
             case 'big_gwen_start':
                 import('./Spells/bigGwen.js').then(({ handleGuestBigGwenStart }) => {
                     handleGuestBigGwenStart(data, this.battleManager);
@@ -1733,6 +1770,16 @@ export class BattleNetworkManager {
 
             case 'future_tech_fists_shield':
                 bm.guest_handleFutureTechFistsShield(data);
+                break;
+            
+            case 'future_tech_bazooka_splash':
+                bm.guest_handleFutureTechBazookaSplash(data);
+                break;
+
+            case 'future_tech_potion_launcher_activated':
+                if (window.futureTechPotionLauncherEffect) {
+                    await window.futureTechPotionLauncherEffect.guest_handleVisualEffects(data, bm);
+                }
                 break;
 
             case 'hero_shield_changed':
@@ -2429,7 +2476,9 @@ export class BattleNetworkManager {
             bm.battleScreen.transferBurningFingerStacksToPermanent();
         }
 
-        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn, permanentGuardians, permanentCaptures,
+        // <<<< UPDATED: Added permanentArmsTradeEquipment to destructuring
+        const { hostResult, guestResult, hostLives, guestLives, hostGold, guestGold, newTurn, 
+                permanentGuardians, permanentCaptures, permanentArmsTradeEquipment,
                 hostPlayerCounters, guestPlayerCounters, hostRoyalCorgiBonusCards, guestRoyalCorgiBonusCards } = data;
         
         // Update turn from the battle_end message BEFORE showing rewards
@@ -2560,7 +2609,7 @@ export class BattleNetworkManager {
             }
         }
 
-        // After permanent guardians handling
+        // Handle permanent captures transfer
         if (permanentCaptures && permanentCaptures.length > 0) {
             try {
                 const { CaptureNetArtifact } = await import('./Artifacts/captureNet.js');
@@ -2570,6 +2619,18 @@ export class BattleNetworkManager {
                 );
             } catch (error) {
                 // Error transferring permanent captures
+            }
+        }
+
+        // <<<< NEW: Handle permanent Arms Trade equipment transfer
+        if (permanentArmsTradeEquipment && permanentArmsTradeEquipment.length > 0) {
+            try {
+                bm.transferPermanentArmsTradeEquipmentToFormation(
+                    permanentArmsTradeEquipment, 
+                    window.heroSelection
+                );
+            } catch (error) {
+                console.error('Error transferring permanent Arms Trade equipment to guest formation:', error);
             }
         }
 

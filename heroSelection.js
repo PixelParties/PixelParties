@@ -45,10 +45,14 @@ import { WaflavEffectManager } from './Heroes/waflav.js';
 import { StormkissedWaflavEffectManager } from './Heroes/stormkissedWaflav.js';
 import { MaryEffectManager } from './Heroes/mary.js';
 import { KazenaEffectManager } from './Heroes/kazena.js';
+import { IngoEffectManager } from './Heroes/ingo.js';
+import { RiffelEffectManager } from './Heroes/riffel.js';
 
 import { crusaderArtifactsHandler } from './Artifacts/crusaderArtifacts.js';
 import { ancientTechInfiniteEnergyCoreEffect } from './Artifacts/ancientTechInfiniteEnergyCore.js';
 import { skullNecklaceEffect } from './Artifacts/skullNecklace.js'; 
+import { futureTechGunEffect } from './Artifacts/futureTechGun.js';
+import { futureTechLaserCannonEffect } from './Artifacts/futureTechLaserCannon.js';
 import { cuteCrownEffect } from './Artifacts/cuteCrown.js';
 
 import { resetDoomClockCountersIfNeeded } from './Spells/doomClock.js';
@@ -146,7 +150,8 @@ export class HeroSelection {
         this.stormkissedWaflavEffectManager = new StormkissedWaflavEffectManager();
         this.maryEffectManager = new MaryEffectManager();
         this.kazenaEffectManager = new KazenaEffectManager();
-
+        this.ingoEffectManager = new IngoEffectManager();
+        this.riffelEffectManager = new RiffelEffectManager();
 
         
         this.graveWormCreature = new GraveWormCreature(this);
@@ -159,6 +164,8 @@ export class HeroSelection {
         this.crusaderArtifactsHandler = crusaderArtifactsHandler;
         this.ancientTechInfiniteEnergyCoreEffect = ancientTechInfiniteEnergyCoreEffect;
         this.skullNecklaceEffect = skullNecklaceEffect; 
+        this.futureTechGunEffect = futureTechGunEffect;
+        this.futureTechLaserCannonEffect = futureTechLaserCannonEffect;
         this.cuteCrownEffect = cuteCrownEffect;
 
         // Initialize hero abilities manager with references
@@ -207,6 +214,16 @@ export class HeroSelection {
                 await this.sendFormationUpdate();
             }
         );
+
+        // ===== INGO INTEGRATION: Set creature summon callback =====
+        this.ingoEffectManager.initForFormation(this);
+        this.heroCreatureManager.onCreatureAdded = async (heroPosition, creature) => {
+            await this.ingoEffectManager.triggerFormationEffect(
+                this.formationManager,
+                this.goldManager
+            );
+        };
+        // ==========================================================
 
         this.heroEquipmentManager.init(
             this.handManager,
@@ -306,6 +323,8 @@ export class HeroSelection {
         this.crusaderArtifactsHandler.init(this);
         this.ancientTechInfiniteEnergyCoreEffect.init(this);
         this.skullNecklaceEffect.init(this); 
+        this.futureTechGunEffect.init(this);
+        this.futureTechLaserCannonEffect.init(this);
         this.cuteCrownEffect.init(this);
 
         this.inventingAbility.init();
@@ -377,6 +396,16 @@ export class HeroSelection {
         if (this.skullNecklaceEffect) {
             skullNecklaceAttackBonus = this.skullNecklaceEffect.calculateAttackBonus(heroPosition);
         }
+        // Check for Future Tech Gun bonus
+        let futureTechGunAttackBonus = 0;
+        if (this.futureTechGunEffect) {
+            futureTechGunAttackBonus = this.futureTechGunEffect.calculateAttackBonus(heroPosition);
+        }
+        // Check for Future Tech Laser Cannon bonus
+        let futureTechLaserCannonAttackBonus = 0;
+        if (this.futureTechLaserCannonEffect) {
+            futureTechLaserCannonAttackBonus = this.futureTechLaserCannonEffect.calculateAttackBonus(heroPosition);
+        }
     
         // Get TRULY permanent bonuses (ForcefulRevival, etc.)
         const formationHero = formation[heroPosition];
@@ -399,7 +428,8 @@ export class HeroSelection {
         const hpBonus = toughnessStacks * 200;
         const fightingAttackBonus = fightingStacks * 20;
         const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + energyCoreAttackBonus 
-            + skullNecklaceAttackBonus + permanentAttackBonus + trulyPermanentAttackBonus;
+            + skullNecklaceAttackBonus + futureTechGunAttackBonus + futureTechLaserCannonAttackBonus 
+            + permanentAttackBonus + trulyPermanentAttackBonus;
         const totalHpBonus = hpBonus + permanentHpBonus + trulyPermanentHpBonus;
 
         // ENFORCE MINIMUM OF 1 MAX HP
@@ -420,6 +450,8 @@ export class HeroSelection {
                 energyCoreCount: energyCoreCount || 0,
                 energyCoreAttackBonus,
                 skullNecklaceAttackBonus, 
+                futureTechGunAttackBonus,
+                futureTechLaserCannonAttackBonus,
                 permanentAttackBonus,  
                 permanentHpBonus,
                 trulyPermanentAttackBonus,
@@ -665,6 +697,10 @@ export class HeroSelection {
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.resetForNewTurn();
             }
+            
+            if (this.riffelEffectManager) {
+                this.riffelEffectManager.resetForNewTurn();
+            }
 
             if (this.kazenaEffectManager) {
                 this.kazenaEffectManager.resetForNewTurn();
@@ -744,7 +780,8 @@ export class HeroSelection {
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
                 'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
-                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png', 'Gabby.png', 'ZombieGabby.png'
+                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png', 'Gabby.png', 'ZombieGabby.png',
+                'Ingo.png', 'Riffel.png'
             ];
 
             // Load character data (for formation - uses Cards/All)
@@ -782,7 +819,8 @@ export class HeroSelection {
                 'Monia.png', 'Nicolas.png', 'Toras.png', 'Sid.png', 'Darge.png', 
                 'Vacarn.png', 'Tharx.png', 'Semi.png', 'Kazena.png', 'Heinz.png',
                 'Kyli.png', 'Nomu.png', 'Beato.png', 'Waflav.png', 'Luna.png', 'Ghuanjun.png',
-                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png', 'Gabby.png', 'ZombieGabby.png'
+                'Mary.png', 'Carris.png', 'Nao.png', 'Thep.png', 'Gabby.png', 'ZombieGabby.png',
+                'Ingo.png', 'Riffel.png'
             ];
 
             // Load preview character data with Cards/Characters sprites
@@ -1108,6 +1146,9 @@ export class HeroSelection {
                 if (this.nicolasEffectManager) {
                     gameState.hostNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
+                if (this.riffelEffectManager) {
+                    gameState.hostRiffelState = sanitizeForFirebase(this.riffelEffectManager.exportRiffelState());
+                }
                 if (this.vacarnEffectManager) {
                     gameState.hostVacarnState = sanitizeForFirebase(this.vacarnEffectManager.exportVacarnState());
                 }
@@ -1282,6 +1323,9 @@ export class HeroSelection {
                 if (this.nicolasEffectManager) {
                     gameState.guestNicolasState = sanitizeForFirebase(this.nicolasEffectManager.exportNicolasState());
                 }
+                if (this.riffelEffectManager) {
+                    gameState.guestRiffelState = sanitizeForFirebase(this.riffelEffectManager.exportRiffelState());
+                }
                 if (this.vacarnEffectManager) {
                     gameState.guestVacarnState = sanitizeForFirebase(this.vacarnEffectManager.exportVacarnState());
                 }
@@ -1362,7 +1406,7 @@ export class HeroSelection {
 
     // Helper method to restore player-specific data
     restorePlayerData(deckData, handData, lifeData, goldData, globalSpellData = null, potionData = null, 
-        nicolasData = null, vacarnData = null, delayedEffectsData = null, semiData = null, 
+        nicolasData = null, riffelData = null, vacarnData = null, delayedEffectsData = null, semiData = null, 
         heinzData = null, kazenaData = null, permanentArtifactsData = null, opponentPermanentArtifactsData = null,
         magicSapphiresUsedData = null, magicRubiesUsedData = null, playerCountersData = null, 
         areaCardData = null, graveyardData = null, inventingData = null, occultismData = null, 
@@ -1460,6 +1504,15 @@ export class HeroSelection {
         } else {
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.reset();
+            }
+        }
+        if (riffelData && this.riffelEffectManager) {
+            const riffelRestored = this.riffelEffectManager.importRiffelState(riffelData);
+            if (riffelRestored) {
+            }
+        } else {
+            if (this.riffelEffectManager) {
+                this.riffelEffectManager.reset();
             }
         }
         if (vacarnData && this.vacarnEffectManager) {
@@ -2288,6 +2341,7 @@ export class HeroSelection {
 
     // Show card tooltip
     showCardTooltip(cardData, cardElement) {
+        console.log('[HeroSelection.showCardTooltip] Calling cardPreviewManager with cardData:', cardData);
         this.cardPreviewManager.showCardTooltip(cardData, cardElement);
     }
 
@@ -2570,6 +2624,9 @@ export class HeroSelection {
             // Reset Hero effect usages when returning to formation
             if (this.nicolasEffectManager) {
                 this.nicolasEffectManager.resetForNewTurn();
+            }
+            if (this.riffelEffectManager) {
+                this.riffelEffectManager.resetForNewTurn();
             }
             if (this.vacarnEffectManager) {
                 this.vacarnEffectManager.resetForNewTurn();
@@ -3695,6 +3752,23 @@ export class HeroSelection {
             return success;
         }
 
+        // Check if artifact handler wants to handle this drop (for hero-targeting artifacts)
+        if (window.artifactHandler && this.handManager && this.handManager.isHandDragging()) {
+            const dragState = this.handManager.getHandDragState();
+            const cardName = dragState.draggedCardName;
+            const canHandle = await window.artifactHandler.canHandleHeroDrop(cardName);
+            
+            if (canHandle) {
+                const success = await window.artifactHandler.handleArtifactHeroDrop(
+                    cardName, 
+                    dragState.draggedCardIndex, 
+                    targetSlot, 
+                    this
+                );
+                return success;
+            }
+        }
+
         // Check if it's an ascended hero card
         if (window.ascendedManager && this.handManager && this.handManager.isHandDragging()) {
             const dragState = this.handManager.getHandDragState();
@@ -4095,6 +4169,9 @@ export class HeroSelection {
         if (this.nicolasEffectManager) {
             this.nicolasEffectManager.reset();
         }
+        if (this.riffelEffectManager) {
+            this.riffelEffectManager.reset();
+        }
         if (this.vacarnEffectManager) {
             this.vacarnEffectManager.reset();
         }
@@ -4135,6 +4212,9 @@ export class HeroSelection {
         }
         if (this.skullNecklaceEffect) {
             this.skullNecklaceEffect.reset();
+        }
+        if (this.futureTechGunEffect) {
+            this.futureTechGunEffect.reset();
         }
         if (this.cuteCrownEffect) {
             this.cuteCrownEffect.reset();
@@ -4588,8 +4668,11 @@ function showCardTooltip(cardDataJson, element) {
     if (window.heroSelection) {
         try {
             const cardData = JSON.parse(cardDataJson.replace(/&quot;/g, '"'));
+            console.log('[GLOBAL showCardTooltip] Parsed cardData:', cardData);
+            console.log('[GLOBAL showCardTooltip] cardData.cardName:', cardData.cardName);
             window.heroSelection.showCardTooltip(cardData, element);
         } catch (error) {
+            console.error('[GLOBAL showCardTooltip] Parse error:', error);
         }
     }
 }

@@ -275,6 +275,7 @@ export class ReconnectionManager {
                     gameState.hostGlobalSpellState,
                     gameState.hostPotionState,
                     gameState.hostNicolasState,
+                    gameState.hostRiffelState,
                     gameState.hostVacarnState,
                     gameState.hostdelayedEffects,
                     gameState.hostSemiState,
@@ -326,6 +327,7 @@ export class ReconnectionManager {
                     gameState.guestGlobalSpellState,
                     gameState.guestPotionState,
                     gameState.guestNicolasState,
+                    gameState.guestRiffelState,
                     gameState.guestVacarnState,
                     gameState.guestdelayedEffects,
                     gameState.guestSemiState,
@@ -569,6 +571,21 @@ export class ReconnectionManager {
             // Initialize Nicolas state if no saved data
             if (this.heroSelection.nicolasEffectManager) {
                 this.heroSelection.nicolasEffectManager.reset();
+            }
+        }
+        
+        if (this.isHost && gameState.hostRiffelState) {
+            if (this.heroSelection.riffelEffectManager) {
+                const riffelRestored = this.heroSelection.riffelEffectManager.importRiffelState(gameState.hostRiffelState);
+            }
+        } else if (!this.isHost && gameState.guestRiffelState) {
+            if (this.heroSelection.riffelEffectManager) {
+                const riffelRestored = this.heroSelection.riffelEffectManager.importRiffelState(gameState.guestRiffelState);
+            }
+        } else {
+            // Initialize Riffel state if no saved data
+            if (this.heroSelection.riffelEffectManager) {
+                this.heroSelection.riffelEffectManager.reset();
             }
         }
 

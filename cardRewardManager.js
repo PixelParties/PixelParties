@@ -1,4 +1,5 @@
 // cardRewardManager.js - Enhanced with Improved Redraw Button and Gold Display System
+// INGO INTEGRATION: Displays Ingo's creature summoning gold bonus in battle rewards
 
 import { CardPreviewManager } from './cardPreviewManager.js';
 import { getCardInfo, getAllAbilityCards, getHeroInfo } from './cardDatabase.js';
@@ -50,6 +51,7 @@ export class CardRewardManager {
             { name: 'Gon', image: './Cards/Characters/Gon.png' },
             { name: 'Heinz', image: './Cards/Characters/Heinz.png' },
             { name: 'Ida', image: './Cards/Characters/Ida.png' },
+            { name: 'Ingo', image: './Cards/Characters/Ingo.png' },
             { name: 'Kazena', image: './Cards/Characters/Kazena.png' },
             { name: 'Kyli', image: './Cards/Characters/Kyli.png' },
             { name: 'Luna', image: './Cards/Characters/Luna.png' },
@@ -106,6 +108,8 @@ export class CardRewardManager {
             wantedPosterDetails: [],
             swordBonuses: [],
             sapphireBonus: 0,  
+            ingoBonus: 0,
+            ingoDetails: null,
             total: 0
         };
 
@@ -126,7 +130,7 @@ export class CardRewardManager {
         }
 
         // Calculate wealth bonuses from current formation
-        if (this.heroSelection && this.heroSelection.heroAbilitiesManager) {
+        if (this.heroSelection && this.heroSelection.formationManager && this.heroSelection.heroAbilitiesManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
             
             ['left', 'center', 'right'].forEach(position => {
@@ -159,7 +163,7 @@ export class CardRewardManager {
         }
 
         // Check for Semi hero bonus
-        if (this.heroSelection && this.heroSelection.formationManager) {
+        if (this.heroSelection && this.heroSelection.formationManager && this.heroSelection.formationManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
             
             // Check if any hero in the formation is Semi
@@ -180,7 +184,7 @@ export class CardRewardManager {
         breakdown.thievingDetails = thievingResult.thievingDetails;
 
         // Calculate Wanted Poster bonuses using the module
-        if (this.heroSelection && this.heroSelection.heroEquipmentManager) {
+        if (this.heroSelection && this.heroSelection.formationManager && this.heroSelection.heroEquipmentManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
             
             // Ensure we're passing the correct side ('player' for our heroes)
@@ -199,8 +203,32 @@ export class CardRewardManager {
             breakdown.sapphireBonus = this.heroSelection.magicSapphiresUsed;
         }
         
+        // ===== INGO INTEGRATION: Calculate Ingo creature summoning bonus =====
+        // Get Ingo rewards from battle manager if available
+        if (this.heroSelection && this.heroSelection.battleScreen && 
+            this.heroSelection.battleScreen.battleManager) {
+            
+            const battleManager = this.heroSelection.battleScreen.battleManager;
+            
+            // Check if battleManager has getIngoRewards method
+            if (battleManager.getIngoRewards && typeof battleManager.getIngoRewards === 'function') {
+                // Get rewards for the PLAYER side (not global)
+                const ingoRewards = battleManager.getIngoRewards('player');
+                
+                if (ingoRewards && ingoRewards.goldEarned > 0) {
+                    breakdown.ingoBonus = ingoRewards.goldEarned;
+                    breakdown.ingoDetails = {
+                        creatureSummons: ingoRewards.creatureSummons,
+                        goldPerCreature: ingoRewards.goldPerCreature,
+                        totalGold: ingoRewards.goldEarned
+                    };
+                }
+            }
+        }
+        // =====================================================================
+        
         // Calculate LegendarySwordOfABarbarianKing bonuses
-        if (this.heroSelection && this.heroSelection.heroEquipmentManager) {
+        if (this.heroSelection && this.heroSelection.formationManager && this.heroSelection.heroEquipmentManager) {
             const formation = this.heroSelection.formationManager.getBattleFormation();
             
             ['left', 'center', 'right'].forEach(position => {
@@ -240,7 +268,7 @@ export class CardRewardManager {
         // Calculate total
         breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
                         breakdown.semiBonus + breakdown.thievingGained - breakdown.thievingLost +
-                        breakdown.wantedPosterBonus + breakdown.sapphireBonus;
+                        breakdown.wantedPosterBonus + breakdown.sapphireBonus + breakdown.ingoBonus;
         
         return breakdown;
     }
@@ -250,6 +278,9 @@ export class CardRewardManager {
         const currentTurn = turnTracker.getCurrentTurn();
         const isHeroRewardTurn = currentTurn === 3 || currentTurn === 5;
         
+        
+        // Set heroSelection BEFORE using it in generateHeroRewards/generateRewardCards
+        this.heroSelection = heroSelection;
         const preGeneratedRewards = isHeroRewardTurn ? 
             this.generateHeroRewards(3) : 
             this.generateRewardCards(3);
@@ -260,7 +291,6 @@ export class CardRewardManager {
         await this.savePendingRewards(preGeneratedRewards, isHeroRewardTurn);
         
         this.redrawCost = 1;
-        this.heroSelection = heroSelection;
         
         await this.heroSelection.setGamePhase('Reward');
         this.charmeManager.setCharmeCounters(heroSelection);
@@ -540,6 +570,15 @@ export class CardRewardManager {
                         details: breakdown.wantedPosterDetails 
                     })}
 
+
+                    <!-- Ingo's Contribution -->
+                    ${breakdown.ingoBonus > 0 ? `
+                        <div class="gold-line-item ingo-bonus">
+                            <span class="gold-source">Ingo's Contribution</span>
+                            <span class="gold-amount">+${breakdown.ingoBonus}</span>
+                        </div>
+                    ` : ''}
+                    
                     <!-- Magic Sapphire Section -->
                     ${breakdown.sapphireBonus > 0 ? `
                         <div class="gold-line-item sapphire-bonus">
@@ -1585,6 +1624,12 @@ export class CardRewardManager {
     }
     
     generateHeroRewards(count = 3) {
+        // Safety check: ensure heroSelection and formationManager exist
+        if (!this.heroSelection || !this.heroSelection.formationManager) {
+            console.warn("generateHeroRewards called without valid heroSelection/formationManager");
+            return [];
+        }
+        
         // Get heroes that the player doesn't already have in formation
         const currentFormation = this.heroSelection.formationManager.getBattleFormation();
         const usedHeroNames = Object.values(currentFormation)
@@ -1798,7 +1843,7 @@ export class CardRewardManager {
                 let targetSlot = null;
                 let heroAddedToFormation = false;
                 
-                if (this.heroSelection && this.heroSelection.formationManager) {
+                if (this.heroSelection && this.heroSelection.formationManager && this.heroSelection.formationManager) {
                     const formation = this.heroSelection.formationManager.getBattleFormation();
 
                     // Find leftmost free slot
@@ -2727,6 +2772,9 @@ export class CardRewardManager {
             // *** In singleplayer, update computer team's gold after thieving ***
             if (this.heroSelection && this.heroSelection.isSingleplayerMode && this.heroSelection.isSingleplayerMode()) {
                 this.updateComputerGoldAfterThieving(this.lastGoldBreakdown.thievingDetails);
+                
+                // Also update computer's Ingo gold if they earned any
+                this.updateComputerIngoGold();
             }
             
             // Send gold update to opponent so they know how much we got
@@ -2786,6 +2834,58 @@ export class CardRewardManager {
             
         } catch (error) {
             console.error('Failed to update computer gold after thieving:', error);
+        }
+    }
+
+    /**
+     * Update computer team's gold from Ingo bonus in singleplayer
+     * @returns {Promise<void>}
+     */
+    async updateComputerIngoGold() {
+        // Only in singleplayer mode
+        if (!this.heroSelection || !this.heroSelection.isSingleplayerMode || 
+            !this.heroSelection.isSingleplayerMode() || !this.heroSelection.roomManager) {
+            return;
+        }
+
+        // Get opponent's Ingo gold
+        if (!this.heroSelection.battleScreen || !this.heroSelection.battleScreen.battleManager) {
+            return;
+        }
+
+        const battleManager = this.heroSelection.battleScreen.battleManager;
+        
+        if (!battleManager.getIngoRewards || typeof battleManager.getIngoRewards !== 'function') {
+            return;
+        }
+
+        // Get Ingo rewards for the OPPONENT side
+        const opponentIngoRewards = battleManager.getIngoRewards('opponent');
+        
+        if (!opponentIngoRewards || opponentIngoRewards.goldEarned <= 0) {
+            return; // Computer didn't earn any Ingo gold
+        }
+
+        try {
+            const roomRef = this.heroSelection.roomManager.getRoomRef();
+            
+            // Get the selected computer team
+            const selectedTeamKey = this.heroSelection.selectedComputerTeamKey || 'team1';
+            
+            // Get current computer team gold
+            const snapshot = await roomRef.child(`singleplayer/computerTeams/${selectedTeamKey}/gold`).once('value');
+            const currentGold = snapshot.val() || 0;
+            
+            // Add Ingo gold
+            const newGold = currentGold + opponentIngoRewards.goldEarned;
+            
+            // Update in Firebase
+            await roomRef.child(`singleplayer/computerTeams/${selectedTeamKey}/gold`).set(newGold);
+            
+            console.log(`💰 Computer team ${selectedTeamKey} earned ${opponentIngoRewards.goldEarned} gold from Ingo! ${currentGold} → ${newGold}`);
+            
+        } catch (error) {
+            console.error('Failed to update computer Ingo gold:', error);
         }
     }
 

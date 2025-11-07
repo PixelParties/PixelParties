@@ -32,6 +32,9 @@ export class BattleStartManager {
 
             // Phase 1.5: Area effects (Gathering Storm, etc.)
             await this.applyAreaEffects();
+            
+            // CHECKPOINT: After area effects (these are critical and set up battle state)
+            await this.createCheckpointIfNeeded('post_area_effects');
 
             // Phase 1.75: Friendship effects (before potions)
             await this.applyFriendshipEffects();
@@ -47,14 +50,36 @@ export class BattleStartManager {
 
             // Phase 5: Delayed artifact effects 
             await this.applyDelayedEffects();
+            
+            // CHECKPOINT: After delayed effects (creatures may have been summoned)
+            await this.createCheckpointIfNeeded('post_delayed_effects');
 
             // Phase 6: Equipment-based start effects
             await this.applyEquipmentStartEffects();
 
             // Phase 7: Permanent artifact effects
             await this.applyPermanentArtifactEffects();
+            
+            // FINAL CHECKPOINT: All battle start effects complete
+            await this.createCheckpointIfNeeded('battle_start_complete');
+            
         } catch (error) {
             console.error('Error applying battle start effects:', error);
+        }
+    }
+
+    // Create a checkpoint if the checkpoint system is available
+    async createCheckpointIfNeeded(checkpointType) {
+        const bm = this.battleManager;
+        
+        if (!bm.checkpointSystem || !bm.isAuthoritative) {
+            return;
+        }
+        
+        try {
+            await bm.checkpointSystem.createBattleCheckpoint(checkpointType);
+        } catch (error) {
+            console.error(`Error creating checkpoint (${checkpointType}):`, error);
         }
     }
 
@@ -112,6 +137,16 @@ export class BattleStartManager {
                 await applyPinkSkyBattleEffects(bm);
             } catch (error) {
                 console.error('Error applying PinkSky effects:', error);
+            }
+
+            // ============================================
+            // Apply Ritual Chamber effects
+            // ============================================
+            try {
+                const { applyRitualChamberBattleEffects } = await import('./Spells/ritualChamber.js');
+                await applyRitualChamberBattleEffects(bm);
+            } catch (error) {
+                console.error('Error applying Ritual Chamber effects:', error);
             }
 
             // ============================================

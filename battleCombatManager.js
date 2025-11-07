@@ -324,6 +324,24 @@ export class BattleCombatManager {
             // 1. Trigger death effects
             this.battleManager.triggerCreatureDeathEffects(creature, hero, attacker, context); 
             this.battleManager.checkForSkeletonMageReactions(creature, side, 'creature'); 
+
+            // 1.5. RITUAL CHAMBER: Trigger buff on ANY creature death
+            console.log('🔍 Creature died, checking Ritual Chamber trigger:', {
+                creatureName: creature?.name,
+                hasBattleManager: !!this.battleManager
+            });
+
+            setTimeout(async () => {
+                try {
+                    console.log('🔍 setTimeout fired for Ritual Chamber');
+                    const { triggerRitualChamberOnCreatureDeath } = await import('./Spells/ritualChamber.js');
+                    console.log('🔍 Import successful, calling trigger');
+                    await triggerRitualChamberOnCreatureDeath(this.battleManager, creature);
+                    console.log('✅ Ritual Chamber trigger completed');
+                } catch (error) {
+                    console.error('❌ Error triggering Ritual Chamber on creature death:', error);
+                }
+            }, 50);
             
             // 2. Check for Furious Anger
             setTimeout(async () => {
@@ -980,15 +998,23 @@ export class BattleCombatManager {
             if (willAttack) {
                 const attackerSide = actingSide;
                 
-                // Determine if this is a ranged attacker
-                const isRanged = this.isRangedAttacker(actingHero);
-                
                 let target = null;
-                if (isRanged) {
-                    target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
-                    this.battleManager.addCombatLog(`🏹 ${actingHero.name} uses ranged attack!`, 'info');
+                
+                // Check for Riffel's special targeting FIRST
+                const riffelTarget = this.checkRiffelSpecialTargeting(actingHero, attackerSide);
+                if (riffelTarget) {
+                    target = riffelTarget;
+                    this.battleManager.addCombatLog(`🎲 ${actingHero.name} attacks randomly!`, 'info');
                 } else {
-                    target = this.authoritative_findTargetWithCreatures(position, attackerSide);
+                    // Normal targeting logic
+                    const isRanged = this.isRangedAttacker(actingHero);
+                    
+                    if (isRanged) {
+                        target = this.authoritative_findTargetIgnoringCreatures(position, attackerSide);
+                        this.battleManager.addCombatLog(`🏹 ${actingHero.name} uses ranged attack!`, 'info');
+                    } else {
+                        target = this.authoritative_findTargetWithCreatures(position, attackerSide);
+                    }
                 }
                 
                 if (target) {
@@ -1238,12 +1264,21 @@ export class BattleCombatManager {
                 playerTarget = playerInfightingData.target;
                 playerIsRanged = false; // Infighting is always melee
             } else {
-                playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
-                if (playerIsRanged) {
-                    playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
-                    this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+                // Check for Riffel's special targeting
+                const riffelTarget = this.checkRiffelSpecialTargeting(playerHeroActor.data, 'player');
+                if (riffelTarget) {
+                    playerTarget = riffelTarget;
+                    playerIsRanged = false;
+                    this.battleManager.addCombatLog(`🎲 ${playerHeroActor.data.name} attacks randomly!`, 'info');
                 } else {
-                    playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
+                    // Normal targeting logic
+                    playerIsRanged = this.isRangedAttacker(playerHeroActor.data);
+                    if (playerIsRanged) {
+                        playerTarget = this.authoritative_findTargetIgnoringCreatures(position, 'player');
+                        this.battleManager.addCombatLog(`🏹 ${playerHeroActor.data.name} uses ranged attack!`, 'info');
+                    } else {
+                        playerTarget = this.authoritative_findTargetWithCreatures(position, 'player');
+                    }
                 }
             }
         }
@@ -1254,12 +1289,21 @@ export class BattleCombatManager {
                 opponentTarget = opponentInfightingData.target;
                 opponentIsRanged = false; // Infighting is always melee
             } else {
-                opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
-                if (opponentIsRanged) {
-                    opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
-                    this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+                // Check for Riffel's special targeting
+                const riffelTarget = this.checkRiffelSpecialTargeting(opponentHeroActor.data, 'opponent');
+                if (riffelTarget) {
+                    opponentTarget = riffelTarget;
+                    opponentIsRanged = false;
+                    this.battleManager.addCombatLog(`🎲 ${opponentHeroActor.data.name} attacks randomly!`, 'info');
                 } else {
-                    opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
+                    // Normal targeting logic
+                    opponentIsRanged = this.isRangedAttacker(opponentHeroActor.data);
+                    if (opponentIsRanged) {
+                        opponentTarget = this.authoritative_findTargetIgnoringCreatures(position, 'opponent');
+                        this.battleManager.addCombatLog(`🏹 ${opponentHeroActor.data.name} uses ranged attack!`, 'info');
+                    } else {
+                        opponentTarget = this.authoritative_findTargetWithCreatures(position, 'opponent');
+                    }
                 }
             }
         }
@@ -2619,6 +2663,122 @@ export class BattleCombatManager {
             criticalStrikeTriggered: result.shouldTrigger,
             effectData: result.effectData
         };
+    }
+
+    // ============================================
+    // RIFFEL SPECIAL TARGETING
+    // ============================================
+
+    /**
+     * Check if Riffel should use special random targeting
+     * @param {Object} attacker - The attacking hero
+     * @param {string} attackerSide - Side of the attacker ('player' or 'opponent')
+     * @returns {Object|null} - Target object or null if not Riffel
+     */
+    checkRiffelSpecialTargeting(attacker, attackerSide) {
+        // Only applies to Riffel
+        if (attacker.name !== 'Riffel') {
+            return null;
+        }
+
+        // Count artifacts equipped to Riffel
+        const artifactCount = attacker.equipment ? attacker.equipment.length : 0;
+
+        // Calculate chance: 5% per artifact, capped at 50%
+        const heroTargetChance = Math.min(artifactCount * 5, 50);
+
+        // Roll the chance
+        const roll = Math.random() * 100;
+
+        if (roll < heroTargetChance) {
+            // Choose random enemy HERO
+            return this.getRiffelRandomHeroTarget(attackerSide);
+        } else {
+            // Choose random enemy target (hero or creature)
+            return this.getRiffelRandomTarget(attackerSide);
+        }
+    }
+
+    /**
+     * Get a random enemy hero for Riffel's special targeting
+     * @param {string} attackerSide - Side of the attacker ('player' or 'opponent')
+     * @returns {Object|null} - Target object or null if no heroes available
+     */
+    getRiffelRandomHeroTarget(attackerSide) {
+        const targets = attackerSide === 'player' ? 
+            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+
+        // Get all alive enemy heroes
+        const aliveHeroes = [];
+        ['left', 'center', 'right'].forEach(pos => {
+            const hero = targets[pos];
+            if (hero && hero.alive) {
+                aliveHeroes.push({ hero, position: pos });
+            }
+        });
+
+        if (aliveHeroes.length === 0) return null;
+
+        // Choose random hero
+        const randomHero = this.battleManager.getRandomChoice(aliveHeroes);
+
+        return {
+            type: 'hero',
+            hero: randomHero.hero,
+            position: randomHero.position,
+            side: attackerSide === 'player' ? 'opponent' : 'player',
+            creature: null
+        };
+    }
+
+    /**
+     * Get a random enemy target (hero or creature) for Riffel's special targeting
+     * @param {string} attackerSide - Side of the attacker ('player' or 'opponent')
+     * @returns {Object|null} - Target object or null if no targets available
+     */
+    getRiffelRandomTarget(attackerSide) {
+        const targets = attackerSide === 'player' ? 
+            this.battleManager.opponentHeroes : this.battleManager.playerHeroes;
+
+        // Calculate target side (opposite of attacker)
+        const targetSide = attackerSide === 'player' ? 'opponent' : 'player';
+
+        // Get all alive enemy heroes and their creatures
+        const allTargets = [];
+        ['left', 'center', 'right'].forEach(pos => {
+            const hero = targets[pos];
+            if (hero && hero.alive) {
+                // Add hero as target
+                allTargets.push({ 
+                    type: 'hero',
+                    hero: hero,
+                    position: pos,
+                    side: targetSide,
+                    creature: null
+                });
+
+                // Add hero's creatures as targets
+                if (hero.creatures && Array.isArray(hero.creatures)) {
+                    hero.creatures.forEach((creature, idx) => {
+                        if (creature && creature.alive !== false) {
+                            allTargets.push({
+                                type: 'creature',
+                                hero: hero,
+                                position: pos,
+                                side: targetSide,
+                                creature: creature,
+                                creatureIndex: idx
+                            });
+                        }
+                    });
+                }
+            }
+        });
+
+        if (allTargets.length === 0) return null;
+
+        // Choose random target
+        return this.battleManager.getRandomChoice(allTargets);
     }
 }
 

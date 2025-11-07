@@ -193,6 +193,25 @@ const CARD_DATABASE = {
         position: [[1,3],3],
         counteredBy: ["Silence", "Anti-AoE"],
     },
+    'Ingo': {
+        name: 'Ingo',
+        image: './Cards/Characters/Ingo.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 40,
+        ability1: 'SummoningMagic',
+        ability2: 'Wealth',
+        tags: ["Gold Generation", "Support", "Summoner"],
+        wants: ["Summoner", "Needs Gold", "Attacker", "Needs Actions"],
+        avoids: [],
+        order: [2,3],
+        position: [[],0],
+        counteredBy: ["AoE"],
+    },
     'Kazena': {
         name: 'Kazena',
         image: './Cards/Characters/Kazena.png',
@@ -363,6 +382,25 @@ const CARD_DATABASE = {
         order: [2,3],
         position: [[],0],
         counteredBy: [],
+    },
+    'Riffel': {
+        name: 'Riffel',
+        image: './Cards/Characters/Riffel.png',
+        cardType: 'hero',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        hp: 400,
+        atk: 40,
+        ability1: 'Adventurousness',
+        ability2: 'Inventing',
+        tags: ["Attacker", "Damage Dealer", "Sniper", 'Burst Damage'],
+        wants: ["Gains Gold", "Defense"],
+        avoids: [],
+        order: [1,2],
+        position: [[1],3],
+        counteredBy: ["Burst Damage", "Tank Stuff"],
     },
     'Semi': {
         name: 'Semi',
@@ -2403,7 +2441,7 @@ const CARD_DATABASE = {
         name: 'CaptureNet',
         image: './Cards/All/CaptureNet.png',
         cardType: 'Artifact',
-        cost: 30,
+        cost: 10,
         action: false,
         spellSchool: null,
         subtype: "Equip",
@@ -2902,6 +2940,126 @@ const CARD_DATABASE = {
 
 
 
+    // INGO
+    'SummoningCircle': {
+        name: 'SummoningCircle',
+        image: './Cards/All/SummoningCircle.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'BurnedContract': {
+        name: 'BurnedContract',
+        image: './Cards/All/BurnedContract.png',
+        cardType: 'Artifact',
+        cost: 6,
+        action: false,
+        spellSchool: null,
+        subtype: null
+    },
+    'RitualChamber': {
+        name: 'RitualChamber',
+        image: './Cards/All/RitualChamber.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: 'Area',
+        counterType: ["Fast DPS"],
+    },
+    'SoulTransmigrationRitual': {
+        name: 'SoulTransmigrationRitual',
+        image: './Cards/All/SoulTransmigrationRitual.png',
+        cardType: 'Spell',
+        level: 0,
+        cost: 0,
+        action: true,
+        spellSchool: 'SupportMagic',
+        subtype: null
+    },
+
+
+
+    
+    //RIFFEL
+    'FutureTechGun': {
+        name: 'FutureTechGun',
+        image: './Cards/All/FutureTechGun.png',
+        cardType: 'Artifact',
+        cost: 6,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip",
+        counterType: ["Fast DPS"],
+    },
+    'FutureTechBazooka': {
+        name: 'FutureTechBazooka',
+        image: './Cards/All/FutureTechBazooka.png',
+        cardType: 'Artifact',
+        cost: 10,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip",
+        counterType: ["AoE"],
+    },
+    'FutureTechLaserCannon': {
+        name: 'FutureTechLaserCannon',
+        image: './Cards/All/FutureTechLaserCannon.png',
+        cardType: 'Artifact',
+        cost: 80,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip",
+        counterType: ["Fast DPS"],
+    },
+    'FutureTechPotionLauncher': {
+        name: 'FutureTechPotionLauncher',
+        image: './Cards/All/FutureTechPotionLauncher.png',
+        cardType: 'Artifact',
+        cost: 20,
+        action: false,
+        spellSchool: null,
+        subtype: "Equip",
+        counterType: [],
+    },
+    'FutureTechBomb': {
+        name: 'FutureTechBomb',
+        image: './Cards/All/FutureTechBomb.png',
+        cardType: 'Potion',
+        cost: 0,
+        action: false,
+        spellSchool: null,
+        subtype: null,
+        counterType: [],
+    },
+    'ArmsTrade': {
+        name: 'ArmsTrade',
+        image: './Cards/All/ArmsTrade.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null,
+        counterType: [],
+    },
+    'FutureTechBarrage': {
+        name: 'FutureTechBarrage',
+        image: './Cards/All/FutureTechBarrage.png',
+        cardType: 'Spell',
+        level: 1,
+        cost: 0,
+        action: true,
+        spellSchool: 'Fighting',
+        subtype: null,
+        counterType: [],
+    },
+
+
+
 
     
 
@@ -2949,7 +3107,7 @@ const CARD_DATABASE = {
         action: true,
         spellSchool: 'SummoningMagic',
         subtype: 'Creature',
-        hp: 40,
+        hp: 20,
         physicalAttack: true,
         archetype: 'Monkees'
     },

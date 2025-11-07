@@ -1,9 +1,47 @@
 // cardPreviewManager.js - Enhanced with Reward Screen Dedicated Tooltip Support (Fixed Layout) and Deck Tooltip Positioning
 
+import { getCardInfo } from './cardDatabase.js';
+
 export class CardPreviewManager {
     constructor() {
         this.cardPreviewVisible = false;
         this.currentlyPreviewedCharacter = null;
+    }
+
+    // Helper method to get artifact cost information (base cost vs effective cost)
+    getArtifactCostInfo(cardName) {        
+        // Get card info from database
+        const cardInfo = getCardInfo(cardName);
+        
+        if (!cardInfo) {
+            return null;
+        }
+        
+        console.log('[getArtifactCostInfo] Card type:', cardInfo.cardType, 'Subtype:', cardInfo.subtype);
+        
+        if (cardInfo.cardType !== 'Artifact' || cardInfo.subtype !== 'Equip') {
+            return null; // Not an equip artifact
+        }
+
+        const baseCost = cardInfo.cost || 0;
+        let effectiveCost = baseCost;
+
+        // Check if there's a heroEquipmentManager available to get the effective cost
+        if (window.heroEquipmentManager && typeof window.heroEquipmentManager.getArtifactEffectiveCost === 'function') {
+            effectiveCost = window.heroEquipmentManager.getArtifactEffectiveCost(cardName);
+        }
+        
+        // Return cost info only if costs differ
+        if (baseCost !== effectiveCost) {
+            const result = {
+                baseCost: baseCost,
+                effectiveCost: effectiveCost,
+                hasCostReduction: effectiveCost < baseCost
+            };
+            return result;
+        }
+
+        return null; // Costs are the same, no need to display
     }
 
     // Helper function to convert spaced names to camelCase for file paths
@@ -110,6 +148,9 @@ export class CardPreviewManager {
         // Check if this is a character card with stats
         const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
         const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats;
+        
+        // Check if this is an artifact with modified cost
+        const artifactCostInfo = cardData.cardName ? this.getArtifactCostInfo(cardData.cardName) : null;
 
         // Build the card HTML with sprite-positioned stats
         let cardHTML = `
@@ -143,6 +184,17 @@ export class CardPreviewManager {
                     <div class="tooltip-sprite-stats">
                         <div class="tooltip-sprite-stat hp-stat" style="left: 130px;">
                             <span class="stat-value">${stats.maxHp}</span>
+                        </div>
+                    </div>
+            `;
+        }
+
+        // Add artifact cost overlay if cost is modified
+        if (artifactCostInfo) {
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat cost-stat" style="left: 180px;">
+                            <span class="stat-value" style="color: #ffffff;">${artifactCostInfo.effectiveCost}</span>
                         </div>
                     </div>
             `;
@@ -190,6 +242,9 @@ export class CardPreviewManager {
         // Check if this is a character card with stats
         const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
         const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats;
+        
+        // Check if this is an artifact with modified cost
+        const artifactCostInfo = cardData.cardName ? this.getArtifactCostInfo(cardData.cardName) : null;
 
         // Build the card HTML with sprite-positioned stats
         let cardHTML = `
@@ -227,6 +282,17 @@ export class CardPreviewManager {
                     </div>
             `;
         }
+
+        // Add artifact cost overlay if cost is modified
+        if (artifactCostInfo) {
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat cost-stat" style="left: 180px;">
+                            <span class="stat-value" style="color: #ffffff;">${artifactCostInfo.effectiveCost}</span>
+                        </div>
+                    </div>
+            `;
+        }
         
         cardHTML += `
                 </div>
@@ -247,6 +313,9 @@ export class CardPreviewManager {
         // Check if this is a character card with stats
         const isCharacterWithStats = cardData.cardType === 'character' && cardData.heroStats;
         const isCreatureWithStats = cardData.cardType === 'creature' && cardData.creatureStats;
+        
+        // Check if this is an artifact with modified cost
+        const artifactCostInfo = cardData.cardName ? this.getArtifactCostInfo(cardData.cardName) : null;
 
         // Build the card HTML with sprite-positioned stats
         let cardHTML = `
@@ -279,6 +348,17 @@ export class CardPreviewManager {
                     <div class="tooltip-sprite-stats">
                         <div class="tooltip-sprite-stat hp-stat" style="left: 130px;">
                             <span class="stat-value">${stats.maxHp}</span>
+                        </div>
+                    </div>
+            `;
+        }
+
+        // Add artifact cost overlay if cost is modified
+        if (artifactCostInfo) {
+            cardHTML += `
+                    <div class="tooltip-sprite-stats">
+                        <div class="tooltip-sprite-stat cost-stat" style="left: 180px;">
+                            <span class="stat-value" style="color: #ffffff;">${artifactCostInfo.effectiveCost}</span>
                         </div>
                     </div>
             `;
@@ -334,16 +414,34 @@ export class CardPreviewManager {
             previewArea.appendChild(stableContainer);
         }
         
-        // Update only the content inside the stable container
-        stableContainer.innerHTML = `
-            <div class="preview-card-display">
+        // Check if this is an artifact with modified cost
+        const artifactCostInfo = cardData.cardName ? this.getArtifactCostInfo(cardData.cardName) : null;
+        
+        // Build the HTML with optional cost overlay
+        let previewHTML = `
+            <div class="preview-card-display" style="position: relative;">
                 <img src="${cardData.imagePath}" 
                      alt="${cardData.displayName}" 
                      class="preview-card-image"
                      onerror="this.src='./Cards/placeholder.png'"
                      style="max-width: 340px; max-height: 85%; object-fit: contain;">
-            </div>
         `;
+        
+        // Add artifact cost overlay if cost is modified
+        if (artifactCostInfo) {
+            previewHTML += `
+                <div class="tooltip-sprite-stats" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                    <div class="tooltip-sprite-stat cost-stat" style="left: 215px; top: 15px;">
+                        <span class="stat-value" style="color: #aa5300;">${artifactCostInfo.effectiveCost}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        previewHTML += `</div>`;
+        
+        // Update only the content inside the stable container
+        stableContainer.innerHTML = previewHTML;
     }
 
     // FIXED: Hide reward screen preview with stable layout

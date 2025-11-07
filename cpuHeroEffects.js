@@ -2,7 +2,7 @@
 
 import { getCardInfo, getAllCardNames } from './cardDatabase.js';
 import { countAbilityStacks } from './cpuHelpers.js';
-import { getDifficultyValue } from './cpuDifficultyConfig.js';
+import { getDifficultyValue, getHeroEffectValue } from './cpuDifficultyConfig.js';
 
 /**
  * Process hero-specific effects after battle for all computer teams
@@ -41,13 +41,40 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
                 const randomBonus = Math.floor(Math.random() * (X + 1));
                 
                 // Apply difficulty-based multiplier and cap
-                const millingMultiplier = getDifficultyValue(difficulty, 'heroEffects', 'heinz').millingMultiplier;
-                const millingCap = getDifficultyValue(difficulty, 'heroEffects', 'heinz').millingCap;
+                const millingMultiplier = getHeroEffectValue(difficulty, 'heinz', 'millingMultiplier');
+                const millingCap = getHeroEffectValue(difficulty, 'heinz', 'millingCap');
                 
                 let cardsToMill = Math.floor((currentTurn + (randomBonus * Y)) * millingMultiplier);
                 cardsToMill = Math.max(1, Math.min(millingCap, cardsToMill));
                 
                 console.log(`[${difficulty}] Heinz milling ${cardsToMill} cards (cap: ${millingCap}, multiplier: ${millingMultiplier}x)`);
+                
+                for (let i = 0; i < cardsToMill; i++) {
+                    const randomIndex = Math.floor(Math.random() * currentDeck.length);
+                    const copiedCard = currentDeck[randomIndex];
+                    currentGraveyard.push(copiedCard);
+                }
+            }
+
+            // RIFFEL GRAVEYARD MILLING
+            const hasRiffel = ['left', 'center', 'right'].some(pos => {
+                const hero = team.formation[pos];
+                return hero && hero.name === 'Riffel';
+            });
+
+            if (hasRiffel && currentDeck.length > 0) {
+                const X = Math.ceil(currentTurn / 2);
+                const Y = currentGraveyard.filter(cardName => cardName === 'FutureTechLamp').length;
+                const randomBonus = Math.floor(Math.random() * (X + 1));
+                
+                // Apply difficulty-based multiplier and cap (lower than Heinz)
+                const millingMultiplier = getHeroEffectValue(difficulty, 'riffel', 'millingMultiplier');
+                const millingCap = getHeroEffectValue(difficulty, 'riffel', 'millingCap');
+                
+                let cardsToMill = Math.floor((currentTurn + (randomBonus * Y)) * millingMultiplier);
+                cardsToMill = Math.max(1, Math.min(millingCap, cardsToMill));
+                
+                console.log(`[${difficulty}] Riffel milling ${cardsToMill} cards (cap: ${millingCap}, multiplier: ${millingMultiplier}x)`);
                 
                 for (let i = 0; i < cardsToMill; i++) {
                     const randomIndex = Math.floor(Math.random() * currentDeck.length);
@@ -83,7 +110,7 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
             });
 
             if (vacarnPosition) {
-                const summonChance = getDifficultyValue(difficulty, 'heroEffects', 'vacarn').summonChance;
+                const summonChance = getHeroEffectValue(difficulty, 'vacarn', 'summonChance');
                 
                 if (Math.random() < summonChance) {
                     const necromancyLevel = countAbilityStacks(team.abilities, vacarnPosition, 'Necromancy');
@@ -176,7 +203,7 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
                     
                     // Get difficulty-based multiplier range
                     const teamDifficulty = loopTeam.difficulty || 'Normal';
-                    const buffRange = getDifficultyValue(teamDifficulty, 'heroEffects', 'luna').buffMultiplierRange;
+                    const buffRange = getHeroEffectValue(teamDifficulty, 'luna', 'buffMultiplierRange');
                     const multiplier = Math.random() * (buffRange.max - buffRange.min) + buffRange.min;
                     
                     const lunaItemCount = countLunaItems(loopTeam);
@@ -245,6 +272,83 @@ export async function processHeroEffectsAfterUpdate(roomRef, currentTurn = 1) {
                             isPermanent: true,
                             sourceHero: 'Mary'
                         });
+                    }
+                }
+            }
+
+            // RIFFEL GRAVEYARD EQUIPMENT
+            const riffelPosition = ['left', 'center', 'right'].find(pos => {
+                const hero = team.formation[pos];
+                return hero && hero.name === 'Riffel';
+            });
+
+            if (riffelPosition) {
+                // Get all Equip artifacts from graveyard
+                const equipArtifactsInGraveyard = currentGraveyard.filter(cardName => {
+                    const cardInfo = getCardInfo(cardName);
+                    return cardInfo && cardInfo.cardType === 'Artifact' && cardInfo.subtype === 'Equip';
+                });
+
+                if (equipArtifactsInGraveyard.length > 0) {
+                    let selectedArtifact = null;
+
+                    // On Hard difficulty, 50% chance to prioritize highest cost
+                    if (difficulty === 'Hard' && Math.random() < 0.5) {
+                        // Find the highest cost Equip artifact
+                        let highestCost = -1;
+                        let highestCostArtifacts = [];
+
+                        equipArtifactsInGraveyard.forEach(artifactName => {
+                            const artifactInfo = getCardInfo(artifactName);
+                            const cost = artifactInfo?.cost || 0;
+
+                            if (cost > highestCost) {
+                                highestCost = cost;
+                                highestCostArtifacts = [artifactName];
+                            } else if (cost === highestCost) {
+                                highestCostArtifacts.push(artifactName);
+                            }
+                        });
+
+                        // Pick random from highest cost artifacts (in case of ties)
+                        selectedArtifact = highestCostArtifacts[
+                            Math.floor(Math.random() * highestCostArtifacts.length)
+                        ];
+                        console.log(`[${difficulty}] Riffel equipped highest-cost artifact: ${selectedArtifact} (cost: ${highestCost})`);
+                    } else {
+                        // Pick random Equip artifact
+                        selectedArtifact = equipArtifactsInGraveyard[
+                            Math.floor(Math.random() * equipArtifactsInGraveyard.length)
+                        ];
+                        console.log(`[${difficulty}] Riffel equipped random artifact: ${selectedArtifact}`);
+                    }
+
+                    if (selectedArtifact) {
+                        const artifactInfo = getCardInfo(selectedArtifact);
+                        
+                        // CRITICAL FIX: Read current equipment from Firebase to avoid overwriting recent changes
+                        // (e.g., from Arms Trade that just saved during battle end)
+                        const currentEquipmentSnapshot = await roomRef
+                            .child(`singleplayer/computerTeams/${teamKey}/equipment/${riffelPosition}`)
+                            .once('value');
+                        const currentEquipment = currentEquipmentSnapshot.val() || [];
+                        
+                        // Add equipment to Riffel's current equipment
+                        const equipmentEntry = {
+                            name: selectedArtifact,
+                            cardName: selectedArtifact,
+                            cost: 0, // No cost for graveyard equipment
+                            image: artifactInfo?.image || `./Cards/All/${selectedArtifact}.png`,
+                            equippedAt: Date.now(),
+                            source: 'RiffelGraveyard'
+                        };
+
+                        currentEquipment.push(equipmentEntry);
+                        
+                        // CRITICAL FIX: Only update Riffel's position, not entire equipment structure
+                        // This prevents overwriting equipment from other sources (like Arms Trade)
+                        updates[`${teamKey}/equipment/${riffelPosition}`] = currentEquipment;
+                        console.log(`💾 Riffel effect: Added ${selectedArtifact} to ${riffelPosition}, preserving existing equipment`);
                     }
                 }
             }

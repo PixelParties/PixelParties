@@ -206,8 +206,37 @@ export class ArtifactHandler {
                 return await this.handleGenericArtifactClick(cardIndex, cardName, heroSelection);
         }
     }
+    
+    // Handle artifacts that need to be dropped on heroes
+    async handleArtifactHeroDrop(cardName, cardIndex, heroPosition, heroSelection) {
+        try {
+            const moduleName = this.cardNameToModuleName(cardName);
+            const artifact = await this.loadArtifact(moduleName);
+            
+            // Check if this artifact requires hero targeting
+            if (artifact && artifact.requiresHeroTarget) {
+                return await artifact.handleHeroDrop(cardIndex, heroPosition, heroSelection);
+            }
+            
+            // Not a hero-targeting artifact
+            return false;
+            
+        } catch (error) {
+            console.error(`Error handling hero drop for ${cardName}:`, error);
+            return false;
+        }
+    }
 
-    // ===== EXISTING HANDLERS (unchanged) =====
+    // Check if an artifact requires hero targeting
+    async canHandleHeroDrop(cardName) {
+        try {
+            const moduleName = this.cardNameToModuleName(cardName);
+            const artifact = await this.loadArtifact(moduleName);
+            return artifact && artifact.requiresHeroTarget === true;
+        } catch (error) {
+            return false;
+        }
+    }
 
     async handleTreasureChestDrag(cardIndex, cardName, heroSelection) {
         return await this.handleTreasureChestClick(cardIndex, cardName, heroSelection);
@@ -255,17 +284,23 @@ export class ArtifactHandler {
 
     async handleGenericArtifactClick(cardIndex, cardName, heroSelection) {
         try {
+            console.log(`🎯 handleGenericArtifactClick called for: ${cardName} at index ${cardIndex}`);
             const moduleName = this.cardNameToModuleName(cardName);
+            console.log(`📝 Converted to module name: ${moduleName}`);
             
             const artifact = await this.loadArtifact(moduleName);
             
             if (artifact && artifact.handleClick) {
+                console.log(`✅ Calling ${moduleName}.handleClick()`);
                 await artifact.handleClick(cardIndex, cardName, heroSelection);
                 return true;
             } else {
+                console.error(`❌ No valid artifact or handleClick method found for ${cardName}`);
+                console.error(`Artifact object:`, artifact);
                 return false;
             }
         } catch (error) {
+            console.error(`❌ Error in handleGenericArtifactClick for ${cardName}:`, error);
             return false;
         }
     }
@@ -319,18 +354,28 @@ export class ArtifactHandler {
         }
 
         try {
+            console.log(`🔍 Attempting to load: ./Artifacts/${moduleName}.js`);
             const module = await import(`./Artifacts/${moduleName}.js`);
+            console.log(`✅ Module loaded successfully`);
+            
             const artifactExportName = `${moduleName}Artifact`;
+            console.log(`🔍 Looking for export: ${artifactExportName}`);
             const artifact = module[artifactExportName];
             
             if (artifact) {
+                console.log(`✅ Found ${artifactExportName}!`);
                 this.loadedArtifacts.set(moduleName, artifact);
                 return artifact;
             } else {
-                console.error(`Artifact export ${artifactExportName} not found in ${moduleName}.js`);
+                console.error(`❌ Export ${artifactExportName} not found!`);
+                console.error(`Available exports:`, Object.keys(module));
                 return null;
             }
         } catch (error) {
+            console.error(`❌ FAILED to load ./Artifacts/${moduleName}.js`);
+            console.error(`Error:`, error);
+            console.error(`Error message:`, error.message);
+            console.error(`Make sure the file exists at: ./Artifacts/${moduleName}.js`);
             return null;
         }
     }
@@ -347,7 +392,7 @@ export class ArtifactHandler {
     }
 
     isDraggableArtifact(cardName) {
-        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore', 'BloodSoakedCoin', 'StaffOfTheTeleporter', 'GoldenBananas' ];
+        const draggableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechFists', 'FutureTechCopyDevice', 'BirthdayPresent', 'AncientTechInfiniteEnergyCore', 'BloodSoakedCoin', 'StaffOfTheTeleporter', 'GoldenBananas', 'SummoningCircle' ];
         return draggableArtifacts.includes(cardName);
     }
 
@@ -356,7 +401,7 @@ export class ArtifactHandler {
             return true;
         }
         
-        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent', 'BloodSoakedCoin', 'StaffOfTheTeleporter', 'GoldenBananas' ];
+        const clickableArtifacts = ['TreasureChest', 'MagneticGlove', 'poisonedMeat', 'Wheels', 'AlchemicJournal', 'TreasureHuntersBackpack', 'MagicCobalt', 'MagicTopaz', 'MagicAmethyst', 'MagicSapphire', 'MagicRuby', 'MagicEmerald', 'CloudPillow', 'StormRing', 'FutureTechLamp', 'FutureTechCopyDevice', 'BirthdayPresent', 'BloodSoakedCoin', 'StaffOfTheTeleporter', 'GoldenBananas', 'BurnedContract' ];
 
         return clickableArtifacts.includes(cardName);
     }
@@ -384,14 +429,13 @@ export class ArtifactHandler {
             'CloudPillow', 
             'StormRing',
             'FutureTechLamp',
-            'FutureTechFists', 
             'FutureTechCopyDevice',
             'BirthdayPresent',
-            'AncientTechInfiniteEnergyCore',
             'BloodSoakedCoin', 
             'StaffOfTheTeleporter',
             'GoldenBananas',
-            'SkullNecklace'
+            'SummoningCircle',
+            'BurnedContract'
         ];
         
         // Convert card names to proper module names using the existing method

@@ -3,6 +3,25 @@
 import { magicArtsRedraw } from './Abilities/magicArts.js';
 import { canHeroUseSpell, doesSpellNeedAction } from './spellValidation.js';
 
+// Get the effective cost of an artifact, accounting for dynamic cost reductions
+// Standalone utility function that can be used throughout the module
+function getEffectiveArtifactCost(cardName, cardInfo) {
+    if (!cardInfo || cardInfo.cardType !== 'Artifact') {
+        return cardInfo?.cost || 0;
+    }
+
+    // Check for artifacts with special cost calculation
+    // FutureTechLaserCannon: Cost reduces based on graveyard count
+    if (cardName === 'FutureTechLaserCannon' && window.futureTechLaserCannonEffect) {
+        return window.futureTechLaserCannonEffect.calculateEffectiveCost();
+    }
+
+    // Add other artifacts with dynamic costs here as needed
+    
+    // Default: return base cost
+    return cardInfo.cost || 0;
+}
+
 export class HandManager {
     constructor(deckManager) {
         this.deckManager = deckManager;
@@ -53,6 +72,15 @@ export class HandManager {
         return doesSpellNeedAction(spellCardName, heroPosition, window.heroSelection);
     }
 
+    /**
+     * Get the effective cost of an artifact, accounting for dynamic cost reductions
+     * Some artifacts like FutureTechLaserCannon have costs that change based on game state
+     * Delegates to standalone function to avoid code duplication
+     */
+    getEffectiveArtifactCost(cardName, cardInfo) {
+        return getEffectiveArtifactCost(cardName, cardInfo);
+    }
+
     // ===== CENTRALIZED CARD VALIDATION LOGIC =====
     
     // Check if a specific hero can use this card
@@ -78,7 +106,8 @@ export class HandManager {
         // Check affordability for artifacts
         if (cardInfo.cardType === 'Artifact' && cardInfo.cost > 0) {
             const playerGold = window.heroSelection.goldManager?.getPlayerGold() || 0;
-            if (playerGold < cardInfo.cost) {
+            const effectiveCost = this.getEffectiveArtifactCost(cardName, cardInfo);
+            if (playerGold < effectiveCost) {
                 return false; // Can't afford it
             }
         }
@@ -1178,10 +1207,11 @@ export class HandManager {
                 dataCardType = 'potion';
             } else if (cardInfo && cardInfo.cardType === 'Artifact') {
                 dataCardType = 'artifact';
-                // Check if player can afford it
+                // Check if player can afford it using effective cost
                 if (cardInfo.cost && cardInfo.cost > 0) {
                     const playerGold = window.heroSelection?.goldManager?.getPlayerGold() || 0;
-                    isUnaffordable = playerGold < cardInfo.cost;
+                    const effectiveCost = this.getEffectiveArtifactCost(cardName, cardInfo);
+                    isUnaffordable = playerGold < effectiveCost;
                 }
             } else if (isAscendedHero) {
                 dataCardType = 'ascended-hero';
@@ -1200,6 +1230,7 @@ export class HandManager {
             const cardData = {
                 imagePath: cardPath,
                 displayName: cardDisplayName,
+                cardName: cardName,  // ADD THE CARD NAME!
                 cardType: 'hand',
                 handIndex: index,
                 requiresAction: requiresAction,
@@ -1572,7 +1603,7 @@ function canPlayerAffordArtifact(cardName) {
         return { canAfford: true };
     }
     
-    const artifactCost = cardInfo.cost || 0;
+    const artifactCost = getEffectiveArtifactCost(cardName, cardInfo);
     if (artifactCost <= 0) {
         return { canAfford: true };
     }
@@ -1864,9 +1895,22 @@ async function onHandCardDragEnd(event) {
                             y <= discardRect.bottom
                         );
                     }
+
+                    // Check if the card was dropped on a hero slot
+                    const teamSlots = document.querySelectorAll('.team-slot');
+                    let droppedOnHeroSlot = false;
+
+                    for (const slot of teamSlots) {
+                        const slotRect = slot.getBoundingClientRect();
+                        if (x >= slotRect.left && x <= slotRect.right && 
+                            y >= slotRect.top && y <= slotRect.bottom) {
+                            droppedOnHeroSlot = true;
+                            break;
+                        }
+                    }
                     
                     // Only activate effects if NOT dropped on discard pile
-                    if (!droppedOnDiscardPile) {
+                    if (!droppedOnDiscardPile && !droppedOnHeroSlot){
                         // Check if it's a potion being dragged out of hand
                         if (window.potionHandler && window.potionHandler.isPotionCard(dragState.draggedCardName, window.heroSelection)) {
                             const result = await window.potionHandler.handlePotionDrag(

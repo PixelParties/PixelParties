@@ -41,6 +41,7 @@ export async function processComputerArtifactsAfterBattle(roomRef) {
             let currentDelayedEffects = [];
             let currentMagicSapphiresUsed = team.magicSapphiresUsed || 0;
             let currentSpellbooks = JSON.parse(JSON.stringify(team.spellbooks || { left: [], center: [], right: [] }));
+            let currentCreatures = JSON.parse(JSON.stringify(team.creatures || { left: [], center: [], right: [] }));
 
             for (const artifactName of shuffledArtifacts) {
                 const artifactInfo = getCardInfo(artifactName);
@@ -141,6 +142,192 @@ export async function processComputerArtifactsAfterBattle(roomRef) {
                     continue;
                 }
 
+                // SUMMONING CIRCLE SPECIAL HANDLING
+                if (artifactName === 'SummoningCircle') {
+                    // Get all creatures from the deck
+                    const creaturesInDeck = currentDeck.filter(cardName => {
+                        const cardInfo = getCardInfo(cardName);
+                        return cardInfo && cardInfo.cardType === 'Spell' && cardInfo.subtype === 'Creature';
+                    });
+                    
+                    if (creaturesInDeck.length > 0) {
+                        // Select a random creature
+                        const randomCreature = creaturesInDeck[Math.floor(Math.random() * creaturesInDeck.length)];
+                        const creatureInfo = getCardInfo(randomCreature);
+                        
+                        if (creatureInfo) {
+                            // Find target hero position
+                            let targetPosition = null;
+                            
+                            // Check if Tharx is present - prioritize Tharx
+                            for (const position of ['left', 'center', 'right']) {
+                                const hero = currentFormation[position];
+                                if (hero && hero.name === 'Tharx') {
+                                    targetPosition = position;
+                                    break;
+                                }
+                            }
+                            
+                            // If no Tharx, find hero with fewest creatures
+                            if (!targetPosition) {
+                                let minCreatures = Infinity;
+                                for (const position of ['left', 'center', 'right']) {
+                                    if (currentFormation[position]) {
+                                        const creatureCount = (currentCreatures[position] || []).length;
+                                        if (creatureCount < minCreatures) {
+                                            minCreatures = creatureCount;
+                                            targetPosition = position;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Add creature to target hero if found
+                            if (targetPosition) {
+                                if (!currentCreatures[targetPosition]) {
+                                    currentCreatures[targetPosition] = [];
+                                }
+                                
+                                currentCreatures[targetPosition].push({
+                                    name: randomCreature,
+                                    image: creatureInfo.image,
+                                    cardType: creatureInfo.cardType,
+                                    maxHp: creatureInfo.hp || 100,
+                                    currentHp: creatureInfo.hp || 100,
+                                    hp: creatureInfo.hp || 100,
+                                    addedAt: Date.now(),
+                                    statusEffects: [],
+                                    type: 'creature',
+                                    counters: 0,
+                                    fromSummoningCircle: true
+                                });
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+
+                // BURNED CONTRACT SPECIAL HANDLING
+                if (artifactName === 'BurnedContract') {
+                    let lowestCreature = null;
+                    let lowestPosition = null;
+                    let lowestIndex = -1;
+                    let lowestLevel = Infinity;
+                    let foundValidTarget = false;
+
+                    // First pass: look for tokens at level 1 or below
+                    for (const pos of ['left', 'center', 'right']) {
+                        const creatures = currentCreatures[pos] || [];
+                        creatures.forEach((creature, index) => {
+                            const creatureName = creature.name || creature.cardName || creature;
+                            const creatureInfo = getCardInfo(creatureName);
+                            
+                            if (creatureInfo && creatureInfo.cardType === 'Token') {
+                                const level = creatureInfo.level || 1;
+                                if (level <= 1) {
+                                    foundValidTarget = true;
+                                    if (lowestLevel > 0 || !lowestCreature) {
+                                        lowestCreature = creature;
+                                        lowestPosition = pos;
+                                        lowestIndex = index;
+                                        lowestLevel = 0;
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    // Second pass: if no tokens, find lowest level creature at level 1 or below
+                    if (!lowestCreature) {
+                        for (const pos of ['left', 'center', 'right']) {
+                            const creatures = currentCreatures[pos] || [];
+                            creatures.forEach((creature, index) => {
+                                const creatureName = creature.name || creature.cardName || creature;
+                                const creatureInfo = getCardInfo(creatureName);
+                                
+                                if (creatureName === 'GraveWorm') {
+                                    return;
+                                }
+                                
+                                if (creatureInfo && creatureInfo.cardType !== 'Token') {
+                                    const level = creatureInfo.level || 1;
+                                    
+                                    if (level <= 1) {
+                                        foundValidTarget = true;
+                                        if (level < lowestLevel) {
+                                            lowestCreature = creature;
+                                            lowestPosition = pos;
+                                            lowestIndex = index;
+                                            lowestLevel = level;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    if (foundValidTarget && lowestCreature && lowestPosition !== null && lowestIndex >= 0) {
+                        const sacrificedCreature = currentCreatures[lowestPosition].splice(lowestIndex, 1)[0];
+                        const sacrificedName = sacrificedCreature.name || sacrificedCreature.cardName || sacrificedCreature;
+                        
+                        console.log(`🔥 CPU BurnedContract: Sacrificed ${sacrificedName} from ${lowestPosition}`);
+                        
+                        const hpBonus = 50;
+                        const attackBonus = 10;
+                        
+                        ['left', 'center', 'right'].forEach(pos => {
+                            const hero = currentFormation[pos];
+                            if (hero) {
+                                hero.hpBonusses = (hero.hpBonusses || 0) + hpBonus;
+                                hero.attackBonusses = (hero.attackBonusses || 0) + attackBonus;
+                                console.log(`✅ CPU BurnedContract: Buffed ${hero.name} (+${attackBonus} ATK, +${hpBonus} HP)`);
+                            }
+                        });
+                        
+                        // GRAVEWORM DUPLICATION
+                        const graveWormLocations = [];
+                        for (const pos of ['left', 'center', 'right']) {
+                            const creatures = currentCreatures[pos] || [];
+                            creatures.forEach((creature, index) => {
+                                const creatureName = creature.name || creature.cardName || creature;
+                                if (creatureName === 'GraveWorm') {
+                                    graveWormLocations.push({
+                                        position: pos,
+                                        index: index,
+                                        creature: creature
+                                    });
+                                }
+                            });
+                        }
+                        
+                        if (graveWormLocations.length > 0) {
+                            const shuffled = [...graveWormLocations].sort(() => Math.random() - 0.5);
+                            const toDuplicate = shuffled.slice(0, Math.min(3, shuffled.length));
+                            
+                            toDuplicate.sort((a, b) => {
+                                if (a.position !== b.position) {
+                                    const posOrder = { right: 2, center: 1, left: 0 };
+                                    return posOrder[b.position] - posOrder[a.position];
+                                }
+                                return b.index - a.index;
+                            });
+                            
+                            toDuplicate.forEach(({ position: pos, index: idx, creature }) => {
+                                const duplicate = JSON.parse(JSON.stringify(creature));
+                                duplicate.addedAt = Date.now();
+                                currentCreatures[pos].splice(idx + 1, 0, duplicate);
+                            });
+                            
+                            console.log(`🪱 CPU BurnedContract: Created ${toDuplicate.length} GraveWorm duplicate(s)`);
+                        }
+                    } else {
+                        console.log(`⚠️ CPU BurnedContract: No creatures at level 1 or below, skipping and refunding gold`);
+                        currentGold += artifactCost;
+                    }
+                    
+                    continue;
+                }
                 // CHEESE ARTIFACTS SPECIAL HANDLING
                 const cheeseArtifacts = ['CuteCheese', 'NerdyCheese', 'HolyCheese', 'SicklyCheese', 'CoolCheese', 'AngryCheese'];
                 if (cheeseArtifacts.includes(artifactName)) {
@@ -245,7 +432,7 @@ export async function processComputerArtifactsAfterBattle(roomRef) {
                 
                 // NORMAL ARTIFACT HANDLING
                 if (artifactInfo.subtype === 'Equip') {
-                    const targetPosition = selectEquipTarget(artifactName, currentFormation, team.abilities, currentEquipment);
+                    const targetPosition = selectEquipTarget(artifactName, currentFormation, team.abilities, currentEquipment, currentGraveyard);
                     
                     if (targetPosition) {
                         if (!currentEquipment[targetPosition]) {
@@ -286,6 +473,7 @@ export async function processComputerArtifactsAfterBattle(roomRef) {
             updates[`${teamKey}/magicSapphiresUsed`] = currentMagicSapphiresUsed;
             updates[`${teamKey}/delayedEffects`] = currentDelayedEffects;
             updates[`${teamKey}/spellbooks`] = currentSpellbooks;
+            updates[`${teamKey}/creatures`] = currentCreatures;
         }
 
         if (Object.keys(updates).length > 0) {
@@ -302,7 +490,7 @@ export async function processComputerArtifactsAfterBattle(roomRef) {
 /**
  * Select target hero for equip artifact with smart rules
  */
-function selectEquipTarget(artifactName, formation, abilities, currentEquipment) {
+function selectEquipTarget(artifactName, formation, abilities, currentEquipment, graveyard = []) {
     const availablePositions = [];
     ['left', 'center', 'right'].forEach(pos => {
         if (formation[pos]) {
@@ -312,7 +500,8 @@ function selectEquipTarget(artifactName, formation, abilities, currentEquipment)
 
     if (availablePositions.length === 0) return null;
 
-    const uniqueGraveyardCards = 0;
+    // Calculate unique graveyard cards count
+    const uniqueGraveyardCards = new Set(graveyard).size;
 
     // CUTE CROWN - Always target Mary
     if (artifactName === 'CuteCrown') {
@@ -326,7 +515,7 @@ function selectEquipTarget(artifactName, formation, abilities, currentEquipment)
 
     // ARROW ARTIFACTS - Prioritize heroes with fewest copies of this arrow, then Darge, then highest attack
     if (artifactName.includes('Arrow')) {
-        return selectArrowTarget(availablePositions, formation, abilities, currentEquipment, uniqueGraveyardCards, artifactName);
+        return selectArrowTarget(availablePositions, formation, abilities, currentEquipment, uniqueGraveyardCards, artifactName, graveyard);
     }
 
     // CRUSADERS ARTIFACTS - Always target Cecilia
@@ -341,7 +530,7 @@ function selectEquipTarget(artifactName, formation, abilities, currentEquipment)
 
     // ALL OTHER EQUIPS - 75% highest attack
     if (Math.random() < 0.75) {
-        return selectHighestAttackHero(availablePositions, formation, abilities, currentEquipment, uniqueGraveyardCards);
+        return selectHighestAttackHero(availablePositions, formation, abilities, currentEquipment, uniqueGraveyardCards, graveyard);
     } else {
         return availablePositions[Math.floor(Math.random() * availablePositions.length)];
     }
@@ -350,12 +539,12 @@ function selectEquipTarget(artifactName, formation, abilities, currentEquipment)
 /**
  * Select hero with highest attack stat
  */
-function selectHighestAttackHero(positions, formation, abilities, equipment, uniqueGraveyardCards) {
+function selectHighestAttackHero(positions, formation, abilities, equipment, uniqueGraveyardCards, graveyard = []) {
     let highestAttack = -1;
     let highestPositions = [];
 
     positions.forEach(pos => {
-        const stats = calculateComputerHeroStats(formation, pos, abilities, equipment, uniqueGraveyardCards);
+        const stats = calculateComputerHeroStats(formation, pos, abilities, equipment, uniqueGraveyardCards, graveyard);
         if (stats && stats.attack > highestAttack) {
             highestAttack = stats.attack;
             highestPositions = [pos];
@@ -377,7 +566,7 @@ function selectHighestAttackHero(positions, formation, abilities, equipment, uni
  * 1. Heroes with fewest copies of this specific arrow
  * 2. Within same count: Darge first, then by attack stat descending
  */
-function selectArrowTarget(positions, formation, abilities, equipment, uniqueGraveyardCards, artifactName) {
+function selectArrowTarget(positions, formation, abilities, equipment, uniqueGraveyardCards, artifactName, graveyard = []) {
     // Count how many of this specific arrow each hero already has
     const heroArrowCounts = positions.map(pos => {
         const heroEquipment = equipment[pos] || [];
@@ -411,13 +600,13 @@ function selectArrowTarget(positions, formation, abilities, equipment, uniqueGra
     }
     
     // No Darge in the tie - select highest attack among tied heroes
-    return selectHighestAttackHero(tiedPositions, formation, abilities, equipment, uniqueGraveyardCards);
+    return selectHighestAttackHero(tiedPositions, formation, abilities, equipment, uniqueGraveyardCards, graveyard);
 }
 
 /**
  * Calculate effective stats for a computer hero
  */
-export function calculateComputerHeroStats(formation, position, abilities, equipment, uniqueGraveyardCards = 0) {
+export function calculateComputerHeroStats(formation, position, abilities, equipment, uniqueGraveyardCards = 0, graveyard = []) {
     const hero = formation[position];
     if (!hero) return null;
         
@@ -454,6 +643,28 @@ export function calculateComputerHeroStats(formation, position, abilities, equip
         skullNecklaceAttackBonus = 0;
     }
     
+    // FutureTechLaserCannon: +100 Attack per copy equipped
+    let laserCannonAttackBonus = 0;
+    const laserCannonCount = heroEquipment.filter(item => {
+        const name = item.name || item.cardName || item;
+        return name === 'FutureTechLaserCannon';
+    }).length;
+    if (laserCannonCount > 0) {
+        laserCannonAttackBonus = laserCannonCount * 100; // +100 per laser cannon
+    }
+    
+    // FutureTechGun: +10 Attack per copy in graveyard (per equipped gun), capped at 15 guns (+150)
+    let futureTechGunAttackBonus = 0;
+    const futureTechGunEquippedCount = heroEquipment.filter(item => {
+        const name = item.name || item.cardName || item;
+        return name === 'FutureTechGun';
+    }).length;
+    if (futureTechGunEquippedCount > 0 && Array.isArray(graveyard)) {
+        const futureTechGunsInGraveyard = graveyard.filter(cardName => cardName === 'FutureTechGun').length;
+        const cappedGunsInGraveyard = Math.min(futureTechGunsInGraveyard, 15); // Cap at 15 guns
+        futureTechGunAttackBonus = futureTechGunEquippedCount * cappedGunsInGraveyard * 10; // +10 per gun in graveyard per equipped gun
+    }
+    
     let permanentAttackBonus = hero.attackBonusses || 0;
     let permanentHpBonus = hero.hpBonusses || 0;
     let trulyPermanentAttackBonus = hero.permanentAttackBonusses || 0;
@@ -462,7 +673,8 @@ export function calculateComputerHeroStats(formation, position, abilities, equip
     const hpBonus = toughnessStacks * 200;
     const fightingAttackBonus = fightingStacks * 20;
     const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + energyCoreAttackBonus 
-        + skullNecklaceAttackBonus + permanentAttackBonus + trulyPermanentAttackBonus;
+        + skullNecklaceAttackBonus + laserCannonAttackBonus + futureTechGunAttackBonus 
+        + permanentAttackBonus + trulyPermanentAttackBonus;
     const totalHpBonus = hpBonus + permanentHpBonus + trulyPermanentHpBonus;
 
     const calculatedMaxHp = heroInfo.hp + totalHpBonus;
@@ -483,6 +695,10 @@ export function calculateComputerHeroStats(formation, position, abilities, equip
             energyCoreCount,
             energyCoreAttackBonus,
             skullNecklaceAttackBonus,
+            laserCannonCount,
+            laserCannonAttackBonus,
+            futureTechGunEquippedCount,
+            futureTechGunAttackBonus,
             permanentAttackBonus,
             permanentHpBonus,
             trulyPermanentAttackBonus,

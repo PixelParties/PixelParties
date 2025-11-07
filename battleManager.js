@@ -1,5 +1,6 @@
 // battleManager.js - Complete Battle Manager with BattleLog Integration (REFACTORED)
 // UPDATED: Uses pre-calculated Hero stats instead of recalculating
+// INGO INTEGRATION: Supports Ingo's merchant effect - creature summons grant +2 gold during battle
 
 import { getCardInfo } from './cardDatabase.js';
 import { BattlePersistenceManager } from './battlePersistenceManager.js';
@@ -31,6 +32,8 @@ import RoyalCorgiCreature from './Creatures/royalCorgi.js';
 import { MoniaHeroEffect } from './Heroes/monia.js';
 import { NomuHeroEffect } from './Heroes/nomu.js';
 import { SwampborneWaflavHeroEffect } from './Heroes/swampborneWaflav.js';
+import { IngoEffectManager } from './Heroes/ingo.js';
+
 
 
 export class BattleManager {
@@ -147,6 +150,10 @@ export class BattleManager {
             window.killTracker = killTracker;
             window.battleManager = this;
         }
+        
+        // ===== INGO INTEGRATION: Initialize Ingo Effect Manager =====
+        this.ingoEffectManager = null;
+        // =============================================================
     }
 
     // ============================================
@@ -310,6 +317,176 @@ export class BattleManager {
     }
 
     // ============================================
+    // ============================================
+    // CREATURE SUMMONING MANAGEMENT - INGO INTEGRATION
+    /**
+     * HOW TO INTEGRATE WITH CREATURE SPELLS:
+     * =======================================
+     * When a spell system or effect creates a creature during battle,
+     * it should call: await battleManager.notifyCreatureSummoned(side, creature, hero);
+     * 
+     * This ensures:
+     * 1. Ingo's merchant effect triggers (+2 gold)
+     * 2. The gold is tracked in checkpoint system
+     * 3. The effect is streamed to guest players
+     * 4. Visual feedback is shown
+     * 5. The gold appears in post-battle rewards
+     * 
+     * Example usage in spell casting:
+     * ------------------------------
+     * // After adding creature to hero.creatures array:
+     * hero.creatures.push(newCreature);
+     * 
+     * // Notify the battle manager:
+     * await this.battleManager.notifyCreatureSummoned(
+     *     hero.side,      // 'player' or 'opponent'  
+     *     newCreature,    // The creature object
+     *     hero            // The hero that owns it
+     * );
+     */
+
+    // ============================================
+
+    /**
+     * Centralized notification for creature summoning
+     * This is called whenever a creature is summoned during battle
+     * Triggers Ingo's merchant effect and any other creature-summon effects
+     * 
+     * @param {string} side - Which side summoned the creature ('player' or 'opponent')
+     * @param {Object} creature - The creature that was summoned
+     * @param {Object} hero - The hero that owns the creature
+     * @returns {Promise<void>}
+     */
+    async notifyCreatureSummoned(side, creature, hero) {
+        // Only host processes game logic
+        if (!this.isAuthoritative) return;
+        
+        try {
+            // ===== INGO EFFECT: Award gold for creature summon =====
+            if (this.ingoEffectManager) {
+                await this.ingoEffectManager.triggerBattleEffect(side, creature);
+            }
+            // ======================================================
+            
+            // Future: Add other hero effects that trigger on creature summon here
+            
+        } catch (error) {
+            console.error('Error in notifyCreatureSummoned:', error);
+        }
+    }
+
+    /**
+     * Wrap a hero's creatures array with a Proxy to auto-detect creature additions
+     * This allows automatic triggering of effects like Ingo's merchant ability
+     * without requiring manual calls in every spell/effect that summons creatures
+     * 
+     * @param {Object} hero - The hero whose creatures array to wrap
+     */
+    wrapCreaturesArrayWithAutoDetection(hero) {
+        // Don't wrap if not authoritative or if already wrapped
+        if (!this.isAuthoritative || hero._creaturesWrapped) return;
+        
+        const battleManager = this;
+        
+        // Create a proxy that intercepts array mutations
+        const creaturesProxy = new Proxy(hero.creatures, {
+            get(target, property) {
+                const original = target[property];
+                
+                // Intercept array methods that add creatures
+                if (property === 'push') {
+                    return function(...creatures) {
+                        const result = Array.prototype.push.apply(target, creatures);
+                        
+                        // Notify for each creature added
+                        creatures.forEach(creature => {
+                            if (creature && typeof creature === 'object') {
+                                // Use setTimeout to avoid blocking and allow async
+                                setTimeout(async () => {
+                                    try {
+                                        await battleManager.notifyCreatureSummoned(
+                                            hero.side,
+                                            creature,
+                                            hero
+                                        );
+                                    } catch (error) {
+                                        console.error('Error in auto-detected creature summon:', error);
+                                    }
+                                }, 0);
+                            }
+                        });
+                        
+                        return result;
+                    };
+                }
+                
+                if (property === 'unshift') {
+                    return function(...creatures) {
+                        const result = Array.prototype.unshift.apply(target, creatures);
+                        
+                        // Notify for each creature added
+                        creatures.forEach(creature => {
+                            if (creature && typeof creature === 'object') {
+                                setTimeout(async () => {
+                                    try {
+                                        await battleManager.notifyCreatureSummoned(
+                                            hero.side,
+                                            creature,
+                                            hero
+                                        );
+                                    } catch (error) {
+                                        console.error('Error in auto-detected creature summon:', error);
+                                    }
+                                }, 0);
+                            }
+                        });
+                        
+                        return result;
+                    };
+                }
+                
+                if (property === 'splice') {
+                    return function(start, deleteCount, ...items) {
+                        const result = Array.prototype.splice.apply(target, [start, deleteCount, ...items]);
+                        
+                        // Only notify for added items (when items are provided)
+                        if (items.length > 0) {
+                            items.forEach(creature => {
+                                if (creature && typeof creature === 'object') {
+                                    setTimeout(async () => {
+                                        try {
+                                            await battleManager.notifyCreatureSummoned(
+                                                hero.side,
+                                                creature,
+                                                hero
+                                            );
+                                        } catch (error) {
+                                            console.error('Error in auto-detected creature summon:', error);
+                                        }
+                                    }, 0);
+                                }
+                            });
+                        }
+                        
+                        return result;
+                    };
+                }
+                
+                // Return original for everything else
+                return typeof original === 'function' ? original.bind(target) : original;
+            }
+        });
+        
+        // Replace the hero's creatures array with the proxy
+        hero.creatures = creaturesProxy;
+        
+        // Mark as wrapped to avoid double-wrapping
+        hero._creaturesWrapped = true;
+        
+        console.log(`🔍 Wrapped ${hero.side} ${hero.position} hero's creatures array for auto-detection`);
+    }
+
+
     // CORE BATTLE MANAGER FUNCTIONALITY
     // ============================================
 
@@ -429,6 +606,23 @@ export class BattleManager {
         this.crusaderArtifactsHandler.initBattleEffects(this);
 
         this.swampborneWaflavEffect = SwampborneWaflavHeroEffect.init(this);
+        
+        // ===== INGO INTEGRATION: Initialize Ingo Effect Manager for Battle =====
+        this.ingoEffectManager = new IngoEffectManager();
+        this.ingoEffectManager.initForBattle(this);
+        // =========================================================================
+    }
+
+    /**
+     * Check if Ingo effect is active for a given side
+     * @param {string} side - 'player' or 'opponent'
+     * @returns {boolean} True if Ingo is alive in that side's formation
+     */
+    hasActiveIngo(side) {
+        if (!this.ingoEffectManager) {
+            return false;
+        }
+        return this.ingoEffectManager.findIngoInBattle(side) !== null;
     }
 
     setBattleSpeed(speed) {
@@ -633,17 +827,50 @@ export class BattleManager {
                         // Note: Full skull necklace calculation would need card type analysis
                         // For now, just flag that it exists
                         
-                        // 5. Get permanent bonuses from hero object
+                        // 5. Calculate FutureTechLaserCannon bonus: +100 Attack per copy equipped
+                        let laserCannonAttackBonus = 0;
+                        const laserCannonCount = heroEquipment.filter(item => {
+                            const name = item.name || item.cardName || item;
+                            return name === 'FutureTechLaserCannon';
+                        }).length;
+                        if (laserCannonCount > 0) {
+                            laserCannonAttackBonus = laserCannonCount * 100; // +100 per laser cannon
+                        }
+                        
+                        // 6. Calculate FutureTechGun bonus: +10 Attack per copy in graveyard (per equipped gun), capped at 15 guns (+150)
+                        let futureTechGunAttackBonus = 0;
+                        const futureTechGunEquippedCount = heroEquipment.filter(item => {
+                            const name = item.name || item.cardName || item;
+                            return name === 'FutureTechGun';
+                        }).length;
+                        if (futureTechGunEquippedCount > 0) {
+                            // Get graveyard for the correct side
+                            let graveyard = [];
+                            if (side === 'opponent' && this.opponentGraveyard) {
+                                graveyard = this.opponentGraveyard;
+                            } else if (side === 'player' && this.playerGraveyard) {
+                                graveyard = this.playerGraveyard;
+                            }
+                            
+                            if (Array.isArray(graveyard)) {
+                                const futureTechGunsInGraveyard = graveyard.filter(cardName => cardName === 'FutureTechGun').length;
+                                const cappedGunsInGraveyard = Math.min(futureTechGunsInGraveyard, 15); // Cap at 15 guns
+                                futureTechGunAttackBonus = futureTechGunEquippedCount * cappedGunsInGraveyard * 10; // +10 per gun in graveyard per equipped gun
+                            }
+                        }
+                        
+                        // 7. Get permanent bonuses from hero object
                         const permanentAttackBonus = hero.attackBonusses || 0;
                         const permanentHpBonus = hero.hpBonusses || 0;
                         const trulyPermanentAttackBonus = hero.permanentAttackBonusses || 0;
                         const trulyPermanentHpBonus = hero.permanentHpBonusses || 0;
                         
-                        // 6. Calculate totals
+                        // 8. Calculate totals
                         const hpBonus = toughnessStacks * 200;
                         const fightingAttackBonus = fightingStacks * 20;
                         const totalAttackBonus = fightingAttackBonus + equipmentAttackBonus + 
                             energyCoreAttackBonus + skullNecklaceAttackBonus + 
+                            laserCannonAttackBonus + futureTechGunAttackBonus +
                             permanentAttackBonus + trulyPermanentAttackBonus;
                         const totalHpBonus = hpBonus + permanentHpBonus + trulyPermanentHpBonus;
                         
@@ -666,6 +893,10 @@ export class BattleManager {
                                 energyCoreCount,
                                 energyCoreAttackBonus,
                                 skullNecklaceAttackBonus,
+                                laserCannonCount,
+                                laserCannonAttackBonus,
+                                futureTechGunEquippedCount,
+                                futureTechGunAttackBonus,
                                 permanentAttackBonus,
                                 permanentHpBonus,
                                 trulyPermanentAttackBonus,
@@ -681,6 +912,11 @@ export class BattleManager {
 
                 // Store the hero
                 heroesObj[position] = hero;
+                
+                // ===== AUTO-DETECT CREATURE SUMMONS: Wrap creatures array with Proxy =====
+                // This automatically triggers Ingo and other effects when creatures are added
+                this.wrapCreaturesArrayWithAutoDetection(hero);
+                // =========================================================================
                 
                 // Update all visual elements
                 this.resetHeroVisualState(side, position);
@@ -924,7 +1160,6 @@ export class BattleManager {
         }
     }
 
-    // REMOVED: Stat logging functions that recalculated stats
     // Heroes now have pre-calculated stats from heroSelection
 
     // Initialize extensible state
@@ -1921,6 +2156,33 @@ export class BattleManager {
         return this.spellSystem ? this.spellSystem.getSpellStatistics() : null;
     }
 
+    // ===== INGO INTEGRATION: Get Ingo battle rewards =====
+    /**
+     * Get Ingo's creature summoning rewards for the reward screen
+     * @returns {Object|null} Ingo rewards data with gold and summon count
+     */
+    getIngoRewards(side = 'player') {
+        if (!this.ingoEffectManager) {
+            return null;
+        }
+        
+        // Get gold earned for the specified side
+        const goldEarned = this.ingoEffectManager.battleGoldEarned?.[side] || 0;
+        const summonCount = this.ingoEffectManager.battleCreatureSummons?.[side] || 0;
+        
+        // Only return data if Ingo actually earned gold for this side
+        if (goldEarned === 0) {
+            return null;
+        }
+        
+        return {
+            goldEarned: goldEarned,
+            creatureSummons: summonCount,
+            goldPerCreature: 2
+        };
+    }
+    // ======================================================
+
     guest_handleRandomnessSeed(data) {
         const { seed } = data;
         if (seed) {
@@ -2016,6 +2278,15 @@ export class BattleManager {
         // Use the existing instance from AttackEffectsManager
         if (this.attackEffectsManager && this.attackEffectsManager.futureTechFistsArtifact) {
             this.attackEffectsManager.futureTechFistsArtifact.handleGuestShieldGeneration(data);
+        }
+    }
+    
+    guest_handleFutureTechBazookaSplash(data) {
+        if (this.isAuthoritative) return;
+
+        // Use the existing instance from AttackEffectsManager
+        if (this.attackEffectsManager && this.attackEffectsManager.futureTechBazookaArtifact) {
+            this.attackEffectsManager.futureTechBazookaArtifact.handleGuestBazookaSplash(data);
         }
     }
 
@@ -2640,6 +2911,12 @@ export class BattleManager {
             }
         }
 
+            // ===== COLLECT PERMANENT ARMS TRADE EQUIPMENT =====
+            let permanentArmsTradeEquipment = [];
+            if (this.isAuthoritative) {
+                permanentArmsTradeEquipment = this.collectPermanentArmsTradeEquipment();
+            }
+
         // ===== SAVE CPU PERMANENT CREATURES TO FIREBASE =====
         if (this.isAuthoritative && this.roomManager) {
             try {
@@ -2686,6 +2963,64 @@ export class BattleManager {
                 }
             } catch (error) {
                 console.error('Error saving CPU permanent creatures:', error);
+            }
+        }
+
+        // ===== SAVE CPU PERMANENT ARMS TRADE EQUIPMENT TO FIREBASE =====
+        if (this.isAuthoritative && this.roomManager && permanentArmsTradeEquipment.length > 0) {
+            try {
+                const roomRef = this.roomManager.getRoomRef();
+                if (roomRef) {
+                    const selectedTeamSnapshot = await roomRef.child('gameState/selectedComputerTeam').once('value');
+                    const selectedTeamKey = selectedTeamSnapshot.val();
+                    
+                    if (selectedTeamKey) {
+                        // Import the helper function
+                        const { mergePermanentArmsTradeEquipmentForCPU } = await import('./generateComputerParty.js');
+                        
+                        // Get current CPU equipment data
+                        const cpuEquipmentSnapshot = await roomRef
+                            .child(`singleplayer/computerTeams/${selectedTeamKey}/equipment`)
+                            .once('value');
+                        const currentCPUEquipment = cpuEquipmentSnapshot.val() || { 
+                            left: [], 
+                            center: [], 
+                            right: [] 
+                        };
+                        
+                        // CRITICAL FIX: Get CPU formation to map randomized positions back to original positions
+                        const cpuFormationSnapshot = await roomRef
+                            .child(`singleplayer/computerTeams/${selectedTeamKey}/formation`)
+                            .once('value');
+                        const cpuFormation = cpuFormationSnapshot.val() || { 
+                            left: null, 
+                            center: null, 
+                            right: null 
+                        };
+                        
+                        // Determine CPU side
+                        const cpuAbsoluteSide = this.isHost ? 'guest' : 'host';
+                        
+                        // Merge permanent equipment using helper function (now with formation data)
+                        const mergedEquipment = mergePermanentArmsTradeEquipmentForCPU(
+                            currentCPUEquipment,
+                            permanentArmsTradeEquipment,
+                            cpuAbsoluteSide,
+                            cpuFormation  // Pass formation to map heroes correctly
+                        );
+                        
+                        // Save merged equipment to Firebase
+                        await roomRef.child(`singleplayer/computerTeams/${selectedTeamKey}/equipment`).set(mergedEquipment);
+                        
+                        const equipmentCount = permanentArmsTradeEquipment.filter(e => e.heroAbsoluteSide === cpuAbsoluteSide).length;
+                        
+                        if (equipmentCount > 0) {
+                            console.log(`💾 Saved ${equipmentCount} Arms Trade equipment item(s) to CPU team ${selectedTeamKey}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error saving CPU permanent Arms Trade equipment:', error);
             }
         }
 
@@ -2904,7 +3239,7 @@ export class BattleManager {
                 newTurn: newTurn,
                 permanentGuardians: permanentGuardians,
                 permanentCaptures: permanentCaptures,
-                // ADD COUNTER DATA FOR BOTH HOST AND GUEST
+                permanentArmsTradeEquipment: permanentArmsTradeEquipment, 
                 hostPlayerCounters: this.playerCounters || { 
                     birthdayPresent: 0, 
                     teleports: 0, 
@@ -3000,6 +3335,18 @@ export class BattleManager {
                     );
                 } catch (error) {
                     console.error('Error transferring permanent captures to host formation:', error);
+                }
+            }
+
+            // Handle permanent Arms Trade equipment transfer
+            if (permanentArmsTradeEquipment && permanentArmsTradeEquipment.length > 0) {
+                try {
+                    this.transferPermanentArmsTradeEquipmentToFormation(
+                        permanentArmsTradeEquipment, 
+                        window.heroSelection
+                    );
+                } catch (error) {
+                    console.error('Error transferring permanent Arms Trade equipment to host formation:', error);
                 }
             }
         }
@@ -3108,7 +3455,7 @@ export class BattleManager {
 
     // Transfer TRULY PERMANENT stat bonuses from battle heroes back to formation heroes
     transferTrulyPermanentBonusesToFormation() {
-        if (!window.heroSelection) return;
+        if (!window.heroSelection || !window.heroSelection.formationManager) return;
         
         const formation = window.heroSelection.formationManager.getBattleFormation();
         
@@ -3414,6 +3761,10 @@ export class BattleManager {
             this.pinkSkyEffect.cleanup();
             this.pinkSkyEffect = null;
         }
+        if (this.ritualChamberEffect) {
+            this.ritualChamberEffect.cleanup(this);
+            this.ritualChamberEffect = null;
+        }
 
         
 
@@ -3428,6 +3779,12 @@ export class BattleManager {
             this.swampborneWaflavEffect.cleanup();
             this.swampborneWaflavEffect = null;
         }
+        
+        // ===== INGO INTEGRATION: Keep Ingo data for reward screen =====
+        // DON'T reset Ingo counters here - they need to persist for the reward screen
+        // The counters will be reset when a new battle starts
+        // Note: ingoEffectManager is intentionally NOT set to null here
+        // =================================================================
 
         // ===== RESTORE OVERHEAT EQUIPMENT AFTER BATTLE =====
         if (this.spellSystem && this.spellSystem.spellImplementations.has('Overheat')) {
@@ -3704,8 +4061,17 @@ export class BattleManager {
             battleLogState: this.battleScreen && this.battleScreen.getBattleLogState ? 
                             this.battleScreen.getBattleLogState() : null,
             
-            ghuanjunState: this.ghuanjunManager ? this.ghuanjunManager.exportState() : null
+            ghuanjunState: this.ghuanjunManager ? this.ghuanjunManager.exportState() : null,
+            
+            // ===== CRITICAL: Export Ingo state for reward screen =====
+            // This ensures gold bonuses persist and are shown in victory/defeat screen
+            ingoState: this.ingoEffectManager ? this.ingoEffectManager.exportState() : null
         };
+        
+        // Log Ingo export for debugging
+        if (baseState.ingoState && baseState.ingoState.battleGoldEarned > 0) {
+            console.log(`💰 Exporting Ingo state: ${baseState.ingoState.battleGoldEarned} gold from ${baseState.ingoState.battleCreatureSummons} summons`);
+        }
 
         return baseState;
     }
@@ -3811,6 +4177,15 @@ export class BattleManager {
             if (stateData.ghuanjunState && this.ghuanjunManager) {
                 this.ghuanjunManager.importState(stateData.ghuanjunState);
             }
+            
+            // ===== INGO INTEGRATION: Restore Ingo state from checkpoint =====
+            if (stateData.ingoState && this.ingoEffectManager) {
+                this.ingoEffectManager.importState(stateData.ingoState);
+                console.log(`✅ Restored Ingo state: ${this.ingoEffectManager.battleGoldEarned} gold from ${this.ingoEffectManager.battleCreatureSummons} summons`);
+            } else if (stateData.ingoState && !this.ingoEffectManager) {
+                console.warn('⚠️ Ingo state exists in saved data but ingoEffectManager not initialized yet!');
+            }
+            // =================================================================
             
             this.updateAllHeroVisuals();
             
@@ -4373,6 +4748,89 @@ export class BattleManager {
         // Reset BattleLog through BattleScreen
         if (this.battleScreen && this.battleScreen.battleLog) {
             this.battleScreen.battleLog.clear();
+        }
+    }
+
+    // ============================================
+    // ARMS TRADE PERMANENT EQUIPMENT TRANSFER
+    // ============================================
+
+    /**
+     * Collect all equipment from player heroes that has source: 'ArmsTrade'
+     * This equipment should be permanently transferred to the formation
+     * @returns {Array} Array of equipment items with hero position info
+     */
+    collectPermanentArmsTradeEquipment() {
+        const permanentEquipment = [];
+        
+        // Check all heroes from both sides (like SkeletonKingSkullmael does)
+        const allHeroes = [
+            ...Object.entries(this.playerHeroes || {}),
+            ...Object.entries(this.opponentHeroes || {})
+        ];
+        
+        for (const [position, hero] of allHeroes) {
+            if (hero && hero.equipment && Array.isArray(hero.equipment)) {
+                // Find all equipment with source: 'ArmsTrade'
+                hero.equipment.forEach(item => {
+                    if (item.source === 'ArmsTrade') {
+                        permanentEquipment.push({
+                            artifactName: item.name || item.cardName,
+                            heroPosition: position,
+                            heroSide: hero.side,
+                            heroAbsoluteSide: hero.absoluteSide,
+                            heroName: hero.name,
+                            equippedAt: item.equippedAt || Date.now()
+                        });
+                    }
+                });
+            }
+        }
+        
+        if (permanentEquipment.length > 0) {
+            console.log(`⚔️ Collected ${permanentEquipment.length} permanent Arms Trade equipment items from both sides`);
+        }
+        
+        return permanentEquipment;
+    }
+
+    /**
+     * Transfer permanent Arms Trade equipment to the formation screen
+     * @param {Array} permanentEquipment - Array of equipment items to transfer
+     * @param {Object} heroSelection - Reference to heroSelection manager
+     */
+    transferPermanentArmsTradeEquipmentToFormation(permanentEquipment, heroSelection) {
+        if (!heroSelection || !heroSelection.heroEquipmentManager) {
+            console.warn('⚠️ Cannot transfer Arms Trade equipment: heroSelection or heroEquipmentManager not found');
+            return;
+        }
+        
+        let transferredCount = 0;
+        const myAbsoluteSide = heroSelection.isHost ? 'host' : 'guest';
+        
+        // Transfer each equipment item to the appropriate hero
+        permanentEquipment.forEach(equipmentData => {
+            // Only transfer equipment for this player (not opponent's equipment)
+            if (equipmentData.heroAbsoluteSide === myAbsoluteSide) {
+                const { artifactName, heroPosition, heroName } = equipmentData;
+                
+                // Add to heroEquipmentManager using the permanent method
+                const result = heroSelection.heroEquipmentManager.addPermanentEquipmentFromBattle(
+                    heroPosition, 
+                    artifactName
+                );
+                
+                if (result.success) {
+                    transferredCount++;
+                    console.log(`⚔️ Transferred ${artifactName} to ${heroPosition} hero (${heroName}) permanently`);
+                } else {
+                    console.warn(`⚠️ Failed to transfer ${artifactName} to ${heroPosition}: ${result.reason}`);
+                }
+            }
+        });
+        
+        if (transferredCount > 0) {
+            console.log(`✅ Successfully transferred ${transferredCount} Arms Trade equipment items to formation`);
         }
     }
 }

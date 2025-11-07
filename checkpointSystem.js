@@ -54,14 +54,18 @@ export class CheckpointSystem {
                     currentTurn: this.battleManager.currentTurn,
                     turnInProgress: this.battleManager.turnInProgress,
                     totalDamageDealt: { ...this.battleManager.totalDamageDealt },
-                    playerHand: this.battleManager.playerHand || [],
-                    opponentHand: this.battleManager.opponentHand || [],
-                    playerDeck: this.battleManager.playerDeck || [],
-                    opponentDeck: this.battleManager.opponentDeck || [],
-                    playerGraveyard: this.battleManager.playerGraveyard || [],
-                    opponentGraveyard: this.battleManager.opponentGraveyard || [],
-                    playerBirthdayPresentCounter: this.battleManager.playerBirthdayPresentCounter || 0,
-                    opponentBirthdayPresentCounter: this.battleManager.opponentBirthdayPresentCounter || 0
+                    // Store by absoluteSide (host/guest) not relative side (player/opponent)
+                    hostHand: this.isHost ? (this.battleManager.playerHand || []) : (this.battleManager.opponentHand || []),
+                    guestHand: this.isHost ? (this.battleManager.opponentHand || []) : (this.battleManager.playerHand || []),
+                    hostDeck: this.isHost ? (this.battleManager.playerDeck || []) : (this.battleManager.opponentDeck || []),
+                    guestDeck: this.isHost ? (this.battleManager.opponentDeck || []) : (this.battleManager.playerDeck || []),
+                    hostGraveyard: this.isHost ? (this.battleManager.playerGraveyard || []) : (this.battleManager.opponentGraveyard || []),
+                    guestGraveyard: this.isHost ? (this.battleManager.opponentGraveyard || []) : (this.battleManager.playerGraveyard || []),
+                    hostBirthdayPresentCounter: this.isHost ? (this.battleManager.playerBirthdayPresentCounter || 0) : (this.battleManager.opponentBirthdayPresentCounter || 0),
+                    guestBirthdayPresentCounter: this.isHost ? (this.battleManager.opponentBirthdayPresentCounter || 0) : (this.battleManager.playerBirthdayPresentCounter || 0),
+                    // ===== CRITICAL: Save counters by absoluteSide for gold bonuses and other effects =====
+                    hostCounters: this.isHost ? (this.battleManager.playerCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 }) : (this.battleManager.opponentCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 }),
+                    guestCounters: this.isHost ? (this.battleManager.opponentCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 }) : (this.battleManager.playerCounters || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 })
                 },
                 
                 // Heroes - Complete state for both sides
@@ -111,22 +115,30 @@ export class CheckpointSystem {
     // ============================================
 
     captureAllHeroStates() {
+        // CRITICAL FIX: Store heroes by absoluteSide (host/guest) not relative side (player/opponent)
+        // This prevents the singleton battleManager reference issue from causing hero swaps
         const heroStates = {
-            player: {},
-            opponent: {}
+            host: {},
+            guest: {}
         };
         
         ['left', 'center', 'right'].forEach(position => {
             // Player heroes
             const playerHero = this.battleManager.playerHeroes[position];
             if (playerHero) {
-                heroStates.player[position] = this.captureHeroState(playerHero);
+                const capturedState = this.captureHeroState(playerHero);
+                // Store by absoluteSide, not by player/opponent
+                const absoluteSide = playerHero.absoluteSide || (this.isHost ? 'host' : 'guest');
+                heroStates[absoluteSide][position] = capturedState;
             }
             
             // Opponent heroes
             const opponentHero = this.battleManager.opponentHeroes[position];
             if (opponentHero) {
-                heroStates.opponent[position] = this.captureHeroState(opponentHero);
+                const capturedState = this.captureHeroState(opponentHero);
+                // Store by absoluteSide, not by player/opponent
+                const absoluteSide = opponentHero.absoluteSide || (this.isHost ? 'guest' : 'host');
+                heroStates[absoluteSide][position] = capturedState;
             }
         });
         
@@ -230,30 +242,46 @@ export class CheckpointSystem {
     }
 
     captureFormations() {
+        // Store by absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
         return {
-            player: JSON.parse(JSON.stringify(this.battleManager.playerFormation || {})),
-            opponent: JSON.parse(JSON.stringify(this.battleManager.opponentFormation || {}))
+            [myAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.playerFormation || {})),
+            [opponentAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.opponentFormation || {}))
         };
     }
 
     captureAbilities() {
+        // Store by absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
         return {
-            player: JSON.parse(JSON.stringify(this.battleManager.playerAbilities || {})),
-            opponent: JSON.parse(JSON.stringify(this.battleManager.opponentAbilities || {}))
+            [myAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.playerAbilities || {})),
+            [opponentAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.opponentAbilities || {}))
         };
     }
 
     captureSpellbooks() {
+        // Store by absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
         return {
-            player: JSON.parse(JSON.stringify(this.battleManager.playerSpellbooks || {})),
-            opponent: JSON.parse(JSON.stringify(this.battleManager.opponentSpellbooks || {}))
+            [myAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.playerSpellbooks || {})),
+            [opponentAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.opponentSpellbooks || {}))
         };
     }
 
     captureCreatures() {
+        // Store by absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
         return {
-            player: JSON.parse(JSON.stringify(this.battleManager.playerCreatures || {})),
-            opponent: JSON.parse(JSON.stringify(this.battleManager.opponentCreatures || {}))
+            [myAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.playerCreatures || {})),
+            [opponentAbsoluteSide]: JSON.parse(JSON.stringify(this.battleManager.opponentCreatures || {}))
         };
     }
 
@@ -311,9 +339,9 @@ export class CheckpointSystem {
             states.arrowSystem = this.battleManager.attackEffectsManager.arrowSystem.exportArrowState();
         }
 
-        // Kazena Effect State
-        if (this.battleManager.kazenaEffect) {
-            states.kazenaEffect = this.battleManager.kazenaEffect.exportKazenaState();
+        // Ingo Effect State
+        if (this.battleManager.ingoEffectManager) {
+            states.ingoEffect = this.battleManager.ingoEffectManager.exportState();
         }
 
         // Area Effect States
@@ -330,6 +358,11 @@ export class CheckpointSystem {
             states.bigGwenEffect = this.battleManager.bigGwenEffect.exportState();
         }
         
+        // Ritual Chamber Effect State
+        if (this.battleManager.ritualChamberEffect) {
+            states.ritualChamberEffect = this.battleManager.ritualChamberEffect.exportState();
+        }
+        
         // Speed Manager State
         if (this.battleManager.speedManager) {
             states.speedManager = {
@@ -337,6 +370,12 @@ export class CheckpointSystem {
                 speedLocked: this.battleManager.speedManager.speedLocked || false
             };
         }
+        
+        // ===== INGO INTEGRATION: Capture Ingo Effect State =====
+        if (this.battleManager.ingoEffectManager) {
+            states.ingoState = this.battleManager.ingoEffectManager.exportState();
+        }
+        // ========================================================
         
         return states;
     }
@@ -519,6 +558,13 @@ export class CheckpointSystem {
                 this.battleManager.killTracker.init(this.battleManager);
             }
             
+            // ============================================
+            // 🔧 CRITICAL: RE-WRAP CREATURE ARRAYS WITH AUTO-DETECTION
+            // This ensures Ingo and other creature-summon effects work after reconnection
+            // Without this, the Proxy that detects creature additions is lost during restoration
+            // ============================================
+            this.rewrapAllCreatureArrays();
+            
             // 5. Restore random state for determinism
             this.restoreRandomState(checkpoint.randomState);
             
@@ -553,9 +599,13 @@ export class CheckpointSystem {
                 await this.syncCreatureStatesToGuest();
             }
             
+            console.log('✅ RESTORATION COMPLETE - Ingo counters and creature detection fully operational');
+            
             return true;
             
         } catch (error) {
+            console.error('❌ Error in restoreFromCheckpoint:', error);
+            console.error('Error details:', error.stack);
             // Try fallback to previous checkpoint if available
             if (this.previousCheckpoint && checkpoint !== this.previousCheckpoint) {
                 return this.restoreFromCheckpoint(this.previousCheckpoint);
@@ -577,34 +627,30 @@ export class CheckpointSystem {
         this.battleManager.turnInProgress = battleState.turnInProgress || false;
         this.battleManager.totalDamageDealt = battleState.totalDamageDealt || {};
 
-        // For guests, swap player and opponent data since checkpoint was saved from host perspective
-        if (this.isHost) {
-            // HOST: Direct assignment
-            this.battleManager.playerHand = battleState.playerHand || [];
-            this.battleManager.opponentHand = battleState.opponentHand || [];
-            
-            this.battleManager.playerDeck = battleState.playerDeck || [];
-            this.battleManager.opponentDeck = battleState.opponentDeck || [];
-            
-            this.battleManager.playerGraveyard = battleState.playerGraveyard || [];
-            this.battleManager.opponentGraveyard = battleState.opponentGraveyard || [];
-            
-            this.battleManager.playerBirthdayPresentCounter = battleState.playerBirthdayPresentCounter || 0;
-            this.battleManager.opponentBirthdayPresentCounter = battleState.opponentBirthdayPresentCounter || 0;
-        } else {
-            // GUEST: Swap the data since checkpoint was saved from host perspective
-            this.battleManager.playerHand = battleState.opponentHand || [];  // Guest's actual hand
-            this.battleManager.opponentHand = battleState.playerHand || [];   // Host's hand (guest's opponent)
-            
-            this.battleManager.playerDeck = battleState.opponentDeck || [];  // Guest's actual deck
-            this.battleManager.opponentDeck = battleState.playerDeck || [];   // Host's deck (guest's opponent)
-            
-            this.battleManager.playerGraveyard = battleState.opponentGraveyard || [];  // Guest's actual graveyard
-            this.battleManager.opponentGraveyard = battleState.playerGraveyard || [];   // Host's graveyard (guest's opponent)
-            
-            this.battleManager.playerBirthdayPresentCounter = battleState.opponentBirthdayPresentCounter || 0;  // Guest's counter
-            this.battleManager.opponentBirthdayPresentCounter = battleState.playerBirthdayPresentCounter || 0;   // Host's counter
-        }
+        // Use absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
+        // Restore hands
+        this.battleManager.playerHand = battleState[`${myAbsoluteSide}Hand`] || [];
+        this.battleManager.opponentHand = battleState[`${opponentAbsoluteSide}Hand`] || [];
+        
+        // Restore decks
+        this.battleManager.playerDeck = battleState[`${myAbsoluteSide}Deck`] || [];
+        this.battleManager.opponentDeck = battleState[`${opponentAbsoluteSide}Deck`] || [];
+        
+        // Restore graveyards
+        this.battleManager.playerGraveyard = battleState[`${myAbsoluteSide}Graveyard`] || [];
+        this.battleManager.opponentGraveyard = battleState[`${opponentAbsoluteSide}Graveyard`] || [];
+        
+        // Restore birthday present counters
+        this.battleManager.playerBirthdayPresentCounter = battleState[`${myAbsoluteSide}BirthdayPresentCounter`] || 0;
+        this.battleManager.opponentBirthdayPresentCounter = battleState[`${opponentAbsoluteSide}BirthdayPresentCounter`] || 0;
+        
+        // ===== CRITICAL: Restore counters by absoluteSide =====
+        this.battleManager.playerCounters = battleState[`${myAbsoluteSide}Counters`] || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 };
+        this.battleManager.opponentCounters = battleState[`${opponentAbsoluteSide}Counters`] || { birthdayPresent: 0, teleports: 0, goldenBananas: 0, evolutionCounters: 1 };
+        console.log(`✅ Restored ${myAbsoluteSide} counters:`, this.battleManager.playerCounters);
         
         // Initialize battleLog as empty array before restoration
         this.battleManager.battleLog = [];
@@ -613,16 +659,12 @@ export class CheckpointSystem {
     restoreFormations(formations) {
         if (!formations) return;
     
-        // For guests, swap player and opponent data
-        let playerFormation, opponentFormation;
-        if (this.isHost) {
-            playerFormation = formations.player || {};
-            opponentFormation = formations.opponent || {};
-        } else {
-            // GUEST: Swap the formations since checkpoint was saved from host perspective
-            playerFormation = formations.opponent || {};  // Guest's actual formation
-            opponentFormation = formations.player || {};   // Host's formation (guest's opponent)
-        }
+        // NEW: Read from host/guest keys based on absoluteSide
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
+        const playerFormation = formations[myAbsoluteSide] || {};
+        const opponentFormation = formations[opponentAbsoluteSide] || {};
         
         // Restore to battle manager
         this.battleManager.playerFormation = playerFormation;
@@ -659,43 +701,34 @@ export class CheckpointSystem {
     restoreAbilities(abilities) {
         if (!abilities) return;
         
-        // For guests, swap player and opponent data
-        if (this.isHost) {
-            this.battleManager.playerAbilities = abilities.player || {};
-            this.battleManager.opponentAbilities = abilities.opponent || {};
-        } else {
-            // GUEST: Swap the abilities since checkpoint was saved from host perspective
-            this.battleManager.playerAbilities = abilities.opponent || {};  // Guest's actual abilities
-            this.battleManager.opponentAbilities = abilities.player || {};   // Host's abilities (guest's opponent)
-        }
+        // Use absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
+        this.battleManager.playerAbilities = abilities[myAbsoluteSide] || {};
+        this.battleManager.opponentAbilities = abilities[opponentAbsoluteSide] || {};
     }
 
     restoreSpellbooks(spellbooks) {
         if (!spellbooks) return;
         
-        // For guests, swap player and opponent data
-        if (this.isHost) {
-            this.battleManager.playerSpellbooks = spellbooks.player || {};
-            this.battleManager.opponentSpellbooks = spellbooks.opponent || {};
-        } else {
-            // GUEST: Swap the spellbooks since checkpoint was saved from host perspective
-            this.battleManager.playerSpellbooks = spellbooks.opponent || {};  // Guest's actual spellbooks
-            this.battleManager.opponentSpellbooks = spellbooks.player || {};   // Host's spellbooks (guest's opponent)
-        }
+        // Use absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
+        this.battleManager.playerSpellbooks = spellbooks[myAbsoluteSide] || {};
+        this.battleManager.opponentSpellbooks = spellbooks[opponentAbsoluteSide] || {};
     }
 
     restoreCreatures(creatures) {
         if (!creatures) return;
         
-        // For guests, swap player and opponent data
-        if (this.isHost) {
-            this.battleManager.playerCreatures = creatures.player || {};
-            this.battleManager.opponentCreatures = creatures.opponent || {};
-        } else {
-            // GUEST: Swap the creatures since checkpoint was saved from host perspective
-            this.battleManager.playerCreatures = creatures.opponent || {};  // Guest's actual creatures
-            this.battleManager.opponentCreatures = creatures.player || {};   // Host's creatures (guest's opponent)
-        }
+        // Use absoluteSide (host/guest) not relative side (player/opponent)
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
+        
+        this.battleManager.playerCreatures = creatures[myAbsoluteSide] || {};
+        this.battleManager.opponentCreatures = creatures[opponentAbsoluteSide] || {};
     }
 
     restoreEquipment(equipment) {
@@ -722,30 +755,48 @@ export class CheckpointSystem {
         this.battleManager.playerHeroes = {};
         this.battleManager.opponentHeroes = {};
         
-        // For guests, swap player and opponent data
-        let playerHeroes, opponentHeroes;
-        if (this.isHost) {
-            playerHeroes = heroStates.player || {};
-            opponentHeroes = heroStates.opponent || {};
-        } else {
-            // GUEST: Swap the hero states since checkpoint was saved from host perspective
-            playerHeroes = heroStates.opponent || {};  // Guest's actual heroes
-            opponentHeroes = heroStates.player || {};   // Host's heroes (guest's opponents)
-        }
+        // ===== CRITICAL FIX: Use absoluteSide to determine which heroes are which =====
+        const myAbsoluteSide = this.isHost ? 'host' : 'guest';
+        const opponentAbsoluteSide = this.isHost ? 'guest' : 'host';
         
-        // Restore player heroes
+        // NEW: Read from host/guest keys based on absoluteSide
+        // The checkpoint stores heroes by their absolute side (host/guest), not relative (player/opponent)
+        const myHeroes = heroStates[myAbsoluteSide] || {};
+        const opponentHeroes = heroStates[opponentAbsoluteSide] || {};
+        
+        // Restore player heroes (my heroes)
         ['left', 'center', 'right'].forEach(position => {
-            if (playerHeroes[position]) {
-                const hero = this.restoreHero(playerHeroes[position]);
-                // Update the side property to match the new perspective
+            if (myHeroes[position]) {
+                // ===== Override side properties to match current client's perspective =====
+                const heroState = { ...myHeroes[position] };
+                heroState.side = 'player';
+                heroState.absoluteSide = myAbsoluteSide;
+                heroState.position = position;
+                
+                // Now restore the hero with the corrected state
+                const hero = this.restoreHero(heroState);
+                
+                // Double-check the values are correct after restoration
                 hero.side = 'player';
+                hero.absoluteSide = myAbsoluteSide;
+                hero.position = position;
                 this.battleManager.playerHeroes[position] = hero;
             }
             
             if (opponentHeroes[position]) {
-                const hero = this.restoreHero(opponentHeroes[position]);
-                // Update the side property to match the new perspective  
+                // ===== Override side properties to match current client's perspective =====
+                const heroState = { ...opponentHeroes[position] };
+                heroState.side = 'opponent';
+                heroState.absoluteSide = opponentAbsoluteSide;
+                heroState.position = position;
+                
+                // Now restore the hero with the corrected state
+                const hero = this.restoreHero(heroState);
+                
+                // Double-check the values are correct after restoration
                 hero.side = 'opponent';
+                hero.absoluteSide = opponentAbsoluteSide;
+                hero.position = position;
                 this.battleManager.opponentHeroes[position] = hero;
             }
         });
@@ -760,7 +811,6 @@ export class CheckpointSystem {
         this.battleManager.playerEquips = {};
         this.battleManager.opponentEquips = {};
     }
-
     restoreHero(heroState) {
         // This will handle battle bonuses and all other state correctly
         const hero = Hero.fromSavedState(heroState);
@@ -783,6 +833,41 @@ export class CheckpointSystem {
         }
         
         return hero;
+    }
+
+    /**
+     * Re-wrap all hero creature arrays with auto-detection after restoration
+     * This ensures that creature summons are properly detected after reconnection
+     * CRITICAL: This fixes the Ingo counter and other creature-summon effects after host reconnects
+     */
+    rewrapAllCreatureArrays() {
+        if (!this.battleManager || !this.battleManager.wrapCreaturesArrayWithAutoDetection) {
+            console.warn('⚠️ Cannot rewrap creature arrays - battle manager or method missing');
+            return;
+        }
+
+        console.log('🔧 Re-wrapping creature arrays with auto-detection after restoration...');
+
+        // Re-wrap all player heroes
+        ['left', 'center', 'right'].forEach(position => {
+            const playerHero = this.battleManager.playerHeroes[position];
+            if (playerHero && playerHero.creatures) {
+                // Clear the wrapped flag so it can be wrapped again
+                playerHero._creaturesWrapped = false;
+                this.battleManager.wrapCreaturesArrayWithAutoDetection(playerHero);
+                console.log(`✅ Re-wrapped creatures array for player ${position} hero`);
+            }
+
+            const opponentHero = this.battleManager.opponentHeroes[position];
+            if (opponentHero && opponentHero.creatures) {
+                // Clear the wrapped flag so it can be wrapped again
+                opponentHero._creaturesWrapped = false;
+                this.battleManager.wrapCreaturesArrayWithAutoDetection(opponentHero);
+                console.log(`✅ Re-wrapped creatures array for opponent ${position} hero`);
+            }
+        });
+
+        console.log('✅ All creature arrays re-wrapped with auto-detection');
     }
 
 
@@ -835,10 +920,10 @@ export class CheckpointSystem {
             this.battleManager.attackEffectsManager.arrowSystem) {
             this.battleManager.attackEffectsManager.arrowSystem.importArrowState(managerStates.arrowSystem);
         }
-
-        // Restore Kazena
-        if (managerStates.kazenaEffect && this.battleManager.kazenaEffect) {
-            this.battleManager.kazenaEffect.importKazenaState(managerStates.kazenaEffect);
+        
+        // Restore Ingo Effect
+        if (managerStates.ingoEffect && this.battleManager.ingoEffectManager) {
+            this.battleManager.ingoEffectManager.importState(managerStates.ingoEffect);
         }
         
         // Restore Gathering Storm Effect
@@ -897,6 +982,28 @@ export class CheckpointSystem {
                 this.battleManager.bigGwenEffect.importState(managerStates.bigGwenEffect);
             }
         }
+        
+        // Restore RitualChamber Effect
+        if (managerStates.ritualChamberEffect) {
+            // Import the RitualChamber effect class if needed
+            if (!this.battleManager.ritualChamberEffect) {
+                import('./Spells/ritualChamber.js').then(({ RitualChamberEffect }) => {
+                    this.battleManager.ritualChamberEffect = new RitualChamberEffect();
+                    this.battleManager.ritualChamberEffect.importState(managerStates.ritualChamberEffect);
+                }).catch(error => {
+                    console.error('Error importing RitualChamber effect:', error);
+                });
+            } else {
+                this.battleManager.ritualChamberEffect.importState(managerStates.ritualChamberEffect);
+            }
+        }
+        
+        // ===== INGO INTEGRATION: Restore Ingo Effect State =====
+        if (managerStates.ingoState && this.battleManager.ingoEffectManager) {
+            this.battleManager.ingoEffectManager.importState(managerStates.ingoState);
+            console.log('✅ Restored Ingo Effect Manager state');
+        }
+        // ========================================================
     }
 
     restoreBattleLog(battleLog) {

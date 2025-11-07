@@ -123,11 +123,21 @@ export async function processComputerPotionsAfterBattle(roomRef) {
                 }
 
                 // NORMAL POTION HANDLING
-                activePotionEffects.push({
+                const potionEffect = {
                     name: potionName,
                     addedAt: Date.now(),
                     id: generatePotionEffectId()
-                });
+                };
+                
+                // SPECIAL CASE: FutureTechBomb needs graveyard count
+                if (potionName === 'FutureTechBomb') {
+                    const currentGraveyard = team.graveyard || [];
+                    const graveyardCount = currentGraveyard.filter(card => card === 'FutureTechBomb').length;
+                    potionEffect.graveyardCount = graveyardCount;
+                    console.log(`💣 CPU ${teamKey} FutureTechBomb used with ${graveyardCount} copies in graveyard`);
+                }
+                
+                activePotionEffects.push(potionEffect);
             }
 
             // UPDATE TEAM DATA

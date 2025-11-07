@@ -32,6 +32,18 @@ export class HeroEquipmentManager {
         return cardInfo && cardInfo.cardType === 'Artifact' && cardInfo.subtype === 'Equip';
     }
     
+    // Get the effective cost of an artifact (handles dynamic costs)
+    getArtifactEffectiveCost(artifactCardName) {
+        // Check for special artifacts with dynamic costs
+        if (artifactCardName === 'FutureTechLaserCannon' && window.futureTechLaserCannonEffect) {
+            return window.futureTechLaserCannonEffect.calculateEffectiveCost();
+        }
+        
+        // Default: return base cost from card database
+        const artifactInfo = getCardInfo(artifactCardName);
+        return artifactInfo?.cost || 0;
+    }
+    
     // Add an artifact to a hero's equipment
     addArtifactToHero(heroPosition, artifactCardName) {
         // Validate position
@@ -58,7 +70,7 @@ export class HeroEquipmentManager {
         }
         
         // Check if player can afford it
-        const artifactCost = artifactInfo.cost || 0;
+        const artifactCost = this.getArtifactEffectiveCost(artifactCardName);
         if (this.goldManager) {
             const playerGold = this.goldManager.getPlayerGold();
             if (playerGold < artifactCost) {
@@ -94,6 +106,16 @@ export class HeroEquipmentManager {
         if (artifactCardName === 'SkullNecklace' && 
             window.skullNecklaceEffect) {
             window.skullNecklaceEffect.onEquipmentChange();
+        }
+        // Trigger Future Tech Gun effect update if this is a Future Tech Gun
+        if (artifactCardName === 'FutureTechGun' && 
+            window.futureTechGunEffect) {
+            window.futureTechGunEffect.onEquipmentChange();
+        }
+        // Trigger Future Tech Laser Cannon effect update if this is a Future Tech Laser Cannon
+        if (artifactCardName === 'FutureTechLaserCannon' && 
+            window.futureTechLaserCannonEffect) {
+            window.futureTechLaserCannonEffect.onEquipmentChange();
         }
         
         // Trigger callback
@@ -291,7 +313,7 @@ export class HeroEquipmentManager {
         }
         
         // Check if player can afford it
-        const artifactCost = artifactInfo.cost || 0;
+        const artifactCost = this.getArtifactEffectiveCost(artifactCardName);
         if (this.goldManager) {
             const playerGold = this.goldManager.getPlayerGold();
             if (playerGold < artifactCost) {
@@ -304,6 +326,211 @@ export class HeroEquipmentManager {
         
         // All checks passed
         return { canEquip: true };
+    }
+
+    // Add permanent equipment from battle (no cost, no checks - for ArmsTrade transfers)
+    addPermanentEquipmentFromBattle(heroPosition, artifactCardName) {
+        if (!['left', 'center', 'right'].includes(heroPosition)) {
+            console.warn(`Invalid hero position for permanent equipment: ${heroPosition}`);
+            return { success: false, reason: 'Invalid hero position!' };
+        }
+        
+        // Get artifact info
+        const artifactInfo = getCardInfo(artifactCardName);
+        if (!artifactInfo) {
+            console.warn(`Invalid artifact for permanent equipment: ${artifactCardName}`);
+            return { success: false, reason: 'Invalid artifact!' };
+        }
+        
+        // Check if it's an equip artifact
+        if (!this.isEquipArtifactCard(artifactCardName)) {
+            console.warn(`${artifactCardName} is not an Equip artifact!`);
+            return { success: false, reason: `${artifactCardName} is not an Equip artifact!` };
+        }
+        
+        // Add artifact to hero's equipment (no cost, no checks)
+        const equipmentEntry = {
+            name: artifactCardName,
+            cardName: artifactCardName,
+            cost: 0, // No cost for permanent transfers
+            image: artifactInfo.image || `./Cards/All/${artifactCardName}.png`,
+            equippedAt: Date.now(),
+            source: 'ArmsTrade' // Mark as permanent from ArmsTrade
+        };
+        
+        this.heroEquipment[heroPosition].push(equipmentEntry);
+        
+        console.log(`⚔️ Permanently added ${artifactCardName} to ${heroPosition} hero from ArmsTrade`);
+        
+        // Trigger Ancient Tech effect update if this is an Energy Core
+        if (artifactCardName === 'AncientTechInfiniteEnergyCore' && 
+            window.ancientTechInfiniteEnergyCoreEffect) {
+            window.ancientTechInfiniteEnergyCoreEffect.onEquipmentChange();
+        }
+        // Trigger Skull Necklace effect update if this is a Skull Necklace
+        if (artifactCardName === 'SkullNecklace' && 
+            window.skullNecklaceEffect) {
+            window.skullNecklaceEffect.onEquipmentChange();
+        }
+        // Trigger Future Tech Gun effect update if this is a Future Tech Gun
+        if (artifactCardName === 'FutureTechGun' && 
+            window.futureTechGunEffect) {
+            window.futureTechGunEffect.onEquipmentChange();
+        }
+        // Trigger Future Tech Laser Cannon effect update if this is a Future Tech Laser Cannon
+        if (artifactCardName === 'FutureTechLaserCannon' && 
+            window.futureTechLaserCannonEffect) {
+            window.futureTechLaserCannonEffect.onEquipmentChange();
+        }
+        
+        // Trigger callback
+        if (this.onEquipmentChangeCallback) {
+            this.onEquipmentChangeCallback({
+                type: 'artifact_equipped',
+                heroPosition,
+                artifactName: artifactCardName
+            });
+        }
+        
+        return { success: true };
+    }
+
+    /**
+     * Recalculate equipment bonuses for a hero during battle
+     * This handles all equipment-based stat bonuses including:
+     * - Toras equipment bonus (+20 ATK per equipment)
+     * - Ancient Tech Energy Core bonuses
+     * - Skull Necklace bonuses
+     * - Future Tech Gun bonuses
+     * - Future Tech Laser Cannon bonuses
+     * - Other equipment-specific bonuses
+     * @param {Object} hero - The hero whose equipment bonuses need recalculation
+     * @param {Object} battleManager - Reference to battleManager for graveyard access and display updates
+     */
+    recalculateEquipmentBonuses(hero, battleManager) {
+        if (!hero) {
+            console.warn('⚠️ Cannot recalculate equipment bonuses: invalid hero');
+            return;
+        }
+
+        if (!battleManager) {
+            console.warn('⚠️ Cannot recalculate equipment bonuses: battleManager not provided');
+            return;
+        }
+
+        const heroEquipment = hero.equipment || [];
+        const equipmentCount = heroEquipment.length;
+        
+        // Store the old attack for comparison
+        const oldAttack = hero.atk;
+        
+        // Calculate Toras equipment bonus
+        let torasEquipmentBonus = 0;
+        if (hero.name === 'Toras') {
+            torasEquipmentBonus = equipmentCount * 20;
+        }
+        
+        // Calculate Ancient Tech Infinite Energy Core bonus
+        let energyCoreBonus = 0;
+        const energyCoreCount = heroEquipment.filter(item => {
+            const name = item.name || item.cardName || item;
+            return name === 'AncientTechInfiniteEnergyCore';
+        }).length;
+        
+        if (energyCoreCount > 0) {
+            // Get unique graveyard cards
+            const graveyard = hero.side === 'player' ? battleManager.playerGraveyard : battleManager.opponentGraveyard;
+            const uniqueGraveyardCards = graveyard ? new Set(graveyard).size : 0;
+            energyCoreBonus = uniqueGraveyardCards * 5 * energyCoreCount;
+        }
+        
+        // Calculate Skull Necklace bonus
+        let skullNecklaceBonus = 0;
+        const hasSkullNecklace = heroEquipment.some(item => {
+            const name = item.name || item.cardName || item;
+            return name === 'SkullNecklace';
+        });
+        
+        if (hasSkullNecklace && window.skullNecklaceEffect) {
+            // Trigger recalculation of skull necklace bonus
+            // The effect manager will update the hero's stats
+            try {
+                window.skullNecklaceEffect.onEquipmentChange();
+            } catch (error) {
+                console.warn('Error updating Skull Necklace bonus:', error);
+            }
+        }
+        
+        // Trigger Future Tech Gun recalculation if equipped
+        const hasFutureTechGun = heroEquipment.some(item => {
+            const name = item.name || item.cardName || item;
+            return name === 'FutureTechGun';
+        });
+        
+        if (hasFutureTechGun && window.futureTechGunEffect) {
+            try {
+                window.futureTechGunEffect.onEquipmentChange();
+            } catch (error) {
+                console.warn('Error updating Future Tech Gun bonus:', error);
+            }
+        }
+        
+        // Trigger Future Tech Laser Cannon recalculation if equipped
+        const hasFutureTechLaserCannon = heroEquipment.some(item => {
+            const name = item.name || item.cardName || item;
+            return name === 'FutureTechLaserCannon';
+        });
+        
+        if (hasFutureTechLaserCannon && window.futureTechLaserCannonEffect) {
+            try {
+                window.futureTechLaserCannonEffect.onEquipmentChange();
+            } catch (error) {
+                console.warn('Error updating Future Tech Laser Cannon bonus:', error);
+            }
+        }
+        
+        // Calculate the total equipment bonus
+        const totalEquipmentBonus = torasEquipmentBonus + energyCoreBonus + skullNecklaceBonus;
+        
+        // Get base attack from hero info
+        const heroInfo = getCardInfo(hero.name);
+        const baseAttack = heroInfo ? heroInfo.atk : 10;
+        
+        // Calculate other bonuses that should remain
+        const fightingStacks = hero.getAbilityStackCount('Fighting');
+        const fightingBonus = fightingStacks * 20;
+        
+        // Get permanent bonuses
+        const permanentAttackBonus = hero.attackBonusses || 0;
+        const trulyPermanentAttackBonus = hero.permanentAttackBonusses || 0;
+        const battleAttackBonus = hero.battleAttackBonus || 0;
+        
+        // Recalculate total attack
+        const newAttack = baseAttack + fightingBonus + totalEquipmentBonus + 
+                         permanentAttackBonus + trulyPermanentAttackBonus + battleAttackBonus;
+        
+        // Update hero's attack
+        hero.atk = newAttack;
+        
+        // Log the change
+        if (newAttack !== oldAttack) {
+            const change = newAttack - oldAttack;
+            const changeStr = change > 0 ? `+${change}` : `${change}`;
+            console.log(`⚔️ ${hero.name}'s attack recalculated: ${oldAttack} → ${newAttack} (${changeStr})`);
+            
+            // Add to combat log if significant change
+            if (Math.abs(change) >= 10 && battleManager.addCombatLog) {
+                battleManager.addCombatLog(
+                    `⚔️ ${hero.name}'s equipment grants ${changeStr} attack!`,
+                    hero.side === 'player' ? 'success' : 'error'
+                );
+            }
+        }
+        
+        // Update the hero display
+        if (battleManager.updateHeroDisplay) {
+            battleManager.updateHeroDisplay(hero);
+        }
     }
 }
 

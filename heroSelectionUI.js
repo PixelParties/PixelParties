@@ -814,6 +814,18 @@ export class HeroSelectionUI {
         return canUse.canUse;
     }
 
+    // Check if Riffel effect is currently usable
+    isRiffelEffectUsable(character) {
+        if (character.name !== 'Riffel') return false;
+        
+        if (!window.heroSelection || !window.heroSelection.riffelEffectManager) {
+            return false;
+        }
+        
+        const canUse = window.heroSelection.riffelEffectManager.canUseRiffelEffect();
+        return canUse.canUse;
+    }
+
     // Helper method to get hero stats for display
     getHeroStats(slotPosition) {
         if (!window.heroSelection || !slotPosition) return null;
@@ -974,6 +986,10 @@ export class HeroSelectionUI {
         // Check if this is Kazena and if the effect is usable
         const isKazenaUsable = character.name === 'Kazena' && isDraggable && this.isKazenaEffectUsable(character);
         const kazenaUsableClass = isKazenaUsable ? 'kazena-effect-usable' : '';
+
+        // Check if this is Riffel and if the effect is usable
+        const isRiffelUsable = character.name === 'Riffel' && isDraggable && this.isRiffelEffectUsable(character);
+        const riffelUsableClass = isRiffelUsable ? 'riffel-effect-usable' : '';
         
         let tooltipEvents = '';
         if (showTooltip) {
@@ -1017,6 +1033,8 @@ export class HeroSelectionUI {
                 heroClickEvents = `onclick="window.handleNicolasClick(event, '${slotPosition}', '${character.name}')"`;
             } else if (character.name === 'Kazena') {
                 heroClickEvents = `onclick="window.handleKazenaClick(event, '${slotPosition}', '${character.name}')"`;
+            } else if (character.name === 'Riffel') {
+                heroClickEvents = `onclick="window.handleRiffelClick(event, '${slotPosition}', '${character.name}')"`;
             } else if (character.name === 'Vacarn') {
                 heroClickEvents = `onclick="window.handleVacarnClick(event, '${slotPosition}', '${character.name}')"`;
             } else if (character.name.includes('Waflav')) {  // NEW - Waflav click handling
@@ -1054,10 +1072,10 @@ export class HeroSelectionUI {
                 data-character-name="${character.name}"
                 ${isSelectable && !isDraggable ? `onclick="window.selectCharacterCard(${character.id})"` : ''}
                 ${hoverEvents}>
-                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass} ${character.name === 'Kazena' && isDraggable ? 'kazena-clickable' : ''} ${kazenaUsableClass} ${character.name.includes('Waflav') && isDraggable ? 'waflav-clickable' : ''}">
+                <div class="character-image-container ${character.name === 'Nicolas' && isDraggable ? 'nicolas-clickable' : ''} ${nicolasUsableClass} ${character.name === 'Kazena' && isDraggable ? 'kazena-clickable' : ''} ${kazenaUsableClass} ${character.name === 'Riffel' && isDraggable ? 'riffel-clickable' : ''} ${riffelUsableClass} ${character.name.includes('Waflav') && isDraggable ? 'waflav-clickable' : ''}">
                     <img src="${character.image}" 
                         alt="${character.name}" 
-                        class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''} ${character.name === 'Kazena' && isDraggable ? 'kazena-hero-image' : ''}"
+                        class="character-image ${character.name === 'Nicolas' && isDraggable ? 'nicolas-hero-image' : ''} ${character.name === 'Kazena' && isDraggable ? 'kazena-hero-image' : ''} ${character.name === 'Riffel' && isDraggable ? 'riffel-hero-image' : ''}"
                         ${tooltipEvents}
                         ${heroHoverEvents}
                         ${dragEvents}
@@ -1550,7 +1568,7 @@ function cleanupAllAbilityTooltips() {
 }
 
 // Enhanced team slot drag over handler
-function onTeamSlotDragOver(event, position) {
+async function onTeamSlotDragOver(event, position) {
     // Check if an ability card is being dragged
     if (window.heroSelection && window.heroSelection.heroAbilitiesManager && 
         window.handManager && window.handManager.isHandDragging()) {
@@ -1992,6 +2010,34 @@ function onTeamSlotDragOver(event, position) {
             return;
         }
 
+        // Check if it's a hero-targeting artifact (like SummoningCircle)
+        if (window.artifactHandler) {
+            const canHandle = await window.artifactHandler.canHandleHeroDrop(cardName);
+            if (canHandle) {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                const slot = event.currentTarget;
+                
+                // Clean up tooltip from other slots if we're over a different slot
+                if (currentTooltipSlot && currentTooltipSlot !== slot) {
+                    cleanupAllAbilityTooltips();
+                    if (currentTooltipSlot && currentTooltipSlot.classList) {
+                        currentTooltipSlot.classList.remove('hero-artifact-drop-ready', 'hero-artifact-drop-invalid');
+                    }
+                }
+                
+                // Add visual feedback (optional - you can customize this)
+                slot.classList.add('hero-artifact-drop-ready');
+                slot.classList.remove('hero-artifact-drop-invalid');
+                
+                // Track current slot
+                currentTooltipSlot = slot;
+                
+                return;
+            }
+        }
+
         // Check if it's an ascended hero card
         if (window.ascendedManager && window.ascendedManager.isAscendedHero(cardName)) {
             event.preventDefault();
@@ -2185,6 +2231,19 @@ async function onTeamSlotDrop(event, targetSlot) {
             // Handle equipment drop through heroSelection
             const success = await window.heroSelection.handleEquipArtifactDrop(targetSlot);
             return success;
+        }
+        // Check for hero-targeting artifacts (like SummoningCircle)
+        if (window.artifactHandler) {
+            const canHandle = await window.artifactHandler.canHandleHeroDrop(cardName);
+            if (canHandle) {
+                const success = await window.artifactHandler.handleArtifactHeroDrop(
+                    cardName,
+                    dragState.draggedCardIndex,
+                    targetSlot,
+                    window.heroSelection
+                );
+                return success;
+            }
         }
     }
     
@@ -2702,6 +2761,19 @@ function handleKazenaClick(event, heroPosition, heroName) {
     window.heroSelection.kazenaEffectManager.showKazenaDialog(window.heroSelection, heroPosition);
 }
 
+// Riffel click handler
+function handleRiffelClick(event, heroPosition, heroName) {
+    event.stopPropagation();
+    
+    // Only handle if this is actually Riffel and we have the effect manager
+    if (heroName !== 'Riffel' || !window.heroSelection?.riffelEffectManager) {
+        return;
+    }
+    
+    // Show Riffel dialog
+    window.heroSelection.riffelEffectManager.showRiffelDialog(window.heroSelection, heroPosition);
+}
+
 function handleVacarnClick(event, heroPosition, heroName) {
     event.stopPropagation();
     
@@ -2736,6 +2808,7 @@ if (typeof window !== 'undefined') {
     window.handleVacarnClick = handleVacarnClick;
     window.handleWaflavClick = handleWaflavClick;
     window.handleKazenaClick = handleKazenaClick;
+    window.handleRiffelClick = handleRiffelClick;
     
     // Creature drag and drop functions
     window.onCreatureDragStart = onCreatureDragStart;

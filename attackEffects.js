@@ -3,6 +3,8 @@ import { TheMastersSwordEffect } from './Artifacts/theMastersSword.js';
 import { registerTheSunSword } from './Artifacts/theSunSword.js';
 import { skullmaelsGreatswordArtifact } from './Artifacts/skullmaelsGreatsword.js';
 import { FutureTechFistsArtifact } from './Artifacts/futureTechFists.js';
+import { FutureTechBazookaEffect } from './Artifacts/futureTechBazooka.js';
+import { FutureTechPotionLauncherEffect } from './Artifacts/futureTechPotionLauncher.js';
 import ArrowSystem from './arrowSystem.js';
 import { registerTheStormblade } from './Artifacts/theStormblade.js';
 
@@ -21,6 +23,8 @@ export class AttackEffectsManager {
         this.sunSwordEffect = null;
         this.skullmaelsGreatswordArtifact = skullmaelsGreatswordArtifact;
         this.futureTechFistsArtifact = new FutureTechFistsArtifact(this.battleManager);
+        this.futureTechBazookaArtifact = new FutureTechBazookaEffect(this.battleManager);
+        this.futureTechPotionLauncherArtifact = new FutureTechPotionLauncherEffect(); 
         this.stormbladeEffect = null;
 
         // Arrow System
@@ -53,10 +57,18 @@ export class AttackEffectsManager {
             handler: this.handleSkullmaelsGreatsword.bind(this)
         });
         
-        // Register FutureTechFists handler
+        // Register FutureTech handlers
         this.registerEffectHandler('FutureTechFists', {
             trigger: 'on_attack_hit',
             handler: this.handleFutureTechFists.bind(this)
+        });
+        this.registerEffectHandler('FutureTechBazooka', {
+            trigger: 'on_attack_hit',
+            handler: this.handleFutureTechBazooka.bind(this)
+        });
+        this.registerEffectHandler('FutureTechPotionLauncher', { 
+            trigger: 'on_attack_hit',
+            handler: this.handleFutureTechPotionLauncher.bind(this)
         });
         
         // Register Equip item effects
@@ -146,6 +158,26 @@ export class AttackEffectsManager {
         if (this.futureTechFistsArtifact) {
             await this.futureTechFistsArtifact.handleFutureTechFistsEffect(
                 attacker, defender, damage, equipmentItem
+            );
+        }
+    }
+    
+    // Handler for FutureTechBazooka effect
+    async handleFutureTechBazooka(attacker, defender, damage, equipmentItem) {
+        if (this.futureTechBazookaArtifact) {
+            await this.futureTechBazookaArtifact.handleFutureTechBazookaEffect(
+                attacker, defender, damage, equipmentItem
+            );
+        }
+    }
+    // Handler for FutureTechPotionLauncher effect
+    async handleFutureTechPotionLauncher(attacker, defender, damage, equipmentItem) {
+        if (this.futureTechPotionLauncherArtifact) {
+            await this.futureTechPotionLauncherArtifact.onAttackHit(
+                attacker,
+                defender,
+                damage,
+                this.battleManager
             );
         }
     }
@@ -832,6 +864,11 @@ export class AttackEffectsManager {
         if (this.futureTechFistsArtifact) {
             this.futureTechFistsArtifact.init();
         }
+        
+        // Initialize FutureTechBazooka artifact
+        if (this.futureTechBazookaArtifact) {
+            this.futureTechBazookaArtifact.init();
+        }
 
         // Reset for new battle
         this.resetForNewBattle();
@@ -859,6 +896,14 @@ export class AttackEffectsManager {
         if (this.futureTechFistsArtifact) {
             this.futureTechFistsArtifact.cleanup();
             this.futureTechFistsArtifact = null;
+        }
+        
+        if (this.futureTechBazookaArtifact) {
+            this.futureTechBazookaArtifact.cleanup();
+            this.futureTechBazookaArtifact = null;
+        }
+        if (this.futureTechPotionLauncherArtifact) {
+            this.futureTechPotionLauncherArtifact = null;
         }
 
         // Arrow System cleanup

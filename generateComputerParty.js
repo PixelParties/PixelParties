@@ -615,7 +615,8 @@ export async function selectComputerTeamForBattle(roomRef, currentTurn = 1, guar
                     position, 
                     reorderedAbilities,
                     reorderedEquipment,
-                    uniqueGraveyardCards
+                    uniqueGraveyardCards,
+                    selectedTeam.graveyard || []
                 );
                                 
                 const heroInstance = new Hero(heroData, position, 'opponent', 'cpu');
@@ -764,10 +765,11 @@ export async function saveComputerTeamAfterBattle(roomRef, teamKey, deck, hand, 
  * Merge permanent creatures from battle into CPU team's existing creatures
  */
 export function mergePermanentCreaturesForCPU(existingCreatures, permanentGuardians, permanentCaptures, cpuAbsoluteSide) {
+    // FIXED: Deep copy using JSON.parse/stringify to prevent object reference sharing
     const mergedCreatures = {
-        left: [...(existingCreatures?.left || [])],
-        center: [...(existingCreatures?.center || [])],
-        right: [...(existingCreatures?.right || [])]
+        left: JSON.parse(JSON.stringify(existingCreatures?.left || [])),
+        center: JSON.parse(JSON.stringify(existingCreatures?.center || [])),
+        right: JSON.parse(JSON.stringify(existingCreatures?.right || []))
     };
     
     const cpuGuardians = permanentGuardians.filter(g => g.heroAbsoluteSide === cpuAbsoluteSide);
@@ -841,6 +843,68 @@ export function mergePermanentCreaturesForCPU(existingCreatures, permanentGuardi
     return mergedCreatures;
 }
 
+/**
+ * Merge permanent Arms Trade equipment from battle into CPU team's existing equipment
+ */
+export function mergePermanentArmsTradeEquipmentForCPU(existingEquipment, permanentArmsTradeEquipment, cpuAbsoluteSide, cpuFormation = null) {
+    // FIXED: Deep copy using JSON.parse/stringify to prevent object reference sharing
+    const mergedEquipment = {
+        left: JSON.parse(JSON.stringify(existingEquipment?.left || [])),
+        center: JSON.parse(JSON.stringify(existingEquipment?.center || [])),
+        right: JSON.parse(JSON.stringify(existingEquipment?.right || []))
+    };
+    
+    // Filter for CPU side equipment only
+    const cpuEquipment = permanentArmsTradeEquipment.filter(e => e.heroAbsoluteSide === cpuAbsoluteSide);
+    
+    cpuEquipment.forEach(equipmentData => {
+        // CRITICAL FIX: Map from randomized battle position to original Firebase position
+        // During battle, heroes are in randomized positions, but we need to save equipment
+        // to the hero's original position in Firebase
+        let targetPosition = equipmentData.heroPosition; // Default to battle position
+        
+        if (cpuFormation && equipmentData.heroName) {
+            // Find the hero's original position in Firebase by name
+            const originalPosition = ['left', 'center', 'right'].find(pos => 
+                cpuFormation[pos] && cpuFormation[pos].name === equipmentData.heroName
+            );
+            
+            if (originalPosition) {
+                targetPosition = originalPosition;
+                console.log(`🔄 Mapping ${equipmentData.heroName} from battle position "${equipmentData.heroPosition}" to original position "${originalPosition}"`);
+            } else {
+                console.warn(`⚠️ Could not find original position for hero "${equipmentData.heroName}", using battle position "${equipmentData.heroPosition}"`);
+            }
+        }
+        
+        if (!mergedEquipment[targetPosition]) {
+            mergedEquipment[targetPosition] = [];
+        }
+        
+        // Check for duplicates (same artifact equipped at same time)
+        const isDuplicate = mergedEquipment[targetPosition].some(e => {
+            const existingName = e.name || e.cardName;
+            return existingName === equipmentData.artifactName && 
+                   e.equippedAt === equipmentData.equippedAt &&
+                   e.source === 'ArmsTrade';
+        });
+        
+        if (!isDuplicate) {
+            mergedEquipment[targetPosition].push({
+                name: equipmentData.artifactName,
+                cardName: equipmentData.artifactName,
+                equippedAt: equipmentData.equippedAt,
+                source: 'ArmsTrade',
+                isPermanent: true
+            });
+            
+            console.log(`⚔️ Added ${equipmentData.artifactName} to ${targetPosition} for hero ${equipmentData.heroName} (from Arms Trade)`);
+        }
+    });
+    
+    return mergedEquipment;
+}
+
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
@@ -910,7 +974,8 @@ function getObtainableHeroes() {
         'Monia', 'Nicolas', 'Toras', 'Sid', 'Darge', 
         'Vacarn', 'Tharx', 'Semi', 'Kazena', 'Heinz',
         'Kyli', 'Nomu', 'Beato', 'Waflav', 'Luna', 'Ghuanjun',
-        'Mary', 'Carris', 'Nao', 'Thep', 'Gabby'
+        'Mary', 'Carris', 'Nao', 'Thep', 'Gabby', 'Ingo',
+        'Riffel'
     ];
     
     return allHeroNames.filter(heroName => {

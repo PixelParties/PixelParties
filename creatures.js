@@ -23,6 +23,11 @@ export class HeroCreatureManager {
         // Sacrifice event callback (will be set by GraveWorm system)
         this.onCreatureSacrificed = null;
         
+        // ===== INGO INTEGRATION: Creature summon callback =====
+        // Callback triggered when a creature is successfully added (for Ingo and other hero effects)
+        this.onCreatureAdded = null;
+        // ======================================================
+        
         // Drag state for creature reordering
         this.dragState = {
             isDragging: false,
@@ -160,6 +165,13 @@ export class HeroCreatureManager {
         if (this.onStateChange) {
             this.onStateChange();
         }
+
+        // ===== INGO INTEGRATION: Trigger creature added callback =====
+        // This allows Ingo (and other hero effects) to respond to creature summons
+        if (this.onCreatureAdded) {
+            this.onCreatureAdded(heroPosition, cardInfo);
+        }
+        // ==============================================================
 
         return true;
     }

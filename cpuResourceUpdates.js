@@ -200,6 +200,7 @@ function calculateComputerGoldBreakdown(team, battleResult, difficulty = 'Normal
         battleBonus: 0,
         wealthBonus: 0,
         semiBonus: 0,
+        ingoBonus: 0,
         sapphireBonus: 0,
         rainbowsArrowBonus: 0,
         multiplier: 1.0,
@@ -242,12 +243,36 @@ function calculateComputerGoldBreakdown(team, battleResult, difficulty = 'Normal
     }
 
     if (team.formation) {
+        let hasIngo = false;
+        
         ['left', 'center', 'right'].forEach(position => {
             const hero = team.formation[position];
-            if (hero && hero.name === 'Semi') {
-                breakdown.semiBonus = 2;
+            if (hero) {
+                if (hero.name === 'Semi') {
+                    breakdown.semiBonus = 6;
+                }
+                if (hero.name === 'Ingo') {
+                    hasIngo = true;
+                }
             }
         });
+        
+        // Calculate Ingo bonus: +1 gold per creature (or +2 on Hard difficulty)
+        if (hasIngo && team.creatures) {
+            let totalCreatures = 0;
+            
+            ['left', 'center', 'right'].forEach(position => {
+                const creatures = team.creatures[position];
+                if (creatures && Array.isArray(creatures)) {
+                    totalCreatures += creatures.length;
+                }
+            });
+            
+            if (totalCreatures > 0) {
+                const goldPerCreature = difficulty === 'Hard' ? 2 : 1;
+                breakdown.ingoBonus = totalCreatures * goldPerCreature;
+            }
+        }
     }
 
     if (team.magicSapphiresUsed) {
@@ -275,7 +300,7 @@ function calculateComputerGoldBreakdown(team, battleResult, difficulty = 'Normal
     }
 
     breakdown.total = breakdown.baseGold + breakdown.battleBonus + breakdown.wealthBonus + 
-                     breakdown.semiBonus + breakdown.sapphireBonus + breakdown.rainbowsArrowBonus;
+                     breakdown.semiBonus + breakdown.ingoBonus + breakdown.sapphireBonus + breakdown.rainbowsArrowBonus;
 
     // Apply difficulty-based gold multiplier
     breakdown.multiplier = getDifficultyValue(difficulty, 'resources', 'goldGainMultiplier');

@@ -42,7 +42,7 @@ export async function processComputerCreaturesAfterBattle(roomRef) {
                 }).length;
 
                 // Calculate evolution chance (difficulty-based base + 10% per CuteCrown)
-                const baseChance = getDifficultyValue(difficulty, 'creatures', 'cuteBirdEvolution').baseChance;
+                const baseChance = getDifficultyValue(difficulty, 'creatures', 'cuteBirdEvolution', 'baseChance');
                 const evolutionChance = baseChance + (cuteCrownCount * 0.10);
 
                 // Process each creature in reverse order

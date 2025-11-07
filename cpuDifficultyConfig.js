@@ -75,6 +75,18 @@ export const DIFFICULTY_CONFIG = {
                 Hard: 14
             }
         },
+        riffel: {
+            millingMultiplier: {
+                Easy: 0.6,
+                Normal: 0.9,
+                Hard: 1.5
+            },
+            millingCap: {
+                Easy: 4,
+                Normal: 6,
+                Hard: 10
+            }
+        },
         vacarn: {
             summonChance: {
                 Easy: 0.80,   // 80%
@@ -128,30 +140,40 @@ export const DIFFICULTY_CONFIG = {
 
 /**
  * Get configuration value for a specific difficulty
+ * Supports variable-depth paths for nested configuration
  * @param {string} difficulty - 'Easy', 'Normal', or 'Hard'
- * @param {string} category - Top-level category (e.g., 'potions')
- * @param {string} setting - Setting name (e.g., 'baseUsages')
+ * @param {...string} path - Path segments to navigate (e.g., 'potions', 'baseUsages' OR 'creatures', 'cuteBirdEvolution', 'baseChance')
  * @returns {*} Configuration value
  */
-export function getDifficultyValue(difficulty, category, setting) {
+export function getDifficultyValue(difficulty, ...path) {
     if (!difficulty) difficulty = 'Normal'; // Default to Normal
     
-    const categoryConfig = DIFFICULTY_CONFIG[category];
-    if (!categoryConfig) {
-        console.error(`Unknown difficulty category: ${category}`);
+    if (path.length === 0) {
+        console.error('getDifficultyValue: No path provided');
         return null;
     }
 
-    const settingConfig = categoryConfig[setting];
-    if (!settingConfig) {
-        console.error(`Unknown difficulty setting: ${category}.${setting}`);
-        return null;
+    // Navigate through the path
+    let current = DIFFICULTY_CONFIG;
+    let pathStr = '';
+    
+    for (let i = 0; i < path.length; i++) {
+        const segment = path[i];
+        pathStr += (i === 0 ? '' : '.') + segment;
+        
+        if (!current[segment]) {
+            console.error(`Unknown difficulty path segment: ${pathStr}`);
+            return null;
+        }
+        
+        current = current[segment];
     }
 
-    const value = settingConfig[difficulty];
+    // Now current should be the object containing difficulty levels
+    const value = current[difficulty];
     if (value === undefined) {
-        console.error(`Unknown difficulty level: ${difficulty} for ${category}.${setting}`);
-        return settingConfig['Normal']; // Fallback to Normal
+        console.error(`Unknown difficulty level: ${difficulty} for ${pathStr}`);
+        return current['Normal']; // Fallback to Normal
     }
 
     return value;
@@ -165,4 +187,35 @@ export function getDifficultyValue(difficulty, category, setting) {
 export function validateDifficulty(difficulty) {
     const valid = ['Easy', 'Normal', 'Hard'];
     return valid.includes(difficulty) ? difficulty : 'Normal';
+}
+/**
+ * Get hero effect configuration value for a specific difficulty
+ * Handles the 3-level nesting: heroEffects.heroName.effectType[difficulty]
+ * @param {string} difficulty - 'Easy', 'Normal', or 'Hard'
+ * @param {string} heroName - Hero name (e.g., 'heinz', 'vacarn', 'luna')
+ * @param {string} effectType - Effect type (e.g., 'millingMultiplier', 'summonChance')
+ * @returns {*} Configuration value
+ */
+export function getHeroEffectValue(difficulty, heroName, effectType) {
+    if (!difficulty) difficulty = 'Normal';
+    
+    const heroConfig = DIFFICULTY_CONFIG.heroEffects?.[heroName];
+    if (!heroConfig) {
+        console.error(`Unknown hero: ${heroName} in heroEffects`);
+        return null;
+    }
+
+    const effectConfig = heroConfig[effectType];
+    if (!effectConfig) {
+        console.error(`Unknown effect type: ${effectType} for hero ${heroName}`);
+        return null;
+    }
+
+    const value = effectConfig[difficulty];
+    if (value === undefined) {
+        console.error(`Unknown difficulty level: ${difficulty} for heroEffects.${heroName}.${effectType}`);
+        return effectConfig['Normal']; // Fallback to Normal
+    }
+
+    return value;
 }

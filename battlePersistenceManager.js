@@ -223,21 +223,21 @@ export class BattlePersistenceManager {
             currentTurn: checkpoint.battleState?.currentTurn,
             turnInProgress: checkpoint.battleState?.turnInProgress,
 
-            // Add hand data
-            playerHand: checkpoint.battleState?.playerHand || [],
-            opponentHand: checkpoint.battleState?.opponentHand || [],
+            // Add hand data (now stored by absoluteSide)
+            playerHand: checkpoint.battleState?.hostHand || checkpoint.battleState?.playerHand || [],
+            opponentHand: checkpoint.battleState?.guestHand || checkpoint.battleState?.opponentHand || [],
             
-            // Or if stored differently in checkpoint:
-            hostHand: checkpoint.hands?.host || [],
-            guestHand: checkpoint.hands?.guest || [],
+            // Also keep the absoluteSide versions for compatibility
+            hostHand: checkpoint.battleState?.hostHand || [],
+            guestHand: checkpoint.battleState?.guestHand || [],
             
-            // Heroes in legacy format
-            hostHeroes: checkpoint.heroes?.player || {},
-            guestHeroes: checkpoint.heroes?.opponent || {},
+            // Heroes in legacy format (now stored by absoluteSide)
+            hostHeroes: checkpoint.heroes?.host || checkpoint.heroes?.player || {},
+            guestHeroes: checkpoint.heroes?.guest || checkpoint.heroes?.opponent || {},
             
-            // Formations
-            hostFormation: checkpoint.formations?.player,
-            guestFormation: checkpoint.formations?.opponent,
+            // Formations (now stored by absoluteSide)
+            hostFormation: checkpoint.formations?.host || checkpoint.formations?.player,
+            guestFormation: checkpoint.formations?.guest || checkpoint.formations?.opponent,
             
             // Other data
             battleLog: checkpoint.battleLog || [],
@@ -290,11 +290,8 @@ export class BattlePersistenceManager {
         
         const allHeroes = this.checkpointSystem.captureAllHeroStates();
         
-        if (this.isHost) {
-            return absoluteSide === 'host' ? allHeroes.player : allHeroes.opponent;
-        } else {
-            return absoluteSide === 'guest' ? allHeroes.player : allHeroes.opponent;
-        }
+        // allHeroes now has .host and .guest properties, not .player and .opponent
+        return allHeroes[absoluteSide] || {};
     }
 
     /**
@@ -307,11 +304,8 @@ export class BattlePersistenceManager {
         
         const formations = this.checkpointSystem.captureFormations();
         
-        if (this.isHost) {
-            return absoluteSide === 'host' ? formations.player : formations.opponent;
-        } else {
-            return absoluteSide === 'guest' ? formations.player : formations.opponent;
-        }
+        // formations now has .host and .guest properties, not .player and .opponent
+        return formations[absoluteSide] || {};
     }
 
     /**

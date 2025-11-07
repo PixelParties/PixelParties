@@ -45,6 +45,9 @@ import HealSpell from './Spells/heal.js';
 import CureSpell from './Spells/cure.js';
 import ForcefulRevivalSpell from './Spells/forcefulRevival.js';
 import InfightingSpell from './Spells/infighting.js';
+import SoulTransmigrationRitualSpell from './Spells/soulTransmigrationRitual.js';
+import ArmsTradeSpell from './Spells/armsTrade.js';
+import FutureTechBarrageSpell from './Spells/futureTechBarrage.js';
 
 
 
@@ -242,6 +245,18 @@ export class BattleSpellSystem {
         // Register Infighting
         const infighting = new InfightingSpell(this.battleManager);
         this.spellImplementations.set('Infighting', infighting);
+
+        // Register the spell
+        const soulRitualSpell = new SoulTransmigrationRitualSpell(battleManager);
+        this.spellImplementations.set('SoulTransmigrationRitual', soulRitualSpell);
+
+        // Register ArmsTrade (Fighting spell)
+        const armsTrade = new ArmsTradeSpell(this.battleManager);
+        this.spellImplementations.set('ArmsTrade', armsTrade);
+
+        // Register FutureTechBarrage (Fighting spell)
+        const futureTechBarrage = new FutureTechBarrageSpell(this.battleManager);
+        this.spellImplementations.set('FutureTechBarrage', futureTechBarrage);
     }
 
     // ============================================

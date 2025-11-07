@@ -42,7 +42,9 @@ export class PotionHandler {
             'OverflowingChalice',
             'PlanetInABottle',
             'TeleportationPowder',
-            'PunchInTheBox'
+            'PunchInTheBox',
+            'FireBomb',
+            'FutureTechBomb'
         ];
         
         return knownPotions.includes(cardName);
@@ -213,7 +215,21 @@ export class PotionHandler {
 
             // ===== NORMAL POTION HANDLING (ALL OTHER POTIONS) =====
             // Add potion effect to active effects list for battle
-            this.addPotionEffect(cardName);
+            // For FutureTechBomb, capture graveyard count when potion is used
+            let potionMetadata = {};
+            if (cardName === 'FutureTechBomb') {
+                if (heroSelection.graveyardManager) {
+                    const graveyardCount = heroSelection.graveyardManager.getCardCount('FutureTechBomb');
+                    potionMetadata.graveyardCount = graveyardCount;
+                    console.log(`💣 FutureTechBomb used with ${graveyardCount} copies in graveyard`);
+                } else {
+                    console.warn('No graveyard manager available for FutureTechBomb');
+                    potionMetadata.graveyardCount = 1; // Default to minimum
+                }
+            }
+
+            // Add potion effect to active effects list for battle
+            this.addPotionEffect(cardName, potionMetadata);
 
             // Draw 1 card from deck (normal potion behavior)
             if (heroSelection.handManager && heroSelection.deckManager) {
@@ -245,11 +261,12 @@ export class PotionHandler {
     // ===== PERSISTENT POTION EFFECTS SYSTEM =====
 
     // Add a potion effect to the active effects list
-    addPotionEffect(potionName) {
+    addPotionEffect(potionName, metadata = {}) {
         const potionEffect = {
             name: potionName,
             addedAt: Date.now(),
-            id: this.generateEffectId()
+            id: this.generateEffectId(),
+            ...metadata  // Include metadata like graveyard count
         };
         
         this.activePotionEffects.push(potionEffect);
@@ -936,8 +953,14 @@ export class PotionHandler {
                     const fireBombPotion = new FireBombPotion();
                     await fireBombPotion.guest_handleVisualEffects(data, battleManager);
                     break;
+
+                case 'FutureTechBomb':
+                    const { FutureTechBombPotion } = await import('./Potions/futureTechBomb.js');
+                    const futureTechBombPotion = new FutureTechBombPotion();
+                    await futureTechBombPotion.guest_handleVisualEffects(data, battleManager);
+                    break;
                     
-                // Add more potion cases as needed
+                
                 default:
                     break;
             }
@@ -1612,7 +1635,8 @@ export class PotionHandler {
             'BoulderInABottle': 'ally_heroes_only',
             'PoisonVial': 'enemy_all',
             'LifeSerum': 'ally_heroes_only',
-            'ElixirOfStrength': 'ally_heroes_only'
+            'ElixirOfStrength': 'ally_heroes_only',
+            'FutureTechBomb': 'enemy_all' 
         };
         
         return targetTypes[potionName] || 'enemy_all';
@@ -1809,10 +1833,35 @@ export class PotionHandler {
 
             case 'FireBomb':
                 return await this.handleFireBombEffects(effects, playerRole, battleManager);
+
+            case 'FutureTechBomb': 
+                return await this.handleFutureTechBombEffects(effects, playerRole, battleManager);
                 
             // Add other potion types here as they get battle effects
             default:
                 return 0;
+        }
+    }
+
+    async handleFutureTechBombEffects(effects, playerRole, battleManager) {
+        try {
+            const { FutureTechBombPotion } = await import('./Potions/futureTechBomb.js');
+            const futureTechBombPotion = new FutureTechBombPotion();
+            
+            // NOTE: FutureTechBomb sends its own visual sync (with graveyardCount) 
+            // inside handlePotionEffectsForPlayer, so we don't send it here
+            
+            const effectsProcessed = await futureTechBombPotion.handlePotionEffectsForPlayer(
+                effects, 
+                playerRole, 
+                battleManager
+            );
+            
+            return effectsProcessed;
+            
+        } catch (error) {
+            console.error('Error handling FutureTechBomb effects:', error);
+            return 0;
         }
     }
 

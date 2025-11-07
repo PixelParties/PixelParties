@@ -21,7 +21,8 @@ export class ExperimentalPotionPotion {
                 .map(potion => potion.name)
                 .filter(name => name !== 'ExperimentalPotion',  // Can't select itself
                                         'ElixirOfQuickness',   // No battle effect (only draws cards)
-                                        'PlanetInABottle'  );
+                                        'PlanetInABottle',
+                                        'MagneticPotion');
             
             return potionNames;
         } catch (error) {

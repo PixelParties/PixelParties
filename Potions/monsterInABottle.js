@@ -70,7 +70,7 @@ export class MonsterInABottlePotion {
             }
         }
 
-        // 🔧 NEW: Send network sync for created creatures
+        // Send network sync for created creatures
         if (battleManager.isAuthoritative && creaturesCreated.length > 0) {
             battleManager.sendBattleUpdate('monster_bottle_creatures_created', {
                 creaturesCreated: creaturesCreated,
